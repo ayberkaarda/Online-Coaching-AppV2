@@ -7,6 +7,9 @@ export default function MessagesTab({ targetId, currentUserId, userRole, selecte
   const [newMessage, setNewMessage] = useState('');
   const [adminId, setAdminId] = useState(null);
   const messagesEndRef = useRef(null);
+  
+  // 1. Çevrimiçi kullanıcıları tutacağımız state
+  const [onlineUsers, setOnlineUsers] = useState({});
 
   // Öğrenci için Admin'in ID'sini bul
   useEffect(() => {
@@ -16,9 +19,43 @@ export default function MessagesTab({ targetId, currentUserId, userRole, selecte
     }
   }, [userRole]);
 
+  // Sohbet edilen kişinin ID'sini belirle
+  const chatPartnerId = userRole === 'admin' ? targetId : adminId;
+
+  // 2. Supabase Presence (Gerçek Zamanlı Takip)
+  useEffect(() => {
+    if (!currentUserId) return;
+
+    const presenceChannel = supabase.channel('global-presence', {
+      config: { presence: { key: currentUserId } },
+    });
+
+    presenceChannel
+      .on('presence', { event: 'sync' }, () => {
+        const state = presenceChannel.presenceState();
+        setOnlineUsers(state);
+      })
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          await presenceChannel.track({
+            user_id: currentUserId,
+            online_at: new Date().toISOString(),
+          });
+        }
+      });
+
+    return () => {
+      supabase.removeChannel(presenceChannel);
+    };
+  }, [currentUserId]);
+
+  // 3. Karşı taraftaki kişinin çevrimiçi olup olmadığını kontrol et
+  const isTargetOnline = Object.values(onlineUsers).some(presenceArray => 
+    presenceArray.some(p => p.user_id === chatPartnerId)
+  );
+
   // Mesajları Çek ve Supabase Realtime (Canlı) Dinlemeyi Başlat
   useEffect(() => {
-    const chatPartnerId = userRole === 'admin' ? targetId : adminId;
     if (!currentUserId || !chatPartnerId) return;
 
     const fetchMessages = async () => {
@@ -48,7 +85,7 @@ export default function MessagesTab({ targetId, currentUserId, userRole, selecte
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [currentUserId, targetId, adminId, userRole]);
+  }, [currentUserId, chatPartnerId]);
 
   const scrollToBottom = () => {
     setTimeout(() => {
@@ -60,7 +97,6 @@ export default function MessagesTab({ targetId, currentUserId, userRole, selecte
     e.preventDefault();
     if (!newMessage.trim()) return;
     
-    const chatPartnerId = userRole === 'admin' ? targetId : adminId;
     if (!chatPartnerId) return alert("Sohbet edilecek kişi bulunamadı.");
 
     const msgData = {
@@ -80,11 +116,29 @@ export default function MessagesTab({ targetId, currentUserId, userRole, selecte
   return (
     <div className="flex flex-col h-[500px] bg-gray-50 dark:bg-[#121212] rounded-2xl border border-gray-200 dark:border-zinc-800 overflow-hidden shadow-inner">
       {/* Sohbet Başlığı */}
-      <div className="p-4 bg-white dark:bg-[#16161d] border-b border-gray-200 dark:border-zinc-800 flex items-center gap-3">
-        <div className="w-3 h-3 rounded-full bg-emerald-500 animate-pulse"></div>
+      <div className="p-4 bg-white dark:bg-[#16161d] border-b border-gray-200 dark:border-zinc-800 flex items-center justify-between">
         <h4 className="font-bold text-sm text-gray-800 dark:text-zinc-200">
           {userRole === 'admin' ? "Öğrenci ile Sohbet" : "Koç ile Sohbet"}
         </h4>
+        
+        {/* 4. Dinamik Çevrimiçi/Çevrimdışı Durum Göstergesi */}
+        <div className="flex items-center gap-1.5">
+          <span className="relative flex h-2.5 w-2.5">
+            {isTargetOnline ? (
+              <>
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+              </>
+            ) : (
+              <>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
+              </>
+            )}
+          </span>
+          <span className={`text-xs font-bold ${isTargetOnline ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+            {isTargetOnline ? 'Çevrimiçi' : 'Çevrimdışı'}
+          </span>
+        </div>
       </div>
 
       {/* Mesaj Kutusu */}
