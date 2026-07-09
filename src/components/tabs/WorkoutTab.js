@@ -7,10 +7,7 @@ export default function WorkoutTab({ targetId, currentUserId, userRole, selected
   const [exerciseDB, setExerciseDB] = useState([]);
   const [workoutData, setWorkoutData] = useState(DAYS.reduce((a, d) => ({ ...a, [d]: '' }), {}));
   const [workoutLogs, setWorkoutLogs] = useState([]);
-  
-  // Akıllı Antrenör State'leri
   const [smartSplit, setSmartSplit] = useState('');
-  const [aiPrompt, setAiPrompt] = useState('');
   const [recommenderFilter, setRecommenderFilter] = useState('');
 
   // Gym Mode States
@@ -61,124 +58,43 @@ export default function WorkoutTab({ targetId, currentUserId, userRole, selected
     alert("Antrenman Programı başarıyla atandı!");
   };
 
-  // 🤖 GELİŞMİŞ HİPERTROFİ MOTORU VE NLP (Doğal Dil İşleme)
   const generateSmartWorkout = () => {
     if (!smartSplit) return alert("Lütfen bir şablon seçin!");
-
-    // 1. NLP: Metni Analiz Et ve Dinlenme Günlerini Çıkar
-    const promptLower = aiPrompt.toLowerCase();
-    const restKeywords = ['yok', 'dinlenme', 'off', 'boş', 'yapmayacağım', 'yapmicam', 'rest'];
-    let userRestDays = [];
-
-    DAYS.forEach(day => {
-      const dLower = day.toLowerCase();
-      if (promptLower.includes(dLower)) {
-         const index = promptLower.indexOf(dLower);
-         const context = promptLower.substring(index, index + 30); // Gün adından sonraki 30 karaktere bak
-         const isRest = restKeywords.some(kw => context.includes(kw));
-         if (isRest) userRestDays.push(day);
-      }
-    });
-
-    // Varsayılan Dinlenme Günleri (Eğer Prompt girilmediyse)
-    if (userRestDays.length === 0) {
-      if (smartSplit === 'ppl') userRestDays = ['Perşembe', 'Pazar'];
-      if (smartSplit === 'upper_lower') userRestDays = ['Çarşamba', 'Cumartesi', 'Pazar'];
-      if (smartSplit === 'torso_limbs') userRestDays = ['Çarşamba', 'Cumartesi', 'Pazar'];
-      if (smartSplit === 'ppl_ul') userRestDays = ['Çarşamba', 'Pazar'];
-    }
-
-    // 2. Vücut Geliştirme Altın Standart Hareket Kütüphanesi (Mekanik Gerilim ve RIR bazlı)
-    const eliteExercises = {
-      'Push': [
-        { name: "Incline Dumbbell Press", sets: "4x8", note: "RIR 1-2" },
-        { name: "Flat Barbell Bench Press", sets: "4x6", note: "RIR 1-2" },
-        { name: "Cable Crossover (High to Low)", sets: "3x12-15", note: "Failure" },
-        { name: "Seated Overhead Dumbbell Press", sets: "4x8-10", note: "RIR 1" },
-        { name: "Lateral Raise (Dumbbell or Cable)", sets: "4x12-15", note: "Beyond Failure (Drop Set)" },
-        { name: "Triceps Rope Pushdown", sets: "4x10-12", note: "Failure (Slow eccentric)" }
-      ],
-      'Pull': [
-        { name: "Lat Pulldown (Wide Grip)", sets: "4x8-10", note: "RIR 1-2" },
-        { name: "Barbell Row (Underhand)", sets: "4x8-10", note: "RIR 1-2" },
-        { name: "Seated Cable Row", sets: "3x10-12", note: "Failure" },
-        { name: "Rear Delt Fly (Machine or Cable)", sets: "3x12-15", note: "Failure" },
-        { name: "Barbell Biceps Curl", sets: "4x8-10", note: "RIR 1" },
-        { name: "Hammer Curl", sets: "3x10-12", note: "Failure" }
-      ],
-      'Legs': [
-        { name: "Barbell Squat", sets: "4x6-8", note: "RIR 2" },
-        { name: "Leg Press (Feet low & close)", sets: "4x10-12", note: "RIR 1-2" },
-        { name: "Romanian Deadlift (Dumbbell)", sets: "4x8-10", note: "RIR 1" },
-        { name: "Leg Extension", sets: "4x12-15", note: "Failure" },
-        { name: "Seated Leg Curl", sets: "4x10-15", note: "Failure" },
-        { name: "Standing Calf Raise", sets: "4x15-20", note: "Failure" }
-      ],
-      'Upper': [
-        { name: "Incline Dumbbell Press", sets: "4x6-8", note: "RIR 1-2" },
-        { name: "Lat Pulldown", sets: "4x8-10", note: "RIR 1-2" },
-        { name: "Machine Chest Fly", sets: "3x10-12", note: "Failure" },
-        { name: "Cable Row", sets: "3x10-12", note: "Failure" },
-        { name: "Lateral Raise", sets: "4x12-15", note: "Failure" },
-        { name: "Overhead Triceps Extension", sets: "3x10-12", note: "Failure" },
-        { name: "Cable Biceps Curl", sets: "3x10-12", note: "Failure" }
-      ],
-      'Lower': [
-        { name: "Leg Press", sets: "4x8-10", note: "RIR 1-2" },
-        { name: "Romanian Deadlift", sets: "4x8-10", note: "RIR 1-2" },
-        { name: "Leg Extension", sets: "3x12-15", note: "Failure" },
-        { name: "Lying Leg Curl", sets: "3x12-15", note: "Failure" },
-        { name: "Seated Calf Raise", sets: "4x15-20", note: "Failure" }
-      ],
-      'Torso': [
-        { name: "Incline Barbell Press", sets: "4x6-8", note: "RIR 1" },
-        { name: "Chest Supported T-Bar Row", sets: "4x8-10", note: "RIR 1-2" },
-        { name: "Pec Deck Fly", sets: "3x10-15", note: "Failure" },
-        { name: "Lat Pulldown (Neutral Grip)", sets: "4x8-10", note: "RIR 1-2" },
-        { name: "Lateral Raise", sets: "4x12-15", note: "Failure" }
-      ],
-      'Limbs': [
-        { name: "Hack Squat", sets: "4x8-10", note: "RIR 1-2" },
-        { name: "Bulgarian Split Squat", sets: "4x8-10", note: "RIR 1" },
-        { name: "Leg Extension", sets: "3x12-15", note: "Failure" },
-        { name: "EZ Bar Preacher Curl", sets: "4x10-12", note: "Failure" },
-        { name: "Skull Crushers", sets: "4x10-12", note: "Failure" },
-        { name: "Calf Raise on Leg Press", sets: "4x15-20", note: "Failure" }
-      ]
+    const splitConfigs = {
+      'ppl': ['Push', 'Pull', 'Legs', 'Dinlenme', 'Push', 'Pull', 'Legs'],
+      'upper_lower': ['Upper', 'Lower', 'Dinlenme', 'Upper', 'Lower', 'Dinlenme', 'Dinlenme'],
+      'torso_limbs': ['Torso', 'Limbs', 'Dinlenme', 'Torso', 'Limbs', 'Dinlenme', 'Dinlenme'],
+      'full_body': ['Full Body', 'Dinlenme', 'Full Body', 'Dinlenme', 'Full Body', 'Dinlenme', 'Dinlenme'],
+      'bro_split': ['Chest', 'Back', 'Legs', 'Shoulders', 'Arms', 'Dinlenme', 'Dinlenme']
+    };
+    const muscleMap = {
+      'Push': ['chest', 'shoulders', 'triceps', 'deltoids'], 'Pull': ['back', 'biceps', 'forearms', 'lats'], 'Legs': ['upper legs', 'lower legs', 'glutes', 'calves', 'quads', 'hamstrings'],
+      'Upper': ['chest', 'back', 'shoulders', 'biceps', 'triceps'], 'Lower': ['upper legs', 'lower legs', 'glutes', 'calves'], 'Torso': ['chest', 'back', 'shoulders', 'abs', 'waist'],
+      'Limbs': ['biceps', 'triceps', 'upper legs', 'lower legs', 'calves', 'forearms'], 'Full Body': ['chest', 'back', 'upper legs', 'shoulders', 'biceps'], 
+      'Chest': ['chest', 'pectorals'], 'Back': ['back', 'lats'], 'Shoulders': ['shoulders', 'deltoids'], 'Arms': ['biceps', 'triceps', 'forearms']
     };
 
-    const splitFlows = {
-      'ppl': ['Push', 'Pull', 'Legs'],
-      'upper_lower': ['Upper', 'Lower'],
-      'torso_limbs': ['Torso', 'Limbs'],
-      'ppl_ul': ['Push', 'Pull', 'Legs', 'Upper', 'Lower']
-    };
-
-    const flow = splitFlows[smartSplit];
+    const daysConfig = splitConfigs[smartSplit];
     const newWorkoutData = {};
-    let flowIndex = 0;
 
-    // 3. Günlere Dağıtım (Kullanıcının Prompt'una Göre Dinamik)
-    DAYS.forEach(day => {
-      if (userRestDays.includes(day)) {
-        newWorkoutData[day] = 'Dinlenme (Aktif Dinlenme / Kardiyo)';
+    daysConfig.forEach((dayType, index) => {
+      const dayName = DAYS[index];
+      if (dayType === 'Dinlenme') {
+        newWorkoutData[dayName] = 'Dinlenme';
       } else {
-        const currentMuscleGroup = flow[flowIndex % flow.length];
-        const exercises = eliteExercises[currentMuscleGroup];
-        
-        const formattedExercises = exercises.map((ex, i) => 
-          `${i + 1}. ${ex.name} - ${ex.sets} | Not: ${ex.note}`
-        ).join('\n');
-
-        newWorkoutData[day] = `--- ${currentMuscleGroup.toUpperCase()} ---\n${formattedExercises}`;
-        flowIndex++;
+        const targetMuscles = muscleMap[dayType] || [];
+        const availableExercises = exerciseDB.filter(ex => targetMuscles.some(m => ex.body_part?.toLowerCase().includes(m) || ex.target?.toLowerCase().includes(m)));
+        if (availableExercises.length > 0) {
+          const shuffled = [...availableExercises].sort(() => 0.5 - Math.random());
+          newWorkoutData[dayName] = shuffled.slice(0, 5).map((ex, i) => `${i + 1}. ${ex.name} - ${i < 2 ? '4x10' : '3x12'}`).join('\n');
+        } else {
+          newWorkoutData[dayName] = `${dayType} Günü (Manuel Hareket Ekle)`;
+        }
       }
     });
-
     setWorkoutData(newWorkoutData);
   };
 
-  // Gym Mode Functions
   const startLiveWorkout = () => {
     const today = getTodayName();
     const todaysPlan = workoutData[today];
@@ -186,16 +102,15 @@ export default function WorkoutTab({ targetId, currentUserId, userRole, selected
     if (!todaysPlan || todaysPlan.toLowerCase().includes('dinlenme') || todaysPlan.trim() === '') {
       return alert("Bugün dinlenme günün veya atanmış bir antrenman yok! Kaslarını dinlendir.");
     }
-
-    const parsed = todaysPlan.split('\n').filter(line => /^\d+\./.test(line)).map(line => {
-      const parts = line.split('-');
-      if (parts.length < 2) return null;
-      const name = parts[0].replace(/^\d+\.\s*/, '').trim();
-      const setsReps = parts[1].split('|')[0].trim().split(/[xX]/);
+    const parsed = todaysPlan.split('\n').map(line => {
+      const lastDash = line.lastIndexOf('-');
+      if (lastDash === -1) return null;
+      const name = line.substring(0, lastDash).replace(/^\d+\.\s*/, '').trim();
+      const setsReps = line.substring(lastDash + 1).trim().split(/[xX]/);
       return { name, sets: parseInt(setsReps[0]) || 3, reps: parseInt(setsReps[1]) || 12 };
     }).filter(Boolean);
 
-    if(parsed.length === 0) return alert("Antrenman formatı uygun değil.");
+    if(parsed.length === 0) return alert("Antrenman formatı uygun değil. Sistem 'Hareket Adı - SetxTekrar' formatı bekliyor.");
 
     setLiveExercises(parsed); setCurrentExIdx(0); setCurrentSet(1); setCompletedSets([]); setLiveWeight(''); setLiveReps(''); setRestTime(0); setIsLiveWorkout(true);
   };
@@ -252,7 +167,7 @@ export default function WorkoutTab({ targetId, currentUserId, userRole, selected
             ) : (
               <>
                 <p className="text-brand-purple font-bold text-sm bg-brand-purple/10 px-3 py-1 rounded-full mb-4 inline-block">Hareket {currentExIdx + 1} / {liveExercises.length}</p>
-                <h2 className="text-2xl font-black text-gray-800 dark:text-zinc-100 mb-2">{currentExercise.name}</h2>
+                <h2 className="text-3xl font-black text-gray-800 dark:text-zinc-100 mb-2">{currentExercise.name}</h2>
                 <p className="text-gray-500 font-bold text-lg mb-8">Set {currentSet} / {currentExercise.sets} <span className="text-brand-purple opacity-50">({currentExercise.reps} Tekrar)</span></p>
 
                 <div className="flex gap-4 mb-6">
@@ -282,32 +197,15 @@ export default function WorkoutTab({ targetId, currentUserId, userRole, selected
       </div>
 
       {userRole === 'admin' && (
-        <div className="flex flex-col md:flex-row items-start gap-4 bg-gradient-to-br from-blue-500/10 to-brand-purple/5 p-5 rounded-2xl border border-blue-500/20 shadow-sm mb-6">
-          <div className="text-4xl pt-2">🤖</div>
-          <div className="flex-1 w-full space-y-3">
-            <div>
-              <p className="text-xs font-black text-blue-600 mb-1 tracking-widest">AKILLI ANTRENÖR ŞABLONU</p>
-              <select value={smartSplit} onChange={(e) => setSmartSplit(e.target.value)} className="w-full p-3 bg-white dark:bg-zinc-900 border border-blue-200 dark:border-zinc-700 rounded-xl text-sm font-bold focus:outline-none focus:border-brand-purple">
-                <option value="">Şablon Seçin...</option>
-                <option value="ppl">Push / Pull / Legs (3 veya 6 Günlük)</option>
-                <option value="upper_lower">Upper / Lower (4 Günlük)</option>
-                <option value="torso_limbs">Torso / Limbs (4 Günlük)</option>
-                <option value="ppl_ul">Push / Pull / Legs / Upper / Lower (5 Günlük)</option>
-              </select>
-            </div>
-            <div>
-              <p className="text-xs font-bold text-gray-500 mb-1">PROGRAM NOTLARI & DİNLENME GÜNLERİ</p>
-              <textarea 
-                value={aiPrompt} 
-                onChange={(e) => setAiPrompt(e.target.value)} 
-                placeholder="Örn: Çarşamba ve Pazar idman yapmayacağım. Omuzlara ağırlık ver..." 
-                className="w-full p-3 bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-xl text-xs focus:outline-none focus:border-brand-purple min-h-[60px]"
-              />
-            </div>
+        <div className="flex items-center gap-3 bg-gradient-to-r from-blue-500/10 to-brand-purple/5 p-4 rounded-2xl border border-blue-500/20 shadow-sm mb-6">
+          <div className="text-2xl">🤖</div>
+          <div className="flex-1">
+            <p className="text-xs font-bold text-blue-600 mb-1">AKILLI ANTRENÖR ŞABLONU</p>
+            <select value={smartSplit} onChange={(e) => setSmartSplit(e.target.value)} className="w-full p-2 bg-white dark:bg-zinc-900 border rounded-lg text-sm focus:outline-none focus:border-brand-purple">
+              <option value="">Şablon Seçin...</option><option value="ppl">Push / Pull / Legs</option><option value="upper_lower">Upper / Lower</option><option value="torso_limbs">Torso / Limbs</option><option value="full_body">Full Body</option><option value="bro_split">Bro Split</option>
+            </select>
           </div>
-          <button onClick={generateSmartWorkout} className="w-full md:w-auto h-full px-8 py-4 bg-blue-600 hover:bg-blue-700 text-white font-black text-sm rounded-xl transition-transform active:scale-95 shadow-md whitespace-nowrap self-end">
-            Oluştur ✨
-          </button>
+          <button onClick={generateSmartWorkout} className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm rounded-xl">Otomatik Oluştur</button>
         </div>
       )}
 
@@ -323,8 +221,8 @@ export default function WorkoutTab({ targetId, currentUserId, userRole, selected
                     <td className={`p-3 font-bold ${userRole === 'student' && isToday ? 'text-brand-purple' : ''}`}>{day} {userRole === 'student' && isToday && <span className="block text-[10px] opacity-70">(Bugün)</span>}</td>
                     <td className="p-2">
                       {userRole === 'admin' ? (
-                        <textarea value={workoutData[day] || ''} onChange={(e) => setWorkoutData(prev => ({...prev, [day]: e.target.value}))} className="w-full p-2 bg-transparent border-transparent hover:border-gray-200 focus:border-brand-purple rounded-lg outline-none min-h-[140px]" />
-                      ) : ( <div className="p-2 whitespace-pre-wrap leading-relaxed">{workoutData[day] || '-'}</div> )}
+                        <textarea value={workoutData[day] || ''} onChange={(e) => setWorkoutData(prev => ({...prev, [day]: e.target.value}))} className="w-full p-2 bg-transparent border-transparent hover:border-gray-200 focus:border-brand-purple rounded-lg outline-none min-h-[120px]" />
+                      ) : ( <div className="p-2 whitespace-pre-wrap">{workoutData[day] || '-'}</div> )}
                     </td>
                   </tr>
                 )
@@ -335,9 +233,9 @@ export default function WorkoutTab({ targetId, currentUserId, userRole, selected
 
         {userRole === 'admin' && (
           <div className="w-full lg:w-1/3 bg-gray-50 dark:bg-zinc-900 border p-5 rounded-2xl h-fit">
-            <h4 className="font-black text-sm mb-4">🔍 KÜTÜPHANEDE ARA (1300+ Hareket)</h4>
-            <input type="text" placeholder="Kas veya Ekipman (Örn: chest)" value={recommenderFilter} onChange={(e) => setRecommenderFilter(e.target.value)} className="w-full p-2 mb-4 rounded-xl border focus:border-brand-purple outline-none" />
-            <div className="space-y-2 max-h-[500px] overflow-y-auto hide-scrollbar">
+            <h4 className="font-black text-sm mb-4">🔍 KÜTÜPHANEDE ARA</h4>
+            <input type="text" placeholder="Kas veya Ekipman" value={recommenderFilter} onChange={(e) => setRecommenderFilter(e.target.value)} className="w-full p-2 mb-4 rounded-xl border focus:border-brand-purple outline-none" />
+            <div className="space-y-2 max-h-[400px] overflow-y-auto hide-scrollbar">
               {exerciseDB.filter(ex => recommenderFilter ? ex.body_part?.toLowerCase().includes(recommenderFilter.toLowerCase()) || ex.target?.toLowerCase().includes(recommenderFilter.toLowerCase()) || ex.equipment?.toLowerCase().includes(recommenderFilter.toLowerCase()) : true).slice(0, 30).map((ex, i) => (
                 <div key={i} className="p-3 bg-white dark:bg-[#16161d] rounded-xl border shadow-sm"><p className="font-bold text-xs">{ex.name}</p><div className="flex gap-2 mt-1 opacity-70"><span className="text-[9px] bg-brand-purple/10 text-brand-purple px-2 rounded">{ex.target || ex.body_part}</span><span className="text-[9px] bg-blue-500/10 text-blue-500 px-2 rounded">{ex.equipment}</span></div></div>
               ))}
@@ -346,7 +244,7 @@ export default function WorkoutTab({ targetId, currentUserId, userRole, selected
         )}
       </div>
 
-      {userRole === 'admin' && <button onClick={handleSaveProgram} className="w-full py-4 bg-brand-purple text-white font-black rounded-xl shadow-md">Antrenman Tablosunu Güncelle</button>}
+      {userRole === 'admin' && <button onClick={handleSaveProgram} className="w-full py-3 bg-brand-purple text-white font-bold rounded-xl shadow-md">Antrenman Tablosunu Güncelle</button>}
 
       <div className="space-y-4 pt-6 border-t dark:border-zinc-800 mt-8">
         <div className="flex justify-between items-center border-b dark:border-zinc-800 pb-3">

@@ -4,6 +4,7 @@ import html2canvas from "html2canvas";
 import { supabase } from "@/lib/supabase";
 
 // Modüllerimizi içeri aktarıyoruz
+import MessagesTab from "./tabs/MessagesTab";
 import StatsTab from "./tabs/StatsTab";
 import AnnouncementsTab from "./tabs/AnnouncementsTab";
 import FormCheckTab from "./tabs/FormCheckTab";
@@ -143,7 +144,7 @@ export function DashboardTabs({ currentUserId, userRole, students }) {
 
       {/* SEKMELER MENÜSÜ */}
       <div className="flex overflow-x-auto hide-scrollbar gap-6 border-b border-gray-200 dark:border-zinc-800 text-sm font-medium pb-2">
-        {['announcements', 'stats', 'formCheck', 'daily', 'nutrition', 'workout'].map((tab) => (
+        {['announcements', 'stats', 'formCheck', 'daily', 'nutrition', 'workout', 'messages'].map((tab) => (
           <button 
             key={tab} onClick={() => setActiveTab(tab)} 
             className={`pb-2 whitespace-nowrap transition-all relative flex items-center gap-2 ${activeTab === tab ? 'text-brand-purple font-bold' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}
@@ -154,6 +155,7 @@ export function DashboardTabs({ currentUserId, userRole, students }) {
             {tab === 'daily' && '📊 Günlük Veriler'}
             {tab === 'nutrition' && '🥗 Beslenme'}
             {tab === 'workout' && '🏋️ Antrenman'}
+            {tab === 'messages' && '💬 Sohbet'}
             {activeTab === tab && <span className="absolute bottom-[-9px] left-0 w-full h-[2px] bg-brand-purple shadow-[0_0_8px_rgba(139,92,246,0.8)]" />}
           </button>
         ))}
@@ -173,6 +175,7 @@ export function DashboardTabs({ currentUserId, userRole, students }) {
             {activeTab === 'daily' && <DailyLogTab {...tabProps} />}
             {activeTab === 'nutrition' && <NutritionTab {...tabProps} />}
             {activeTab === 'workout' && <WorkoutTab {...tabProps} />}
+            {activeTab === 'messages' && <MessagesTab {...tabProps} />}
           </>
         )}
       </div>
