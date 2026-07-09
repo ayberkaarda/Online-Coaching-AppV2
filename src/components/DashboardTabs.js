@@ -3,26 +3,15 @@
 import { useState, useEffect, useRef } from "react";
 import html2canvas from "html2canvas";
 import { supabase } from "@/lib/supabase";
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend,
-  Filler
-} from 'chart.js';
+import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler } from 'chart.js';
 import { Line } from 'react-chartjs-2';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler);
 
+const DAYS = ['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar'];
+
 const downloadCSV = (data, filename, isText = false) => {
-  if (!data || data.length === 0) {
-    alert("İndirilecek veri bulunamadı.");
-    return;
-  }
+  if (!data || data.length === 0) return alert("İndirilecek veri bulunamadı.");
   let csvContent = "\uFEFF";
   if (isText) {
     const formattedText = `"${String(data).replace(/"/g, '""')}"`;
@@ -36,49 +25,40 @@ const downloadCSV = (data, filename, isText = false) => {
   const link = document.createElement("a");
   link.setAttribute("href", URL.createObjectURL(blob));
   link.setAttribute("download", `${filename}.csv`);
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
+  document.body.appendChild(link); link.click(); document.body.removeChild(link);
 };
 
 export function DashboardTabs({ currentUserId, userRole, students }) {
   const [activeTab, setActiveTab] = useState('formCheck');
   const exportRef = useRef(null);
-
+  
   // Arama, Sayfalama, Seçim
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStudentIds, setSelectedStudentIds] = useState([]);
   const [currentPage, setCurrentPage] = useState(0);
   const ITEMS_PER_PAGE = 5;
-
-  // Öncesi/Sonrası (Before/After) State'leri
   const [compareMode, setCompareMode] = useState(false);
   const [beforeImageId, setBeforeImageId] = useState('');
   const [afterImageId, setAfterImageId] = useState('');
-
-  const studentsList = students?.filter(s => s.role !== 'admin') || [];
-  const filteredStudents = studentsList.filter(s => s.full_name.toLowerCase().includes(searchTerm.toLowerCase()));
-  const totalPages = Math.ceil(filteredStudents.length / ITEMS_PER_PAGE);
-  const criticalStudents = studentsList.filter(s => s.current_streak === 0);
-
-  const nextBtn = () => setCurrentPage(p => Math.min(totalPages - 1, p + 1));
-  const prevBtn = () => setCurrentPage(p => Math.max(0, p - 1));
-  const toggleStudent = (id) => setSelectedStudentIds(prev => prev.includes(id) ? prev.filter(sId => sId !== id) : [...prev, id]);
-  const selectAll = () => setSelectedStudentIds(selectedStudentIds.length === filteredStudents.length ? [] : filteredStudents.map(s => s.id));
-
-  const targetId = userRole === 'admin' ? (selectedStudentIds.length === 1 ? selectedStudentIds[0] : null) : currentUserId;
-
-  // Veriler
+  
+  // Veritabanları
   const [fetchedFormChecks, setFetchedFormChecks] = useState([]);
   const [fetchedDailyLogs, setFetchedDailyLogs] = useState([]);
   const [announcements, setAnnouncements] = useState([]);
-  const [templates, setTemplates] = useState([]);
   const [workoutLogs, setWorkoutLogs] = useState([]);
-  const [nutritionPlan, setNutritionPlan] = useState('');
-  const [workoutPlan, setWorkoutPlan] = useState('');
-  const [currentStreak, setCurrentStreak] = useState(0);
+  const [foodDB, setFoodDB] = useState([]);
+  const [exerciseDB, setExerciseDB] = useState([]);
+  
+  // Tablo Yapılı Program State'leri
+  const [nutritionData, setNutritionData] = useState(DAYS.reduce((a, d) => ({ ...a, [d]: { items: '', total: 0 } }), {}));
+  const [workoutData, setWorkoutData] = useState(DAYS.reduce((a, d) => ({ ...a, [d]: '' }), {}));
+  
+  // Akıllı Diyetisyen State'leri
+  const [studentMetrics, setStudentMetrics] = useState({ age: 20, height_cm: 175, weight_kg: 70, gender: 'male', activity_level: 1.55, goal: 'maintain' });
+  const [targetCalories, setTargetCalories] = useState(0);
+  const [targetMacros, setTargetMacros] = useState({ protein: 0, carb: 0, fat: 0 });
 
-  // Form State'leri
+  const [currentStreak, setCurrentStreak] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
   const [weight, setWeight] = useState('');
   const [water, setWater] = useState('');
@@ -86,33 +66,35 @@ export function DashboardTabs({ currentUserId, userRole, students }) {
   const [protein, setProtein] = useState('');
   const [carb, setCarb] = useState('');
   const [fat, setFat] = useState('');
+  
+  // Antrenman Günlüğü State
   const [exerciseName, setExerciseName] = useState('');
   const [liftWeight, setLiftWeight] = useState('');
   const [reps, setReps] = useState('');
   const [rpe, setRpe] = useState('');
 
+  // Önerici State
+  const [recommenderFilter, setRecommenderFilter] = useState('');
+
+  const studentsList = students?.filter(s => s.role !== 'admin') || [];
+  const filteredStudents = studentsList.filter(s => s.full_name.toLowerCase().includes(searchTerm.toLowerCase()));
+  const totalPages = Math.ceil(filteredStudents.length / ITEMS_PER_PAGE);
+  const criticalStudents = studentsList.filter(s => s.current_streak === 0);
+  const targetId = userRole === 'admin' ? (selectedStudentIds.length === 1 ? selectedStudentIds[0] : null) : currentUserId;
+
+  // Temel Veritabanlarını Çek
   useEffect(() => {
-    if (userRole === 'admin') {
-      const fetchTemplates = async () => {
-        const { data } = await supabase.from('program_templates').select('*');
-        setTemplates(data || []);
-      };
-      fetchTemplates();
-    }
+    supabase.from('food_database').select('*').then(({ data }) => setFoodDB(data || []));
+    supabase.from('exercises').select('name, body_part, target, equipment').then(({ data }) => setExerciseDB(data || []));
+  }, []);
 
-    if (!targetId) {
-      setFetchedFormChecks([]); setFetchedDailyLogs([]); setAnnouncements([]); setWorkoutLogs([]); setNutritionPlan(''); setWorkoutPlan('');
-      return;
-    }
-
+  useEffect(() => {
+    if (!targetId) return;
     const fetchData = async () => {
       if (activeTab === 'formCheck' || activeTab === 'stats') {
         const { data } = await supabase.from('form_checks').select('*').eq('student_id', targetId).order('created_at', { ascending: false });
         setFetchedFormChecks(data || []);
-        if (data?.length >= 2) {
-          setBeforeImageId(data[data.length - 1].id);
-          setAfterImageId(data[0].id);
-        }
+        if (data?.length >= 2) { setBeforeImageId(data[data.length - 1].id); setAfterImageId(data[0].id); }
       } else if (activeTab === 'daily') {
         const { data } = await supabase.from('daily_logs').select('*').eq('student_id', targetId).order('log_date', { ascending: false });
         setFetchedDailyLogs(data || []);
@@ -120,68 +102,95 @@ export function DashboardTabs({ currentUserId, userRole, students }) {
         const { data } = await supabase.from('workout_logs').select('*').eq('student_id', targetId).order('created_at', { ascending: false });
         setWorkoutLogs(data || []);
       } else if (activeTab === 'announcements') {
-        const thirtyDaysAgo = new Date(); thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-        const { data } = await supabase.from('notifications').select('*').eq('student_id', targetId).gte('created_at', thirtyDaysAgo.toISOString()).order('created_at', { ascending: false });
+        const d = new Date(); d.setDate(d.getDate() - 30);
+        const { data } = await supabase.from('notifications').select('*').eq('student_id', targetId).gte('created_at', d.toISOString()).order('created_at', { ascending: false });
         setAnnouncements(data || []);
       }
-      
-      const { data: profileData } = await supabase.from('profiles').select('nutrition_plan, workout_plan, current_streak').eq('id', targetId).single();
-      if (profileData) {
-        setNutritionPlan(profileData.nutrition_plan || '');
-        setWorkoutPlan(profileData.workout_plan || '');
-        setCurrentStreak(profileData.current_streak || 0);
+      const { data: p } = await supabase.from('profiles').select('nutrition_plan, workout_plan, current_streak').eq('id', targetId).single();
+      if (p) { 
+        setCurrentStreak(p.current_streak || 0);
+        try { if(p.nutrition_plan) setNutritionData(JSON.parse(p.nutrition_plan)); } catch(e) {}
+        try { if(p.workout_plan) setWorkoutData(JSON.parse(p.workout_plan)); } catch(e) {}
       }
     };
     fetchData();
   }, [activeTab, targetId, userRole]);
 
-  useEffect(() => {
-    if (userRole === 'student' && currentUserId) {
-      const getInitialAnnouncements = async () => {
-        const thirtyDaysAgo = new Date(); thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-        const { data } = await supabase.from('notifications').select('id').eq('student_id', currentUserId).gte('created_at', thirtyDaysAgo.toISOString());
-        setAnnouncements(data || []);
-      };
-      getInitialAnnouncements();
-    }
-  }, [currentUserId, userRole]);
+  // Mifflin-St Jeor Akıllı Diyet Algoritması
+  const calculateDietTarget = () => {
+    const { age, height_cm, weight_kg, gender, activity_level, goal } = studentMetrics;
+    
+    let bmr = (10 * weight_kg) + (6.25 * height_cm) - (5 * age);
+    bmr += gender === 'male' ? 5 : -161;
+    let tdee = bmr * activity_level;
+    
+    let finalCalories = tdee;
+    let pPct = 0.30, cPct = 0.40, fPct = 0.30; // Koruma oranları
 
-  const handleSaveProgram = async (type) => {
-    if (selectedStudentIds.length === 0) return alert("Lütfen programı atamak için en az bir öğrenci seçin!");
-    const updateData = type === 'nutrition' ? { nutrition_plan: nutritionPlan } : { workout_plan: workoutPlan };
-    for (const sId of selectedStudentIds) {
-      await supabase.from('profiles').update(updateData).eq('id', sId);
+    if (goal === 'cut') {
+      finalCalories -= 500;
+      pPct = 0.40; cPct = 0.30; fPct = 0.30; // Definasyonda proteini artır
+    } else if (goal === 'bulk') {
+      finalCalories += 500;
+      pPct = 0.25; cPct = 0.50; fPct = 0.25; // Bulkta karbı fırlat
     }
-    alert(`Program ${selectedStudentIds.length} öğrenciye başarıyla atandı!`);
+    
+    finalCalories = Math.round(finalCalories);
+    setTargetCalories(finalCalories);
+    setTargetMacros({
+      protein: Math.round((finalCalories * pPct) / 4),
+      carb: Math.round((finalCalories * cPct) / 4),
+      fat: Math.round((finalCalories * fPct) / 9)
+    });
   };
 
+  // Otomatik Kalori Hesaplayıcı (100g bazlı)
+  const calculateCalories = (foodName, grams) => {
+    const food = foodDB.find(f => f.name.toLowerCase() === foodName.toLowerCase().trim());
+    if (!food) return 0;
+    return Math.round((food.calories_per_100g * grams) / 100);
+  };
+
+  const handleNutritionChange = (day, value) => {
+    let total = 0;
+    if(value) {
+      value.split(',').forEach(item => {
+        const parts = item.split(':');
+        if(parts.length === 2) {
+          total += calculateCalories(parts[0], parseInt(parts[1]) || 0);
+        }
+      });
+    }
+    setNutritionData(prev => ({ ...prev, [day]: { items: value, total } }));
+  };
+
+  const handleSaveProgram = async (type) => {
+    if (selectedStudentIds.length === 0) return alert("Öğrenci seçin!");
+    const updateData = type === 'nutrition' ? { nutrition_plan: JSON.stringify(nutritionData) } : { workout_plan: JSON.stringify(workoutData) };
+    for (const sId of selectedStudentIds) await supabase.from('profiles').update(updateData).eq('id', sId);
+    alert("Program başarıyla atandı!");
+  };
+
+  // Yükleme ve Form İşlemleri
   const handleFileUpload = async (e) => {
     e.preventDefault();
     if (!currentUserId || !weight) return alert("Kilo giriniz.");
     const file = e.target.poseImage.files[0];
     if (!file) return alert("Fotoğraf seçiniz.");
-
     setIsUploading(true);
     try {
       const fileExt = file.name.split('.').pop();
       const fileName = `${currentUserId}-${Math.random()}.${fileExt}`;
       const { error: uploadError } = await supabase.storage.from('form-checks-media').upload(`poses/${fileName}`, file);
       if (uploadError) throw uploadError;
-
       const { data: { publicUrl } } = supabase.storage.from('form-checks-media').getPublicUrl(`poses/${fileName}`);
-
       await supabase.from('form_checks').insert([{ student_id: currentUserId, current_weight: parseFloat(weight), front_pose_url: publicUrl, notes: "Yeni form" }]);
       await supabase.rpc('increment_streak', { user_id: currentUserId }).catch(() => {});
-
       alert("Form başarıyla iletildi!");
       e.target.reset(); setWeight('');
       const { data } = await supabase.from('form_checks').select('*').eq('student_id', currentUserId).order('created_at', { ascending: false });
       setFetchedFormChecks(data || []);
-    } catch (error) {
-      alert("Hata: " + error.message);
-    } finally {
-      setIsUploading(false);
-    }
+    } catch (error) { alert("Hata: " + error.message); } finally { setIsUploading(false); }
   };
 
   const handleDailySubmit = async (e) => {
@@ -207,27 +216,22 @@ export function DashboardTabs({ currentUserId, userRole, students }) {
     const link = document.createElement("a"); link.href = canvas.toDataURL("image/png"); link.download = `kocluk_${activeTab}.png`; link.click();
   };
 
-  const currentStudentProfile = students?.find(s => s.id === currentUserId);
+  const toggleStudent = (id) => setSelectedStudentIds(prev => prev.includes(id) ? prev.filter(sId => sId !== id) : [...prev, id]);
+  const selectAll = () => setSelectedStudentIds(selectedStudentIds.length === filteredStudents.length ? [] : filteredStudents.map(s => s.id));
+  const nextBtn = () => setCurrentPage(p => Math.min(totalPages - 1, p + 1));
+  const prevBtn = () => setCurrentPage(p => Math.max(0, p - 1));
 
-  const chartData = {
-    labels: fetchedFormChecks.slice().reverse().map(c => new Date(c.created_at).toLocaleDateString('tr-TR')),
-    datasets: [{
-        label: 'Vücut Ağırlığı (kg)',
-        data: fetchedFormChecks.slice().reverse().map(c => c.current_weight),
-        borderColor: '#8b5cf6', backgroundColor: 'rgba(139, 92, 246, 0.2)',
-        tension: 0.4, fill: true, pointBackgroundColor: '#8b5cf6', pointBorderColor: '#fff',
-        pointHoverBackgroundColor: '#fff', pointHoverBorderColor: '#8b5cf6', pointRadius: 5, pointHoverRadius: 7,
-    }],
-  };
-  const chartOptions = { responsive: true, plugins: { legend: { position: 'top', labels: { color: '#888' } }, title: { display: false } }, scales: { y: { ticks: { color: '#888' }, grid: { color: 'rgba(200, 200, 200, 0.1)' } }, x: { ticks: { color: '#888' }, grid: { display: false } } } };
-
-  // Makro Oran Hesaplayıcı
   const getMacroPercentage = (p, c, f) => {
     const pro = parseFloat(p) || 0; const car = parseFloat(c) || 0; const fat = parseFloat(f) || 0;
     const total = pro + car + fat;
-    if (total === 0) return { p: 0, c: 0, f: 0 };
-    return { p: (pro/total)*100, c: (car/total)*100, f: (fat/total)*100 };
+    return total === 0 ? { p: 0, c: 0, f: 0 } : { p: (pro/total)*100, c: (car/total)*100, f: (fat/total)*100 };
   };
+
+  const chartData = {
+    labels: fetchedFormChecks.slice().reverse().map(c => new Date(c.created_at).toLocaleDateString('tr-TR')),
+    datasets: [{ label: 'Vücut Ağırlığı (kg)', data: fetchedFormChecks.slice().reverse().map(c => c.current_weight), borderColor: '#8b5cf6', backgroundColor: 'rgba(139, 92, 246, 0.2)', tension: 0.4, fill: true, pointRadius: 5 }],
+  };
+  const chartOptions = { responsive: true, plugins: { legend: { position: 'top', labels: { color: '#888' } }, title: { display: false } }, scales: { y: { ticks: { color: '#888' }, grid: { color: 'rgba(200, 200, 200, 0.1)' } }, x: { ticks: { color: '#888' }, grid: { display: false } } } };
 
   return (
     <div className="w-full mt-4">
@@ -262,9 +266,7 @@ export function DashboardTabs({ currentUserId, userRole, students }) {
 
           <div className="mb-8 bg-white dark:bg-[#16161d] rounded-3xl border border-gray-200 dark:border-zinc-800 shadow-sm overflow-hidden p-5 transition-all">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 border-b border-gray-100 dark:border-zinc-800 pb-4">
-              <div>
-                <h3 className="text-sm font-black text-brand-purple uppercase tracking-widest">Öğrenci Yönetimi</h3>
-              </div>
+              <div><h3 className="text-sm font-black text-brand-purple uppercase tracking-widest">Öğrenci Yönetimi</h3></div>
               <div className="relative w-full md:w-64">
                 <span className="absolute inset-y-0 left-3 flex items-center text-gray-400 text-sm">🔍</span>
                 <input type="text" placeholder="Öğrenci Ara..." value={searchTerm} onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(0); }} className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-gray-200 dark:border-zinc-700 bg-gray-50 dark:bg-zinc-900 text-sm focus:outline-none focus:border-brand-purple transition-all" />
@@ -327,10 +329,6 @@ export function DashboardTabs({ currentUserId, userRole, students }) {
         ))}
       </div>
 
-      <div className="flex justify-end mt-4">
-        <button onClick={handleDownloadImage} className="text-xs bg-brand-purple/10 text-brand-purple hover:bg-brand-purple/20 px-3 py-2 rounded-lg font-bold transition-all">Görsel İndir</button>
-      </div>
-
       <div ref={exportRef} className="mt-4 bg-white dark:bg-[#16161d] rounded-3xl p-5 md:p-8 border border-gray-100 dark:border-zinc-800 shadow-sm min-h-[400px]">
         
         {userRole === 'admin' && selectedStudentIds.length === 0 ? (
@@ -378,53 +376,175 @@ export function DashboardTabs({ currentUserId, userRole, students }) {
               </div>
             )}
 
+            {/* === BESLENME SEKMESİ === */}
             {activeTab === 'nutrition' && (
-              <div className="space-y-4 animate-fadeIn">
+              <div className="space-y-6 animate-fadeIn">
                 <div className="flex justify-between items-center border-b dark:border-zinc-800 pb-3">
-                  <h4 className="font-bold text-lg text-gray-800 dark:text-zinc-200">Güncel Beslenme Programı</h4>
-                  <button onClick={() => downloadCSV(nutritionPlan, 'Beslenme_Programi', true)} className="text-xs font-bold px-3 py-1.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 rounded-lg transition-all flex items-center gap-2">📊 CSV İndir</button>
-                </div>
-                {userRole === 'admin' ? (
-                  <div className="space-y-3">
-                    <div className="flex justify-end mb-2">
-                      <select onChange={(e) => e.target.value && setNutritionPlan(e.target.value)} className="p-2 text-xs font-bold rounded-lg border border-brand-purple/30 bg-brand-purple/5 text-brand-purple focus:outline-none">
-                        <option value="">+ Hazır Şablon Kullan</option>
-                        {templates.filter(t => t.category === 'nutrition').map(t => <option key={t.id} value={t.content}>{t.title}</option>)}
-                      </select>
-                    </div>
-                    <textarea value={nutritionPlan} onChange={(e) => setNutritionPlan(e.target.value)} placeholder="Örn: 3000 Kalori..." className="w-full h-48 p-4 rounded-xl border dark:border-zinc-800 bg-gray-50 dark:bg-zinc-950 text-sm focus:outline-none" />
-                    <button onClick={() => handleSaveProgram('nutrition')} className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-xl text-sm transition-all">{selectedStudentIds.length > 1 ? 'Toplu Beslenme Programı Ata' : 'Beslenme Programını Güncelle'}</button>
+                  <h4 className="font-bold text-lg text-gray-800 dark:text-zinc-200">Haftalık Beslenme Planı</h4>
+                  <div className="flex gap-2">
+                    <button onClick={handleDownloadImage} className="text-xs font-bold px-3 py-1.5 bg-brand-purple/10 text-brand-purple hover:bg-brand-purple/20 rounded-lg transition-all flex items-center gap-2">🖼️ Görsel İndir</button>
+                    <button onClick={() => downloadCSV([nutritionData], 'Beslenme_Programi', false)} className="text-xs font-bold px-3 py-1.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 rounded-lg transition-all flex items-center gap-2">📊 CSV İndir</button>
                   </div>
-                ) : (
-                  <div className="p-5 bg-gray-50 dark:bg-zinc-950 rounded-2xl whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300 leading-relaxed">{nutritionPlan || "Koçunuz henüz bir beslenme programı atamadı."}</div>
+                </div>
+
+                {/* 🧠 AKILLI DİYETİSYEN PANELİ */}
+                {userRole === 'admin' && (
+                  <div className="bg-gradient-to-br from-brand-purple/5 to-transparent border border-brand-purple/20 p-5 rounded-2xl shadow-inner mb-6">
+                    <h4 className="font-black text-brand-purple text-sm mb-4 flex items-center gap-2">🧠 AKILLI DİYET HESAPLAYICI</h4>
+                    <div className="grid grid-cols-2 md:grid-cols-7 gap-3 mb-4">
+                      <input type="number" placeholder="Yaş" value={studentMetrics.age} onChange={e => setStudentMetrics({...studentMetrics, age: e.target.value})} className="p-2 rounded-lg text-xs border border-brand-purple/20 focus:outline-none" title="Yaş" />
+                      <input type="number" placeholder="Boy (cm)" value={studentMetrics.height_cm} onChange={e => setStudentMetrics({...studentMetrics, height_cm: e.target.value})} className="p-2 rounded-lg text-xs border border-brand-purple/20 focus:outline-none" title="Boy (cm)" />
+                      <input type="number" placeholder="Kilo (kg)" value={studentMetrics.weight_kg} onChange={e => setStudentMetrics({...studentMetrics, weight_kg: e.target.value})} className="p-2 rounded-lg text-xs border border-brand-purple/20 focus:outline-none" title="Kilo (kg)" />
+                      
+                      <select value={studentMetrics.gender} onChange={e => setStudentMetrics({...studentMetrics, gender: e.target.value})} className="p-2 rounded-lg text-xs border border-brand-purple/20 focus:outline-none">
+                        <option value="male">Erkek</option>
+                        <option value="female">Kadın</option>
+                      </select>
+                      
+                      <select value={studentMetrics.activity_level} onChange={e => setStudentMetrics({...studentMetrics, activity_level: parseFloat(e.target.value)})} className="p-2 rounded-lg text-xs border border-brand-purple/20 focus:outline-none">
+                        <option value={1.2}>Hareketsiz (Masa başı)</option>
+                        <option value={1.375}>Az Hareketli (Hafif idman)</option>
+                        <option value={1.55}>Orta Hareketli (3-5 gün)</option>
+                        <option value={1.725}>Çok Hareketli (6-7 gün)</option>
+                      </select>
+                      
+                      <select value={studentMetrics.goal} onChange={e => setStudentMetrics({...studentMetrics, goal: e.target.value})} className="p-2 rounded-lg text-xs border border-orange-500/30 bg-orange-50 dark:bg-orange-900/20 font-bold focus:outline-none">
+                        <option value="maintain">Koruma (0 kcal)</option>
+                        <option value="cut">Definasyon (-500 kcal)</option>
+                        <option value="bulk">Bulk (+500 kcal)</option>
+                      </select>
+
+                      <button onClick={calculateDietTarget} className="p-2 bg-brand-purple text-white text-xs font-bold rounded-lg hover:bg-brand-purpleHover transition-all shadow-md">HESAPLA</button>
+                    </div>
+
+                    {targetCalories > 0 && (
+                      <div className="flex flex-wrap gap-4 items-center bg-white dark:bg-zinc-900 p-4 rounded-xl border border-brand-purple/20">
+                        <div className="text-center px-4 border-r border-gray-100 dark:border-zinc-800">
+                          <p className="text-[10px] text-gray-500 font-bold">HEDEF KALORİ</p>
+                          <p className="text-2xl font-black text-brand-purple">{targetCalories} <span className="text-sm">kcal</span></p>
+                        </div>
+                        <div className="flex gap-6 text-center pl-2">
+                          <div><p className="text-[10px] text-gray-500 font-bold">PROTEİN</p><p className="font-bold text-red-500">{targetMacros.protein}g</p></div>
+                          <div><p className="text-[10px] text-gray-500 font-bold">KARBONHİDRAT</p><p className="font-bold text-blue-500">{targetMacros.carb}g</p></div>
+                          <div><p className="text-[10px] text-gray-500 font-bold">YAĞ</p><p className="font-bold text-yellow-500">{targetMacros.fat}g</p></div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+                
+                {/* 7 GÜNLÜK OTOMATİK TABLO */}
+                <div className="overflow-x-auto border border-gray-200 dark:border-zinc-800 rounded-xl">
+                  <table className="w-full text-sm text-left">
+                    <thead className="bg-gray-50 dark:bg-zinc-900 border-b border-gray-200 dark:border-zinc-800">
+                      <tr>
+                        <th className="p-3 font-bold text-gray-600 dark:text-gray-300 w-1/4">Gün</th>
+                        <th className="p-3 font-bold text-gray-600 dark:text-gray-300">Besinler (Besin:Gramaj) <span className="text-[10px] font-normal block">Örn: Yulaf:100, Tavuk Göğsü:200</span></th>
+                        <th className="p-3 font-bold text-gray-600 dark:text-gray-300 w-1/6">Otomatik Kalori</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {DAYS.map(day => (
+                        <tr key={day} className="border-b border-gray-100 dark:border-zinc-800/50 hover:bg-gray-50/50 dark:hover:bg-zinc-900/50 transition-colors">
+                          <td className="p-3 font-bold text-gray-700 dark:text-gray-300">{day}</td>
+                          <td className="p-2">
+                            <input 
+                              disabled={userRole !== 'admin'}
+                              value={nutritionData[day]?.items || ''}
+                              onChange={(e) => handleNutritionChange(day, e.target.value)}
+                              placeholder="Besin giriniz..."
+                              className="w-full p-2 bg-transparent border border-transparent hover:border-gray-200 focus:border-brand-purple dark:hover:border-zinc-700 rounded-lg outline-none transition-all disabled:opacity-80"
+                            />
+                          </td>
+                          <td className="p-3 font-black text-brand-purple">
+                            {nutritionData[day]?.total || 0} <span className="text-xs font-bold opacity-50">kcal</span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {userRole === 'admin' && (
+                  <button onClick={() => handleSaveProgram('nutrition')} className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-xl text-sm transition-all shadow-md">
+                    Beslenme Tablosunu Güncelle
+                  </button>
                 )}
               </div>
             )}
 
+            {/* === ANTRENMAN SEKMESİ === */}
             {activeTab === 'workout' && (
               <div className="space-y-8 animate-fadeIn">
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center border-b dark:border-zinc-800 pb-3">
-                    <h4 className="font-bold text-lg text-gray-800 dark:text-zinc-200">Güncel Antrenman Programı</h4>
-                    <button onClick={() => downloadCSV(workoutPlan, 'Antrenman_Programi', true)} className="text-xs font-bold px-3 py-1.5 bg-brand-purple/10 text-brand-purple hover:bg-brand-purple/20 rounded-lg transition-all flex items-center gap-2">📊 CSV İndir</button>
+                <div className="flex justify-between items-center border-b dark:border-zinc-800 pb-3">
+                  <h4 className="font-bold text-lg text-gray-800 dark:text-zinc-200">Haftalık Antrenman Planı</h4>
+                  <div className="flex gap-2">
+                    <button onClick={handleDownloadImage} className="text-xs font-bold px-3 py-1.5 bg-brand-purple/10 text-brand-purple hover:bg-brand-purple/20 rounded-lg transition-all flex items-center gap-2">🖼️ Görsel İndir</button>
+                    <button onClick={() => downloadCSV([workoutData], 'Antrenman_Programi', false)} className="text-xs font-bold px-3 py-1.5 bg-brand-purple/10 text-brand-purple hover:bg-brand-purple/20 rounded-lg transition-all flex items-center gap-2">📊 CSV İndir</button>
                   </div>
-                  {userRole === 'admin' ? (
-                    <div className="space-y-3">
-                      <div className="flex justify-end mb-2">
-                        <select onChange={(e) => e.target.value && setWorkoutPlan(e.target.value)} className="p-2 text-xs font-bold rounded-lg border border-brand-purple/30 bg-brand-purple/5 text-brand-purple focus:outline-none">
-                          <option value="">+ Hazır Şablon Kullan</option>
-                          {templates.filter(t => t.category === 'workout').map(t => <option key={t.id} value={t.content}>{t.title}</option>)}
-                        </select>
+                </div>
+
+                <div className="flex flex-col lg:flex-row gap-6">
+                  {/* Sol Taraf: Antrenman Tablosu */}
+                  <div className="w-full lg:w-2/3 overflow-x-auto border border-gray-200 dark:border-zinc-800 rounded-xl h-fit">
+                    <table className="w-full text-sm text-left">
+                      <thead className="bg-gray-50 dark:bg-zinc-900 border-b border-gray-200 dark:border-zinc-800">
+                        <tr>
+                          <th className="p-3 font-bold text-gray-600 dark:text-gray-300 w-1/4">Gün</th>
+                          <th className="p-3 font-bold text-gray-600 dark:text-gray-300">Hareketler (Set x Tekrar)</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {DAYS.map(day => (
+                          <tr key={day} className="border-b border-gray-100 dark:border-zinc-800/50 hover:bg-gray-50/50 dark:hover:bg-zinc-900/50">
+                            <td className="p-3 font-bold text-gray-700 dark:text-gray-300">{day}</td>
+                            <td className="p-2">
+                              <textarea 
+                                disabled={userRole !== 'admin'}
+                                value={workoutData[day] || ''}
+                                onChange={(e) => setWorkoutData(prev => ({...prev, [day]: e.target.value}))}
+                                placeholder="Bench Press 4x10..."
+                                className="w-full p-2 bg-transparent border border-transparent hover:border-gray-200 focus:border-brand-purple dark:hover:border-zinc-700 rounded-lg outline-none min-h-[60px] resize-y disabled:opacity-80"
+                              />
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Sağ Taraf: Akıllı Önerici */}
+                  {userRole === 'admin' && (
+                    <div className="w-full lg:w-1/3 bg-brand-purple/5 border border-brand-purple/20 p-5 rounded-2xl h-fit shadow-inner">
+                      <h4 className="font-black text-brand-purple text-sm mb-4 flex items-center gap-2">🤖 AKILLI ÖNERİCİ</h4>
+                      <input 
+                        type="text" 
+                        placeholder="Kas Grubu Ara (Örn: chest, back)" 
+                        value={recommenderFilter}
+                        onChange={(e) => setRecommenderFilter(e.target.value)}
+                        className="w-full p-2 mb-4 rounded-xl border border-brand-purple/30 bg-white dark:bg-zinc-900 text-xs focus:outline-none focus:border-brand-purple"
+                      />
+                      <div className="space-y-2 max-h-[400px] overflow-y-auto hide-scrollbar">
+                        {exerciseDB.filter(ex => recommenderFilter ? ex.body_part?.toLowerCase().includes(recommenderFilter.toLowerCase()) || ex.target?.toLowerCase().includes(recommenderFilter.toLowerCase()) || ex.equipment?.toLowerCase().includes(recommenderFilter.toLowerCase()) : true).slice(0, 30).map((ex, i) => (
+                          <div key={i} className="p-3 bg-white dark:bg-zinc-900 rounded-xl border border-gray-100 dark:border-zinc-800 shadow-sm cursor-pointer hover:border-brand-purple/50 transition-colors">
+                            <p className="font-bold text-xs text-gray-800 dark:text-zinc-200">{ex.name}</p>
+                            <div className="flex gap-2 mt-1 opacity-70 flex-wrap">
+                              <span className="text-[9px] bg-brand-purple/10 text-brand-purple px-2 py-0.5 rounded">{ex.target || ex.body_part}</span>
+                              <span className="text-[9px] bg-blue-500/10 text-blue-500 px-2 py-0.5 rounded">{ex.equipment}</span>
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                      <textarea value={workoutPlan} onChange={(e) => setWorkoutPlan(e.target.value)} placeholder="Örn: Push/Pull/Legs Split..." className="w-full h-48 p-4 rounded-xl border dark:border-zinc-800 bg-gray-50 dark:bg-zinc-950 text-sm focus:outline-none" />
-                      <button onClick={() => handleSaveProgram('workout')} className="w-full py-3 bg-brand-purple hover:bg-brand-purpleHover text-white font-bold rounded-xl text-sm transition-all">{selectedStudentIds.length > 1 ? 'Toplu Antrenman Programı Ata' : 'Antrenman Programını Güncelle'}</button>
                     </div>
-                  ) : (
-                    <div className="p-5 bg-gray-50 dark:bg-zinc-950 rounded-2xl whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300 leading-relaxed">{workoutPlan || "Koçunuz henüz bir antrenman programı atamadı."}</div>
                   )}
                 </div>
 
-                <div className="space-y-4 pt-6 border-t border-gray-100 dark:border-zinc-800">
+                {userRole === 'admin' && (
+                  <button onClick={() => handleSaveProgram('workout')} className="w-full py-3 bg-brand-purple hover:bg-brand-purpleHover text-white font-bold rounded-xl text-sm transition-all shadow-md">
+                    Antrenman Tablosunu Güncelle
+                  </button>
+                )}
+
+                <div className="space-y-4 pt-6 border-t border-gray-100 dark:border-zinc-800 mt-8">
                   <div className="flex justify-between items-center border-b dark:border-zinc-800 pb-3">
                     <h4 className="font-bold text-lg text-gray-800 dark:text-zinc-200">İnteraktif Antrenman Günlüğü</h4>
                     {workoutLogs.length > 0 && <button onClick={() => downloadCSV(workoutLogs, 'Antrenman_Gecmisi', false)} className="text-xs font-bold px-3 py-1.5 bg-blue-500/10 text-blue-600 hover:bg-blue-500/20 rounded-lg transition-all">📥 Logları İndir</button>}
@@ -549,7 +669,7 @@ export function DashboardTabs({ currentUserId, userRole, students }) {
               </div>
             )}
 
-            {/* === YENİ: GÖRSEL MAKRO İLERLEME ÇUBUKLU GÜNLÜK VERİLER === */}
+            {/* === GÖRSEL MAKRO İLERLEME ÇUBUKLU GÜNLÜK VERİLER === */}
             {activeTab === 'daily' && (
               <div className="space-y-6 animate-fadeIn">
                 {userRole === 'student' && (
@@ -592,7 +712,6 @@ export function DashboardTabs({ currentUserId, userRole, students }) {
                               <span className="font-black text-emerald-500 bg-emerald-500/10 px-3 py-1 rounded-lg">💧 {log.water_lt}L | 🧂 {log.sodium_mg}mg</span>
                             </div>
                             
-                            {/* İlerleme Çubuğu */}
                             <div className="space-y-2">
                               <div className="flex justify-between text-xs font-bold">
                                 <span className="text-red-500">Protein: {log.macros?.protein}g</span>
@@ -605,7 +724,6 @@ export function DashboardTabs({ currentUserId, userRole, students }) {
                                 <div style={{ width: `${macros.f}%` }} className="bg-yellow-500 h-full transition-all duration-500"></div>
                               </div>
                             </div>
-
                           </div>
                         )
                       })}
