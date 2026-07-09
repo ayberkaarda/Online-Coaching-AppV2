@@ -1,0 +1,640 @@
+name,calories_per_100g
+"Scrambled Eggs (2 large)",180
+"Whole Wheat Toast (1 slice)",80
+"Coffee (black)",5
+"Banana",105
+"Grilled Chicken Salad",350
+"Apple",95
+"Salmon (4oz grilled)",230
+"Quinoa (1 cup cooked)",222
+"Steamed Broccoli (1 cup)",55
+"Greek Yogurt (plain 1 cup)",150
+"Oatmeal (1 cup cooked)",160
+"Blueberries (1/2 cup)",42
+"Almonds (1 oz)",164
+"Turkey Sandwich (on wheat)",340
+"Carrot Sticks (1 cup)",52
+"Spaghetti Bolognese",460
+"Side Salad (light dressing)",70
+"Protein Shake (Whey)",120
+"Cereal (Frosted Flakes 1 cup)",130
+"Lentil Soup (1 can)",230
+"White Rice (1 cup cooked)",204
+"Tofu Stir-fry",400
+"Orange",62
+"Bagel (plain)",270
+"Cream Cheese (2 tbsp)",100
+"Tuna Salad (1/2 cup)",190
+"Crackers (5 whole wheat)",90
+"Beef Steak (6oz sirloin)",270
+"Baked Potato (medium)",160
+"Ice Cream (1/2 cup vanilla)",145
+"Pizza (1 slice pepperoni)",290
+"Avocado Toast (1 slice)",260
+"Hard-Boiled Egg (1 large)",78
+"Chicken Wrap (with tortilla)",410
+"Grapes (1 cup)",104
+"Cottage Cheese (1/2 cup)",90
+"Burger (cheeseburger)",550
+"French Fries (medium)",340
+"Protein Bar",210
+"Black Beans (1/2 cup)",114
+"Salsa (1/4 cup)",20
+"Chicken Noodle Soup (1 can)",150
+"Peanut Butter (2 tbsp)",190
+"Celery Sticks (1 cup)",14
+"Cod (4oz baked)",95
+"Green Beans (1 cup)",31
+"Chocolate Chip Cookie (1 large)",220
+"Shrimp (3oz steamed)",84
+"Pancakes (2 medium)",180
+"Maple Syrup (2 tbsp)",104
+"Sausage Link (1 cooked)",85
+"Smoothie (Fruit & Yogurt)",280
+"Tofu (4oz firm)",90
+"Brown Rice (1 cup cooked)",215
+"Bell Pepper (1 medium red)",31
+"Hummus (2 tbsp)",70
+"Pita Bread (1 whole wheat)",170
+"Pork Chop (4oz grilled)",220
+"Mashed Potatoes (1 cup)",230
+"Corn (1 cup)",132
+"Soda (1 can Coke)",140
+"Pretzels (1 oz)",110
+"Cheddar Cheese (1 oz)",115
+"Caesar Salad (with chicken)",470
+"Orange Juice (1 cup)",112
+"Bacon (2 slices cooked)",86
+"Waffles (2 homemade)",220
+"Pear",101
+"Chicken Breast (4oz roasted)",185
+"Mixed Nuts (1/4 cup)",200
+"Tilapia (4oz baked)",110
+"Asparagus (1 cup steamed)",40
+"Sweet Potato (1 medium baked)",103
+"Popcorn (3 cups air-popped)",93
+"Raisins (1/4 cup)",130
+"Macaroni & Cheese (1 cup)",350
+"Tomato Soup (1 can)",170
+"Grilled Cheese Sandwich",390
+"Beef Tacos (2 hard shell)",380
+"Refried Beans (1/2 cup)",115
+"Guacamole (1/4 cup)",90
+"Watermelon (1 cup diced)",46
+"English Muffin (whole wheat)",134
+"Peanut Butter & Jelly Sandwich",390
+"Clam Chowder (1 cup)",200
+"Iced Tea (Sweetened 16oz)",180
+"Lasagna (1 serving meat)",350
+"Garlic Bread (1 slice)",150
+"Chocolate Milk (1 cup)",200
+"White Bread (1 slice)",70
+"Jelly (1 tbsp grape)",50
+"Veggie Burger (1 patty)",120
+"Bun (hamburger)",140
+"Ketchup (1 tbsp)",20
+"Muffin (Blueberry 1 large)",380
+"Coffee (with cream/sugar)",50
+"Potato Chips (1 oz)",160
+"Tzatziki Sauce (2 tbsp)",30
+"Pancakes (2 medium)",180
+"Maple Syrup (2 tbsp)",104
+"Sausage Link (1 cooked)",85
+"Smoothie (Fruit & Yogurt)",280
+"Tofu (4oz firm)",90
+"Brown Rice (1 cup cooked)",215
+"Bell Pepper (1 medium red)",31
+"Hummus (2 tbsp)",70
+"Pita Bread (1 whole wheat)",170
+"Pork Chop (4oz grilled)",220
+"Mashed Potatoes (1 cup)",230
+"Corn (1 cup)",132
+"Soda (1 can Coke)",140
+"Pretzels (1 oz)",110
+"Cheddar Cheese (1 oz)",115
+"Caesar Salad (with chicken)",470
+"Orange Juice (1 cup)",112
+"Bacon (2 slices cooked)",86
+"Waffles (2 homemade)",220
+"Pear",101
+"Chicken Breast (4oz roasted)",185
+"Mixed Nuts (1/4 cup)",200
+"Tilapia (4oz baked)",110
+"Asparagus (1 cup steamed)",40
+"Sweet Potato (1 medium baked)",103
+"Popcorn (3 cups air-popped)",93
+"Raisins (1/4 cup)",130
+"Macaroni & Cheese (1 cup)",350
+"Tomato Soup (1 can)",170
+"Grilled Cheese Sandwich",390
+"Beef Tacos (2 hard shell)",380
+"Refried Beans (1/2 cup)",115
+"Guacamole (1/4 cup)",90
+"Watermelon (1 cup diced)",46
+"English Muffin (whole wheat)",134
+"Peanut Butter & Jelly Sandwich",390
+"Clam Chowder (1 cup)",200
+"Iced Tea (Sweetened 16oz)",180
+"Lasagna (1 serving meat)",350
+"Garlic Bread (1 slice)",150
+"Chocolate Milk (1 cup)",200
+"White Bread (1 slice)",70
+"Jelly (1 tbsp grape)",50
+"Veggie Burger (1 patty)",120
+"Bun (hamburger)",140
+"Ketchup (1 tbsp)",20
+"Muffin (Blueberry 1 large)",380
+"Coffee (with cream/sugar)",50
+"Potato Chips (1 oz)",160
+"Tzatziki Sauce (2 tbsp)",30
+"Scallops (3oz seared)",95
+"Risotto (Mushroom 1 cup)",250
+"Caprese Salad",240
+"Balsamic Vinaigrette (2 tbsp)",90
+"Cherries (1 cup)",77
+"Turkey Bacon (2 slices)",70
+"Grits (1 cup cooked)",150
+"Butter (1 tbsp)",100
+"Meatball Sub (6 inch)",580
+"Kiwifruit (1 medium)",46
+"Beef Jerky (1 oz)",116
+"Figs (2 medium)",74
+"Lobster (3oz steamed)",76
+"Melted Butter (for lobster)",200
+"Corn on the Cob (1 large)",125
+"Vegetable Soup (1 can)",140
+"Saltine Crackers (5 crackers)",60
+"Mango (1 cup slices)",99
+"Cheesecake (1 slice)",320
+"Pad Thai (Chicken 1.5 cups)",550
+"Spring Roll (Veg 2 rolls)",180
+"Coconut Water (1 cup)",46
+"Kimchi (1/2 cup)",22
+"Sashimi (Salmon 3 pcs)",120
+"Wasabi (1 tsp)",10
+"Seaweed Salad (1/2 cup)",60
+"French Onion Soup (1 cup)",150
+"Croutons (1/4 cup)",50
+"Shepherd's Pie (1 serving)",400
+"Green Peas (1/2 cup)",62
+"Apple Pie (1 slice)",410
+"Gin & Tonic (1 drink)",170
+"Red Wine (5 oz glass)",125
+"Halibut (4oz baked)",125
+"Quinoa Salad (1 cup)",260
+"Lemonade (1 cup)",99
+"Pistachios (1 oz shelled)",159
+"Oat Milk (1 cup)",120
+"Biscuits and Gravy (1 serving)",480
+"Avocado (1/2 fruit)",160
+"Corn Flakes (1 cup)",100
+"T-Bone Steak (6oz)",460
+"Creamed Spinach (1/2 cup)",190
+"Pecans (1 oz)",196
+"Fruit Cocktail (canned 1 cup)",110
+"Ramen (Instant 1 pack)",380
+"Mocha Latte (16oz)",360
+"Cucumber Slices (1 cup)",16
+"Feta Cheese (1 oz)",75
+"Olives (Kalamata 5 large)",35
+"Chicken Alfredo (1.5 cups)",680
+"Breadstick (1 large)",160
+"Cobb Salad",510
+"Blue Cheese Dressing (2 tbsp)",150
+"Mandarin Orange (1 medium)",37
+"Cashews (1 oz roasted)",163
+"Eggo Waffle (2 waffles)",180
+"Pulled Pork Sandwich",480
+"Macadamia Nuts (1 oz)",204
+"Crab Cakes (2 medium)",340
+"Tartar Sauce (2 tbsp)",60
+"Lemon Bar (1 square)",150
+"Almond Milk (Unsweetened 1 cup)",30
+"Rice Krispies (1.5 cups)",160
+"Sugar (1 tsp for cereal)",16
+"Tuna (Canned 3oz in water)",90
+"Mayonnaise (1 tbsp)",90
+"Pickle (1 spear dill)",5
+"Lobster Bisque (1 cup)",250
+"Reuben Sandwich",650
+"Sauerkraut (1/4 cup side)",7
+"Mushroom (White 1 cup sliced)",15
+"Soy Milk (Original 1 cup)",110
+"Chicken Tikka Masala (1.5 cups)",480
+"Naan Bread (1 piece)",260
+"Cucumber Salad (1/2 cup)",40
+"Vodka Soda (1 drink)",100
+"Chocolate Croissant",350
+"Sweet & Sour Chicken (1 cup)",380
+"Egg Drop Soup (1 cup)",65
+"String Cheese (1 stick)",80
+"Turkey Burger (1 patty)",160
+"Potato Salad (1/2 cup)",180
+"Cranberry Juice (1 cup)",130
+"Chicken Piccata (1 serving)",350
+"Angel Hair Pasta (1 cup)",200
+"Olive Oil (1 tbsp)",120
+"Garlic (1 clove)",4
+"Salami (3 slices)",110
+"Provolone Cheese (1 slice)",100
+"Ginger Ale (1 can)",124
+"Shrimp Scampi (1 cup)",380
+"Tiramisu (1 slice)",450
+"Cereal Bar (Fruit)",140
+"Veal Parmesan (1 serving)",550
+"Spaghetti (side)",100
+"Hot Chocolate (1 cup)",200
+"Coconut Shrimp (5 pcs)",320
+"Sweet Chili Sauce (2 tbsp)",70
+"White Wine (5 oz glass)",121
+"Trail Mix (1/4 cup)",190
+"Onion Rings (6 rings)",280
+"Poached Egg (1 large)",72
+"Canadian Bacon (2 slices)",80
+"Eggs Benedict (1 serving)",600
+"Hollandaise Sauce (2 tbsp)",110
+"Spinach Artichoke Dip (1/4 cup)",160
+"Tortilla Chips (1 oz)",140
+"Chicken Kebab (2 skewers)",280
+"Bell Peppers & Onions (sautéed)",60
+"Hummus Wrap (large)",450
+"Kombucha (1 cup)",30
+"Beef Stroganoff (1.5 cups)",550
+"Egg Noodles (1 cup cooked)",220
+"Cottage Cheese (1 cup low fat)",160
+"Tomato (1 medium sliced)",22
+"Black Pepper (1 tsp)",6
+"Chocolate Pudding (1/2 cup)",150
+"Mackerel (3oz cooked)",175
+"Collard Greens (1 cup cooked)",60
+"Ham (3oz deli sliced)",110
+"Swiss Cheese (1 slice)",106
+"Rye Bread (1 slice)",83
+"Potato Leek Soup (1 cup)",180
+"Brie Cheese (1 oz)",95
+"Water Cracker (5 crackers)",70
+"Grapefruit (1/2 medium)",52
+"Veggie Straws (1 oz)",130
+"Fish Tacos (2 tacos)",420
+"Cabbage Slaw (side)",60
+"Lime (juice of 1)",11
+"Beer (12 oz light)",103
+"Danish (Cheese 1 medium)",340
+"Kefir (Plain 1 cup)",104
+"Gnocchi (1 cup)",210
+"Pesto Sauce (1/4 cup)",260
+"Pine Nuts (1 tbsp)",95
+"Chai Latte (12 oz)",190
+"Manicotti (2 shells cheese)",380
+"Italian Sausage (1 link)",200
+"Jicama (1 cup sticks)",46
+"Chili Powder (1 tsp)",8
+"Ants on a Log (4 pcs)",180
+"Split Pea Soup (1 cup)",180
+"Ham & Cheese Croissant",400
+"Espresso (double shot)",5
+"Ricotta Cheese (1/4 cup)",85
+"Chicken & Rice Soup (1 can)",130
+"Guava",68
+"Club Sandwich",580
+"Pickle (1 whole dill)",17
+"Turkey Chili (1 cup)",250
+"Sour Cream (2 tbsp)",60
+"Shredded Cheese (Cheddar 1/4 cup)",115
+"Matcha Latte (12 oz)",180
+"Chocolate Donut (1 medium)",300
+"Tuna Melt",450
+"Apple Cider (1 cup)",117
+"Beef Burrito (large)",650
+"Pico de Gallo (1/4 cup)",15
+"Corn Tortilla (1 medium)",52
+"Mussels (3oz steamed)",146
+"White Wine Sauce (1/4 cup)",80
+"French Bread (2 slices)",180
+"Blackberries (1 cup)",62
+"Cheese Danish",340
+"Chicken Salad Sandwich",420
+"Soyrizo (2 oz)",140
+"Hash Browns (1 cup)",330
+"Ketchup (1 packet)",10
+"Philly Cheesesteak (6 inch)",500
+"Cheese Whiz (2 tbsp)",90
+"Onions (sautéed 1/4 cup)",30
+"Raspberries (1 cup)",64
+"Cheesy Grits (1 cup)",210
+"Collard Greens (with ham hock)",180
+"Fried Okra (1 cup)",220
+"Sweet Tea (16 oz)",180
+"Gyro (1 sandwich)",600
+"Pita Bread (White 1 large)",220
+"Tzatziki Sauce (2 tbsp)",30
+"Baklava (1 piece)",280
+"Coconut (shredded 1/4 cup)",110
+"S'more (1 serving)",140
+"Graham Cracker (1 large rectangle)",60
+"Marshmallow (1 large)",23
+"Chocolate (Hershey's bar 1 segment)",25
+"Chicken Parm Sandwich",650
+"Mozzarella (1 slice)",80
+"Bread Roll (hoagie)",200
+"Artichoke (1 medium steamed)",60
+"Mayonnaise (1 tbsp for dipping)",90
+"Calamari (fried 3oz)",150
+"Lemon Wedge (for calamari)",3
+"Root Beer (1 can)",150
+"Chicken McNuggets (6 pcs)",270
+"BBQ Sauce (2 tbsp)",60
+"Honey (1 tbsp)",64
+"Tofu Scramble",250
+"Turmeric (1 tsp)",9
+"Nutritional Yeast (1 tbsp)",20
+"Seitan (3oz)",90
+"Vegetable Broth (1 cup)",15
+"Mashed Cauliflower (1 cup)",140
+"Peanut Sauce (2 tbsp)",80
+"Tempeh (3oz)",160
+"Sauerkraut (1/2 cup)",14
+"Rye Crispbread (2 slices)",70
+"Capers (1 tbsp)",2
+"Chicken Liver (2 oz cooked)",91
+"Onion (1/2 cup raw chopped)",32
+"Bok Choy (1 cup steamed)",10
+"Gummy Bears (10 pcs)",100
+"Whiskey (1.5 oz shot)",105
+"Dates (2 medium Medjool)",133
+"Tahini (1 tbsp)",89
+"Chickpeas (1/2 cup canned)",135
+"Lettuce (Romaine 2 cups)",16
+"Italian Dressing (2 tbsp)",70
+"Croutons (1/4 cup)",50
+"Turkey Sausage (1 patty)",70
+"Maple Syrup (1 tbsp)",52
+"Quesadilla (Cheese 1 medium)",400
+"Sour Cream (1 tbsp)",30
+"Salsa (2 tbsp)",10
+"Red Cabbage (1 cup raw)",22
+"Duck (3oz roasted)",285
+"Orange Sauce (1/4 cup for duck)",90
+"Wild Rice (1 cup cooked)",166
+"Cupcake (Vanilla 1 medium)",240
+"Frosting (Vanilla 2 tbsp)",140
+"Bison Burger (1 patty)",150
+"Pretzel Bun (1 medium)",230
+"Spicy Mustard (1 tbsp)",10
+"Pasta Salad (1 cup)",280
+"Salami (3 slices)",110
+"Pepperoncini (2 peppers)",10
+"Coconut Milk (1/4 cup canned)",111
+"Green Curry Paste (1 tbsp)",30
+"Chicken Thigh (1 roasted)",210
+"Jasmine Rice (1 cup cooked)",205
+"Thai Iced Tea (1 glass)",250
+"Papaya (1 cup cubes)",62
+"Lime Juice (1 tbsp)",4
+"Macaroni Salad (1 cup)",380
+"Celery (1 stalk)",6
+"Blue Cheese (1 oz)",100
+"Dark Chocolate (1 oz 70%)",170
+"Acai Bowl (1 serving)",350
+"Granola (1/4 cup topping)",120
+"Coconut Flakes (1 tbsp topping)",35
+"Honey (1 tsp drizzle)",21
+"Shrimp Cocktail (4 large shrimp)",60
+"Cocktail Sauce (2 tbsp)",30
+"Pork Bun (1 steamed)",220
+"Dim Sum (Siu Mai 3 pcs)",180
+"Soy Sauce (1 tbsp for dipping)",9
+"Oyster (1 medium raw)",8
+"Mignonette Sauce (1 tbsp)",5
+"Beef Pho (1 large bowl)",450
+"Bean Sprouts (1/4 cup garnish)",8
+"Thai Basil (garnish)",1
+"Lime Wedge (garnish)",3
+"Jalapeno (1 tbsp sliced)",4
+"Hoisin Sauce (1 tbsp)",35
+"Sriracha (1 tsp)",5
+"Crepe (1 plain)",90
+"Nutella (1 tbsp)",100
+"Powdered Sugar (1 tsp)",10
+"Sake (3 oz)",117
+"Edamame (in pod 1 cup)",120
+"Biryani (Chicken 1.5 cups)",520
+"Raita (2 tbsp)",30
+"Lassi (Mango 1 cup)",180
+"Samosa (1 piece vegetable)",130
+"Tamarind Chutney (1 tbsp)",20
+"Mint Chutney (1 tbsp)",5
+"Pani Puri (6 pcs)",200
+"Passion Fruit (1 fruit)",17
+"Kimchi Jjigae (1 bowl)",350
+"Silken Tofu (3oz in soup)",45
+"Pork Belly (1 oz in soup)",145
+"Gochugaru (1 tsp)",10
+"Gochujang (1 tbsp)",30
+"Sesame Oil (1 tsp)",40
+"Fish Sauce (1 tsp)",5
+"Green Onion (1 tbsp garnish)",3
+"Kombucha (16 oz)",60
+"Beef Wellington (1 slice)",600
+"Pate (Mushroom 2 tbsp)",70
+"Puff Pastry (1 oz wrapper)",115
+"Prosciutto (1 slice)",35
+"Asparagus (6 spears roasted)",40
+"Hollandaise Sauce (1 tbsp)",55
+"Flan (1 slice)",220
+"Caramel Sauce (1 tbsp)",60
+"Congee (1 cup plain)",130
+"Pickled Radish (1/4 cup)",15
+"Pork Floss (1 tbsp)",50
+"Century Egg (1 egg)",100
+"Arugula (2 cups)",10
+"Goat Cheese (1 oz)",103
+"Beets (1/2 cup roasted)",30
+"Walnuts (1 tbsp chopped)",46
+"Balsamic Glaze (1 tbsp)",40
+"Bobotie (1 serving)",450
+"Yellow Rice (1 cup)",230
+"Chutney (Mango 1 tbsp)",45
+"Malva Pudding (1 slice)",380
+"Custard (1/4 cup)",80
+"Bubble Tea (16 oz milk tea)",320
+"Tapioca Pearls (1/4 cup boba)",100
+"Paella (1.5 cups seafood)",550
+"Chorizo (1 oz in paella)",130
+"Saffron (pinch)",1
+"Aioli (Garlic 1 tbsp)",95
+"Gazpacho (1 cup)",90
+"Croutons (Garlic 1/4 cup)",50
+"Olive Oil (1 tsp garnish)",40
+"Churros (2 sticks)",240
+"Chocolate Sauce (1 tbsp dipping)",50
+"Cinnamon Sugar (1 tsp)",20
+"Horchata (1 cup)",140
+"Ceviche (1 cup fish)",180
+"Red Onion (1/4 cup in ceviche)",16
+"Cilantro (2 tbsp garnish)",1
+"Corn Nuts (1 oz)",130
+"Lomo Saltado (1.5 cups)",500
+"French Fries (as side)",200
+"Soy Sauce (1 tbsp in stir-fry)",9
+"Aji Amarillo Paste (1 tsp)",5
+"Pisco Sour (1 drink)",250
+"Egg White (in drink)",17
+"Angostura Bitters (dash)",5
+"Alfajores (1 cookie)",180
+"Dulce de Leche (1 tbsp filling)",65
+"Coconut (shredded garnish)",10
+"Mate (1 cup)",5
+"Media Luna (1 pastry)",190
+"Chimichurri (1 tbsp)",45
+"Skirt Steak (4oz grilled)",240
+"Provoleta (1 oz grilled cheese)",100
+"Oregano (1 tsp)",3
+"Empanada (Beef 1 medium)",290
+"Chicken Milanesa (1 serving)",450
+"Mashed Potatoes (side)",150
+"Flan (1 slice)",220
+"Choripan (1 sandwich)",550
+"Baguette (slice)",70
+"Chimichurri (1 tbsp)",45
+"Pizza (Margherita 1 slice)",250
+"Fresh Mozzarella (1 oz)",72
+"Basil (2 tbsp fresh)",1
+"Carbonara (1.5 cups)",650
+"Guanciale (1 oz)",170
+"Pecorino Cheese (1 tbsp)",25
+"Black Pepper (1/4 tsp)",1
+"Egg Yolk (1 large in sauce)",55
+"Supplì (1 piece fried rice ball)",200
+"Aperol Spritz (1 drink)",180
+"Prosecco (3 oz)",70
+"Orange Slice (garnish)",5
+"Tagliatelle al Ragù (Bolognese)",550
+"Ground Beef (2 oz in sauce)",140
+"Pancetta (0.5 oz in sauce)",45
+"Carrot (1/4 minced in sauce)",10
+"Celery (1/4 stalk minced)",2
+"Onion (1/8 minced in sauce)",5
+"Crushed Tomatoes (1/2 cup sauce)",20
+"Parmigiano-Reggiano (1 tbsp)",22
+"Cannoli (1 medium)",240
+"Ricotta (filling 1 oz)",49
+"Pistachio (garnish)",10
+"Biscotti (1 cookie)",110
+"Espresso (for dipping)",2
+"Focaccia (1 square)",250
+"Rosemary (1 tsp topping)",1
+"Olive Oil (1 tbsp drizzle)",120
+"Bruschetta (2 pcs)",180
+"Balsamic Glaze (1 tsp)",13
+"Ribollita (1.5 cups soup)",350
+"Cannellini Beans (1/2 cup in soup)",105
+"Kale (1 cup in soup)",33
+"Stale Bread (1/2 cup in soup)",80
+"Polenta (1 cup creamy)",150
+"Gorgonzola Cheese (1 oz)",100
+"Negroni (1 drink)",190
+"Gin (1 oz)",70
+"Campari (1 oz)",80
+"Sweet Vermouth (1 oz)",40
+"Orange Peel (garnish)",1
+"Osso Buco (1 serving)",550
+"Gremolata (1 tbsp)",15
+"Risotto alla Milanese (1 cup)",350
+"Saffron (pinch in risotto)",1
+"Panettone (1 slice)",320
+"Candied Fruit (1 tbsp)",30
+"Amaretti Cookie (2 cookies)",90
+"Limoncello (1.5 oz shot)",150
+"Panna Cotta (1 serving)",300
+"Berry Coulis (1 tbsp)",20
+"Saltimbocca (1 serving)",380
+"Prosciutto (1 slice wrapper)",35
+"Sage (2 leaves)",1
+"White Wine Sauce (1/4 cup)",80
+"Polenta (grilled 1 slice)",120
+"Caponata (1/2 cup)",180
+"Eggplant (1/2 cup in caponata)",40
+"Pine Nuts (1/2 tbsp)",48
+"Raisins (1 tbsp)",27
+"Gelato (Pistachio 1/2 cup)",220
+"Waffle Cone (1 small)",70
+"Cacio e Pepe (1.5 cups)",500
+"Pecorino Romano (1/4 cup)",110
+"Black Pepper (1/2 tsp)",3
+"Fiorentina Steak (3oz portion)",230
+"Olive Oil (1 tbsp drizzle)",120
+"Rosemary (garnish)",1
+"White Beans (Tuscan style 1/2 cup)",150
+"Garlic (1 clove in beans)",4
+"Sage (in beans)",1
+"Arancini (1 large ball)",250
+"Ragù (filling 1 tbsp)",25
+"Mozzarella (filling 0.5 oz)",40
+"Breadcrumbs (coating)",25
+"Campari & Soda (1 drink)",85
+"Olive (garnish)",5
+"Vitello Tonnato (1 serving)",380
+"Tuna Sauce (2 tbsp)",100
+"Capers (garnish)",2
+"Lemon Slice (garnish)",1
+"Gnocchi alla Sorrentina (1.5 cups)",450
+"Tomato Sauce (1/2 cup)",40
+"Mozzarella (1 oz melted)",80
+"Basil (fresh garnish)",1
+"Parmigiano-Reggiano (1 tbsp)",22
+"Pesto (1/4 cup)",290
+"Pine Nuts (1 tbsp in pesto)",95
+"Garlic (1/2 clove in pesto)",2
+"Trofie Pasta (1 cup cooked)",210
+"Green Beans (1/2 cup w/ pasta)",15
+"Potato (1/2 w/ pasta)",65
+"Espresso Martini (1 drink)",280
+"Vodka (1.5 oz)",97
+"Coffee Liqueur (1 oz)",100
+"Espresso (1 oz in drink)",3
+"Simple Syrup (1/2 oz)",30
+"Coffee Beans (3 garnish)",2
+"Baba Ganoush (1/4 cup)",100
+"Pita Bread (1 white)",165
+"Falafel (3 pieces)",180
+"Tahini Sauce (1 tbsp)",30
+"Pickled Turnips (2 tbsp)",10
+"Shawarma (Chicken 1 wrap)",550
+"Garlic Sauce (1 tbsp)",90
+"Hummus (1/4 cup)",130
+"Tabouli (1/2 cup)",120
+"Bulgur (1/4 cup in tabouli)",76
+"Parsley (1/4 cup in tabouli)",5
+"Mint (1 tbsp in tabouli)",1
+"Lemon Juice (1 tbsp dressing)",4
+"Olive Oil (1 tbsp dressing)",120
+"Kibbeh (1 piece fried)",230
+"Pine Nuts (1/2 tbsp filling)",48
+"Ground Lamb (1 oz filling)",80
+"Bulgur (1 tbsp shell)",15
+"Lentil Soup (1 cup Middle Eastern)",200
+"Cumin (1 tsp)",8
+"Coriander (1 tsp)",5
+"Lemon Juice (1 tsp in soup)",1
+"Pita Crisps (1 oz)",130
+"Manakeesh (Za'atar 1 small)",300
+"Za'atar (1 tbsp)",40
+"Olive Oil (1 tbsp on bread)",120
+"Labneh (2 tbsp)",60
+"Cucumber (1/4 cup side)",8
+"Tomato (1/4 cup side)",8
+"Olives (5 side)",35
+"Mint Tea (1 cup)",2
+"Stuffed Grape Leaves (3 pcs)",150
+"Rice (1/4 cup filling)",51
+"Turkish Coffee (1 small cup)",5
+"Cardamom (in coffee)",1
+"Shish Tawook (2 skewers)",300
+"Garlic Sauce (Toum 1 tbsp)",90
+"French Fries (side)",340
+"Pickled Cucumber (1/4 cup)",10
+"Fattoush Salad (1.5 cups)",250
+"Fried Pita (1/2 pita in salad)",80
+"Sumac (1/2 tsp dressing)",5
+"Pomegranate Molasses (1 tsp)",15

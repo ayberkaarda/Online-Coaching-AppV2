@@ -3,8 +3,8 @@ const fs = require('fs');
 console.log("⏳ Besin CSV Temizleme işlemi başlıyor...");
 
 try {
-  // İndirdiğin kaggle dosyasının adının 'foods.csv' olduğunu varsayıyorum
-  const rawData = fs.readFileSync('foods.csv', 'utf8');
+  // İndirdiğin kaggle dosyasının adının 'daily_food_nutrition_dataset.csv' olduğunu varsayıyorum
+  const rawData = fs.readFileSync('daily_food_nutrition_dataset.csv', 'utf8');
   const lines = rawData.split('\n');
   const headers = lines[0].toLowerCase().split(',');
 
