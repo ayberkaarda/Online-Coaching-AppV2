@@ -64,6 +64,42 @@ export default function WorkoutTab({ targetId, currentUserId, userRole, selected
     return () => clearInterval(timer);
   }, [restTime]);
 
+
+  // --- 🚀 SÜRÜKLE BIRAK (DRAG & DROP) SİSTEMİ ---
+  const handleDragStart = (e, exerciseName) => {
+    e.dataTransfer.setData('text/plain', exerciseName);
+    e.currentTarget.classList.add('opacity-50', 'scale-95');
+  };
+
+  const handleDragEnd = (e) => {
+    e.currentTarget.classList.remove('opacity-50', 'scale-95');
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.currentTarget.classList.add('border-brand-purple', 'bg-brand-purple/5', 'ring-2', 'ring-brand-purple/50');
+  };
+
+  const handleDragLeave = (e) => {
+    e.currentTarget.classList.remove('border-brand-purple', 'bg-brand-purple/5', 'ring-2', 'ring-brand-purple/50');
+  };
+
+  const handleDrop = (e, day) => {
+    e.preventDefault();
+    e.currentTarget.classList.remove('border-brand-purple', 'bg-brand-purple/5', 'ring-2', 'ring-brand-purple/50');
+    
+    const exerciseName = e.dataTransfer.getData('text/plain');
+    if (exerciseName) {
+      setWorkoutData(prev => {
+        const currentText = prev[day] || '';
+        const newText = currentText.trim() === '' ? `${exerciseName} - 3x10` : `${currentText}\n${exerciseName} - 3x10`;
+        return { ...prev, [day]: newText };
+      });
+    }
+  };
+  // ----------------------------------------------
+
+
   const generateSmartWorkout = async () => {
     if (!smartSplit) return alert("Lütfen bir şablon seçin!");
     setIsGenerating(true);
@@ -122,10 +158,11 @@ export default function WorkoutTab({ targetId, currentUserId, userRole, selected
       return alert("Bugün dinlenme günün veya atanmış bir antrenman yok! Kaslarını dinlendir.");
     }
 
-    const parsed = todaysPlan.split('\n').filter(line => /^\d+\./.test(line)).map(line => {
+    const parsed = todaysPlan.split('\n').filter(line => /^\d+\./.test(line) || line.includes('-')).map(line => {
+      // Hareket ismini ve set/tekrar sayılarını daha esnek ayır
       const parts = line.split('-');
       if (parts.length < 2) return null;
-      const name = parts[0].replace(/^\d+\.\s*/, '').trim();
+      let name = parts[0].replace(/^\d+\.\s*/, '').trim();
       const setsReps = parts[1].split('|')[0].trim().split(/[xX]/);
       return { name, sets: parseInt(setsReps[0]) || 3, reps: parseInt(setsReps[1]) || 12 };
     }).filter(Boolean);
@@ -187,7 +224,7 @@ export default function WorkoutTab({ targetId, currentUserId, userRole, selected
               <>
                 <p className="text-brand-purple font-bold text-sm bg-brand-purple/10 px-3 py-1 rounded-full mb-4 inline-block">Hareket {currentExIdx + 1} / {liveExercises.length}</p>
                 
-                {/* 🎥 YENİ: HOVER OYATICI (HOVER TO PLAY GIF) */}
+                {/* 🎥 HOVER OYNATICI */}
                 <div 
                   className="w-full h-48 bg-zinc-200 dark:bg-black rounded-xl mb-4 overflow-hidden flex items-center justify-center border border-gray-300 dark:border-zinc-800 relative cursor-pointer group"
                   onMouseEnter={() => setIsGifPlaying(true)}
@@ -286,7 +323,17 @@ export default function WorkoutTab({ targetId, currentUserId, userRole, selected
                 <tr key={day} className={`border-b hover:bg-gray-50/50`}>
                   <td className={`p-3 font-bold`}>{day}</td>
                   <td className="p-2">
-                    <textarea disabled={userRole === 'student' && isWaitingMyApproval} value={workoutData[day] || ''} onChange={(e) => setWorkoutData(prev => ({...prev, [day]: e.target.value}))} className="w-full p-2 bg-transparent border-transparent hover:border-gray-200 focus:border-brand-purple rounded-lg outline-none min-h-[120px]" />
+                    {/* 🚀 DROP ZONE EKLENDİ */}
+                    <textarea 
+                      disabled={userRole === 'student' && isWaitingMyApproval} 
+                      value={workoutData[day] || ''} 
+                      onChange={(e) => setWorkoutData(prev => ({...prev, [day]: e.target.value}))} 
+                      onDragOver={handleDragOver}
+                      onDragLeave={handleDragLeave}
+                      onDrop={(e) => handleDrop(e, day)}
+                      placeholder={userRole === 'admin' ? "Manuel yazabilir veya sağdan sürükleyebilirsiniz..." : ""}
+                      className="w-full p-2 bg-transparent border border-transparent hover:border-gray-200 focus:border-brand-purple transition-all rounded-lg outline-none min-h-[120px]" 
+                    />
                   </td>
                 </tr>
               ))}
@@ -295,20 +342,44 @@ export default function WorkoutTab({ targetId, currentUserId, userRole, selected
         </div>
 
         {userRole === 'admin' && (
-          <div className="w-full lg:w-1/3 bg-gray-50 dark:bg-zinc-900 border p-5 rounded-2xl h-fit">
-            <h4 className="font-black text-sm mb-4">🔍 KÜTÜPHANEDE ARA</h4>
-            <input type="text" placeholder="Kas veya Ekipman" value={recommenderFilter} onChange={(e) => setRecommenderFilter(e.target.value)} className="w-full p-2 mb-4 rounded-xl border focus:border-brand-purple outline-none" />
-            <div className="space-y-2 max-h-[500px] overflow-y-auto hide-scrollbar">
-              {exerciseDB.filter(ex => recommenderFilter ? ex.body_part?.toLowerCase().includes(recommenderFilter.toLowerCase()) || ex.target?.toLowerCase().includes(recommenderFilter.toLowerCase()) || ex.equipment?.toLowerCase().includes(recommenderFilter.toLowerCase()) : true).slice(0, 30).map((ex, i) => (
-                <div key={i} className="p-3 bg-white dark:bg-[#16161d] rounded-xl border shadow-sm"><p className="font-bold text-xs">{ex.name}</p><div className="flex gap-2 mt-1 opacity-70"><span className="text-[9px] bg-brand-purple/10 text-brand-purple px-2 rounded">{ex.target || ex.body_part}</span><span className="text-[9px] bg-blue-500/10 text-blue-500 px-2 rounded">{ex.equipment}</span></div></div>
+          <div className="w-full lg:w-1/3 bg-gray-50 dark:bg-zinc-900 border p-5 rounded-2xl h-fit sticky top-4">
+            <h4 className="font-black text-sm mb-2 flex items-center gap-2">📚 Egzersiz Kütüphanesi</h4>
+            <p className="text-[10px] text-gray-500 font-medium mb-4 italic">💡 Hareketi tutup soldaki günlerin içine sürükleyin.</p>
+            <input type="text" placeholder="Hareket Ara (Örn: Incline...)" value={recommenderFilter} onChange={(e) => setRecommenderFilter(e.target.value)} className="w-full p-2.5 mb-4 rounded-xl border dark:border-zinc-700 bg-white dark:bg-black text-xs outline-none focus:border-brand-purple" />
+            <div className="space-y-2 max-h-[500px] overflow-y-auto custom-scrollbar">
+              {exerciseDB
+                .filter(ex => recommenderFilter ? 
+                  ex.name?.toLowerCase().includes(recommenderFilter.toLowerCase()) || 
+                  ex.body_part?.toLowerCase().includes(recommenderFilter.toLowerCase()) || 
+                  ex.target?.toLowerCase().includes(recommenderFilter.toLowerCase()) || 
+                  ex.equipment?.toLowerCase().includes(recommenderFilter.toLowerCase()) 
+                  : true)
+                .slice(0, 30).map((ex, i) => (
+                // 🚀 DRAGGABLE ITEMS EKLENDİ
+                <div 
+                  key={i} 
+                  draggable
+                  onDragStart={(e) => handleDragStart(e, ex.name)}
+                  onDragEnd={handleDragEnd}
+                  className="p-3 bg-white dark:bg-[#16161d] rounded-xl border border-gray-100 dark:border-zinc-800 shadow-sm cursor-grab active:cursor-grabbing hover:border-brand-purple hover:bg-brand-purple/5 transition-all group"
+                >
+                  <p className="font-bold text-xs text-gray-700 dark:text-gray-300 pointer-events-none">{ex.name}</p>
+                  <div className="flex gap-2 mt-1 opacity-70 pointer-events-none">
+                    <span className="text-[9px] bg-brand-purple/10 text-brand-purple px-2 rounded">{ex.target || ex.body_part}</span>
+                    <span className="text-[9px] bg-blue-500/10 text-blue-500 px-2 rounded">{ex.equipment}</span>
+                  </div>
+                </div>
               ))}
+              {exerciseDB.length > 0 && exerciseDB.filter(ex => recommenderFilter ? ex.name?.toLowerCase().includes(recommenderFilter.toLowerCase()) || ex.body_part?.toLowerCase().includes(recommenderFilter.toLowerCase()) : true).length === 0 && (
+                <div className="text-center py-4 text-xs font-bold text-gray-400">Sonuç bulunamadı.</div>
+              )}
             </div>
           </div>
         )}
       </div>
 
       {userRole === 'admin' ? (
-        <button onClick={handleSaveProgram} className="w-full py-4 bg-brand-purple text-white font-black rounded-xl shadow-md">Antrenman Tablosunu Güncelle</button>
+        <button onClick={handleSaveProgram} className="w-full py-4 bg-emerald-500 hover:bg-emerald-600 text-white font-black rounded-xl shadow-md transition-transform active:scale-95">Antrenman Tablosunu Güncelle</button>
       ) : (
         <button onClick={sendToCoachForApproval} disabled={isWaitingMyApproval} className={`w-full py-4 font-black rounded-xl shadow-md transition-all ${isWaitingMyApproval ? 'bg-gray-400 text-white cursor-not-allowed' : 'bg-orange-500 hover:bg-orange-600 text-white'}`}>
           {isWaitingMyApproval ? '⏳ Koçun Onayı Bekleniyor...' : '📨 Bu Programı Koça Onaya Gönder'}
