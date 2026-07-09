@@ -9,7 +9,12 @@ export default function WorkoutTab({ targetId, currentUserId, userRole, selected
   const [workoutLogs, setWorkoutLogs] = useState([]);
   const [smartSplit, setSmartSplit] = useState('');
   const [recommenderFilter, setRecommenderFilter] = useState('');
+  const [pendingApproval, setPendingApproval] = useState(false);
+  const [adminApprovals, setAdminApprovals] = useState([]);
 
+// --- ÖĞRENCİ İÇİN: KOÇA ONAYA GÖNDER ---
+const sendToCoachForApproval = async () => {
+  if (!workoutData || Object.keys(workoutData).length === 0) return alert("Program boş olamaz!");
   // Gym Mode States
   const [isLiveWorkout, setIsLiveWorkout] = useState(false);
   const [liveExercises, setLiveExercises] = useState([]);
@@ -284,4 +289,4 @@ export default function WorkoutTab({ targetId, currentUserId, userRole, selected
       </div>
     </div>
   );
-}
+}}
