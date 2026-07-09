@@ -3,9 +3,17 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { DAYS, downloadCSV } from "@/lib/helpers";
 
-export default function NutritionTab({ targetId, userRole, selectedStudentIds, onDownloadImage }) {
+export default function NutritionTab({ targetId, currentUserId, userRole, selectedStudentIds, onDownloadImage }) {
   const [foodDB, setFoodDB] = useState([]);
   const [nutritionData, setNutritionData] = useState(DAYS.reduce((a, d) => ({ ...a, [d]: { items: '', total: 0 } }), {}));
+  
+  // Hızlı Ekle (Oto-Tamamlama) State'leri
+  const [quickAddDay, setQuickAddDay] = useState(DAYS[0]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [suggestions, setSuggestions] = useState([]);
+  const [selectedFood, setSelectedFood] = useState(null);
+  const [quickAddGrams, setQuickAddGrams] = useState(100);
+
   const [studentMetrics, setStudentMetrics] = useState({ age: 20, height_cm: 175, weight_kg: 70, gender: 'male', activity_level: 1.55, goal: 'maintain' });
   const [targetCalories, setTargetCalories] = useState(0);
   const [targetMacros, setTargetMacros] = useState({ protein: 0, carb: 0, fat: 0 });
@@ -24,6 +32,16 @@ export default function NutritionTab({ targetId, userRole, selectedStudentIds, o
       }
     });
   }, [targetId]);
+
+  // Oto-Tamamlama Mantığı
+  useEffect(() => {
+    if (searchQuery.trim().length > 1) {
+      const filtered = foodDB.filter(f => f.name.toLowerCase().includes(searchQuery.toLowerCase()));
+      setSuggestions(filtered.slice(0, 5)); // En iyi 5 sonucu göster
+    } else {
+      setSuggestions([]);
+    }
+  }, [searchQuery, foodDB]);
 
   const calculateDietTarget = () => {
     const { age, height_cm, weight_kg, gender, activity_level, goal } = studentMetrics;
@@ -47,7 +65,33 @@ export default function NutritionTab({ targetId, userRole, selectedStudentIds, o
     return Math.round((food.calories_per_100g * grams) / 100);
   };
 
-  const handleNutritionChange = (day, value) => {
+  // Hızlı Ekleme Fonksiyonu
+  const handleQuickAdd = () => {
+    if (!selectedFood) return alert("Lütfen listeden bir besin seçin.");
+    if (!quickAddGrams || quickAddGrams <= 0) return alert("Geçerli bir gramaj girin.");
+
+    const newEntry = `${selectedFood.name}:${quickAddGrams}`;
+    const currentDayData = nutritionData[quickAddDay];
+    
+    // Var olan metne virgül ile ekle
+    const newItemsString = currentDayData.items ? `${currentDayData.items}, ${newEntry}` : newEntry;
+    
+    // Toplam kaloriyi yeniden hesapla
+    let total = 0;
+    newItemsString.split(',').forEach(item => {
+      const parts = item.split(':');
+      if(parts.length === 2) total += calculateCalories(parts[0], parseInt(parts[1]) || 0);
+    });
+
+    setNutritionData(prev => ({ ...prev, [quickAddDay]: { items: newItemsString, total } }));
+    
+    // Kutuları sıfırla
+    setSearchQuery('');
+    setSelectedFood(null);
+    setQuickAddGrams(100);
+  };
+
+  const handleManualNutritionChange = (day, value) => {
     let total = 0;
     if(value) {
       value.split(',').forEach(item => {
@@ -59,10 +103,11 @@ export default function NutritionTab({ targetId, userRole, selectedStudentIds, o
   };
 
   const handleSaveProgram = async () => {
-    if (selectedStudentIds.length === 0) return alert("Öğrenci seçin!");
+    const target = userRole === 'admin' ? selectedStudentIds : [currentUserId];
+    if (target.length === 0) return alert("Öğrenci seçin!");
     const updateData = { nutrition_plan: JSON.stringify(nutritionData) };
-    for (const sId of selectedStudentIds) await supabase.from('profiles').update(updateData).eq('id', sId);
-    alert("Beslenme Programı başarıyla atandı!");
+    for (const sId of target) await supabase.from('profiles').update(updateData).eq('id', sId);
+    alert("Beslenme Programı başarıyla güncellendi!");
   };
 
   return (
@@ -70,8 +115,8 @@ export default function NutritionTab({ targetId, userRole, selectedStudentIds, o
       <div className="flex justify-between items-center border-b dark:border-zinc-800 pb-3">
         <h4 className="font-bold text-lg text-gray-800 dark:text-zinc-200">Haftalık Beslenme Planı</h4>
         <div className="flex gap-2">
-          <button onClick={onDownloadImage} className="text-xs font-bold px-3 py-1.5 bg-brand-purple/10 text-brand-purple hover:bg-brand-purple/20 rounded-lg transition-all flex items-center gap-2">🖼️ Görsel İndir</button>
-          <button onClick={() => downloadCSV([nutritionData], 'Beslenme_Programi', false)} className="text-xs font-bold px-3 py-1.5 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 rounded-lg transition-all flex items-center gap-2">📊 CSV İndir</button>
+          <button onClick={onDownloadImage} className="text-xs font-bold px-3 py-1.5 bg-brand-purple/10 text-brand-purple rounded-lg">🖼️ Görsel İndir</button>
+          <button onClick={() => downloadCSV([nutritionData], 'Beslenme_Programi', false)} className="text-xs font-bold px-3 py-1.5 bg-emerald-500/10 text-emerald-600 rounded-lg">📊 CSV İndir</button>
         </div>
       </div>
 
@@ -79,19 +124,19 @@ export default function NutritionTab({ targetId, userRole, selectedStudentIds, o
         <div className="bg-gradient-to-br from-brand-purple/5 to-transparent border border-brand-purple/20 p-5 rounded-2xl shadow-inner mb-6">
           <h4 className="font-black text-brand-purple text-sm mb-4 flex items-center gap-2">🧠 AKILLI DİYET HESAPLAYICI</h4>
           <div className="grid grid-cols-2 md:grid-cols-7 gap-3 mb-4">
-            <input type="number" placeholder="Yaş" value={studentMetrics.age} onChange={e => setStudentMetrics({...studentMetrics, age: e.target.value})} className="p-2 rounded-lg text-xs border border-brand-purple/20 focus:outline-none" title="Yaş" />
-            <input type="number" placeholder="Boy (cm)" value={studentMetrics.height_cm} onChange={e => setStudentMetrics({...studentMetrics, height_cm: e.target.value})} className="p-2 rounded-lg text-xs border border-brand-purple/20 focus:outline-none" title="Boy (cm)" />
-            <input type="number" placeholder="Kilo (kg)" value={studentMetrics.weight_kg} onChange={e => setStudentMetrics({...studentMetrics, weight_kg: e.target.value})} className="p-2 rounded-lg text-xs border border-brand-purple/20 focus:outline-none" title="Kilo (kg)" />
-            <select value={studentMetrics.gender} onChange={e => setStudentMetrics({...studentMetrics, gender: e.target.value})} className="p-2 rounded-lg text-xs border border-brand-purple/20 focus:outline-none">
+            <input type="number" placeholder="Yaş" value={studentMetrics.age} onChange={e => setStudentMetrics({...studentMetrics, age: e.target.value})} className="p-2 rounded-lg text-xs border" />
+            <input type="number" placeholder="Boy (cm)" value={studentMetrics.height_cm} onChange={e => setStudentMetrics({...studentMetrics, height_cm: e.target.value})} className="p-2 rounded-lg text-xs border" />
+            <input type="number" placeholder="Kilo (kg)" value={studentMetrics.weight_kg} onChange={e => setStudentMetrics({...studentMetrics, weight_kg: e.target.value})} className="p-2 rounded-lg text-xs border" />
+            <select value={studentMetrics.gender} onChange={e => setStudentMetrics({...studentMetrics, gender: e.target.value})} className="p-2 rounded-lg text-xs border">
               <option value="male">Erkek</option><option value="female">Kadın</option>
             </select>
-            <select value={studentMetrics.activity_level} onChange={e => setStudentMetrics({...studentMetrics, activity_level: parseFloat(e.target.value)})} className="p-2 rounded-lg text-xs border border-brand-purple/20 focus:outline-none">
-              <option value={1.2}>Hareketsiz (Masa başı)</option><option value={1.375}>Az Hareketli (Hafif idman)</option><option value={1.55}>Orta Hareketli (3-5 gün)</option><option value={1.725}>Çok Hareketli (6-7 gün)</option>
+            <select value={studentMetrics.activity_level} onChange={e => setStudentMetrics({...studentMetrics, activity_level: parseFloat(e.target.value)})} className="p-2 rounded-lg text-xs border">
+              <option value={1.2}>Hareketsiz</option><option value={1.375}>Az Hareketli</option><option value={1.55}>Orta Hareketli</option><option value={1.725}>Çok Hareketli</option>
             </select>
-            <select value={studentMetrics.goal} onChange={e => setStudentMetrics({...studentMetrics, goal: e.target.value})} className="p-2 rounded-lg text-xs border border-orange-500/30 bg-orange-50 dark:bg-orange-900/20 font-bold focus:outline-none">
+            <select value={studentMetrics.goal} onChange={e => setStudentMetrics({...studentMetrics, goal: e.target.value})} className="p-2 rounded-lg text-xs border font-bold">
               <option value="maintain">Koruma (0 kcal)</option><option value="cut">Definasyon (-500 kcal)</option><option value="bulk">Bulk (+500 kcal)</option>
             </select>
-            <button onClick={calculateDietTarget} className="p-2 bg-brand-purple text-white text-xs font-bold rounded-lg hover:bg-brand-purpleHover transition-all shadow-md">HESAPLA</button>
+            <button onClick={calculateDietTarget} className="p-2 bg-brand-purple text-white text-xs font-bold rounded-lg shadow-md">HESAPLA</button>
           </div>
           {targetCalories > 0 && (
             <div className="flex flex-wrap gap-4 items-center bg-white dark:bg-zinc-900 p-4 rounded-xl border border-brand-purple/20">
@@ -107,7 +152,57 @@ export default function NutritionTab({ targetId, userRole, selectedStudentIds, o
           )}
         </div>
       )}
+
+      {/* 🔍 YENİ: HIZLI BESİN EKLEME PANELİ (Oto-Tamamlama) */}
+      <div className="bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 p-4 rounded-2xl flex flex-col md:flex-row items-end gap-4 shadow-sm relative z-10">
+        <div className="w-full md:w-1/4">
+          <label className="block text-[10px] font-bold text-gray-500 mb-1">GÜN SEÇ</label>
+          <select value={quickAddDay} onChange={(e) => setQuickAddDay(e.target.value)} className="w-full p-2.5 rounded-xl border dark:border-zinc-700 bg-white dark:bg-black text-sm outline-none">
+            {DAYS.map(d => <option key={d} value={d}>{d}</option>)}
+          </select>
+        </div>
+        
+        <div className="w-full md:w-2/4 relative">
+          <label className="block text-[10px] font-bold text-gray-500 mb-1">BESİN ARA</label>
+          <input 
+            type="text" 
+            placeholder="Örn: Yulaf, Tavuk..." 
+            value={searchQuery} 
+            onChange={(e) => { setSearchQuery(e.target.value); setSelectedFood(null); }}
+            className="w-full p-2.5 rounded-xl border dark:border-zinc-700 bg-white dark:bg-black text-sm outline-none focus:border-brand-purple"
+          />
+          {/* Arama Önerileri Dropdown */}
+          {suggestions.length > 0 && !selectedFood && (
+            <div className="absolute top-full left-0 w-full mt-1 bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-xl shadow-xl overflow-hidden z-50">
+              {suggestions.map(food => (
+                <div 
+                  key={food.id} 
+                  onClick={() => { setSelectedFood(food); setSearchQuery(food.name); setSuggestions([]); }}
+                  className="p-3 text-sm hover:bg-brand-purple/10 cursor-pointer border-b last:border-0 dark:border-zinc-800"
+                >
+                  <span className="font-bold">{food.name}</span> <span className="text-[10px] text-gray-500">({food.calories_per_100g} kcal / 100g)</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="w-full md:w-1/4">
+          <label className="block text-[10px] font-bold text-gray-500 mb-1">GRAMAJ</label>
+          <input 
+            type="number" 
+            value={quickAddGrams} 
+            onChange={(e) => setQuickAddGrams(e.target.value)}
+            className="w-full p-2.5 rounded-xl border dark:border-zinc-700 bg-white dark:bg-black text-sm outline-none focus:border-brand-purple"
+          />
+        </div>
+
+        <button onClick={handleQuickAdd} className="w-full md:w-auto px-6 py-2.5 bg-brand-purple text-white font-bold rounded-xl whitespace-nowrap shadow-md active:scale-95 transition-transform">
+          Hızlı Ekle ⚡
+        </button>
+      </div>
       
+      {/* TABLO */}
       <div className="overflow-x-auto border border-gray-200 dark:border-zinc-800 rounded-xl">
         <table className="w-full text-sm text-left">
           <thead className="bg-gray-50 dark:bg-zinc-900 border-b border-gray-200 dark:border-zinc-800">
@@ -119,12 +214,14 @@ export default function NutritionTab({ targetId, userRole, selectedStudentIds, o
           </thead>
           <tbody>
             {DAYS.map(day => (
-              <tr key={day} className="border-b border-gray-100 dark:border-zinc-800/50 hover:bg-gray-50/50 dark:hover:bg-zinc-900/50 transition-colors">
+              <tr key={day} className="border-b border-gray-100 dark:border-zinc-800/50 hover:bg-gray-50/50 transition-colors">
                 <td className="p-3 font-bold text-gray-700 dark:text-gray-300">{day}</td>
                 <td className="p-2">
                   <input 
-                    disabled={userRole !== 'admin'} value={nutritionData[day]?.items || ''} onChange={(e) => handleNutritionChange(day, e.target.value)}
-                    placeholder="Örn: Yulaf:100" className="w-full p-2 bg-transparent border border-transparent hover:border-gray-200 focus:border-brand-purple dark:hover:border-zinc-700 rounded-lg outline-none transition-all disabled:opacity-80"
+                    value={nutritionData[day]?.items || ''} 
+                    onChange={(e) => handleManualNutritionChange(day, e.target.value)}
+                    placeholder="Manuel de yazabilirsiniz..." 
+                    className="w-full p-2 bg-transparent border border-transparent hover:border-gray-200 focus:border-brand-purple dark:hover:border-zinc-700 rounded-lg outline-none transition-all"
                   />
                 </td>
                 <td className="p-3 font-black text-brand-purple">{nutritionData[day]?.total || 0} <span className="text-xs font-bold opacity-50">kcal</span></td>
@@ -133,11 +230,10 @@ export default function NutritionTab({ targetId, userRole, selectedStudentIds, o
           </tbody>
         </table>
       </div>
-      {userRole === 'admin' && (
-        <button onClick={handleSaveProgram} className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-xl text-sm transition-all shadow-md">
-          Beslenme Tablosunu Güncelle
-        </button>
-      )}
+      
+      <button onClick={handleSaveProgram} className="w-full py-4 bg-emerald-500 hover:bg-emerald-600 text-white font-black rounded-xl text-sm shadow-md transition-transform active:scale-95">
+        Beslenme Tablosunu Kaydet
+      </button>
     </div>
   );
 }
