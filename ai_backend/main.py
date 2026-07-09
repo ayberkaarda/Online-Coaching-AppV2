@@ -9,7 +9,7 @@ app = FastAPI()
 # React'tan gelecek istekleri kabul etmek için CORS ayarları
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # Güvenlik için canlıya alırken "http://localhost:3000" yap
+    allow_origins=["*"], 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -35,17 +35,80 @@ async def generate_ai_workout(req: WorkoutRequest):
         if day in prompt_lower and any(word in prompt_lower for word in ["yok", "off", "dinlenme", "yapmicam"]):
             rest_days.append(day.capitalize())
 
-    base_sets = "4x10"
+    # 🤖 YENİ: EĞER KULLANICI GÜN BELİRTMEDİYSE, ŞABLONA GÖRE OTOMATİK DİNLENME ATA
+    if not rest_days:
+        if req.split_type == "ppl_torso_limbs":
+            rest_days = ["Çarşamba", "Pazar"] # 5 Günlük idman, 2 off
+        elif req.split_type == "ppl":
+            rest_days = ["Perşembe", "Pazar"] # 3 Günlük PPL için standart off günleri
+        elif req.split_type in ["upper_lower", "torso_limbs"]:
+            rest_days = ["Çarşamba", "Cumartesi", "Pazar"] # 4 günlük şablonlar için 3 off
+
+    # Hacim Kararı
+    base_sets = "3x10-12"
     if req.goal == "bulk" and req.age < 30:
-        base_sets = "4x8-12 (Tükeniş - RIR 0)"
+        base_sets = "4x8-12 (RIR 0-1)"
     elif req.goal == "cut":
-        base_sets = "3x10 (Kas koruma - RIR 1-2)"
+        base_sets = "3x8-10 (RIR 1-2 / Kas Koruma)"
+
+    # 2026 Biyomekanik & Hipertrofi Odaklı Kapsamlı Egzersiz Kütüphanesi
+    elite_exercises = {
+        "Push": [
+            ["Smith Machine Incline Press", "Incline Dumbbell Press (30 Derece)", "Converging Chest Press Machine"],
+            ["Flat Dumbbell Press", "Pec Deck Fly (Lengthened Partials)", "Cable Crossover (Low to High)"],
+            ["Cuff Lateral Raise (Kablo)", "Dumbbell Lateral Raise (Hafif Eğilerek)", "Machine Lateral Raise"],
+            ["Cross-body Cable Triceps Extension", "Triceps Rope Pushdown", "Overhead Cable Extension (D-Handle)"]
+        ],
+        "Pull": [
+            ["Single-arm Iliac Lat Pulldown", "Neutral Grip Lat Pulldown", "Assisted Pull-ups"],
+            ["Chest Supported T-Bar Row", "Meadows Row", "Barbell Row (Strict Form)"],
+            ["Seated Cable Row (D-Handle / Lats Focus)", "Machine High Row (Upper Back Focus)"],
+            ["Rear Delt Cable Fly", "Reverse Pec Deck (Lengthened Focus)"],
+            ["Preacher Curl (Machine or EZ Bar)", "Incline Dumbbell Curl", "Bayesian Cable Curl (Arkalı)"]
+        ],
+        "Legs": [
+            ["Pendulum Squat", "Hack Squat", "Smith Machine Squat (Topuklar Önde)", "Leg Press (Düşük Duruş)"],
+            ["Bulgarian Split Squat (Deficit)", "Walking Lunges (Geniş Adım)", "Leg Extension (Tepede 1sn Bekleme)"],
+            ["Seated Leg Curl", "Lying Leg Curl (Kalça Sabit)"],
+            ["Romanian Deadlift (Dumbbell)", "Stiff-leg Barbell Deadlift", "Glute Ham Raise"],
+            ["Standing Calf Raise", "Seated Calf Raise"]
+        ],
+        "Upper": [
+            ["Incline Machine Press", "Flat Dumbbell Press", "Smith Machine Press"],
+            ["Lat Pulldown (Iliac Focus)", "Chest Supported Row", "T-Bar Row"],
+            ["Pec Deck Fly", "Cable Lateral Raise", "Cuff Lateral Raise"],
+            ["Overhead Triceps Extension", "Triceps Pushdown (V-Bar)"],
+            ["Preacher Curl", "Hammer Curl (Kablo)"]
+        ],
+        "Lower": [
+            ["Hack Squat", "Leg Press", "Pendulum Squat"],
+            ["Romanian Deadlift", "Seated Leg Curl"],
+            ["Leg Extension", "Walking Lunges"],
+            ["Standing Calf Raise", "Seated Calf Raise"]
+        ],
+        "Torso": [
+            ["Incline Smith Press", "Dumbbell Bench Press"],
+            ["Chest Supported Row", "Lat Pulldown (Wide Grip)"],
+            ["Pec Deck Fly", "Cable Crossover"],
+            ["Single Arm Cable Row", "Straight Arm Pulldown"],
+            ["Cuff Lateral Raise", "Dumbbell Lateral Raise"]
+        ],
+        "Limbs": [
+            ["Hack Squat", "Leg Press"],
+            ["Leg Extension", "Sissy Squat"],
+            ["Seated Leg Curl", "RDL (Dumbbell)"],
+            ["Cable Biceps Curl", "Hammer Curl"],
+            ["Overhead Triceps Extension", "Skull Crushers"],
+            ["Calf Raises", "Tibialis Raise"]
+        ]
+    }
 
     generated_plan = {}
     split_logic = {
         "ppl_torso_limbs": ["Push", "Pull", "Legs", "Torso", "Limbs"],
         "ppl": ["Push", "Pull", "Legs"],
-        "upper_lower": ["Upper", "Lower"]
+        "upper_lower": ["Upper", "Lower"],
+        "torso_limbs": ["Torso", "Limbs"]
     }
     
     flow = split_logic.get(req.split_type, ["Full Body"])
@@ -57,14 +120,26 @@ async def generate_ai_workout(req: WorkoutRequest):
             generated_plan[cap_day] = "Dinlenme (Aktif Dinlenme / Hafif Kardiyo)"
         else:
             muscle = flow[flow_idx % len(flow)]
-            if muscle == "Push":
-                plan = f"1. Incline Dumbbell Press - {base_sets}\n2. Flat Bench Press - {base_sets}\n3. Cable Crossover - 3x15 (Failure)\n4. Lateral Raise - 4x15 (Beyond Failure)"
-            elif muscle == "Torso":
-                plan = f"1. Incline Barbell Press - {base_sets}\n2. T-Bar Row - {base_sets}\n3. Lat Pulldown - 4x10\n4. Machine Fly - 3x12"
+            options_list = elite_exercises.get(muscle, [])
+            
+            plan_lines = []
+            plan_lines.append(f"--- {muscle.upper()} GÜNÜ ---")
+            
+            if options_list:
+                for i, exercise_options in enumerate(options_list):
+                    chosen_ex = random.choice(exercise_options)
+                    alt_options = [opt for opt in exercise_options if opt != chosen_ex]
+                    alt_ex = random.choice(alt_options) if alt_options else None
+                    
+                    line = f"{i + 1}. {chosen_ex} - {base_sets}"
+                    if alt_ex:
+                        line += f"\n   ↳ (Alternatif: {alt_ex})"
+                    
+                    plan_lines.append(line)
             else:
-                plan = f"--- {muscle.upper()} GÜNÜ ---\n(Yapay zeka tarafından optimize edilmiş hareketler)"
+                plan_lines.append("(Yapay zeka tarafından optimize edilmiş hareketler)")
                 
-            generated_plan[cap_day] = plan
+            generated_plan[cap_day] = "\n".join(plan_lines)
             flow_idx += 1
 
     return {
@@ -88,7 +163,6 @@ class DietRequest(BaseModel):
 
 @app.post("/api/generate-ai-diet")
 async def generate_ai_diet(req: DietRequest):
-    # 1. BMR ve TDEE Hesaplaması
     bmr = (10 * req.weight_kg) + (6.25 * req.height_cm) - (5 * req.age)
     bmr += 5 if req.gender == 'male' else -161
 
@@ -105,12 +179,10 @@ async def generate_ai_diet(req: DietRequest):
     
     target_cals = round(tdee)
 
-    # 2. Vücut Geliştirme Makro Matematiği
     target_p = req.weight_kg * 2.2
     target_f = (target_cals * 0.25) / 9 
     target_c = (target_cals - (target_p * 4) - (target_f * 9)) / 4 
 
-    # 3. Çiğ Değerlerle Güncellenmiş Türk Damak Tadı Veritabanı
     db = {
         "proteins": {
             "Tavuk Göğsü": {"p": 31, "c": 0, "f": 3.6},
@@ -121,13 +193,12 @@ async def generate_ai_diet(req: DietRequest):
             "Dana Eti": {"p": 26, "c": 0, "f": 15},
             "Yağsız Kıyma": {"p": 21, "c": 0, "f": 5},
             "Whey Protein": {"p": 80, "c": 5, "f": 2}
-            # Tofu Türkiye'de zor bulunduğu için sistemden çıkarıldı
         },
         "carbs": {
             "Yulaf": {"p": 13, "c": 68, "f": 6.5},
             "Basmati Pirinç": {"p": 8, "c": 78, "f": 1},
-            "Baldo Pirinç": {"p": 7, "c": 79, "f": 1},      # YENİ
-            "Yasemin Pirinç": {"p": 7, "c": 80, "f": 0.5},  # YENİ
+            "Baldo Pirinç": {"p": 7, "c": 79, "f": 1},      
+            "Yasemin Pirinç": {"p": 7, "c": 80, "f": 0.5},  
             "Kepekli Makarna": {"p": 13, "c": 65, "f": 2},
             "Tatlı Patates": {"p": 1.6, "c": 20, "f": 0.1},
             "Karabuğday": {"p": 13, "c": 71, "f": 3.4},
@@ -149,24 +220,20 @@ async def generate_ai_diet(req: DietRequest):
     pref_carbs = list(db["carbs"].keys())
     pref_proteins = list(db["proteins"].keys())
 
-    # --- NLP: İstekler ve Tercihler ---
     if "sadece zeytinyağı" in prompt or "hepsini zeytinyağı" in prompt: pref_fats = ["Zeytinyağı"]
     elif "kuruyemiş" in prompt: pref_fats = ["Ceviz", "Çiğ Badem", "Fıstık Ezmesi"]
 
     if any(word in prompt for word in ["yulaf yemem", "yulaf yok"]): pref_carbs = [c for c in pref_carbs if c != "Yulaf"]
     if any(word in prompt for word in ["tavuk yemem", "tavuk yok"]): pref_proteins = [p for p in pref_proteins if p != "Tavuk Göğsü"]
     
-    # 🤖 YENİ NLP: Tek Çeşit Protein (Bölme) İsteği
     split_proteins = True
     if any(word in prompt for word in ["bölme", "tek çeşit", "günde tek", "tek protein", "aynı protein"]):
         split_proteins = False
     
-    # 4. GÜNLÜK PORSİYONLAR VE BÖLÜNMELER
     days = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi", "Pazar"]
     diet_plan = {}
     
     for day in days:
-        # Eğer kullanıcı "bölme" dediyse, o gün için tek bir protein kaynağı seçip onu 4 öğüne kopyalıyoruz
         if split_proteins:
             p_list = random.choices(pref_proteins, k=4)
         else:
@@ -182,12 +249,10 @@ async def generate_ai_diet(req: DietRequest):
             meal_p = target_p / 4
             grams = max(50, round((meal_p / db["proteins"][p]["p"]) * 100 / 10) * 10)
             
-            # Sınırlar (Mide dostu)
             if split_proteins:
                 if p == "Yumurta" and grams > 150: grams = 150 
                 if p == "Lor Peyniri" and grams > 100: grams = 100 
             else:
-                # Kullanıcı tek çeşit istediyse sınırları biraz esnetiyoruz ki proteine ulaşabilsin
                 if p == "Yumurta" and grams > 200: grams = 200 
                 if p == "Lor Peyniri" and grams > 200: grams = 200 
             
