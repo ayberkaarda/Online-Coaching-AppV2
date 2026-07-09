@@ -105,12 +105,12 @@ async def generate_ai_diet(req: DietRequest):
     
     target_cals = round(tdee)
 
-    # 2. Günlük Makro Hedefleri (%30 Pro, %45 Karb, %25 Yağ)
-    target_p = (target_cals * 0.30) / 4
-    target_c = (target_cals * 0.45) / 4
-    target_f = (target_cals * 0.25) / 9
+    # 2. Vücut Geliştirme Makro Matematiği
+    target_p = req.weight_kg * 2.2
+    target_f = (target_cals * 0.25) / 9 
+    target_c = (target_cals - (target_p * 4) - (target_f * 9)) / 4 
 
-    # 3. Çiğ Değerlerle (Raw) Güncellenmiş Veritabanı
+    # 3. Çiğ Değerlerle Güncellenmiş Türk Damak Tadı Veritabanı
     db = {
         "proteins": {
             "Tavuk Göğsü": {"p": 31, "c": 0, "f": 3.6},
@@ -118,31 +118,28 @@ async def generate_ai_diet(req: DietRequest):
             "Yumurta": {"p": 13, "c": 1.1, "f": 11},
             "Lor Peyniri": {"p": 16, "c": 3, "f": 1},
             "Somon": {"p": 20, "c": 0, "f": 13},
-            "Ton Balığı": {"p": 25, "c": 0, "f": 1},
             "Dana Eti": {"p": 26, "c": 0, "f": 15},
             "Yağsız Kıyma": {"p": 21, "c": 0, "f": 5},
-            "Whey Protein": {"p": 80, "c": 5, "f": 2},
-            "Tofu": {"p": 8, "c": 2, "f": 4}
+            "Whey Protein": {"p": 80, "c": 5, "f": 2}
+            # Tofu Türkiye'de zor bulunduğu için sistemden çıkarıldı
         },
         "carbs": {
             "Yulaf": {"p": 13, "c": 68, "f": 6.5},
             "Basmati Pirinç": {"p": 8, "c": 78, "f": 1},
+            "Baldo Pirinç": {"p": 7, "c": 79, "f": 1},      # YENİ
+            "Yasemin Pirinç": {"p": 7, "c": 80, "f": 0.5},  # YENİ
             "Kepekli Makarna": {"p": 13, "c": 65, "f": 2},
             "Tatlı Patates": {"p": 1.6, "c": 20, "f": 0.1},
             "Karabuğday": {"p": 13, "c": 71, "f": 3.4},
             "Kinoa": {"p": 14, "c": 64, "f": 6},
-            "Bulgur": {"p": 12, "c": 76, "f": 1.3},
-            "Yeşil Mercimek": {"p": 25, "c": 60, "f": 1},
-            "Pirinç Patlağı": {"p": 8, "c": 80, "f": 3}
+            "Yeşil Mercimek": {"p": 25, "c": 60, "f": 1}
         },
         "fats": {
             "Zeytinyağı": {"p": 0, "c": 0, "f": 100},
             "Çiğ Badem": {"p": 21, "c": 22, "f": 49},
             "Ceviz": {"p": 15, "c": 14, "f": 65},
             "Fıstık Ezmesi": {"p": 25, "c": 20, "f": 50},
-            "Avokado": {"p": 2, "c": 9, "f": 15},
-            "Keten Tohumu": {"p": 18, "c": 29, "f": 42},
-            "Chia Tohumu": {"p": 17, "c": 42, "f": 31}
+            "Avokado": {"p": 2, "c": 9, "f": 15}
         }
     }
 
@@ -152,48 +149,89 @@ async def generate_ai_diet(req: DietRequest):
     pref_carbs = list(db["carbs"].keys())
     pref_proteins = list(db["proteins"].keys())
 
+    # --- NLP: İstekler ve Tercihler ---
     if "sadece zeytinyağı" in prompt or "hepsini zeytinyağı" in prompt: pref_fats = ["Zeytinyağı"]
     elif "kuruyemiş" in prompt: pref_fats = ["Ceviz", "Çiğ Badem", "Fıstık Ezmesi"]
 
-    if "vegan" in prompt: pref_proteins = ["Tofu", "Whey Protein", "Yeşil Mercimek"]
-    if "balık" in prompt and "sadece" in prompt: pref_proteins = ["Somon", "Ton Balığı"]
-    
     if any(word in prompt for word in ["yulaf yemem", "yulaf yok"]): pref_carbs = [c for c in pref_carbs if c != "Yulaf"]
     if any(word in prompt for word in ["tavuk yemem", "tavuk yok"]): pref_proteins = [p for p in pref_proteins if p != "Tavuk Göğsü"]
-    if any(word in prompt for word in ["kırmızı et yemem", "et yok"]): pref_proteins = [p for p in pref_proteins if p not in ["Dana Eti", "Yağsız Kıyma"]]
-
-    # 4. GÜNLÜK PORSİYONLARI 2 ANA ÖĞÜNE BÖL (Çok yemeği önler)
+    
+    # 🤖 YENİ NLP: Tek Çeşit Protein (Bölme) İsteği
+    split_proteins = True
+    if any(word in prompt for word in ["bölme", "tek çeşit", "günde tek", "tek protein", "aynı protein"]):
+        split_proteins = False
+    
+    # 4. GÜNLÜK PORSİYONLAR VE BÖLÜNMELER
     days = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi", "Pazar"]
     diet_plan = {}
     
     for day in days:
-        # Rastgele 2 farklı protein ve 2 farklı karb seç
-        p_list = random.sample(pref_proteins, min(2, len(pref_proteins)))
-        p1, p2 = p_list[0], p_list[-1]
+        # Eğer kullanıcı "bölme" dediyse, o gün için tek bir protein kaynağı seçip onu 4 öğüne kopyalıyoruz
+        if split_proteins:
+            p_list = random.choices(pref_proteins, k=4)
+        else:
+            single_p = random.choice(pref_proteins)
+            p_list = [single_p] * 4 
+
+        c_list = random.choices(pref_carbs, k=4)
+        f_list = random.choices(pref_fats, k=2)
         
-        c_list = random.sample(pref_carbs, min(2, len(pref_carbs)))
-        c1, c2 = c_list[0], c_list[-1]
+        daily_foods = {}
         
-        f1 = random.choice(pref_fats)
+        for p in p_list:
+            meal_p = target_p / 4
+            grams = max(50, round((meal_p / db["proteins"][p]["p"]) * 100 / 10) * 10)
+            
+            # Sınırlar (Mide dostu)
+            if split_proteins:
+                if p == "Yumurta" and grams > 150: grams = 150 
+                if p == "Lor Peyniri" and grams > 100: grams = 100 
+            else:
+                # Kullanıcı tek çeşit istediyse sınırları biraz esnetiyoruz ki proteine ulaşabilsin
+                if p == "Yumurta" and grams > 200: grams = 200 
+                if p == "Lor Peyniri" and grams > 200: grams = 200 
+            
+            daily_foods[p] = daily_foods.get(p, 0) + grams
+            
+        for c in c_list:
+            meal_c = target_c / 4
+            grams = max(40, round((meal_c / db["carbs"][c]["c"]) * 100 / 10) * 10)
+            if c in ["Yulaf", "Kinoa", "Karabuğday"] and grams > 80: grams = 80
+            daily_foods[c] = daily_foods.get(c, 0) + grams
+            
+        trace_f = sum((grams/100) * db["proteins"][p]["f"] for p, grams in daily_foods.items() if p in db["proteins"]) + \
+                  sum((grams/100) * db["carbs"][c]["f"] for c, grams in daily_foods.items() if c in db["carbs"])
         
-        # Günlük proteini ikiye böl (%60'ı birinden, %40'ı diğerinden)
-        p1_grams = round(((target_p * 0.6) / db["proteins"][p1]["p"]) * 100 / 10) * 10
-        p2_grams = round(((target_p * 0.4) / db["proteins"][p2]["p"]) * 100 / 10) * 10
+        rem_f = max(10, target_f - trace_f)
         
-        # Kalan Karbonhidratı hesapla ve böl
-        rem_c = target_c - ((p1_grams/100) * db["proteins"][p1]["c"]) - ((p2_grams/100) * db["proteins"][p2]["c"])
-        c1_grams = max(30, round(((rem_c * 0.6) / db["carbs"][c1]["c"]) * 100 / 10) * 10)
-        c2_grams = max(30, round(((rem_c * 0.4) / db["carbs"][c2]["c"]) * 100 / 10) * 10)
-        
-        # Kalan Yağı hesapla
-        rem_f = target_f - ((p1_grams/100) * db["proteins"][p1]["f"]) - ((p2_grams/100) * db["proteins"][p2]["f"]) - ((c1_grams/100) * db["carbs"][c1]["f"]) - ((c2_grams/100) * db["carbs"][c2]["f"])
-        f1_grams = max(10, round((rem_f / db["fats"][f1]["f"]) * 100 / 5) * 5)
-        
-        diet_plan[day] = f"{p1}:{p1_grams}, {p2}:{p2_grams}, {c1}:{c1_grams}, {c2}:{c2_grams}, {f1}:{f1_grams}"
+        for f in f_list:
+            meal_f = rem_f / 2
+            grams = max(10, round((meal_f / db["fats"][f]["f"]) * 100 / 5) * 5)
+            if f in ["Çiğ Badem", "Ceviz", "Fıstık Ezmesi"] and grams > 30: grams = 30 
+            daily_foods[f] = daily_foods.get(f, 0) + grams
+
+        total_f_added = sum((grams/100) * db["fats"][f]["f"] for f, grams in daily_foods.items() if f in db["fats"])
+        if rem_f - total_f_added > 10:
+            extra_oil = round((rem_f - total_f_added) / db["fats"]["Zeytinyağı"]["f"] * 100 / 5) * 5
+            daily_foods["Zeytinyağı"] = daily_foods.get("Zeytinyağı", 0) + extra_oil
+
+        final_strings = []
+        for name, grams in daily_foods.items():
+            if name == "Yumurta":
+                adet = int(grams / 50)
+                final_strings.append(f"Yumurta:{grams} ({adet} Adet)")
+            else:
+                final_strings.append(f"{name}:{grams}")
+
+        diet_plan[day] = ", ".join(final_strings)
+
+    analysis_msg = f"TDEE: {target_cals} kcal."
+    if not split_proteins:
+        analysis_msg += " 'Tek çeşit protein' isteği uygulandı."
 
     return {
         "status": "success",
         "target_calories": target_cals,
-        "ai_analysis": f"TDEE: {target_cals} kcal. Çoklu öğün sistemine göre 2 Protein + 2 Karb kaynağına bölündü.",
+        "ai_analysis": analysis_msg,
         "diet_plan": diet_plan
     }
