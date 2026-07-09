@@ -1,36 +1,33 @@
-# 🚀 Online Coaching Management Platform
+# 🚀 Online Coaching Management Platform 2
 
-Bu proje, koçlar ve danışanlar arasındaki etkileşimi dijitalleştirmek, yönetim süreçlerini optimize etmek ve verimli bir koçluk deneyimi sunmak amacıyla geliştirilmiş modern bir web uygulamasıdır.
+Bu proje, yapay zeka destekli bir **Online Koçluk ve Fitness Takip Uygulaması**'dır. Next.js, Supabase ve Python (AI Backend) teknolojileri kullanılarak geliştirilmiş olup, kullanıcılara beslenme takibi, antrenman loglama ve gelişmiş veri analitiği sunar.
 
 # 🛠️ Mimari ve Teknolojiler
 
 Platform, yüksek performans, modern web standartları ve ölçeklenebilir altyapı bileşenleri kullanılarak inşa edilmiştir:
 
-![Next.js](https://img.shields.io/badge/next.js-000000?style=for-the-badge&logo=nextdotjs&logoColor=white)
-![React](https://img.shields.io/badge/react-%2320232a.svg?style=for-the-badge&logo=react&logoColor=%2361DAFB)
-![TailwindCSS](https://img.shields.io/badge/tailwindcss-%2338B2AC.svg?style=for-the-badge&logo=tailwind-css&logoColor=white)
+![Next.js](https://img.shields.io/badge/Next.js-000000?style=for-the-badge&logo=nextdotjs&logoColor=white)
 ![Supabase](https://img.shields.io/badge/Supabase-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-316192?style=for-the-badge&logo=postgresql&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)
 
 ## ✨ Öne Çıkan Özellikler
 
-* **Kullanıcı ve Rol Yönetimi:** Admin panelleri üzerinden kullanıcı ve yetki yönetimi; AdminUserManagement.js ile merkezi kontrol.
-* **Dinamik Dashboard:** DashboardTabs.js aracılığıyla koçluk süreçlerinin modüler takibi.
-* **İletişim ve Bildirimler:** NotificationForm.js ile danışanlarla hızlı etkileşim ve bildirim yönetimi.
-* **Süreç Takibi:** Koçlar için danışan profillerini ve ilerlemelerini takip edebilecekleri kapsamlı paneller.
-* **Yönetim ve Güvenlik:** Supabase üzerinden sağlanan kullanıcı kimlik doğrulama, yetkilendirme ve rol tabanlı erişim kontrolü (RBAC)
-* **Temalandırma:** ThemeProvider ve ThemeToggle bileşenleri ile özelleştirilebilir kullanıcı deneyimi.
+* **AI Tabanlı Analiz:** Python destekli `ai_backend` sayesinde kişiselleştirilmiş fitness analizleri ve önerileri sunar
+* **Veri Yönetimi:** Beslenme ve antrenman verilerini CSV veri setleri üzerinden işler ve analiz eder.
+* **Kapsamlı Dashboard:** Kullanıcıların ilerlemesini takip edebileceği; günlük loglar, beslenme planları, antrenman programları ve istatistik sekmelerini içeren modüler bir yapı sunar.
+* **Gerçek Zamanlı Veritabanı:** Supabase ile güvenli kullanıcı yönetimi ve veri depolama altyapısı sağlar[cite: 8].
 
 ---
 ## 📂 Dizin Yapısı ve Önemli Konumlar
 
-* **`/src/app`**: Uygulamanın yönlendirme (routing) yapısı ve temel sayfalar (login, profile, users, dashboard).
+* **`src/app/`**: Uygulamanın yönlendirme (routing) sayfalarını ve temel iş mantığını içerir.
 
-* **`/src/components`**: Uygulamayı oluşturan yeniden kullanılabilir bileşenler (AdminPanel, DashboardTabs, ThemeToggle vb.).
+*   **`src/components/tabs/`**: Dashboard üzerinde kullanıcı deneyimini optimize eden sekmeli bileşenleri (NutritionTab, WorkoutTab, StatsTab vb.) barındırır.
 
-* **`/src/lib`**: Supabase gibi servislerin yapılandırma ve istemci bağlantı dosyaları.
+* **`ai_backend/`**: Yapay zeka motorunun çalıştığı, veri işleme ve analiz süreçlerini yürüten Python dizini.
   
-* **`/tailwind.config.js`**: Tasarım sisteminin özelleştirildiği yapılandırma dosyası.
+* **`src/lib/`**: Supabase bağlantı konfigürasyonlarını ve yardımcı (helper) fonksiyonları içerir.
 ---
 
 ## 🛠️ Kurulum & Çalıştırma (Local Development)
@@ -38,6 +35,7 @@ Platform, yüksek performans, modern web standartları ve ölçeklenebilir altya
 ### 1. Gereksinimler
 * Supabase Hesabı
 * Node.js & npm
+* Python 3.x
 
 
 Projeyi klonlayın ve kök dizine gidin:
