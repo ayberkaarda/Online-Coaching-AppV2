@@ -1,41 +1,36 @@
 const fs = require('fs');
 
-console.log("⏳ V2 CSV Temizleme işlemi başlıyor (Görseller dahil)...");
+console.log("⏳ Besin CSV Temizleme işlemi başlıyor...");
 
 try {
-  const rawData = fs.readFileSync('exercises.csv', 'utf8');
+  // İndirdiğin kaggle dosyasının adının 'foods.csv' olduğunu varsayıyorum
+  const rawData = fs.readFileSync('foods.csv', 'utf8');
   const lines = rawData.split('\n');
-  const headers = lines[0].split(',');
+  const headers = lines[0].toLowerCase().split(',');
 
-  const nameIdx = headers.indexOf('name');
-  const bodyPartIdx = headers.indexOf('body_part');
-  const targetIdx = headers.indexOf('target');
-  const equipmentIdx = headers.indexOf('equipment');
-  const gifUrlIdx = headers.indexOf('gif_url');
-  const imageIdx = headers.indexOf('image'); 
+  // CSV'nin içindeki sütun isimlerini bul (İndirdiğin CSV'ye göre buradaki isimler değişebilir)
+  const nameIdx = headers.findIndex(h => h.includes('name') || h.includes('food'));
+  const calIdx = headers.findIndex(h => h.includes('calor') || h.includes('kcal') || h.includes('energy'));
 
-  let cleanCSV = 'name,body_part,target,equipment,gif_url,image\n';
+  let cleanCSV = 'name,calories_per_100g\n';
 
   for (let i = 1; i < lines.length; i++) {
     if (!lines[i].trim()) continue;
     const row = lines[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
     
-    if (row.length > Math.max(nameIdx, bodyPartIdx, targetIdx, equipmentIdx)) {
+    if (row.length > Math.max(nameIdx, calIdx)) {
         const name = (row[nameIdx] || '').replace(/"/g, '').trim();
-        const bodyPart = (row[bodyPartIdx] || '').replace(/"/g, '').trim();
-        const target = (row[targetIdx] || '').replace(/"/g, '').trim();
-        const equipment = (row[equipmentIdx] || '').replace(/"/g, '').trim();
-        const gifUrl = gifUrlIdx !== -1 ? (row[gifUrlIdx] || '').replace(/"/g, '').trim() : '';
-        const image = imageIdx !== -1 ? (row[imageIdx] || '').replace(/"/g, '').trim() : '';
+        const calories = parseFloat((row[calIdx] || '').replace(/"/g, '').trim()) || 0;
         
-        if (name) {
-            cleanCSV += `"${name}","${bodyPart}","${target}","${equipment}","${gifUrl}","${image}"\n`;
+        // Türkçe karakterli örnek besinleri de Python AI ile uyuşması için manuel ekleyebilirsin
+        if (name && calories > 0) {
+            cleanCSV += `"${name}",${calories}\n`;
         }
     }
   }
 
-  fs.writeFileSync('clean_exercises_v2.csv', cleanCSV);
-  console.log("✅ İŞLEM TAMAM! Linkler dahil edildi ve 'clean_exercises_v2.csv' oluşturuldu.");
+  fs.writeFileSync('clean_foods.csv', cleanCSV);
+  console.log("✅ İŞLEM TAMAM! 'clean_foods.csv' dosyası oluşturuldu. Supabase'e import edebilirsin.");
 } catch (error) {
   console.log("❌ Hata oluştu:", error.message);
 }
