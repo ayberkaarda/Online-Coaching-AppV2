@@ -1,0 +1,73 @@
+# Bu compose dosyası yalnızca UYGULAMA KATMANINI (web + ai-backend) ayağa
+# kaldırır ve isteğe bağlı olarak minimal bir Postgres örneği sağlar.
+#
+# Tam yerel Supabase stack'i (Auth, Storage, Realtime, Studio, GoTrue vb.)
+# için bu dosya yerine `npx supabase start` KULLANILMASI ÖNERİLİR — bu daha
+# doğru ve resmi Supabase CLI/Docker altyapısını kullanır.
+#
+# `supabase-db` servisi burada yalnızca compose ile tamamen izole, hafif bir
+# ortamda (örn. CI, hızlı smoke test) minimal bir Postgres gerektiğinde
+# opsiyonel bir yedek olarak bulunur.
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - '3000:3000'
+    env_file:
+      - .env.local
+    environment:
+      AI_BACKEND_URL: http://ai-backend:8000
+    depends_on:
+      ai-backend:
+        condition: service_healthy
+    networks:
+      - coaching-net
+    restart: unless-stopped
+
+  ai-backend:
+    build:
+      context: ./ai_backend
+    ports:
+      - '8000:8000'
+    environment:
+      CORS_ORIGINS: http://localhost:3000
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'python',
+          '-c',
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - coaching-net
+    restart: unless-stopped
+
+  # Opsiyonel, minimal Postgres. Gerçek yerel Supabase geliştirme deneyimi
+  # (Auth/Storage/Studio dahil) için bunun yerine `npx supabase start` çalıştırın.
+  supabase-db:
+    image: supabase/postgres:15.8.1.020
+    ports:
+      - '54322:5432'
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    volumes:
+      - supabase-db-data:/var/lib/postgresql/data
+      - ./supabase/migrations:/docker-entrypoint-initdb.d/migrations:ro
+    networks:
+      - coaching-net
+    restart: unless-stopped
+
+volumes:
+  supabase-db-data:
+
+networks:
+  coaching-net:
+    driver: bridge

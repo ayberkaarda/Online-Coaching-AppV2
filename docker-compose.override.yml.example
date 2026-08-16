@@ -1,0 +1,30 @@
+# Hot-reload'lu yerel geliştirme varyantı örneği.
+#
+# Kullanım:
+#   cp docker-compose.override.yml.example docker-compose.override.yml
+#   docker compose up
+#
+# `docker-compose.override.yml` .gitignore'dadır; bu örnek dosya sürüm
+# kontrolünde kalır, kişisel override'ınız kalmaz.
+
+services:
+  web:
+    build:
+      target: builder
+    command: npm run dev
+    ports:
+      - '3000:3000'
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+    environment:
+      NODE_ENV: development
+      WATCHPACK_POLLING: 'true'
+
+  ai-backend:
+    build:
+      context: ./ai_backend
+    volumes:
+      - ./ai_backend:/app
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload

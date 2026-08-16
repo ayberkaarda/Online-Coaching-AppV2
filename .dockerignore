@@ -1,0 +1,11 @@
+node_modules
+.next
+.git
+coverage
+playwright-report
+test-results
+ai_backend
+supabase
+data/exercises.csv
+*.md
+.env*

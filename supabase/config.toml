@@ -1,0 +1,92 @@
+# Supabase CLI yerel geliştirme yapılandırması
+# Docs: https://supabase.com/docs/guides/cli/config
+#
+# `supabase start` bu dosyayı okuyarak yerel Docker yığınını ayağa kaldırır.
+# Uzak projeye bağlanmak için: `supabase link --project-ref <project-ref>`
+
+project_id = "my-coaching-app"
+
+[api]
+enabled = true
+# REST/GraphQL API portu -> http://127.0.0.1:54321
+port = 54321
+# PostgREST üzerinden dışa açılan şemalar
+schemas = ["public", "storage", "graphql_public"]
+# Fonksiyon/tip çözümlemesi için arama yolu
+extra_search_path = ["public", "extensions"]
+# Tek istekte dönebilecek maksimum satır sayısı
+max_rows = 1000
+
+[db]
+# Postgres portu -> postgresql://postgres:postgres@127.0.0.1:54322/postgres
+port = 54322
+# Migration diff'i için kullanılan gölge veritabanı portu
+shadow_port = 54320
+# Supabase projesindeki Postgres ana sürümü ile aynı olmalı
+major_version = 15
+
+[db.pooler]
+enabled = false
+port = 54329
+pool_mode = "transaction"
+default_pool_size = 20
+max_client_conn = 100
+
+[db.seed]
+# `supabase db reset` sonrası seed dosyalarını çalıştır
+enabled = true
+sql_paths = ["./seed.sql"]
+
+[realtime]
+# messages / notifications tabloları için canlı abonelik gerekli
+enabled = true
+
+[studio]
+enabled = true
+# Studio arayüzü -> http://127.0.0.1:54323
+port = 54323
+api_url = "http://127.0.0.1"
+
+# Eski adı [inbucket] idi; Supabase CLI bunu [local_smtp] olarak yeniden adlandırdı.
+[local_smtp]
+enabled = true
+# Yerel e-posta kutusu (doğrulama/şifre sıfırlama) -> http://127.0.0.1:54324
+port = 54324
+
+[storage]
+enabled = true
+# Yerel yığın için üst sınır; bucket bazlı limitler migration'da tanımlı
+file_size_limit = "50MiB"
+
+[auth]
+enabled = true
+site_url = "http://localhost:3000"
+additional_redirect_urls = ["http://localhost:3000/**"]
+jwt_expiry = 3600
+enable_refresh_token_rotation = true
+refresh_token_reuse_interval = 10
+# Kayıt kapalı: danışan hesaplarını yalnızca koç (admin) service_role ile açar
+enable_signup = false
+enable_manual_linking = false
+
+[auth.email]
+# DİKKAT: Supabase CLI'ın [auth.email] şemasında `enabled` diye bir anahtar YOK
+# (CLI kaynağında -- apps/cli/src/legacy/commands/start/services/gotrue.service.ts --
+# doğrulandı); yazılsa bile CLI tarafından sessizce yok sayılır. E-posta
+# SAĞLAYICISINI açıp kapatan gerçek anahtar `enable_signup`tır ve doğrudan
+# GOTRUE_EXTERNAL_EMAIL_ENABLED ortam değişkenine eşlenir. Uygulamanın tek giriş
+# yöntemi e-posta/şifre olduğundan bu AÇIK olmalı -> enable_signup = true.
+#
+# Kullanıcıların KENDİ KENDİNE KAYIT OLMASI ise ayrı ve üst seviyede bir anahtarla
+# engellenir: yukarıdaki [auth] bölümündeki `enable_signup = false`,
+# GOTRUE_DISABLE_SIGNUP=true değerine eşlenir ve danışan hesapları yalnızca koç
+# (admin) service_role ile açabilsin diye bilinçli olarak KAPALI tutulur. Yani
+# e-posta sağlayıcısı açıkken bile [auth].enable_signup = false sayesinde kimse
+# kendi kendine kayıt olamaz.
+enable_signup = true
+double_confirm_changes = true
+# Yerelde e-posta doğrulaması istemiyoruz
+enable_confirmations = false
+
+[analytics]
+enabled = false

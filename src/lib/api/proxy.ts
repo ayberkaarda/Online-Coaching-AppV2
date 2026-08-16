@@ -1,0 +1,142 @@
+import 'server-only'
+
+// AI proxy route'larının ortak iskeleti: doğrulama, upstream çağrısı, hata maskeleme.
+// GÜVENLİK: upstream hata detayları/stack istemciye ASLA sızdırılmaz, yalnızca loglanır.
+
+import { NextResponse } from 'next/server'
+import type { z } from 'zod'
+
+import { getServerEnv } from '@/env'
+import { createRequestLogger } from '@/lib/logger'
+import { formatZodError } from '@/lib/validation/schemas'
+
+const UPSTREAM_TIMEOUT_MS = 30_000
+
+/** Standart hata gövdesi (`ApiErrorBody`) üretir. */
+export function errorResponse(
+  status: number,
+  code: string,
+  message: string,
+  requestId: string,
+  details?: unknown
+): NextResponse {
+  return NextResponse.json(
+    {
+      error: {
+        code,
+        message,
+        request_id: requestId,
+        ...(details !== undefined ? { details } : {}),
+      },
+    },
+    {
+      status,
+      headers: { 'X-Request-ID': requestId, 'Cache-Control': 'no-store' },
+    }
+  )
+}
+
+/**
+ * Gövdeyi doğrulayıp Python AI backend'ine iletir ve yanıtını aynen döndürür.
+ *
+ * @param upstreamPath `/analyze/workout` gibi, AI_BACKEND_URL'e eklenen yol.
+ */
+export async function handleAiProxy<TOut>(
+  request: Request,
+  schema: z.ZodType<TOut, z.ZodTypeDef, unknown>,
+  upstreamPath: string
+): Promise<NextResponse> {
+  const requestId = crypto.randomUUID()
+  const log = createRequestLogger(requestId)
+
+  // 1) Gövdeyi oku
+  let rawBody: unknown
+  try {
+    rawBody = await request.json()
+  } catch {
+    return errorResponse(400, 'INVALID_JSON', 'İstek gövdesi geçerli bir JSON değil.', requestId)
+  }
+
+  // 2) Doğrula
+  const parsed = schema.safeParse(rawBody)
+  if (!parsed.success) {
+    const details = formatZodError(parsed.error)
+    log.warn({ upstreamPath, details }, 'AI proxy doğrulama hatası')
+    return errorResponse(
+      422,
+      'VALIDATION_ERROR',
+      'Gönderilen bilgiler geçersiz. Lütfen alanları kontrol edin.',
+      requestId,
+      details
+    )
+  }
+
+  // 3) Upstream'e ilet
+  const env = getServerEnv()
+  const upstreamUrl = `${env.AI_BACKEND_URL.replace(/\/+$/, '')}${upstreamPath}`
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'X-Request-ID': requestId,
+  }
+  if (env.AI_BACKEND_API_KEY) headers['X-API-Key'] = env.AI_BACKEND_API_KEY
+
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS)
+
+  let upstreamResponse: Response
+  try {
+    upstreamResponse = await fetch(upstreamUrl, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(parsed.data),
+      signal: controller.signal,
+      cache: 'no-store',
+    })
+  } catch (error) {
+    log.error({ upstreamPath, err: error }, 'AI backend’e ulaşılamadı')
+    return errorResponse(
+      503,
+      'AI_BACKEND_UNAVAILABLE',
+      'Python AI sunucusuna ulaşılamadı. Sunucunun çalıştığından emin olun.',
+      requestId
+    )
+  } finally {
+    clearTimeout(timeoutId)
+  }
+
+  // 4) Upstream hatası — detay sızdırma
+  if (!upstreamResponse.ok) {
+    const upstreamText = await upstreamResponse.text().catch(() => '')
+    log.error(
+      { upstreamPath, status: upstreamResponse.status, body: upstreamText.slice(0, 2000) },
+      'AI backend hata döndü'
+    )
+    return errorResponse(
+      502,
+      'AI_BACKEND_ERROR',
+      'Yapay zeka servisi şu anda yanıt vermiyor.',
+      requestId
+    )
+  }
+
+  // 5) Başarılı yanıtı aynen ilet
+  let data: unknown
+  try {
+    data = await upstreamResponse.json()
+  } catch (error) {
+    log.error({ upstreamPath, err: error }, 'AI backend geçersiz JSON döndü')
+    return errorResponse(
+      502,
+      'AI_BACKEND_ERROR',
+      'Yapay zeka servisi şu anda yanıt vermiyor.',
+      requestId
+    )
+  }
+
+  log.info({ upstreamPath }, 'AI proxy başarılı')
+
+  return NextResponse.json(data, {
+    headers: { 'X-Request-ID': requestId, 'Cache-Control': 'no-store' },
+  })
+}

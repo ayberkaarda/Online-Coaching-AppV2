@@ -12,10 +12,20 @@
 
 # testing
 /coverage
+/playwright-report
+/test-results
+/.vitest
 
 # next.js
 /.next/
 /out/
+
+# next-pwa tarafından build sırasında üretilir — commit edilmez
+public/sw.js
+public/sw.js.map
+public/workbox-*.js
+public/workbox-*.js.map
+public/fallback-*.js
 
 # production
 /build
@@ -39,3 +49,23 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# python (ai_backend)
+.venv/
+__pycache__/
+*.pyc
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+
+# editors
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# docker
+docker-compose.override.yml
+
+# supabase (local stack scratch files — contains generated secrets)
+supabase/.temp/
+supabase/.branches/

@@ -32,9 +32,54 @@
 }
 /* Sadece yatay sekmelerdeki scrollbar'ı gizleyen özel sınıf */
 .hide-scrollbar {
-  -ms-overflow-style: none;  /* IE and Edge */
-  scrollbar-width: none;  /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
 }
 .hide-scrollbar::-webkit-scrollbar {
   display: none; /* Chrome, Safari and Opera */
 }
+
+/* İnce, marka renginde scrollbar (kodda kullanılıyor ama tanımsızdı) */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #8b5cf6 transparent;
+}
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #8b5cf6;
+  border-radius: 10px;
+}
+
+/* Erişilebilirlik güvenlik ağı: kodda bolca `focus:outline-none` kullanılıyor,
+   bu global kural klavye kullanıcıları için odak görünürlüğünü garanti eder. */
+:focus-visible {
+  outline: 2px solid #8b5cf6;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Hareket azaltma tercihi: animate-pulse / animate-ping / animate-bounce bolca kullanılıyor. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Kontrast notu (WCAG AA):
+   `.text-gray-400` açık zeminde (beyaz kart üstünde) normal metin boyutunda AA kontrastını
+   (4.5:1) zor geçiyor ya da geçmiyor; `.text-gray-500` sınırda. Bu sınıflar özellikle küçük
+   punto (text-xs) ile birlikte kullanıldığında risklidir. Burada override edilmedi çünkü
+   tasarım dilinin bir parçası; ileride bu sınıfların kritik/okunması gereken metinlerde
+   (hata mesajları, form etiketleri gibi) `.text-gray-600` veya daha koyusuyla değiştirilmesi
+   önerilir. */

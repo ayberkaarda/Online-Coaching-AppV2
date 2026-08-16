@@ -1,0 +1,11 @@
+data/
+coverage/
+.next/
+ai_backend/
+node_modules/
+playwright-report/
+test-results/
+public/
+supabase/
+# `npm run db:types` ile üretilir — formatı Supabase CLI belirler.
+src/types/database.ts
