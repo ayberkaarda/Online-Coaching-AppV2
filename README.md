@@ -253,8 +253,8 @@ Uygulama `http://localhost:3000`, AI servisi `http://localhost:8000` (Swagger: `
 | `NEXT_PUBLIC_APP_URL`           | Hayır                                       | `http://localhost:3000` | İstemci + sunucu           | Mutlak URL üretimi (ör. e-posta linkleri).                                                                            |
 | `NODE_ENV`                      | Hayır                                       | `development`           | Sunucu                     | `development` \| `test` \| `production`.                                                                              |
 | `LOG_LEVEL`                     | Hayır                                       | `info`                  | Sunucu                     | pino log seviyesi.                                                                                                    |
-| `RATE_LIMIT_WINDOW_MS`          | Hayır                                       | `60000`                 | Sunucu (`middleware.ts`)   | Genel `/api/*` rate limit penceresi (ms).                                                                             |
-| `RATE_LIMIT_MAX_REQUESTS`       | Hayır                                       | `60`                    | Sunucu (`middleware.ts`)   | Pencere başına genel istek sınırı. AI uçları (`/api/ai/*`) bundan bağımsız, sabit **20 istek/dakika** ile sınırlıdır. |
+| `RATE_LIMIT_WINDOW_MS`          | Hayır                                       | `60000`                 | Sunucu (`proxy.ts`)        | Genel `/api/*` rate limit penceresi (ms).                                                                             |
+| `RATE_LIMIT_MAX_REQUESTS`       | Hayır                                       | `60`                    | Sunucu (`proxy.ts`)        | Pencere başına genel istek sınırı. AI uçları (`/api/ai/*`) bundan bağımsız, sabit **20 istek/dakika** ile sınırlıdır. |
 
 > **UYARI: `SUPABASE_SERVICE_ROLE_KEY` ASLA `NEXT_PUBLIC_` öneki ALMAMALI ve istemci koduna (bileşen, hook, `'use client'` dosyası) ASLA import EDİLMEMELİDİR.** Bu anahtar RLS'yi tamamen atlar; sızması tüm veritabanının ele geçirilmesi anlamına gelir. Kod tabanında yalnızca `src/lib/supabase/admin.ts` içinde, `server-only` paketiyle korunmuş şekilde kullanılmalıdır.
 
@@ -368,7 +368,7 @@ Frontend Vercel'e, AI backend Railway veya Fly.io'ya, veritabanı Supabase'e da�
 ## Güvenlik
 
 - **HTTP güvenlik başlıkları** (`next.config.mjs`): CSP, HSTS (`max-age=63072000; includeSubDomains; preload`), `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy`, `Permissions-Policy`.
-- **Rate limiting**: Next.js `middleware.ts` tüm `/api/*` yollarına IP+yol bazlı bellek-içi limit uygular (`/api/health` muaf, `/api/ai/*` dakikada 20 istekle daha sıkı sınırlıdır); FastAPI tarafında aynı prensip `slowapi` ile (`RATE_LIMIT`, `/analyze/*` ve `/recommendations` için ayrıca 20/dakika).
+- **Rate limiting**: Next.js `proxy.ts` tüm `/api/*` yollarına IP+yol bazlı bellek-içi limit uygular (`/api/health` muaf, `/api/ai/*` dakikada 20 istekle daha sıkı sınırlıdır); FastAPI tarafında aynı prensip `slowapi` ile (`RATE_LIMIT`, `/analyze/*` ve `/recommendations` için ayrıca 20/dakika).
 - **Girdi doğrulama**: tüm API route ve server action girdileri zod şemalarıyla (`src/lib/validation/schemas.ts`) doğrulanır; FastAPI tarafında Pydantic modelleri aynı rolü üstlenir.
 - **Service-role anahtarı sunucudan çıkmaz**: `src/lib/supabase/admin.ts` `server-only` paketiyle işaretlidir; istemci bundle'ına import edilirse build hatası verir.
 - **Hata mesajlarında stack trace sızdırılmaz**: AI proxy (`src/lib/api/proxy.ts`) upstream hata detaylarını yalnızca sunucu loguna yazar, istemciye genel bir mesaj + `request_id` döner; FastAPI production modunda da generic hata mesajına düşer (`ENVIRONMENT=production`).
@@ -400,7 +400,7 @@ src/
   lib/                 logger.ts (pino), rate-limit.ts, utils.ts
   types/               database.ts (Supabase üretimi), domain.ts, index.ts
   env.ts               zod ile runtime env doğrulaması
-  middleware.ts        /api/* için rate limiting
+  proxy.ts             /api/* için rate limiting
 ai_backend/app/        main.py (factory), core/, routers/, services/, schemas/, data/
 supabase/migrations/   şema, fonksiyon/trigger, RLS politikaları, storage
 data/                  CSV kaynak dosyaları (exercises, foods)
@@ -413,4 +413,4 @@ tests/e2e/             Playwright senaryoları
 
 Katkı süreci, dal adlandırma, commit kuralları ve PR beklentileri için bkz. [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
-**Lisans:** Bu depoda henüz bir `LICENSE` dosyası bulunmamaktadır; açık kaynak bir lisans (ör. MIT) eklenmek isteniyorsa depo köküne bir `LICENSE` dosyası konulmalıdır. Lisans netleşene kadar tüm haklar saklıdır.
+**Lisans:** Bu proje MIT Lisansı ile lisanslanmıştır. Tam metin ve telif bildirimi için bkz. [`LICENSE.txt`](LICENSE.txt).

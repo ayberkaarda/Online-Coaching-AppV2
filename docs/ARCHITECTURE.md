@@ -167,7 +167,7 @@ Tarayıcı, FastAPI'ye **hiçbir zaman doğrudan** istek atmaz; her zaman `src/a
 
 - **API anahtarı sızıntısı:** FastAPI, ayarlıysa `X-API-Key` header'ı bekler (`API_KEY` ortam değişkeni). Bu anahtar tarayıcıya asla gönderilmez; yalnızca sunucu-sunucu isteğinde (`src/lib/api/proxy.ts` → `handleAiProxy`) eklenir.
 - **CORS:** FastAPI CORS allowlist'i yalnızca Next.js'in origin'ini (`CORS_ORIGINS`) tanır; tarayıcının doğrudan farklı bir origin'deki (`localhost:8000` vb.) servise istek atması zaten CORS tarafından engellenir. Tek origin olan Next.js üzerinden geçmek bu sınırı basitleştirir.
-- **Rate limit tekilleştirme:** İstekler hem Next.js `middleware.ts` (IP+yol bazlı, AI uçları için 20/dk) hem FastAPI `slowapi` (`RATE_LIMIT`, `/analyze/*` ve `/recommendations` için 20/dk) katmanında sınırlanır — çift katman, tek bir servisin atlanmasıyla sınırın delinmesini engeller.
+- **Rate limit tekilleştirme:** İstekler hem Next.js `proxy.ts` (IP+yol bazlı, AI uçları için 20/dk) hem FastAPI `slowapi` (`RATE_LIMIT`, `/analyze/*` ve `/recommendations` için 20/dk) katmanında sınırlanır — çift katman, tek bir servisin atlanmasıyla sınırın delinmesini engeller.
 - **Denetlenebilirlik:** Next.js proxy katmanı, her isteğe girişte `crypto.randomUUID()` ile bir `requestId` üretir, bunu hem kendi pino loguna hem FastAPI'ye giden `X-Request-ID` header'ına yazar; FastAPI de aynı kimlikle structlog'a loglar. Bu sayede tek bir isteğin uçtan uca (tarayıcı → Next.js → FastAPI) izi tek bir kimlikle sürülebilir.
 
 **Hata eşlemesi** (`src/lib/api/proxy.ts` → `handleAiProxy`):

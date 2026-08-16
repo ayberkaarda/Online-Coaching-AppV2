@@ -1,3 +1,5 @@
+// Next.js 16 "proxy" dosya konvansiyonu — önceki adı middleware.ts idi (middleware
+// konvansiyonu deprecate edildi: https://nextjs.org/docs/messages/middleware-to-proxy).
 // Tüm /api/* isteklerine IP + yol bazlı hız sınırı uygular.
 // AI uçları daha pahalı olduğu için daha sıkı limite tabidir; /api/health muaftır.
 
@@ -25,7 +27,7 @@ function getClientIp(request: NextRequest): string {
   return 'unknown'
 }
 
-export function middleware(request: NextRequest): NextResponse {
+export function proxy(request: NextRequest): NextResponse {
   const { pathname } = request.nextUrl
 
   // Docker HEALTHCHECK bu ucu sürekli çağırır — sınırlamaya dahil edilmez.

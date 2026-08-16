@@ -1,5 +1,5 @@
 // Sağlık kontrolü ucu. Docker HEALTHCHECK ve yük dengeleyiciler bunu çağırır.
-// Rate limit'ten muaftır (bkz. src/middleware.ts).
+// Rate limit'ten muaftır (bkz. src/proxy.ts).
 
 import { NextResponse } from 'next/server'
 

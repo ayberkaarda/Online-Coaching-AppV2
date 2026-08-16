@@ -24,9 +24,16 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'npm run build && npm run start',
+    // CI'da build ayrı bir adımda (.github/workflows/ci.yml -> e2e job'u,
+    // "Build" step'i) gerçek Supabase env değişkenleriyle zaten alınıyor;
+    // burada tekrar `npm run build` çalıştırmak boşa zaman harcar ve
+    // webServer.timeout'u aşma riski taşır. Yerelde ise `npm run test:e2e`
+    // tek başına çalışabilsin diye build adımı komuta dahil edilir.
+    command: process.env.CI ? 'npm run start' : 'npm run build && npm run start',
     url: process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:3000',
     reuseExistingServer: !process.env.CI,
-    timeout: 180_000,
+    // CI'da yalnızca `next start` çalıştığı için 120 sn fazlasıyla yeterli;
+    // yerelde build de dahil olduğundan daha cömert bir süre tanınıyor.
+    timeout: process.env.CI ? 120_000 : 300_000,
   },
 })
