@@ -145,7 +145,7 @@ Her iki fonksiyon da `stable`'dır (tek sorgu içinde tekrar hesaplanmaz), `sear
 
 **Yetki yükseltme koruması:** `profiles` UPDATE politikasının `WITH CHECK` ifadesi `role = public.profile_role(auth.uid())` kontrolü yapar — bir danışan kendi profilini güncelleyebilir ama rolünü `admin`'e çeviremez; yalnızca koç rol değiştirebilir.
 
-**Sunucu tarafı ayrıcalıklı erişim:** `SUPABASE_SERVICE_ROLE_KEY` RLS'yi tamamen bypass eder ve yalnızca `src/lib/supabase/admin.ts` (`server-only` ile korumalı) içinde kullanılır — örn. koçun yeni danışan hesabı oluşturduğu server action'larda. Bu tür server action'lar **çağıranın gerçekten koç olduğunu** kendileri de doğrulamalıdır (service_role RLS'i atladığı için, yetki kontrolü artık uygulama kodunun sorumluluğuna geçer).
+**Sunucu tarafı ayrıcalıklı erişim (kaldırıldı, Faz 2'de geri gelecek):** `SUPABASE_SERVICE_ROLE_KEY` RLS'yi tamamen bypass eder. Bunu kullanan `src/lib/supabase/admin.ts` istemcisi ve onu tüketen tek yer olan dört server action (`src/app/actions.ts`: `createStudentAction`, `deleteStudentAction`, `sendNotificationAction`, `submitFormCheckAction`) hiçbir yerden çağrılmadığı tespit edildiği için kaldırıldı (bkz. `docs/DISCOVERY.md` §2.5, §15.2 #3) — mevcut UI aynı işleri `src/hooks/*` üzerinden anon key + kullanıcı JWT'siyle, RLS altında yapıyor. Uygulama kodunda şu an service_role kullanan hiçbir yer yok. Koçun yeni danışan hesabı oluşturması Faz 2'de koç-danışan akışıyla birlikte yeniden kurulacak; o akış geldiğinde **çağıranın gerçekten koç olduğunu** kendisi de doğrulamalıdır (service_role RLS'i atladığı için, yetki kontrolü uygulama kodunun sorumluluğuna geçer).
 
 ---
 

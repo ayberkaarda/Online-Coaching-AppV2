@@ -36,7 +36,7 @@ Koçların danışanlarını antrenman, beslenme ve ilerleme verisi üzerinden u
 - Danışanların önerdiği AI antrenman/beslenme planlarını **onaylama veya reddetme** (`program_approvals`) — hiçbir plan koç onayı olmadan danışanın aktif programına yazılmaz.
 - Duyuru ve bireysel bildirim gönderme.
 - Danışanlarla gerçek zamanlı, çevrimiçi durumu görünen birebir sohbet.
-- Danışan hesabı oluşturma/yönetme (rol ataması dahil).
+- ~~Danışan hesabı oluşturma/yönetme (rol ataması dahil)~~ — bu akış için yazılmış `service_role` tabanlı server action'lar hiçbir yerden çağrılmadığı tespit edildiği için kaldırıldı (bkz. `docs/DISCOVERY.md` §2.5, §15.2 #3); uygulamada şu an danışan hesabı oluşturmanın bir yolu **yok**. Faz 2'de koç-danışan akışıyla birlikte yeniden kurulacak.
 
 ### Danışan (`student`) perspektifinden
 
@@ -63,7 +63,6 @@ graph TD
 
   subgraph NextJS["Next.js 16 — App Router"]
     Pages["Sayfalar / Server Components"]
-    Actions["Server Actions (actions.ts)"]
     APIRoutes["API Routes (/api/*)"]
   end
 
@@ -80,11 +79,8 @@ graph TD
   end
 
   Browser -->|HTTPS| Pages
-  Browser -->|"Server Action çağrısı"| Actions
   Browser -->|"fetch /api/*"| APIRoutes
   Pages -->|"supabase-js, anon key + oturum JWT"| PG
-  Actions -->|"supabase-js, anon veya service_role"| PG
-  Actions -->|"oturum yönetimi"| Auth
   Browser -->|"supabase-js, anon key + JWT"| Realtime
   Pages -->|"public read / imzalı URL"| Storage
   APIRoutes -->|"server-side fetch, X-API-Key + X-Request-ID"| Routers
@@ -243,20 +239,20 @@ Uygulama `http://localhost:3000`, AI servisi `http://localhost:8000` (Swagger: `
 
 ### Next.js (`.env.local`, kaynak: `.env.example`, doğrulama: `src/env.ts` ile zod)
 
-| Değişken                        | Zorunlu mu                                  | Varsayılan              | Kullanıldığı yer           | Açıklama                                                                                                              |
-| ------------------------------- | ------------------------------------------- | ----------------------- | -------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| `NEXT_PUBLIC_SUPABASE_URL`      | Evet                                        | —                       | İstemci + sunucu           | Supabase proje URL'i. Build-time'da tarayıcı paketine gömülür.                                                        |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Evet                                        | —                       | İstemci + sunucu           | Supabase anon/public anahtarı. RLS ile korunur, istemciye açık olması güvenlidir.                                     |
-| `SUPABASE_SERVICE_ROLE_KEY`     | Yalnızca admin server action'ları için      | —                       | **Yalnızca sunucu**        | RLS'yi bypass eden servis rolü anahtarı.                                                                              |
-| `AI_BACKEND_URL`                | Hayır                                       | `http://localhost:8000` | Sunucu (`/api/ai/*` proxy) | FastAPI servisinin adresi.                                                                                            |
-| `AI_BACKEND_API_KEY`            | Hayır (FastAPI `API_KEY` ayarlıysa gerekli) | —                       | Sunucu                     | FastAPI'ye `X-API-Key` header'ı olarak iletilir.                                                                      |
-| `NEXT_PUBLIC_APP_URL`           | Hayır                                       | `http://localhost:3000` | İstemci + sunucu           | Mutlak URL üretimi (ör. e-posta linkleri).                                                                            |
-| `NODE_ENV`                      | Hayır                                       | `development`           | Sunucu                     | `development` \| `test` \| `production`.                                                                              |
-| `LOG_LEVEL`                     | Hayır                                       | `info`                  | Sunucu                     | pino log seviyesi.                                                                                                    |
-| `RATE_LIMIT_WINDOW_MS`          | Hayır                                       | `60000`                 | Sunucu (`proxy.ts`)        | Genel `/api/*` rate limit penceresi (ms).                                                                             |
-| `RATE_LIMIT_MAX_REQUESTS`       | Hayır                                       | `60`                    | Sunucu (`proxy.ts`)        | Pencere başına genel istek sınırı. AI uçları (`/api/ai/*`) bundan bağımsız, sabit **20 istek/dakika** ile sınırlıdır. |
+| Değişken                        | Zorunlu mu                                  | Varsayılan              | Kullanıldığı yer           | Açıklama                                                                                                                                                                                                                         |
+| ------------------------------- | ------------------------------------------- | ----------------------- | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `NEXT_PUBLIC_SUPABASE_URL`      | Evet                                        | —                       | İstemci + sunucu           | Supabase proje URL'i. Build-time'da tarayıcı paketine gömülür.                                                                                                                                                                   |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Evet                                        | —                       | İstemci + sunucu           | Supabase anon/public anahtarı. RLS ile korunur, istemciye açık olması güvenlidir.                                                                                                                                                |
+| `SUPABASE_SERVICE_ROLE_KEY`     | Hayır — şu an kod tabanında kullanılmıyor   | —                       | **Yalnızca sunucu**        | RLS'yi bypass eden servis rolü anahtarı. Onu tüketen `src/lib/supabase/admin.ts` ve çağrılmayan server action'lar (`src/app/actions.ts`) ölü kod oldukları için kaldırıldı; Faz 2'de koç-danışan akışıyla birlikte geri gelecek. |
+| `AI_BACKEND_URL`                | Hayır                                       | `http://localhost:8000` | Sunucu (`/api/ai/*` proxy) | FastAPI servisinin adresi.                                                                                                                                                                                                       |
+| `AI_BACKEND_API_KEY`            | Hayır (FastAPI `API_KEY` ayarlıysa gerekli) | —                       | Sunucu                     | FastAPI'ye `X-API-Key` header'ı olarak iletilir.                                                                                                                                                                                 |
+| `NEXT_PUBLIC_APP_URL`           | Hayır                                       | `http://localhost:3000` | İstemci + sunucu           | Mutlak URL üretimi (ör. e-posta linkleri).                                                                                                                                                                                       |
+| `NODE_ENV`                      | Hayır                                       | `development`           | Sunucu                     | `development` \| `test` \| `production`.                                                                                                                                                                                         |
+| `LOG_LEVEL`                     | Hayır                                       | `info`                  | Sunucu                     | pino log seviyesi.                                                                                                                                                                                                               |
+| `RATE_LIMIT_WINDOW_MS`          | Hayır                                       | `60000`                 | Sunucu (`proxy.ts`)        | Genel `/api/*` rate limit penceresi (ms).                                                                                                                                                                                        |
+| `RATE_LIMIT_MAX_REQUESTS`       | Hayır                                       | `60`                    | Sunucu (`proxy.ts`)        | Pencere başına genel istek sınırı. AI uçları (`/api/ai/*`) bundan bağımsız, sabit **20 istek/dakika** ile sınırlıdır.                                                                                                            |
 
-> **UYARI: `SUPABASE_SERVICE_ROLE_KEY` ASLA `NEXT_PUBLIC_` öneki ALMAMALI ve istemci koduna (bileşen, hook, `'use client'` dosyası) ASLA import EDİLMEMELİDİR.** Bu anahtar RLS'yi tamamen atlar; sızması tüm veritabanının ele geçirilmesi anlamına gelir. Kod tabanında yalnızca `src/lib/supabase/admin.ts` içinde, `server-only` paketiyle korunmuş şekilde kullanılmalıdır.
+> **UYARI: `SUPABASE_SERVICE_ROLE_KEY` ASLA `NEXT_PUBLIC_` öneki ALMAMALI ve istemci koduna (bileşen, hook, `'use client'` dosyası) ASLA import EDİLMEMELİDİR.** Bu anahtar RLS'yi tamamen atlar; sızması tüm veritabanının ele geçirilmesi anlamına gelir. Kod tabanında şu an bu anahtarı kullanan hiçbir kod yok (eski `src/lib/supabase/admin.ts` istemcisi, onu tüketen tek yer olan ölü server action'larla birlikte kaldırıldı); yeniden eklenirse `server-only` paketiyle korunmalıdır.
 
 ### FastAPI (`ai_backend/.env`, kaynak: `ai_backend/app/core/config.py`)
 
@@ -370,7 +366,7 @@ Frontend Vercel'e, AI backend Railway veya Fly.io'ya, veritabanı Supabase'e da�
 - **HTTP güvenlik başlıkları** (`next.config.mjs`): CSP, HSTS (`max-age=63072000; includeSubDomains; preload`), `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy`, `Permissions-Policy`.
 - **Rate limiting**: Next.js `proxy.ts` tüm `/api/*` yollarına IP+yol bazlı bellek-içi limit uygular (`/api/health` muaf, `/api/ai/*` dakikada 20 istekle daha sıkı sınırlıdır); FastAPI tarafında aynı prensip `slowapi` ile (`RATE_LIMIT`, `/analyze/*` ve `/recommendations` için ayrıca 20/dakika).
 - **Girdi doğrulama**: tüm API route ve server action girdileri zod şemalarıyla (`src/lib/validation/schemas.ts`) doğrulanır; FastAPI tarafında Pydantic modelleri aynı rolü üstlenir.
-- **Service-role anahtarı sunucudan çıkmaz**: `src/lib/supabase/admin.ts` `server-only` paketiyle işaretlidir; istemci bundle'ına import edilirse build hatası verir.
+- **Service-role anahtarı kod tabanında yok**: onu kullanan tek yer olan `src/lib/supabase/admin.ts` ve çağrılmayan server action'lar (`src/app/actions.ts`) ölü kod oldukları için kaldırıldı; geri eklenirse `server-only` paketiyle işaretlenip istemci bundle'ına sızması build hatasıyla engellenmelidir.
 - **Hata mesajlarında stack trace sızdırılmaz**: AI proxy (`src/lib/api/proxy.ts`) upstream hata detaylarını yalnızca sunucu loguna yazar, istemciye genel bir mesaj + `request_id` döner; FastAPI production modunda da generic hata mesajına düşer (`ENVIRONMENT=production`).
 - **RLS**: satır düzeyi izolasyonun tek kaynağı; bkz. [Veritabanı ve RLS](#veritabanı-ve-rls).
 - **Uçtan uca izlenebilirlik**: her AI proxy isteği bir `X-Request-ID` üretir, hem Next.js hem FastAPI loglarında bu kimlikle görünür.
@@ -386,14 +382,14 @@ Bir güvenlik açığı bulduysanız lütfen **genel bir GitHub issue AÇMAYIN**
 ```
 src/
   app/                 App Router: layout, page (dashboard), login, profile, users,
-                       error/global-error/not-found/loading, actions.ts (server actions)
+                       error/global-error/not-found/loading
   app/api/health       sağlık kontrolü (Docker HEALTHCHECK)
   app/api/ai/{workout,nutrition,recommendations}   FastAPI'ye sunucu tarafı proxy
   components/          DashboardTabs, AdminUserManagement, NotificationForm, ThemeToggle
   components/tabs/     Announcements, Stats, FormCheck, DailyLog, Nutrition, Workout, Messages
   components/ui/       Skeleton, ErrorBoundary, QueryState, EmptyState
   hooks/               TanStack Query hook'ları (useSession, useProfile, usePlans, useAi, ...)
-  lib/supabase/        client.ts (tarayıcı), server.ts, admin.ts (service role, server-only)
+  lib/supabase/        client.ts (tarayıcı), server.ts
   lib/api/             merkezi fetch client + ApiError + AI sözleşme tipleri + proxy yardımcısı
   lib/query/           QueryClient yapılandırması ve queryKeys
   lib/validation/      zod şemaları
