@@ -462,13 +462,407 @@ end $$;
 rollback;
 
 
+-- #############################################################################
+-- FAZ 1b / ADIM 1 — ANTRENMAN PLANI TABLOLARI (20260817110000_workout_plan_tables.sql)
+--
+-- Bu bölümdeki senaryolar `public.workout_plans` ve
+-- `public.workout_plan_exercises` tablolarının RLS politikalarını ve
+-- `public.save_workout_plan()` RPC'sinin (SECURITY INVOKER) yetki sınırını
+-- doğrular.
+--
+-- KURULUM DESENİ: bu tablolar `supabase db reset` sonrasında BOŞTUR (migration'lar
+-- seed'den önce koştuğu için dönüşüm no-op'tur). Bu yüzden her senaryo, rol
+-- taklidine GEÇMEDEN ÖNCE `postgres` (superuser, RLS bypass) kimliğiyle kendi
+-- verisini kurar; `set local role` çağrısı bundan SONRA gelir. Tümü ROLLBACK ile
+-- geri alınır.
+--
+-- Sabit plan kimlikleri (yalnızca test içi):
+--   Danışan A planı : aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa
+--   Danışan B planı : bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb
+-- #############################################################################
+
+
+-- =============================================================================
+-- ANTRENMAN PLANI — 20) Danışan A kendi planını okur, Danışan B'ninkini OKUYAMAZ
+-- =============================================================================
+begin;
+
+delete from public.workout_plans
+ where client_id in ('22222222-2222-2222-2222-222222222222', '33333333-3333-3333-3333-333333333333');
+
+insert into public.workout_plans (id, client_id, version, is_active) values
+  ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '22222222-2222-2222-2222-222222222222', 1, true),
+  ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', '33333333-3333-3333-3333-333333333333', 1, true);
+
+insert into public.workout_plan_exercises (plan_id, day, position, raw_line, name, target_sets, target_reps) values
+  ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'Pazartesi', 0, '1. Bench Press - 4x8', 'Bench Press', 4, 8),
+  ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'Pazartesi', 0, '1. Squat - 5x5',       'Squat',       5, 5);
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+
+do $$
+declare
+  v_own_plans   int;
+  v_other_plans int;
+  v_own_ex      int;
+  v_other_ex    int;
+begin
+  select count(*) into v_own_plans   from public.workout_plans where client_id = '22222222-2222-2222-2222-222222222222';
+  select count(*) into v_other_plans from public.workout_plans where client_id = '33333333-3333-3333-3333-333333333333';
+  select count(*) into v_own_ex      from public.workout_plan_exercises where plan_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+  select count(*) into v_other_ex    from public.workout_plan_exercises where plan_id = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
+
+  if v_own_plans is distinct from 1 then
+    raise exception 'BASARISIZ [Danisan A - kendi antrenman planini okur]: beklenen 1 plan, gelen %', v_own_plans;
+  end if;
+  if v_own_ex is distinct from 1 then
+    raise exception 'BASARISIZ [Danisan A - kendi plan satirlarini okur]: beklenen 1 satir, gelen %', v_own_ex;
+  end if;
+  if v_other_plans is distinct from 0 then
+    raise exception 'BASARISIZ [Danisan A - Danisan B planini goremez]: beklenen 0 plan, gelen %', v_other_plans;
+  end if;
+  if v_other_ex is distinct from 0 then
+    raise exception 'BASARISIZ [Danisan A - Danisan B plan satirlarini goremez]: beklenen 0 satir, gelen %', v_other_ex;
+  end if;
+
+  raise notice 'GECTI [Danisan A - kendi antrenman planini okur, Danisan B''ninkini okuyamaz]';
+end $$;
+
+rollback;
+
+
+-- =============================================================================
+-- ANTRENMAN PLANI — 21) Koç her iki danışanın planını da okur
+-- =============================================================================
+begin;
+
+delete from public.workout_plans
+ where client_id in ('22222222-2222-2222-2222-222222222222', '33333333-3333-3333-3333-333333333333');
+
+insert into public.workout_plans (id, client_id, version, is_active) values
+  ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '22222222-2222-2222-2222-222222222222', 1, true),
+  ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', '33333333-3333-3333-3333-333333333333', 1, true);
+
+insert into public.workout_plan_exercises (plan_id, day, position, raw_line) values
+  ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'Pazartesi', 0, '1. Bench Press - 4x8'),
+  ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'Pazartesi', 0, '1. Squat - 5x5');
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+
+do $$
+declare
+  v_plans int;
+  v_ex    int;
+begin
+  select count(*) into v_plans
+    from public.workout_plans
+   where client_id in ('22222222-2222-2222-2222-222222222222', '33333333-3333-3333-3333-333333333333');
+
+  select count(*) into v_ex
+    from public.workout_plan_exercises
+   where plan_id in ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb');
+
+  if v_plans is distinct from 2 then
+    raise exception 'BASARISIZ [Koc - her iki plani okur]: beklenen 2 plan, gelen %', v_plans;
+  end if;
+  if v_ex is distinct from 2 then
+    raise exception 'BASARISIZ [Koc - her iki planin satirlarini okur]: beklenen 2 satir, gelen %', v_ex;
+  end if;
+
+  raise notice 'GECTI [Koc - her iki danisanin antrenman planini okur]';
+end $$;
+
+rollback;
+
+
+-- =============================================================================
+-- ANTRENMAN PLANI — 22) Danışan A KENDİ planına yazabilir
+-- BİLİNÇLİ SAPMA KORUMASI: plan §3.2 "yalnız koç yazar" der; mevcut ürün
+-- davranışında danışan kendi programını düzenleyip onaya sunabiliyor. Bu senaryo
+-- o davranışın korunduğunu kanıtlar (bkz. migration §6 sapma notu).
+-- =============================================================================
+begin;
+
+delete from public.workout_plans where client_id = '22222222-2222-2222-2222-222222222222';
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+
+do $$
+declare
+  v_plan_id uuid;
+  v_rows    int;
+begin
+  -- Plan başlığı
+  insert into public.workout_plans (client_id, version, is_active)
+  values ('22222222-2222-2222-2222-222222222222', 1, true)
+  returning id into v_plan_id;
+
+  if v_plan_id is null then
+    raise exception 'BASARISIZ [Danisan A - kendi planini olusturur]: insert basarisiz';
+  end if;
+
+  -- Plan satırı
+  insert into public.workout_plan_exercises (plan_id, day, position, raw_line)
+  values (v_plan_id, 'Pazartesi', 0, '1. Bench Press - 4x8');
+  get diagnostics v_rows = row_count;
+  if v_rows is distinct from 1 then
+    raise exception 'BASARISIZ [Danisan A - kendi plan satirini yazar]: beklenen 1, gelen %', v_rows;
+  end if;
+
+  -- Güncelleme ve silme de kendi planında serbest olmalı
+  update public.workout_plan_exercises set raw_line = '1. Bench Press - 5x5' where plan_id = v_plan_id;
+  get diagnostics v_rows = row_count;
+  if v_rows is distinct from 1 then
+    raise exception 'BASARISIZ [Danisan A - kendi plan satirini gunceller]: beklenen 1, gelen %', v_rows;
+  end if;
+
+  delete from public.workout_plan_exercises where plan_id = v_plan_id;
+  get diagnostics v_rows = row_count;
+  if v_rows is distinct from 1 then
+    raise exception 'BASARISIZ [Danisan A - kendi plan satirini siler]: beklenen 1, gelen %', v_rows;
+  end if;
+
+  raise notice 'GECTI [Danisan A - kendi antrenman planina yazabilir]';
+end $$;
+
+rollback;
+
+
+-- =============================================================================
+-- ANTRENMAN PLANI — 23) Danışan A, Danışan B'nin planına YAZAMAZ
+-- =============================================================================
+begin;
+
+delete from public.workout_plans where client_id = '33333333-3333-3333-3333-333333333333';
+
+insert into public.workout_plans (id, client_id, version, is_active) values
+  ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', '33333333-3333-3333-3333-333333333333', 1, true);
+
+insert into public.workout_plan_exercises (plan_id, day, position, raw_line) values
+  ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'Pazartesi', 0, '1. Squat - 5x5');
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+
+do $$
+declare
+  v_caught boolean := false;
+  v_rows   int;
+begin
+  -- a) Başkası adına plan başlığı açamaz
+  begin
+    insert into public.workout_plans (client_id, version, is_active)
+    values ('33333333-3333-3333-3333-333333333333', 1, true);
+  exception when insufficient_privilege then
+    v_caught := true;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [Danisan A - Danisan B adina plan acamaz]: beklenen RLS ihlali, hata alinmadi';
+  end if;
+
+  -- b) Başkasının planına satır ekleyemez
+  v_caught := false;
+  begin
+    insert into public.workout_plan_exercises (plan_id, day, position, raw_line)
+    values ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'Salı', 0, 'RLS testi - olmamali');
+  exception when insufficient_privilege then
+    v_caught := true;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [Danisan A - Danisan B planina satir ekleyemez]: beklenen RLS ihlali, hata alinmadi';
+  end if;
+
+  -- c) Başkasının planındaki satırları GÜNCELLEYEMEZ/SİLEMEZ (satırlar görünmediği
+  --    için 0 satır etkilenir -- sessiz veri bozulması olmaz).
+  update public.workout_plan_exercises set raw_line = 'HACKED'
+   where plan_id = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
+  get diagnostics v_rows = row_count;
+  if v_rows is distinct from 0 then
+    raise exception 'BASARISIZ [Danisan A - Danisan B plan satirini guncelleyemez]: beklenen 0 satir, etkilenen %', v_rows;
+  end if;
+
+  delete from public.workout_plans where client_id = '33333333-3333-3333-3333-333333333333';
+  get diagnostics v_rows = row_count;
+  if v_rows is distinct from 0 then
+    raise exception 'BASARISIZ [Danisan A - Danisan B planini silemez]: beklenen 0 satir, etkilenen %', v_rows;
+  end if;
+
+  raise notice 'GECTI [Danisan A - Danisan B''nin antrenman planina yazamaz]';
+end $$;
+
+rollback;
+
+
+-- =============================================================================
+-- ANTRENMAN PLANI — 24) anon rolü plan tablolarını OKUYAMAZ
+-- =============================================================================
+begin;
+set local role anon;
+do $$
+declare
+  v_count  int;
+  v_caught boolean := false;
+begin
+  begin
+    select count(*) into v_count from public.workout_plans;
+  exception when insufficient_privilege then
+    v_caught := true;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [anon - workout_plans okuyamaz]: beklenen permission denied, gelen v_count=%', v_count;
+  end if;
+
+  v_caught := false;
+  begin
+    select count(*) into v_count from public.workout_plan_exercises;
+  exception when insufficient_privilege then
+    v_caught := true;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [anon - workout_plan_exercises okuyamaz]: beklenen permission denied, gelen v_count=%', v_count;
+  end if;
+
+  raise notice 'GECTI [anon - antrenman plani tablolarini okuyamaz]';
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- ANTRENMAN PLANI — 25) save_workout_plan() danışan olarak KENDİ id'si için çalışır
+-- =============================================================================
+begin;
+
+delete from public.workout_plans where client_id = '22222222-2222-2222-2222-222222222222';
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+
+do $$
+declare
+  v_affected int;
+  v_plan_id  uuid;
+  v_rows     int;
+begin
+  v_affected := public.save_workout_plan(
+    array['22222222-2222-2222-2222-222222222222']::uuid[],
+    jsonb_build_object('Pazartesi', E'1. Bench Press - 4x8\n2. Cable Fly - 3x12', 'Çarşamba', 'Dinlenme')
+  );
+
+  if v_affected is distinct from 1 then
+    raise exception 'BASARISIZ [save_workout_plan - kendi id]: beklenen 1 danisan, gelen %', v_affected;
+  end if;
+
+  select id into v_plan_id from public.workout_plans
+   where client_id = '22222222-2222-2222-2222-222222222222' and is_active;
+  if v_plan_id is null then
+    raise exception 'BASARISIZ [save_workout_plan - kendi id]: aktif plan olusmadi';
+  end if;
+
+  select count(*) into v_rows from public.workout_plan_exercises where plan_id = v_plan_id;
+  if v_rows is distinct from 3 then
+    raise exception 'BASARISIZ [save_workout_plan - kendi id]: beklenen 3 satir, gelen %', v_rows;
+  end if;
+
+  raise notice 'GECTI [save_workout_plan - danisan kendi id''si icin calistirabilir]';
+end $$;
+
+rollback;
+
+
+-- =============================================================================
+-- ANTRENMAN PLANI — 26) save_workout_plan() BAŞKASININ id'siyle RLS hatası verir
+-- (fonksiyon SECURITY INVOKER'dır ve hatayı YAKALAMAZ -> tüm çağrı geri alınır)
+-- =============================================================================
+begin;
+
+delete from public.workout_plans
+ where client_id in ('22222222-2222-2222-2222-222222222222', '33333333-3333-3333-3333-333333333333');
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+
+do $$
+declare
+  v_caught boolean := false;
+begin
+  begin
+    perform public.save_workout_plan(
+      array['33333333-3333-3333-3333-333333333333']::uuid[],
+      jsonb_build_object('Pazartesi', '1. Squat - 5x5')
+    );
+  exception when insufficient_privilege then
+    v_caught := true;
+  end;
+
+  if not v_caught then
+    raise exception 'BASARISIZ [save_workout_plan - baskasinin id''si]: beklenen RLS ihlali, hata alinmadi';
+  end if;
+
+  raise notice 'GECTI [save_workout_plan - baskasinin id''si icin RLS hatasi verir]';
+end $$;
+
+rollback;
+
+
+-- =============================================================================
+-- ANTRENMAN PLANI — 27) save_workout_plan() ATOMİKTİR
+-- Karma liste (kendi id + başkasının id) verildiğinde hata yükselir ve
+-- KENDİ planı da yazılmaz -- yani kısmi yazma olmaz.
+-- =============================================================================
+begin;
+
+delete from public.workout_plans
+ where client_id in ('22222222-2222-2222-2222-222222222222', '33333333-3333-3333-3333-333333333333');
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+
+do $$
+declare
+  v_caught boolean := false;
+  v_plans  int;
+begin
+  begin
+    perform public.save_workout_plan(
+      array['22222222-2222-2222-2222-222222222222',
+            '33333333-3333-3333-3333-333333333333']::uuid[],
+      jsonb_build_object('Pazartesi', '1. Squat - 5x5')
+    );
+  exception when insufficient_privilege then
+    v_caught := true;
+  end;
+
+  if not v_caught then
+    raise exception 'BASARISIZ [save_workout_plan - atomiklik]: beklenen RLS ihlali, hata alinmadi';
+  end if;
+
+  -- plpgsql BEGIN/EXCEPTION bir subtransaction acar; hata yakalandiginda
+  -- blogun ICINDEKI tum yazmalar (kendi planinin olusturulmasi dahil) geri alinir.
+  select count(*) into v_plans from public.workout_plans
+   where client_id = '22222222-2222-2222-2222-222222222222';
+  if v_plans is distinct from 0 then
+    raise exception 'BASARISIZ [save_workout_plan - atomiklik]: kismi yazma olustu, % plan satiri kaldi', v_plans;
+  end if;
+
+  raise notice 'GECTI [save_workout_plan - atomik: kismi yazma yok]';
+end $$;
+
+rollback;
+
+
 -- =============================================================================
 -- TOPLAM ÖZET
--- Bu noktaya yalnızca YUKARIDAKİ 19 senaryonun HEPSİ GECTI verdiyse ulaşılır --
+-- Bu noktaya yalnızca YUKARIDAKİ 27 senaryonun HEPSİ GECTI verdiyse ulaşılır --
 -- herhangi biri BASARISIZ olsaydı raise exception + ON_ERROR_STOP psql'i
 -- daha önce sıfırdan farklı çıkış koduyla durdururdu.
+--   * 1–19  : Faz 1a ve öncesi (profiles, notifications, form_checks, daily_logs,
+--             workout_logs, messages, katalog)
+--   * 20–27 : Faz 1b Adım 1 — workout_plans / workout_plan_exercises / save_workout_plan
 -- =============================================================================
 do $$
 begin
-  raise notice 'TUM RLS TESTLERI GECTI (19 senaryo)';
+  raise notice 'TUM RLS TESTLERI GECTI (27 senaryo)';
 end $$;

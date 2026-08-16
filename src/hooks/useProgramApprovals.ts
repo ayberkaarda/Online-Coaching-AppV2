@@ -5,6 +5,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 
+import { planToRpcPayload } from '@/hooks/usePlans'
 import { queryKeyRoots, queryKeys } from '@/lib/query/keys'
 import { supabase } from '@/lib/supabase/client'
 import type { Json, ProgramApproval, WorkoutPlan } from '@/types'
@@ -91,11 +92,18 @@ export function useApproveProgram() {
       plan,
       reviewerId,
     }: ApproveProgramInput): Promise<void> => {
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({ workout_plan: JSON.stringify(plan) })
-        .eq('id', clientId)
-      if (profileError) throw new Error(profileError.message)
+      // SIRA KRİTİK: önce plan yazılır, sonra onay 'approved' işaretlenir.
+      // Plan yazımı başarısız olursa onay 'pending' kalır — "onaylandı ama plan
+      // işlenmedi" tutarsızlığı oluşmaz.
+      //
+      // `plan` bileşende `program_approvals.workout_data` jsonb'sinden
+      // `parseWorkoutPlan` ile normalize edilerek gelir; `planToRpcPayload`
+      // ayrıca yalnızca 7 geçerli gün anahtarını göndermeyi garanti eder.
+      const { error: planError } = await supabase.rpc('save_workout_plan', {
+        p_client_ids: [clientId],
+        p_plan: planToRpcPayload(plan),
+      })
+      if (planError) throw new Error(planError.message)
 
       const { error: approvalError } = await supabase
         .from('program_approvals')
@@ -115,7 +123,7 @@ export function useApproveProgram() {
     },
     onSuccess: (_result, { clientId }) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.programApprovals(clientId) })
-      void queryClient.invalidateQueries({ queryKey: queryKeys.profile(clientId) })
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workoutPlan(clientId) })
       void queryClient.invalidateQueries({ queryKey: queryKeyRoots.notifications })
       toast.success('Program onaylandı ve öğrencinin profiline işlendi.')
     },

@@ -13,7 +13,11 @@ supabase/
 │   ├── 20260816090300_storage.sql                # bucket'lar + storage.objects politikaları
 │   ├── 20260816100000_fix_rls_visibility.sql     # koç profili görünürlüğü + danışan→koç bildirimi
 │   ├── 20260817090000_rename_roles.sql           # rol yeniden adlandırma: admin→coach, student→client
-│   └── 20260817100000_private_storage.sql        # bucket'lar private + *_url → *_path + imzalı okuma
+│   ├── 20260817100000_private_storage.sql        # bucket'lar private + *_url → *_path + imzalı okuma
+│   └── 20260817110000_workout_plan_tables.sql    # normalize antrenman planı tabloları + dönüşüm + RPC
+├── tests/
+│   ├── rls.test.sql            # 27 RLS senaryosu       (npm run test:rls)
+│   └── transform.test.sql      # 10 dönüşüm senaryosu   (npm run test:transform)
 ├── seed.sql                    # SADECE YEREL demo verisi
 └── README.md
 ```
@@ -104,6 +108,8 @@ Kısaltmalar: **S** = satır sahibi (`client_id`/`id` = `auth.uid()`), **K** = k
 | `messages` | gönderen **veya** alıcı veya K | `sender_id = auth.uid()` | **Sadece alıcı** (`is_read`) | gönderen veya K |
 | `exercises` | Tüm `authenticated` | Sadece K | Sadece K | Sadece K |
 | `food_database` | Tüm `authenticated` | Sadece K | Sadece K | Sadece K |
+| `workout_plans` | S veya K | K **veya** kendi planı | K veya kendi planı | K veya kendi planı |
+| `workout_plan_exercises` | plan üzerinden S veya K (`EXISTS`) | plan üzerinden K veya kendi planı | plan üzerinden K veya kendi planı | plan üzerinden K veya kendi planı |
 
 ### Koç görünürlüğü (`20260816100000_fix_rls_visibility.sql`)
 
@@ -124,6 +130,22 @@ Kısaltmalar: **S** = satır sahibi (`client_id`/`id` = `auth.uid()`), **K** = k
   > `notifications_select` **değiştirilmedi**: danışan koça yazdığı bildirimi geri okuyamaz.
   > Bu yüzden bu insert'e `.select()` / `RETURNING` zincirlenmemelidir — aksi hâlde satır
   > yazılsa bile sorgu `new row violates row-level security policy` ile döner.
+
+### Antrenman planı tablolarında bilinçli sapma (`20260817110000_workout_plan_tables.sql`)
+
+`active_planprogram.md` §3.2 "plan tablolarına **yalnızca koç** yazar" diyor.
+**Bu uygulanmadı** — danışan kendi planına da yazabilir.
+
+* **Gerekçe:** mevcut ürün davranışında danışan `WorkoutTab` üzerinden kendi programını
+  düzenleyip onaya sunabiliyor (`src/hooks/usePlans.ts` → `useSaveWorkoutPlan`,
+  `src/hooks/useProgramApprovals.ts`) ve bu akış `profiles` UPDATE'i ile çalışıyor.
+  Yazmayı koça kısıtlamak, Faz 1b Adım 2'deki kod cutover'ında bu akışı **sessizce**
+  kırardı.
+* **Kapsam sınırı:** danışan **yalnızca kendi** `client_id`'sine ait plana yazabilir.
+  Başka danışanın planına insert/update/delete **reddedilir**
+  (`rls.test.sql` senaryo 23, 26, 27).
+* **Geri alma koşulu:** Faz 2'de onay akışı ayrı bir "önerilen plan" yüzeyine taşınırsa
+  politika §3.2'ye daraltılmalıdır.
 
 ### Yetki yükseltme koruması
 
@@ -173,6 +195,9 @@ Her iki bucket da **PRIVATE**'tır (`20260817100000_private_storage.sql`).
 | `public.profile_role` | `(uid uuid default auth.uid()) -> user_role` | `SECURITY DEFINER`, `STABLE` |
 | `public.is_coach_profile` | `(target uuid) -> boolean` | `SECURITY DEFINER`, `STABLE`. Yalnız `notifications_insert` içinde kullanılır; `profiles` politikalarında **çağrılmamalıdır** (özyineleme) |
 | `public.increment_streak` | `(user_id uuid) -> integer` | **İmza değiştirilemez** — kod `rpc('increment_streak', { user_id })` çağırıyor |
+| `public.explode_plan_day` | `(p_plan_id uuid, p_day text, p_text text) -> integer` | `SECURITY INVOKER`. **TEK plan ayrıştırıcısı** — hem veri dönüşümü hem `save_workout_plan` bunu kullanır |
+| `public.save_workout_plan` | `(p_client_ids uuid[], p_plan jsonb) -> integer` | `SECURITY INVOKER` (RLS uygulanır). `p_plan` = `{"Pazartesi": "metin", ...}`. Etkilenen danışan sayısını döner |
+| `public.migrate_workout_plans_from_profiles` | `() -> table(profiles_converted int, exercises_inserted int)` | `SECURITY DEFINER`, yalnız `service_role`. Idempotent veri dönüşümü; `transform.test.sql` bunu çağırır |
 
 `increment_streak` mantığı: `last_checkin_at` bugünse seri değişmez, dünse +1,
 daha eski/`NULL` ise 1'e sıfırlanır; her durumda `last_checkin_at = now()`.
@@ -182,6 +207,88 @@ Yalnızca `auth.uid() = user_id` veya koç çalıştırabilir, aksi hâlde `4250
 > `*_coach` olarak yeniden adlandırıldı (ör. `profiles_insert_admin` → `profiles_insert_coach`,
 > `exercises_update_admin` → `exercises_update_coach`). Bu yalnızca kozmetiktir — politika
 > ifadeleri (yukarıdaki tablo) değişmedi.
+
+---
+
+## 4a. Antrenman Planı Tabloları ve Veri Dönüşümü
+
+`20260817110000_workout_plan_tables.sql` (Faz 1b / Adım 1). `profiles.workout_plan`
+JSON string kolonu **silinmedi**; `DEPRECATED` yorumuyla yan yana yaşıyor ve Faz 2
+kapısında DROP edilecek.
+
+| Tablo | Kolonlar |
+|---|---|
+| `workout_plans` | `id, client_id, version (>0), is_active, notes, created_at, updated_at` |
+| `workout_plan_exercises` | `id, plan_id, day, position (>=0), raw_line, name, target_sets, target_reps, target_weight_kg, video_url` |
+
+* **Aktif plan tekilliği:** `workout_plans_one_active_idx` — `unique (client_id) where is_active`.
+  Danışan başına en fazla **bir** aktif plan; `is_active = false` arşiv satırları sınırsızdır.
+* **Gün kısıtı:** `day` yalnızca 7 Türkçe gün adını kabul eder
+  (`Pazartesi … Pazar`); `(plan_id, day, position)` tekildir.
+* **`updated_at`:** mevcut `public.set_updated_at()` trigger'ı ile tazelenir.
+
+### `raw_line` kanoniktir
+
+Her satırın **orijinal metni** `raw_line`'da kayıpsız saklanır. `name` / `target_*`
+kolonları **türevdir** ve NULL olabilir — ayrıştırma best-effort'tur
+(`^\s*\d+\.\s*(.+?)\s*-\s*(\d+)\s*[xX]\s*(\d+)`). Desen tutmazsa (örn. `Dinlenme`)
+satır **yine de eklenir**, yalnızca türev kolonlar NULL kalır.
+
+Bir günün metni şu ifadeyle **birebir** geri üretilir:
+
+```sql
+select string_agg(raw_line, E'\n' order by position)
+  from public.workout_plan_exercises
+ where plan_id = :plan and day = :day;
+```
+
+> **Tek bilinçli kayıp:** yalnızca boşluktan ibaret satırlar atılır
+> (`explode_plan_day` sözleşmesi). `transform.test.sql` senaryo 2 bu round-trip'i
+> birebir, senaryo 2b ise boş satır sınırını test eder.
+
+### Tek ayrıştırıcı kuralı
+
+`public.explode_plan_day()` **tek** ayrıştırıcıdır: hem veri dönüşümü
+(`migrate_workout_plans_from_profiles`) hem yazma RPC'si (`save_workout_plan`) onu
+çağırır. İkinci bir implementasyon yazılmamalıdır — `transform.test.sql` senaryo 9
+iki yolun **birebir aynı** satırları ürettiğini doğrular.
+
+### `save_workout_plan()` semantiği (Faz 1b)
+
+* Aktif plan satırı yoksa `version = 1` ile oluşturulur; **varsa o kullanılır**.
+* Planın **tüm** `workout_plan_exercises` satırları silinip yeniden yazılır.
+* **Yeni versiyon ÜRETİLMEZ** — versiyon-yayınlama semantiği Faz 2'dedir.
+* `SECURITY INVOKER`: RLS ihlalinde hata **yükselir** (yakalanmaz) → çağrı atomiktir.
+* Geçersiz gün anahtarı **hata verir** (yazma yolunda sessiz veri kaybı kabul edilmez);
+  dönüşüm yolunda ise atlanır (eski/bozuk veriyi kurtarabilmek için).
+
+### Veri dönüşümü neden ayrı test ister
+
+`supabase db reset` akışında migration'lar **seed'den önce** koşar, yani dönüşüm her
+zaman **boş** `profiles` tablosunda çalışır ve no-op'tur. "db reset temiz geçti"
+ifadesi dönüşüm mantığı hakkında hiçbir şey kanıtlamaz. Bu yüzden mantık
+`public.migrate_workout_plans_from_profiles()` fonksiyonuna çıkarıldı ve
+`supabase/tests/transform.test.sql` içinden çağrılıyor.
+
+Dönüşüm kuralları: NULL / boş / geçersiz JSON / JSON-nesnesi-olmayan içerik **atlanır**
+(hata verilmez); danışanın zaten aktif planı varsa **atlanır** (idempotency).
+
+### Testler
+
+```bash
+npm run test:rls         # 27 senaryo (20–27 bu tablolara ait)
+npm run test:transform   # 10 senaryo (dönüşüm + round-trip + idempotency)
+```
+
+Her iki script de `BEGIN … ROLLBACK` kullanır, kalıcı veri bırakmaz ve başarısızlıkta
+`raise exception` + `ON_ERROR_STOP=1` ile psql'i **sıfırdan farklı** çıkış koduyla
+durdurur.
+
+### Geri alma
+
+Migration dosyasının sonunda yorum bloğu hâlinde çalıştırılabilir bir `-- DOWN`
+script'i vardır (fonksiyonlar → politikalar → trigger → tablolar → eski kolon yorumu).
+Veri kaybı yaratmaz: kaynak veri `profiles.workout_plan` kolonunda durmaya devam eder.
 
 ---
 

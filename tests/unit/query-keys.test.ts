@@ -13,6 +13,7 @@ describe('queryKeys fabrika fonksiyonları', () => {
 
   it('argümansız çağrılarda null ile doldurur', () => {
     expect(queryKeys.profile()).toEqual(['profile', null])
+    expect(queryKeys.workoutPlan()).toEqual(['workout-plan', null])
     expect(queryKeys.dailyLogs()).toEqual(['daily-logs', null])
     expect(queryKeys.notifications()).toEqual(['notifications', null, null])
   })
@@ -35,6 +36,7 @@ describe('queryKeys fabrika fonksiyonları', () => {
       queryKeys.dailyLogs(),
       queryKeys.workoutLogs(),
       queryKeys.programApprovals(),
+      queryKeys.workoutPlan(),
       queryKeys.messages(),
       queryKeys.exercises(),
       queryKeys.foods(),
@@ -73,6 +75,9 @@ describe('queryKeys fabrika fonksiyonları', () => {
     expect(
       queryKeys.programApprovals('s1').slice(0, queryKeyRoots.programApprovals.length)
     ).toEqual([...queryKeyRoots.programApprovals])
+    expect(queryKeys.workoutPlan('s1').slice(0, queryKeyRoots.workoutPlan.length)).toEqual([
+      ...queryKeyRoots.workoutPlan,
+    ])
     expect(queryKeys.messages('a', 'b').slice(0, queryKeyRoots.messages.length)).toEqual([
       ...queryKeyRoots.messages,
     ])

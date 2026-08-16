@@ -169,8 +169,11 @@ export const quickAddFoodSchema = z.object({
 })
 export type QuickAddFoodInput = z.infer<typeof quickAddFoodSchema>
 
+// NOT (Faz 1b Adım 2): `workout_plan` alanı kaldırıldı. Antrenman planı artık
+// `workout_plans` + `workout_plan_exercises` tablolarında tutuluyor ve yalnızca
+// `save_workout_plan` RPC'si üzerinden yazılıyor; DEPRECATED `profiles.workout_plan`
+// kolonuna yazan yol kalmadı. Beslenme planı hâlâ `profiles.nutrition_plan`.
 export const planUpdateSchema = z.object({
-  workout_plan: z.string().optional(),
   nutrition_plan: z.string().optional(),
 })
 export type PlanUpdateInput = z.infer<typeof planUpdateSchema>

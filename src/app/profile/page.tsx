@@ -8,10 +8,10 @@ import type { ChangeEvent, JSX } from 'react'
 import { useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 
-import { useProfile, useSession, useUpdatePassword, useUploadAvatar } from '@/hooks'
-import { SkeletonCard, SkeletonText } from '@/components/ui'
+import { useProfile, useSession, useUpdatePassword, useUploadAvatar, useWorkoutPlan } from '@/hooks'
+import { QueryState, SkeletonCard, SkeletonText } from '@/components/ui'
 import { passwordChangeSchema, type PasswordChangeInput } from '@/lib/validation/schemas'
-import { DAY_NAMES, parseNutritionPlan, parseWorkoutPlan } from '@/types/domain'
+import { DAY_NAMES, EMPTY_WORKOUT_PLAN, parseNutritionPlan, type WorkoutPlan } from '@/types/domain'
 
 function isParsableJson(raw: string): boolean {
   try {
@@ -22,8 +22,17 @@ function isParsableJson(raw: string): boolean {
   }
 }
 
-function WorkoutPlanView({ raw }: { raw: string | null }): JSX.Element {
-  if (!raw) {
+/**
+ * Antrenman planı görünümü.
+ *
+ * Faz 1b Adım 2 sonrası kaynak `workout_plans` + `workout_plan_exercises`
+ * tablolarıdır; `useWorkoutPlan()` gün->metin sözlüğü döndürür. DEPRECATED
+ * `profiles.workout_plan` kolonu artık OKUNMAZ (bayat veri gösteriyordu).
+ */
+function WorkoutPlanView({ plan }: { plan: WorkoutPlan }): JSX.Element {
+  const hasContent = DAY_NAMES.some((day) => plan[day].trim().length > 0)
+
+  if (!hasContent) {
     return (
       <p className="text-sm font-medium leading-relaxed text-gray-700 dark:text-gray-300">
         Koçunuz henüz bir antrenman programı atamadı.
@@ -31,21 +40,13 @@ function WorkoutPlanView({ raw }: { raw: string | null }): JSX.Element {
     )
   }
 
-  if (!isParsableJson(raw)) {
-    return (
-      <div className="whitespace-pre-wrap text-sm font-medium leading-relaxed text-gray-700 dark:text-gray-300">
-        {raw}
-      </div>
-    )
-  }
-
-  const plan = parseWorkoutPlan(raw)
   return (
     <ul className="space-y-3">
       {DAY_NAMES.map((day) => (
         <li key={day} className="text-sm">
           <span className="font-bold text-gray-800 dark:text-zinc-200">{day}: </span>
-          <span className="font-medium text-gray-700 dark:text-gray-300">
+          {/* Bir günün metni birden çok hareket satırı içerebilir ('\n' ile birleşik). */}
+          <span className="whitespace-pre-line font-medium text-gray-700 dark:text-gray-300">
             {plan[day].trim() ? plan[day] : '—'}
           </span>
         </li>
@@ -95,6 +96,7 @@ export default function ProfilePage(): JSX.Element {
   const { data: session, isLoading: isSessionLoading } = useSession()
   const userId = session?.user.id
   const { data: profile, isLoading: isProfileLoading } = useProfile(userId)
+  const workoutPlanQuery = useWorkoutPlan(userId)
 
   const uploadAvatar = useUploadAvatar()
   const updatePassword = useUpdatePassword()
@@ -247,7 +249,15 @@ export default function ProfilePage(): JSX.Element {
           <h3 className="mb-4 border-b pb-3 text-lg font-black text-emerald-500 dark:border-zinc-800">
             🏋️ Antrenman Programım
           </h3>
-          <WorkoutPlanView raw={profile.workout_plan} />
+          <QueryState
+            isLoading={workoutPlanQuery.isLoading}
+            isError={workoutPlanQuery.isError}
+            error={workoutPlanQuery.error}
+            skeleton={<SkeletonText lines={7} />}
+            onRetry={() => void workoutPlanQuery.refetch()}
+          >
+            <WorkoutPlanView plan={workoutPlanQuery.data ?? EMPTY_WORKOUT_PLAN} />
+          </QueryState>
         </div>
       </div>
     </main>

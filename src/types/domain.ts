@@ -121,8 +121,13 @@ export const EMPTY_WORKOUT_PLAN: WorkoutPlan = buildEmptyWorkoutPlan()
 export const EMPTY_NUTRITION_PLAN: NutritionPlan = buildEmptyNutritionPlan()
 
 /**
- * `profiles.workout_plan` JSON string'ini güvenle parse eder.
+ * Gün->metin şeklindeki plan JSON string'ini güvenle parse eder.
  * Bozuk JSON veya eksik günler tam bir haftalık plana tamamlanır.
+ *
+ * NOT (Faz 1b Adım 2): antrenman planının kaynağı artık `workout_plans` /
+ * `workout_plan_exercises` tablolarıdır (bkz. src/hooks/usePlans.ts). Bu
+ * fonksiyon yalnızca hâlâ JSON olarak saklanan `program_approvals.workout_data`
+ * için kullanılır; DEPRECATED `profiles.workout_plan` kolonu okunmaz.
  */
 export function parseWorkoutPlan(raw: string | null | undefined): WorkoutPlan {
   const plan = buildEmptyWorkoutPlan()

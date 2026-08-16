@@ -46,15 +46,15 @@ export function CoachUserManagement({ clients }: CoachUserManagementProps): JSX.
   // "Şimdi" render sırasında değil, lazy initializer + event handler'larda hesaplanır (saflık kuralı).
   const [nowMs, setNowMs] = useState<number>(() => Date.now())
 
+  // Yalnızca beslenme taslağı: antrenman editörü bu çekmeceden kaldırıldı
+  // (Faz 1b Adım 2 — plan kaynağı `workout_plans` tabloları, "Antrenman" sekmesi).
   const [nutritionDraft, setNutritionDraft] = useState('')
-  const [workoutDraft, setWorkoutDraft] = useState('')
 
   // Prop değişince state'i ayarlamanın resmî React kalıbı: effect yerine render sırasında senkronlama.
   const [prevClientId, setPrevClientId] = useState<string | null>(selectedClient?.id ?? null)
   if ((selectedClient?.id ?? null) !== prevClientId) {
     setPrevClientId(selectedClient?.id ?? null)
     setNutritionDraft(selectedClient?.nutrition_plan ?? '')
-    setWorkoutDraft(selectedClient?.workout_plan ?? '')
     setBeforePoseOverride(null)
     setAfterPoseOverride(null)
   }
@@ -615,32 +615,20 @@ export function CoachUserManagement({ clients }: CoachUserManagementProps): JSX.
                         Beslenmeyi Kaydet
                       </button>
                     </div>
-                    <div className="space-y-2">
-                      <label
-                        htmlFor="coach-workout-editor"
-                        className="text-xs font-bold uppercase tracking-wider text-emerald-500"
-                      >
-                        Antrenman Programı (Admin Editörü)
-                      </label>
-                      <textarea
-                        id="coach-workout-editor"
-                        value={workoutDraft}
-                        onChange={(e) => setWorkoutDraft(e.target.value)}
-                        className="h-32 w-full rounded-xl border bg-white p-4 text-sm focus:border-emerald-500 focus:outline-none dark:border-zinc-800 dark:bg-zinc-950"
-                      />
-                      <button
-                        type="button"
-                        onClick={() =>
-                          updateProfile.mutate({
-                            id: selectedClient.id,
-                            values: { workout_plan: workoutDraft },
-                          })
-                        }
-                        disabled={updateProfile.isPending}
-                        className="w-full rounded-xl bg-emerald-500 py-3 text-sm font-bold text-white transition-all hover:bg-emerald-600 disabled:opacity-50"
-                      >
-                        Antrenmanı Kaydet
-                      </button>
+                    {/* Antrenman editörü bilinçli olarak KALDIRILDI: plan artık
+                        `workout_plans` tablolarında tutuluyor ve buradaki ham metin
+                        editörü ölü yazma yapıyordu (koç kaydediyor, danışan göremiyordu).
+                        Tam editör "Antrenman" sekmesinde. */}
+                    <div className="space-y-2 rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-4">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-500">
+                        Antrenman Programı
+                      </h4>
+                      <p className="text-sm font-medium leading-relaxed text-gray-600 dark:text-gray-400">
+                        Antrenman programı buradan düzenlenmez. Gün bazlı editör, hareket
+                        kütüphanesi ve AI desteği için üstteki{' '}
+                        <span className="font-bold text-emerald-500">Antrenman</span> sekmesini
+                        kullanın.
+                      </p>
                     </div>
                   </div>
                 </>

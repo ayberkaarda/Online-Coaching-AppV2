@@ -182,6 +182,50 @@ update public.profiles
  where id = '33333333-3333-3333-3333-333333333333';
 
 
+-- -----------------------------------------------------------------------------
+-- 2b) ANTRENMAN PLANLARINI NORMALİZE TABLOLARA DA YAZ
+--     (workout_plans + workout_plan_exercises — Faz 1b Adım 2 cutover'ı)
+--
+--     Uygulama artık planı `profiles.workout_plan` kolonundan DEĞİL, bu
+--     tablolardan okuyor (src/hooks/usePlans.ts). Yukarıdaki `workout_plan`
+--     yazımı BİLEREK korunuyor: DEPRECATED kolon, veri dönüşümü testine
+--     (supabase/tests/transform.test.sql) malzeme olmaya devam ediyor.
+--
+--     İKİ KAYNAK AYNI İÇERİĞİ ÜRETİR: aşağıdaki blok planı elle tekrarlamaz,
+--     doğrudan `profiles.workout_plan` JSON'unu okuyup TEK ayrıştırıcıdan
+--     (`explode_plan_day`, `save_workout_plan` içinden) geçirir. Böylece
+--     kopyala-yapıştır kayması imkânsızdır.
+--
+--     NOT: migration'lar `supabase db reset` sırasında seed'den ÖNCE koştuğu
+--     için `migrate_workout_plans_from_profiles()` orada boş tabloda çalışır
+--     (no-op). Dolum bu yüzden seed'in görevidir.
+--
+--     Idempotent: `save_workout_plan` aktif planın satırlarını silip yeniden
+--     yazar; seed tekrar çalıştırıldığında satır çoğalmaz, içerik seed'e döner.
+--     (Seed superuser ile koştuğu için RLS ve fonksiyon ACL'i engel değildir.)
+-- -----------------------------------------------------------------------------
+do $$
+declare
+  v_id   uuid;
+  v_plan jsonb;
+begin
+  for v_id, v_plan in
+    select p.id, p.workout_plan::jsonb
+      from public.profiles p
+     where p.id in (
+             '22222222-2222-2222-2222-222222222222',
+             '33333333-3333-3333-3333-333333333333'
+           )
+       and p.workout_plan is not null
+       and btrim(p.workout_plan) <> ''
+     order by p.id
+  loop
+    perform public.save_workout_plan(array[v_id], v_plan);
+  end loop;
+end
+$$;
+
+
 -- =============================================================================
 -- 3) REFERANS KATALOGLARI
 --    Gerçek veri src/app/clean_foods.csv ve src/app/clean_exercises_v2.csv

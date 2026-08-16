@@ -16,6 +16,8 @@ export const queryKeyRoots = {
   dailyLogs: ['daily-logs'] as const,
   workoutLogs: ['workout-logs'] as const,
   programApprovals: ['program-approvals'] as const,
+  /** Antrenman planı artık `profiles` altında değil, kendi tablolarında yaşar (Faz 1b). */
+  workoutPlan: ['workout-plan'] as const,
   messages: ['messages'] as const,
   exercises: ['exercises'] as const,
   foods: ['foods'] as const,
@@ -37,6 +39,14 @@ export const queryKeys = {
   dailyLogs: (clientId?: string) => ['daily-logs', clientId ?? null] as const,
   workoutLogs: (clientId?: string) => ['workout-logs', clientId ?? null] as const,
   programApprovals: (clientId?: string) => ['program-approvals', clientId ?? null] as const,
+
+  /**
+   * Antrenman planı (workout_plans + workout_plan_exercises).
+   * Faz 1b öncesinde plan `profiles.workout_plan` kolonundaydı ve anahtarı
+   * `[...profile(id), 'workout-plan']` idi; tablolar ayrıldığı için artık
+   * bağımsız bir köke sahiptir ve `profile` invalidate'i onu SÜPÜRMEZ.
+   */
+  workoutPlan: (clientId?: string) => ['workout-plan', clientId ?? null] as const,
 
   /** Sohbet anahtarı yön bağımsızdır: (a,b) ve (b,a) aynı anahtarı üretir. */
   messages: (a?: string, b?: string) => {
