@@ -59,7 +59,7 @@ export const passwordChangeSchema = z.object({
 })
 export type PasswordChangeInput = z.infer<typeof passwordChangeSchema>
 
-export const createStudentSchema = z.object({
+export const createClientSchema = z.object({
   email: emailField,
   password: z
     .string({ required_error: 'Şifre zorunludur.' })
@@ -70,7 +70,7 @@ export const createStudentSchema = z.object({
     .min(2, { message: 'Ad soyad en az 2 karakter olmalıdır.' })
     .max(80, { message: 'Ad soyad en fazla 80 karakter olabilir.' }),
 })
-export type CreateStudentInput = z.infer<typeof createStudentSchema>
+export type CreateClientInput = z.infer<typeof createClientSchema>
 
 // ---------------------------------------------------------------------------
 // Günlük takip
@@ -226,7 +226,8 @@ export const aiDietSchema = z.object({
 export type AiDietInput = z.infer<typeof aiDietSchema>
 
 export const recommendationSchema = z.object({
-  student_id: uuidField.optional(),
+  // AI backend tel protokolü: alan adı ai_backend/app/schemas/recommendations.py ile eşleşmeli (bkz. Faz 1a rol yeniden adlandırması).
+  client_id: uuidField.optional(),
   goal: goalEnum,
   recent_weights: z
     .array(z.coerce.number())

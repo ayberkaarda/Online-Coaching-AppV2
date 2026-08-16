@@ -18,14 +18,14 @@ export interface DailyLogTabProps {
   targetId: string | undefined
   currentUserId: string | undefined
   userRole: UserRole | null | undefined
-  selectedStudentIds: string[]
+  selectedClientIds: string[]
 }
 
 export default function DailyLogTab({
   targetId,
   currentUserId,
   userRole,
-  selectedStudentIds,
+  selectedClientIds,
 }: DailyLogTabProps): JSX.Element {
   const { data, isLoading, isError, error, refetch } = useDailyLogs(targetId)
   const createDailyLog = useCreateDailyLog()
@@ -47,7 +47,7 @@ export default function DailyLogTab({
 
     // Başarı/hata toast'ı hook içinde gösterilir; aynı gün için kayıt UPSERT edilir.
     await createDailyLog.mutateAsync({
-      studentId: currentUserId,
+      clientId: currentUserId,
       water_lt: values.water_lt,
       sodium_mg: values.sodium_mg,
       macros: { protein: values.protein, carb: values.carb, fat: values.fat },
@@ -74,7 +74,7 @@ export default function DailyLogTab({
 
   return (
     <div className="animate-fadeIn space-y-6">
-      {userRole === 'student' && (
+      {userRole === 'client' && (
         <form
           onSubmit={onSubmit}
           noValidate
@@ -211,7 +211,7 @@ export default function DailyLogTab({
         </form>
       )}
 
-      {userRole === 'admin' && selectedStudentIds.length > 1 ? (
+      {userRole === 'coach' && selectedClientIds.length > 1 ? (
         <p className="py-10 text-center text-sm font-bold text-brand-purple">
           Sadece 1 öğrenci seçili bırakın.
         </p>

@@ -10,15 +10,15 @@ import { queryKeys } from '@/lib/query/keys'
 import { supabase } from '@/lib/supabase/client'
 import { parseMacros, type DailyLog, type Macros } from '@/types'
 
-export function useDailyLogs(studentId?: string) {
+export function useDailyLogs(clientId?: string) {
   return useQuery({
-    queryKey: queryKeys.dailyLogs(studentId),
-    enabled: Boolean(studentId),
+    queryKey: queryKeys.dailyLogs(clientId),
+    enabled: Boolean(clientId),
     queryFn: async (): Promise<DailyLog[]> => {
       const { data, error } = await supabase
         .from('daily_logs')
         .select('*')
-        .eq('student_id', studentId ?? '')
+        .eq('client_id', clientId ?? '')
         .order('log_date', { ascending: false })
       if (error) throw new Error(error.message)
 
@@ -28,7 +28,7 @@ export function useDailyLogs(studentId?: string) {
 }
 
 export interface CreateDailyLogInput {
-  studentId: string
+  clientId: string
   water_lt: number | null
   sodium_mg: number | null
   macros: Macros
@@ -38,14 +38,14 @@ export interface CreateDailyLogInput {
 
 /**
  * Günlük kaydı oluşturur/günceller.
- * Şemada `(student_id, log_date)` benzersizdir; bu yüzden insert değil UPSERT kullanılır.
+ * Şemada `(client_id, log_date)` benzersizdir; bu yüzden insert değil UPSERT kullanılır.
  */
 export function useCreateDailyLog() {
   const queryClient = useQueryClient()
 
   return useMutation({
     mutationFn: async ({
-      studentId,
+      clientId,
       water_lt,
       sodium_mg,
       macros,
@@ -55,13 +55,13 @@ export function useCreateDailyLog() {
         .from('daily_logs')
         .upsert(
           {
-            student_id: studentId,
+            client_id: clientId,
             water_lt,
             sodium_mg,
             macros: { protein: macros.protein, carb: macros.carb, fat: macros.fat },
             ...(log_date ? { log_date } : {}),
           },
-          { onConflict: 'student_id,log_date' }
+          { onConflict: 'client_id,log_date' }
         )
         .select()
         .single()
@@ -69,8 +69,8 @@ export function useCreateDailyLog() {
 
       return { ...data, macros: parseMacros(data.macros) }
     },
-    onSuccess: (_log, { studentId }) => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.dailyLogs(studentId) })
+    onSuccess: (_log, { clientId }) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.dailyLogs(clientId) })
       toast.success('Günlük veriler kaydedildi.')
     },
     onError: (error: Error) => {

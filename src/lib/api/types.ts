@@ -62,7 +62,8 @@ export interface DietGenerateResult {
 // ---------------------------------------------------------------------------
 
 export interface RecommendationInput {
-  student_id?: string
+  // AI backend tel protokolü: alan adı ai_backend/app/schemas/recommendations.py ile eşleşmeli (bkz. Faz 1a rol yeniden adlandırması).
+  client_id?: string
   goal: Goal
   recent_weights: number[]
   recent_macros: Macros[]

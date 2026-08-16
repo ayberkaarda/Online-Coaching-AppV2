@@ -21,7 +21,7 @@ import WorkoutTab from './tabs/WorkoutTab'
 export interface DashboardTabsProps {
   currentUserId: string | undefined
   userRole: UserRole | null | undefined
-  students: Profile[]
+  clients: Profile[]
 }
 
 const TABS = [
@@ -41,28 +41,28 @@ const ITEMS_PER_PAGE = 5
 export function DashboardTabs({
   currentUserId,
   userRole,
-  students,
+  clients,
 }: DashboardTabsProps): JSX.Element {
   const [activeTab, setActiveTab] = useState<TabKey>('formCheck')
   const exportRef = useRef<HTMLDivElement | null>(null)
   const tabRefs = useRef<Partial<Record<TabKey, HTMLButtonElement | null>>>({})
 
   const [searchTerm, setSearchTerm] = useState('')
-  const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([])
+  const [selectedClientIds, setSelectedClientIds] = useState<string[]>([])
   const [currentPage, setCurrentPage] = useState(0)
 
-  const studentsList = students.filter((s) => s.role !== 'admin')
-  const filteredStudents = studentsList.filter((s) =>
-    (s.full_name ?? '').toLowerCase().includes(searchTerm.toLowerCase())
+  const clientsList = clients.filter((c) => c.role !== 'coach')
+  const filteredClients = clientsList.filter((c) =>
+    (c.full_name ?? '').toLowerCase().includes(searchTerm.toLowerCase())
   )
-  const totalPages = Math.ceil(filteredStudents.length / ITEMS_PER_PAGE)
+  const totalPages = Math.ceil(filteredClients.length / ITEMS_PER_PAGE)
   const safeTotalPages = Math.max(totalPages, 1)
-  const criticalStudents = studentsList.filter((s) => s.current_streak === 0)
+  const criticalClients = clientsList.filter((c) => c.current_streak === 0)
 
   const targetId =
-    userRole === 'admin'
-      ? selectedStudentIds.length === 1
-        ? selectedStudentIds[0]
+    userRole === 'coach'
+      ? selectedClientIds.length === 1
+        ? selectedClientIds[0]
         : undefined
       : currentUserId
 
@@ -87,14 +87,14 @@ export function DashboardTabs({
     }
   }
 
-  const toggleStudent = (id: string): void =>
-    setSelectedStudentIds((prev) =>
-      prev.includes(id) ? prev.filter((sId) => sId !== id) : [...prev, id]
+  const toggleClient = (id: string): void =>
+    setSelectedClientIds((prev) =>
+      prev.includes(id) ? prev.filter((cId) => cId !== id) : [...prev, id]
     )
 
   const selectAll = (): void =>
-    setSelectedStudentIds(
-      selectedStudentIds.length === filteredStudents.length ? [] : filteredStudents.map((s) => s.id)
+    setSelectedClientIds(
+      selectedClientIds.length === filteredClients.length ? [] : filteredClients.map((c) => c.id)
     )
 
   const nextBtn = (): void => setCurrentPage((p) => Math.min(totalPages - 1, p + 1))
@@ -128,14 +128,14 @@ export function DashboardTabs({
     targetId,
     currentUserId,
     userRole,
-    selectedStudentIds,
+    selectedClientIds,
     onDownloadImage: () => void handleDownloadImage(),
   }
 
   return (
     <div className="mt-4 w-full">
       {/* Öğrenci Başlığı (Streak) */}
-      {userRole === 'student' && (
+      {userRole === 'client' && (
         <div className="mb-6 flex items-center justify-between rounded-2xl border border-orange-500/20 bg-gradient-to-r from-orange-500/10 to-transparent p-4">
           <div>
             <h3 className="text-sm font-black text-orange-600 dark:text-orange-400">
@@ -151,26 +151,26 @@ export function DashboardTabs({
         </div>
       )}
 
-      {/* Admin Öğrenci Paneli */}
-      {userRole === 'admin' && (
+      {/* Koç Öğrenci Paneli */}
+      {userRole === 'coach' && (
         <>
-          {criticalStudents.length > 0 && (
+          {criticalClients.length > 0 && (
             <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 p-4 dark:border-red-900/30 dark:bg-red-900/10">
               <h3 className="mb-3 flex items-center gap-2 text-xs font-black uppercase tracking-widest text-red-600 dark:text-red-400">
                 <span className="h-2 w-2 animate-ping rounded-full bg-red-500" aria-hidden="true" />{' '}
                 Acil İlgilenilmesi Gerekenler
               </h3>
               <div className="hide-scrollbar flex gap-3 overflow-x-auto">
-                {criticalStudents.map((s) => (
+                {criticalClients.map((c) => (
                   <button
                     type="button"
-                    key={s.id}
-                    onClick={() => toggleStudent(s.id)}
-                    aria-pressed={selectedStudentIds.includes(s.id)}
-                    aria-label={`${s.full_name ?? 'Öğrenci'} seç`}
+                    key={c.id}
+                    onClick={() => toggleClient(c.id)}
+                    aria-pressed={selectedClientIds.includes(c.id)}
+                    aria-label={`${c.full_name ?? 'Öğrenci'} seç`}
                     className="cursor-pointer whitespace-nowrap rounded-xl border border-red-100 bg-white px-3 py-2 text-xs font-bold text-gray-700 shadow-sm transition-transform hover:scale-105 dark:border-red-900/20 dark:bg-[#16161d] dark:text-gray-300"
                   >
-                    <span aria-hidden="true">⚠️</span> {(s.full_name ?? '').split(' ')[0] ?? ''}
+                    <span aria-hidden="true">⚠️</span> {(c.full_name ?? '').split(' ')[0] ?? ''}
                   </button>
                 ))}
               </div>
@@ -191,11 +191,11 @@ export function DashboardTabs({
                 >
                   🔍
                 </span>
-                <label htmlFor="student-search" className="sr-only">
+                <label htmlFor="client-search" className="sr-only">
                   Öğrenci Ara
                 </label>
                 <input
-                  id="student-search"
+                  id="client-search"
                   type="text"
                   placeholder="Öğrenci Ara..."
                   value={searchTerm}
@@ -212,8 +212,7 @@ export function DashboardTabs({
                   onClick={selectAll}
                   className="whitespace-nowrap rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-bold text-gray-600 transition-all hover:bg-brand-purple hover:text-white dark:bg-zinc-800 dark:text-gray-300"
                 >
-                  {selectedStudentIds.length === filteredStudents.length &&
-                  filteredStudents.length > 0
+                  {selectedClientIds.length === filteredClients.length && filteredClients.length > 0
                     ? 'SEÇİMİ TEMİZLE'
                     : 'TÜMÜNÜ SEÇ'}
                 </button>
@@ -241,7 +240,7 @@ export function DashboardTabs({
             </div>
 
             <div className="relative h-24 w-full overflow-hidden">
-              {filteredStudents.length === 0 ? (
+              {filteredClients.length === 0 ? (
                 <div className="flex h-full items-center justify-center text-xs font-bold text-gray-400">
                   Aramayla eşleşen öğrenci bulunamadı.
                 </div>
@@ -259,17 +258,17 @@ export function DashboardTabs({
                       className="flex justify-around gap-4 px-2"
                       style={{ width: `${100 / safeTotalPages}%` }}
                     >
-                      {filteredStudents
+                      {filteredClients
                         .slice(pageIndex * ITEMS_PER_PAGE, (pageIndex + 1) * ITEMS_PER_PAGE)
-                        .map((student) => {
-                          const isSelected = selectedStudentIds.includes(student.id)
-                          const fullName = student.full_name ?? ''
+                        .map((client) => {
+                          const isSelected = selectedClientIds.includes(client.id)
+                          const fullName = client.full_name ?? ''
                           const firstName = fullName.split(' ')[0] ?? ''
                           return (
                             <button
                               type="button"
-                              key={student.id}
-                              onClick={() => toggleStudent(student.id)}
+                              key={client.id}
+                              onClick={() => toggleClient(client.id)}
                               aria-pressed={isSelected}
                               aria-label={`${fullName || 'Öğrenci'} seç`}
                               className="group relative flex w-16 cursor-pointer flex-col items-center gap-2"
@@ -287,9 +286,9 @@ export function DashboardTabs({
                                       : 'opacity-60 grayscale hover:grayscale-0 group-hover:scale-105 group-hover:opacity-100'
                                   }`}
                                 />
-                                {student.current_streak > 0 && (
+                                {client.current_streak > 0 && (
                                   <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border-2 border-white bg-orange-500 text-[9px] font-black text-white dark:border-zinc-900">
-                                    {student.current_streak}
+                                    {client.current_streak}
                                   </span>
                                 )}
                               </div>
@@ -397,7 +396,7 @@ export function DashboardTabs({
         tabIndex={0}
         className="mt-4 min-h-[400px] rounded-3xl border border-gray-100 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-[#16161d] md:p-8"
       >
-        {userRole === 'admin' && selectedStudentIds.length === 0 ? (
+        {userRole === 'coach' && selectedClientIds.length === 0 ? (
           <div className="flex h-64 flex-col items-center justify-center text-sm font-bold text-gray-500">
             <span className="mb-3 text-4xl opacity-50" aria-hidden="true">
               👥
@@ -410,14 +409,14 @@ export function DashboardTabs({
               <StatsTab
                 targetId={targetId}
                 userRole={userRole}
-                selectedStudentIds={selectedStudentIds}
+                selectedClientIds={selectedClientIds}
               />
             )}
             {activeTab === 'announcements' && (
               <AnnouncementsTab
                 announcements={announcements}
                 userRole={userRole}
-                selectedStudentIds={selectedStudentIds}
+                selectedClientIds={selectedClientIds}
               />
             )}
             {activeTab === 'formCheck' && (
@@ -425,7 +424,7 @@ export function DashboardTabs({
                 targetId={tabProps.targetId}
                 currentUserId={tabProps.currentUserId}
                 userRole={tabProps.userRole}
-                selectedStudentIds={tabProps.selectedStudentIds}
+                selectedClientIds={tabProps.selectedClientIds}
               />
             )}
             {activeTab === 'daily' && (
@@ -433,7 +432,7 @@ export function DashboardTabs({
                 targetId={tabProps.targetId}
                 currentUserId={tabProps.currentUserId}
                 userRole={tabProps.userRole}
-                selectedStudentIds={tabProps.selectedStudentIds}
+                selectedClientIds={tabProps.selectedClientIds}
               />
             )}
             {activeTab === 'nutrition' && (
@@ -441,7 +440,7 @@ export function DashboardTabs({
                 targetId={tabProps.targetId}
                 currentUserId={tabProps.currentUserId}
                 userRole={tabProps.userRole}
-                selectedStudentIds={tabProps.selectedStudentIds}
+                selectedClientIds={tabProps.selectedClientIds}
                 onDownloadImage={tabProps.onDownloadImage}
               />
             )}
@@ -450,7 +449,7 @@ export function DashboardTabs({
                 targetId={tabProps.targetId}
                 currentUserId={tabProps.currentUserId}
                 userRole={tabProps.userRole}
-                selectedStudentIds={tabProps.selectedStudentIds}
+                selectedClientIds={tabProps.selectedClientIds}
                 onDownloadImage={tabProps.onDownloadImage}
               />
             )}
@@ -459,7 +458,7 @@ export function DashboardTabs({
                 targetId={tabProps.targetId}
                 currentUserId={tabProps.currentUserId}
                 userRole={tabProps.userRole}
-                selectedStudentIds={tabProps.selectedStudentIds}
+                selectedClientIds={tabProps.selectedClientIds}
               />
             )}
           </>

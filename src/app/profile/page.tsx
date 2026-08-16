@@ -150,10 +150,12 @@ export default function ProfilePage(): JSX.Element {
         {/* Avatar Bölümü */}
         <div className="group relative cursor-pointer">
           <div className="flex h-32 w-32 items-center justify-center overflow-hidden rounded-full border-4 border-brand-purple/20 bg-gray-100 transition-all group-hover:border-brand-purple dark:bg-zinc-900">
-            {profile.avatar_url ? (
+            {/* Avatar private bucket'tadır: adres imzalıdır ve süreye bağlıdır.
+                İmza üretilemezse (dosya yok/erişim yok) kırık görsel yerine 👤 gösterilir. */}
+            {profile.avatarSignedUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
-                src={profile.avatar_url}
+                src={profile.avatarSignedUrl}
                 alt={`${profile.full_name} profil fotoğrafı`}
                 loading="lazy"
                 className="h-full w-full object-cover"

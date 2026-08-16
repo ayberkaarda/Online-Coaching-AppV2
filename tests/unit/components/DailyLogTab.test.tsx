@@ -64,7 +64,7 @@ function mockCreateDailyLogMutation(
 function makeLog(overrides: Partial<DailyLog> = {}): DailyLog {
   return {
     id: 'log-1',
-    student_id: 'std-1',
+    client_id: 'std-1',
     log_date: '2026-08-10',
     water_lt: 3,
     sodium_mg: 2000,
@@ -75,7 +75,7 @@ function makeLog(overrides: Partial<DailyLog> = {}): DailyLog {
 }
 
 describe('DailyLogTab', () => {
-  it('userRole="student" iken form görünür', () => {
+  it('userRole="client" iken form görünür', () => {
     vi.mocked(useDailyLogs).mockReturnValue(mockDailyLogsQuery())
     vi.mocked(useCreateDailyLog).mockReturnValue(mockCreateDailyLogMutation())
 
@@ -83,8 +83,8 @@ describe('DailyLogTab', () => {
       <DailyLogTab
         targetId="std-1"
         currentUserId="std-1"
-        userRole="student"
-        selectedStudentIds={[]}
+        userRole="client"
+        selectedClientIds={[]}
       />
     )
 
@@ -92,7 +92,7 @@ describe('DailyLogTab', () => {
     expect(screen.getByRole('button', { name: 'Antrenörüme Gönder' })).toBeInTheDocument()
   })
 
-  it('userRole="admin" iken form görünmez', () => {
+  it('userRole="coach" iken form görünmez', () => {
     vi.mocked(useDailyLogs).mockReturnValue(mockDailyLogsQuery())
     vi.mocked(useCreateDailyLog).mockReturnValue(mockCreateDailyLogMutation())
 
@@ -100,8 +100,8 @@ describe('DailyLogTab', () => {
       <DailyLogTab
         targetId="std-1"
         currentUserId="coach-1"
-        userRole="admin"
-        selectedStudentIds={['std-1']}
+        userRole="coach"
+        selectedClientIds={['std-1']}
       />
     )
 
@@ -118,8 +118,8 @@ describe('DailyLogTab', () => {
       <DailyLogTab
         targetId="std-1"
         currentUserId="std-1"
-        userRole="student"
-        selectedStudentIds={[]}
+        userRole="client"
+        selectedClientIds={[]}
       />
     )
 
@@ -141,8 +141,8 @@ describe('DailyLogTab', () => {
       <DailyLogTab
         targetId="std-1"
         currentUserId="std-1"
-        userRole="student"
-        selectedStudentIds={[]}
+        userRole="client"
+        selectedClientIds={[]}
       />
     )
 
@@ -157,7 +157,7 @@ describe('DailyLogTab', () => {
     // `toHaveBeenCalledWith` derin eşitlik yapar: sayı yerine string ('150') gönderilseydi
     // bu assertion başarısız olurdu — bu, sayısal makro regresyonunun testidir.
     expect(mutation.mutateAsync).toHaveBeenCalledWith({
-      studentId: 'std-1',
+      clientId: 'std-1',
       water_lt: 2.5,
       sodium_mg: 2000,
       macros: { protein: 150, carb: 200, fat: 60 },
@@ -173,8 +173,8 @@ describe('DailyLogTab', () => {
       <DailyLogTab
         targetId="std-1"
         currentUserId="std-1"
-        userRole="student"
-        selectedStudentIds={[]}
+        userRole="client"
+        selectedClientIds={[]}
       />
     )
 
@@ -196,8 +196,8 @@ describe('DailyLogTab', () => {
       <DailyLogTab
         targetId="std-1"
         currentUserId="std-1"
-        userRole="student"
-        selectedStudentIds={[]}
+        userRole="client"
+        selectedClientIds={[]}
       />
     )
 
@@ -212,15 +212,15 @@ describe('DailyLogTab', () => {
       <DailyLogTab
         targetId="std-1"
         currentUserId="std-1"
-        userRole="student"
-        selectedStudentIds={[]}
+        userRole="client"
+        selectedClientIds={[]}
       />
     )
 
     expect(screen.getByText('Kayıt bulunamadı.')).toBeInTheDocument()
   })
 
-  it('admin + birden fazla seçili öğrenci iken uyarı metni gösterilir', () => {
+  it('coach + birden fazla seçili öğrenci iken uyarı metni gösterilir', () => {
     vi.mocked(useDailyLogs).mockReturnValue(mockDailyLogsQuery({ data: [makeLog()] }))
     vi.mocked(useCreateDailyLog).mockReturnValue(mockCreateDailyLogMutation())
 
@@ -228,8 +228,8 @@ describe('DailyLogTab', () => {
       <DailyLogTab
         targetId={undefined}
         currentUserId="coach-1"
-        userRole="admin"
-        selectedStudentIds={['std-1', 'std-2']}
+        userRole="coach"
+        selectedClientIds={['std-1', 'std-2']}
       />
     )
 

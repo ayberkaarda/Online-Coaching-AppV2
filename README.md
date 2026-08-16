@@ -30,7 +30,7 @@ Koçların danışanlarını antrenman, beslenme ve ilerleme verisi üzerinden u
 
 ## Özellikler
 
-### Koç (`admin`) perspektifinden
+### Koç (`coach`) perspektifinden
 
 - Tüm danışanların profilini, ilerleme geçmişini ve form-check fotoğraflarını tek panelden görme.
 - Danışanların önerdiği AI antrenman/beslenme planlarını **onaylama veya reddetme** (`program_approvals`) — hiçbir plan koç onayı olmadan danışanın aktif programına yazılmaz.
@@ -38,9 +38,9 @@ Koçların danışanlarını antrenman, beslenme ve ilerleme verisi üzerinden u
 - Danışanlarla gerçek zamanlı, çevrimiçi durumu görünen birebir sohbet.
 - ~~Danışan hesabı oluşturma/yönetme (rol ataması dahil)~~ — bu akış için yazılmış `service_role` tabanlı server action'lar hiçbir yerden çağrılmadığı tespit edildiği için kaldırıldı (bkz. `docs/DISCOVERY.md` §2.5, §15.2 #3); uygulamada şu an danışan hesabı oluşturmanın bir yolu **yok**. Faz 2'de koç-danışan akışıyla birlikte yeniden kurulacak.
 
-### Danışan (`student`) perspektifinden
+### Danışan (`client`) perspektifinden
 
-- **Form check**: haftalık kilo girişi + önden/arkadan poz fotoğrafı; geçmiş kayıtlarla **before/after** kıyaslama.
+- **Form check**: haftalık kilo girişi + önden/arkadan poz fotoğrafı; geçmiş kayıtlarla **before/after** kıyaslama. Fotoğraflar private bir Supabase Storage bucket'ında (`form-checks-media`) tutulur ve yalnızca **imzalı (signed) adres** ile, TTL 1 saat sonra geçersiz olacak şekilde sunulur — bkz. [Güvenlik](#güvenlik).
 - Kilo ve makro (protein/karbonhidrat/yağ) trendlerini grafiklerle (Recharts/Chart.js) izleme.
 - **Canlı gym modu**: antrenman sırasında set bazlı ağırlık/tekrar/RPE girişi (`workout_logs`).
 - Hedef, split tipi ve seviyeye göre **AI antrenman planı** ve antropometrik verilere göre **AI beslenme planı (BMR/TDEE + makro dağılımı)** üretimi.
@@ -109,7 +109,7 @@ sequenceDiagram
   K->>P: UPDATE status=approved, reviewed_by, reviewed_at
   P-->>D: Realtime bildirim (program_approvals değişti)
   D->>D: onaylanan plan profiles.workout_plan alanına yazılır
-  K->>Not: insert notifications (student_id, mesaj)
+  K->>Not: insert notifications (client_id, mesaj)
   Not-->>D: bildirim listesine düşer
 ```
 
@@ -312,11 +312,12 @@ Uygulama `http://localhost:3000`, AI servisi `http://localhost:8000` (Swagger: `
 
 Test piramidi üç katmandan oluşur:
 
-1. **Vitest (birim/bileşen)** — `vitest.config.ts`. Ortam: jsdom. Kapsam eşikleri (`v8` provider): `lines 60`, `functions 60`, `branches 55`, `statements 60`. Çalıştırma: `npm run test:coverage`; HTML rapor `coverage/index.html`, terminalde `text` özeti.
-2. **pytest (backend)** — `ai_backend/pyproject.toml` → `--cov=app --cov-report=term-missing --cov-fail-under=70`. Çalıştırma: `cd ai_backend && uv run pytest`.
-3. **Playwright (E2E)** — `playwright.config.ts`, senaryolar `tests/e2e/` altında (chromium + Mobile Chrome projeleri). Örnek akış: **giriş yap → günlük veri girişi (`daily_logs`) → dashboard'da güncellenmiş veriyi doğrula**. Çalıştırma: `npm run test:e2e`; rapor `playwright-report/index.html`. `webServer` ayarı testten önce otomatik `npm run build && npm run start` çalıştırır.
+1. **Vitest (birim/bileşen)** — `vitest.config.ts`. Ortam: jsdom. Kapsam eşikleri (`v8` provider): `lines 60`, `functions 60`, `branches 55`, `statements 60`. Çalıştırma: `npm run test:coverage`; HTML rapor `coverage/index.html`, terminalde `text` özeti. Güncel durum: **203/203 test, 18 dosya** (`src/lib/storage.ts` testleri dahil).
+2. **pytest (backend)** — `ai_backend/pyproject.toml` → `--cov=app --cov-report=term-missing --cov-fail-under=70`. Çalıştırma: `cd ai_backend && uv run pytest`. Güncel durum: **63 test, kapsam %92**.
+3. **Playwright (E2E)** — `playwright.config.ts`, senaryolar `tests/e2e/` altında (chromium + Mobile Chrome projeleri). Örnek akış: **giriş yap → günlük veri girişi (`daily_logs`) → dashboard'da güncellenmiş veriyi doğrula**. Çalıştırma: `npm run test:e2e`; rapor `playwright-report/index.html`. `webServer` ayarı testten önce otomatik `npm run build && npm run start` çalıştırır. Güncel durum: **16 senaryo × 2 profil (chromium + Mobile Chrome) = 16×2 koşum**, hepsi geçiyor.
+4. **RLS (SQL)** — `supabase/tests/rls.test.sql`, `npm run test:rls`. Güncel durum: **19/19 senaryo** geçiyor (bkz. [Veritabanı ve RLS](#veritabanı-ve-rls)).
 
-CI, her PR'da bu üç katmanı da çalıştırır (bkz. `.github/workflows/ci.yml`); `test:e2e` yalnızca `pull_request` event'inde tetiklenir.
+CI, her PR'da bu katmanları çalıştırır (bkz. `.github/workflows/ci.yml`); `test:e2e` yalnızca `pull_request` event'inde tetiklenir.
 
 ---
 
@@ -324,7 +325,9 @@ CI, her PR'da bu üç katmanı da çalıştırır (bkz. `.github/workflows/ci.ym
 
 **Tablolar:** `profiles`, `notifications`, `form_checks`, `daily_logs`, `workout_logs`, `program_approvals`, `messages`, `exercises`, `food_database`.
 
-**Rol modeli:** Veritabanı enum'u `user_role` yalnızca `admin` ve `student` değerlerini alır. Ürün dilinde **`admin` = koç**, **`student` = danışan**. Mevcut veriyi ve uygulama kodunu bozmamak için enum değerleri değiştirilmemiştir; "koç/danışan" yalnızca dokümantasyon ve UI metni düzeyinde bir eşlemedir.
+**Rol modeli:** Veritabanı enum'u `user_role` artık doğrudan **`coach`** (koç) ve **`client`** (danışan) değerlerini alır (bkz. `supabase/migrations/20260817090000_rename_roles.sql` — önceki `admin`/`student` etiketlerinden yeniden adlandırıldı; ilgili tablolardaki `student_id` kolonları da `client_id` oldu). Kullanıcıya görünen Türkçe arayüz metinleri ("Öğrenci Paneli" gibi) bu fazın kapsamı dışında bırakıldı ve henüz güncellenmedi; ürün dili düzenlemesi Faz 2'de yapılacak.
+
+> **Bilinçli istisna:** AI backend tel protokolündeki `student_id` alanı (`src/lib/api/types.ts` → `RecommendationInput.student_id`, `src/lib/validation/schemas.ts` → `recommendationSchema.student_id`) DEĞİŞMEDİ, çünkü `ai_backend/app/schemas/recommendations.py` bu adı bekliyor ve backend bu fazın kapsamı dışında.
 
 **Yetkilendirmenin tek kaynağı Row Level Security'dir.** Uygulama kodu (server action, API route, client component) hiçbir yerde rol kontrolünü kendi başına yapıp veriye erişim kararı vermez — tüm SELECT/INSERT/UPDATE/DELETE, Postgres'teki RLS politikaları tarafından süzülür. `anon` (oturumsuz) rolünden `public` şemadaki tüm tablo/fonksiyon yetkileri REVOKE edilmiştir.
 
@@ -369,6 +372,7 @@ Frontend Vercel'e, AI backend Railway veya Fly.io'ya, veritabanı Supabase'e da�
 - **Service-role anahtarı kod tabanında yok**: onu kullanan tek yer olan `src/lib/supabase/admin.ts` ve çağrılmayan server action'lar (`src/app/actions.ts`) ölü kod oldukları için kaldırıldı; geri eklenirse `server-only` paketiyle işaretlenip istemci bundle'ına sızması build hatasıyla engellenmelidir.
 - **Hata mesajlarında stack trace sızdırılmaz**: AI proxy (`src/lib/api/proxy.ts`) upstream hata detaylarını yalnızca sunucu loguna yazar, istemciye genel bir mesaj + `request_id` döner; FastAPI production modunda da generic hata mesajına düşer (`ENVIRONMENT=production`).
 - **RLS**: satır düzeyi izolasyonun tek kaynağı; bkz. [Veritabanı ve RLS](#veritabanı-ve-rls).
+- **Storage mahremiyeti**: `avatars` ve `form-checks-media` bucket'ları **private**'tır (`public = false`, bkz. `supabase/migrations/20260817100000_private_storage.sql`). Kolonlar (`profiles.avatar_path`, `form_checks.front_pose_path`/`back_pose_path`) tam URL değil bucket içi yol saklar; okuma yalnızca `src/lib/storage.ts` ile üretilen **imzalı adres** (TTL 3600 sn, sahibi veya koç için) üzerinden yapılır. `anon` rolü hiçbir storage nesnesini okuyamaz.
 - **Uçtan uca izlenebilirlik**: her AI proxy isteği bir `X-Request-ID` üretir, hem Next.js hem FastAPI loglarında bu kimlikle görünür.
 
 ### Zafiyet Bildirimi
@@ -385,7 +389,7 @@ src/
                        error/global-error/not-found/loading
   app/api/health       sağlık kontrolü (Docker HEALTHCHECK)
   app/api/ai/{workout,nutrition,recommendations}   FastAPI'ye sunucu tarafı proxy
-  components/          DashboardTabs, AdminUserManagement, NotificationForm, ThemeToggle
+  components/          DashboardTabs, CoachUserManagement, NotificationForm, ThemeToggle
   components/tabs/     Announcements, Stats, FormCheck, DailyLog, Nutrition, Workout, Messages
   components/ui/       Skeleton, ErrorBoundary, QueryState, EmptyState
   hooks/               TanStack Query hook'ları (useSession, useProfile, usePlans, useAi, ...)
@@ -393,6 +397,7 @@ src/
   lib/api/             merkezi fetch client + ApiError + AI sözleşme tipleri + proxy yardımcısı
   lib/query/           QueryClient yapılandırması ve queryKeys
   lib/validation/      zod şemaları
+  lib/storage.ts       private bucket'lar için imzalı (signed) adres üretimi (TTL 1 saat)
   lib/                 logger.ts (pino), rate-limit.ts, utils.ts
   types/               database.ts (Supabase üretimi), domain.ts, index.ts
   env.ts               zod ile runtime env doğrulaması

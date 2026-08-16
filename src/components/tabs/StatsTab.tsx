@@ -38,13 +38,13 @@ ChartJS.register(
 export interface StatsTabProps {
   targetId: string | undefined
   userRole: UserRole | null | undefined
-  selectedStudentIds: string[]
+  selectedClientIds: string[]
 }
 
 export default function StatsTab({
   targetId,
   userRole,
-  selectedStudentIds,
+  selectedClientIds,
 }: StatsTabProps): JSX.Element {
   const { data, isLoading, isError, error, refetch } = useFormChecks(targetId)
 
@@ -94,7 +94,7 @@ export default function StatsTab({
         <h4 className="text-lg font-bold text-gray-800 dark:text-zinc-200">Gelişim Analizi</h4>
       </div>
 
-      {userRole === 'admin' && selectedStudentIds.length > 1 ? (
+      {userRole === 'coach' && selectedClientIds.length > 1 ? (
         <p className="py-10 text-center text-sm font-bold text-brand-purple">
           Grafikleri görüntülemek için sadece 1 öğrenci seçili bırakın.
         </p>

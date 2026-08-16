@@ -12,10 +12,10 @@ import { notificationSchema, type NotificationInput } from '@/lib/validation/sch
 import type { Profile } from '@/types'
 
 export interface NotificationFormProps {
-  students: Profile[]
+  clients: Profile[]
 }
 
-export function NotificationForm({ students }: NotificationFormProps): JSX.Element {
+export function NotificationForm({ clients }: NotificationFormProps): JSX.Element {
   const sendNotification = useSendNotification()
 
   const {
@@ -28,14 +28,14 @@ export function NotificationForm({ students }: NotificationFormProps): JSX.Eleme
     defaultValues: { target: 'all', title: '', message: '' },
   })
 
-  const studentOptions = students.filter((s) => s.role !== 'admin')
+  const clientOptions = clients.filter((c) => c.role !== 'coach')
 
   const onSubmit = handleSubmit(async (values) => {
-    const studentIds = values.target === 'all' ? studentOptions.map((s) => s.id) : [values.target]
+    const clientIds = values.target === 'all' ? clientOptions.map((c) => c.id) : [values.target]
 
     // Başarı/hata toast'ları hook içinde gösteriliyor; burada tekrarlanmaz.
     await sendNotification.mutateAsync({
-      studentIds,
+      clientIds,
       title: values.title,
       message: values.message,
     })
@@ -71,9 +71,9 @@ export function NotificationForm({ students }: NotificationFormProps): JSX.Eleme
             className="w-full rounded-xl border border-gray-200 bg-gray-50 p-3.5 text-sm font-medium focus:border-brand-purple focus:outline-none dark:border-zinc-800 dark:bg-zinc-950"
           >
             <option value="all">🌐 Tüm Öğrenciler</option>
-            {studentOptions.map((s) => (
-              <option key={s.id} value={s.id}>
-                👤 {s.full_name}
+            {clientOptions.map((c) => (
+              <option key={c.id} value={c.id}>
+                👤 {c.full_name}
               </option>
             ))}
           </select>

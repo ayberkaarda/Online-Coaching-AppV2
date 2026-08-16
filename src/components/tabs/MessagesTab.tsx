@@ -8,27 +8,27 @@ import type { FormEvent, JSX } from 'react'
 import { toast } from 'sonner'
 
 import { QueryState, SkeletonText } from '@/components/ui'
-import { useAdminId, useMessages, usePresence, useSendMessage } from '@/hooks'
+import { useCoachId, useMessages, usePresence, useSendMessage } from '@/hooks'
 import type { UserRole } from '@/types'
 
 export interface MessagesTabProps {
   targetId: string | undefined
   currentUserId: string | undefined
   userRole: UserRole | null | undefined
-  selectedStudentIds: string[]
+  selectedClientIds: string[]
 }
 
 export default function MessagesTab({
   targetId,
   currentUserId,
   userRole,
-  selectedStudentIds,
+  selectedClientIds,
 }: MessagesTabProps): JSX.Element {
   const [newMessage, setNewMessage] = useState('')
   const messagesEndRef = useRef<HTMLDivElement | null>(null)
 
-  const { data: adminId } = useAdminId()
-  const chatPartnerId = userRole === 'admin' ? targetId : (adminId ?? undefined)
+  const { data: coachId } = useCoachId()
+  const chatPartnerId = userRole === 'coach' ? targetId : (coachId ?? undefined)
 
   const { data, isLoading, isError, error, refetch } = useMessages(currentUserId, chatPartnerId)
   const sendMessage = useSendMessage()
@@ -60,7 +60,7 @@ export default function MessagesTab({
     sendMessage.mutate({ senderId: currentUserId, receiverId: chatPartnerId, message: text })
   }
 
-  if (userRole === 'admin' && selectedStudentIds.length !== 1) {
+  if (userRole === 'coach' && selectedClientIds.length !== 1) {
     return (
       <p className="py-10 text-center text-sm font-bold text-brand-purple">
         Sohbet etmek için sadece 1 öğrenci seçili bırakın.
@@ -73,7 +73,7 @@ export default function MessagesTab({
       {/* Sohbet Başlığı */}
       <div className="flex items-center justify-between border-b border-gray-200 bg-white p-4 dark:border-zinc-800 dark:bg-[#16161d]">
         <h4 className="text-sm font-bold text-gray-800 dark:text-zinc-200">
-          {userRole === 'admin' ? 'Öğrenci ile Sohbet' : 'Koç ile Sohbet'}
+          {userRole === 'coach' ? 'Öğrenci ile Sohbet' : 'Koç ile Sohbet'}
         </h4>
 
         <div className="flex items-center gap-1.5" role="status" aria-live="polite">

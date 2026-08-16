@@ -1,6 +1,6 @@
 'use client'
 
-// Ana panel (Dashboard): oturum + role göre admin/öğrenci görünümü, bildirim zili.
+// Ana panel (Dashboard): oturum + role göre koç/öğrenci görünümü, bildirim zili.
 
 import { useRouter } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
@@ -70,7 +70,7 @@ export default function DashboardPage(): JSX.Element {
     })
   }
 
-  const students = allProfiles ?? []
+  const clients = allProfiles ?? []
   const notifList = notifications ?? []
   const unreadCount = notifList.length
 
@@ -92,7 +92,7 @@ export default function DashboardPage(): JSX.Element {
     <main id="main-content" className="container relative mx-auto max-w-6xl px-4 py-12 sm:px-6">
       <div className="absolute left-4 top-4 z-50 flex items-center gap-2">
         {/* ÖĞRENCİ BİLDİRİM ZİLİ */}
-        {role === 'student' && (
+        {role === 'client' && (
           <div className="relative" ref={notifRef}>
             <button
               onClick={() => setShowNotifs(!showNotifs)}
@@ -153,7 +153,7 @@ export default function DashboardPage(): JSX.Element {
         )}
 
         {/* AKILLI MENÜ BUTONLARI */}
-        {role === 'admin' ? (
+        {role === 'coach' ? (
           <button
             onClick={() => router.push('/users')}
             aria-label="Kullanıcı Yönetimi"
@@ -188,18 +188,18 @@ export default function DashboardPage(): JSX.Element {
           Closed-Loop Coaching Hub
         </h1>
         <p className="text-sm font-medium uppercase tracking-widest text-gray-500 dark:text-gray-400 md:text-base">
-          {role === 'admin' ? 'Yönetici Paneli' : 'Öğrenci Paneli'}
+          {role === 'coach' ? 'Yönetici Paneli' : 'Öğrenci Paneli'}
         </p>
       </header>
 
       <div className="flex flex-col items-start gap-8 lg:flex-row">
-        {role === 'admin' && (
+        {role === 'coach' && (
           <div className="w-full space-y-6 lg:w-1/3">
-            <NotificationForm students={students} />
+            <NotificationForm clients={clients} />
           </div>
         )}
-        <div className={`w-full ${role === 'admin' ? 'lg:w-2/3' : 'mx-auto max-w-3xl'}`}>
-          <DashboardTabs currentUserId={userId} userRole={role} students={students} />
+        <div className={`w-full ${role === 'coach' ? 'lg:w-2/3' : 'mx-auto max-w-3xl'}`}>
+          <DashboardTabs currentUserId={userId} userRole={role} clients={clients} />
         </div>
       </div>
     </main>

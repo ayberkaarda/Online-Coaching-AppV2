@@ -7,7 +7,7 @@
 --
 -- Bu script iki bilinen regresyona karşı kalıcı koruma sağlar
 -- (bkz. supabase/migrations/20260816100000_fix_rls_visibility.sql):
---   KIRIK 1 — Danışan koçun profil satırını göremiyordu (useAdminId() null dönüyordu).
+--   KIRIK 1 — Danışan koçun profil satırını göremiyordu (useCoachId() null dönüyordu).
 --   KIRIK 2 — Danışan koça bildirim (program onay talebi) yazamıyordu.
 --
 -- ÇALIŞTIRMA:
@@ -28,7 +28,7 @@
 --     olarak doğrulanır; script kırılmaz.
 --
 -- Seed kimlikleri (bkz. supabase/seed.sql):
---   Koç (admin)  : 11111111-1111-1111-1111-111111111111 (Deniz Koç)
+--   Koç (coach)  : 11111111-1111-1111-1111-111111111111 (Deniz Koç)
 --   Danışan A    : 22222222-2222-2222-2222-222222222222 (Ahmet Yılmaz)
 --   Danışan B    : 33333333-3333-3333-3333-333333333333 (Elif Demir)
 -- =============================================================================
@@ -55,9 +55,9 @@ rollback;
 
 
 -- =============================================================================
--- GORUNURLUK — 2) Danışan A -> role='admin' sorgusu koçun id'sini döndürür
+-- GORUNURLUK — 2) Danışan A -> role='coach' sorgusu koçun id'sini döndürür
 -- REGRESYON KORUMASI: bu senaryo 2026-08-16'da kırıktı, bkz. 20260816100000_fix_rls_visibility.sql
--- (useAdminId() src/hooks/useMessages.ts tam olarak bu sorguyu çalıştırır)
+-- (useCoachId() src/hooks/useMessages.ts tam olarak bu sorguyu çalıştırır)
 -- =============================================================================
 begin;
 set local role authenticated;
@@ -66,12 +66,12 @@ do $$
 declare
   v_coach_id uuid;
 begin
-  select id into v_coach_id from public.profiles where role = 'admin'::public.user_role;
+  select id into v_coach_id from public.profiles where role = 'coach'::public.user_role;
   if v_coach_id is distinct from '11111111-1111-1111-1111-111111111111'::uuid then
-    raise exception 'BASARISIZ [Danisan A - useAdminId koc id dondurur]: beklenen %, gelen %',
+    raise exception 'BASARISIZ [Danisan A - useCoachId koc id dondurur]: beklenen %, gelen %',
       '11111111-1111-1111-1111-111111111111'::uuid, v_coach_id;
   end if;
-  raise notice 'GECTI [Danisan A - useAdminId koc id dondurur]';
+  raise notice 'GECTI [Danisan A - useCoachId koc id dondurur]';
 end $$;
 rollback;
 
@@ -140,9 +140,9 @@ set local role authenticated;
 set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
 do $$
 begin
-  if (select count(*) from public.form_checks where student_id = '33333333-3333-3333-3333-333333333333') is distinct from (0) then
+  if (select count(*) from public.form_checks where client_id = '33333333-3333-3333-3333-333333333333') is distinct from (0) then
     raise exception 'BASARISIZ [Danisan A - Danisan B form_checks goremez]: beklenen %, gelen %',
-      0, (select count(*) from public.form_checks where student_id = '33333333-3333-3333-3333-333333333333');
+      0, (select count(*) from public.form_checks where client_id = '33333333-3333-3333-3333-333333333333');
   end if;
   raise notice 'GECTI [Danisan A - Danisan B form_checks goremez]';
 end $$;
@@ -157,9 +157,9 @@ set local role authenticated;
 set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
 do $$
 begin
-  if (select count(*) from public.daily_logs where student_id = '33333333-3333-3333-3333-333333333333') is distinct from (0) then
+  if (select count(*) from public.daily_logs where client_id = '33333333-3333-3333-3333-333333333333') is distinct from (0) then
     raise exception 'BASARISIZ [Danisan A - Danisan B daily_logs goremez]: beklenen %, gelen %',
-      0, (select count(*) from public.daily_logs where student_id = '33333333-3333-3333-3333-333333333333');
+      0, (select count(*) from public.daily_logs where client_id = '33333333-3333-3333-3333-333333333333');
   end if;
   raise notice 'GECTI [Danisan A - Danisan B daily_logs goremez]';
 end $$;
@@ -174,9 +174,9 @@ set local role authenticated;
 set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
 do $$
 begin
-  if (select count(*) from public.workout_logs where student_id = '33333333-3333-3333-3333-333333333333') is distinct from (0) then
+  if (select count(*) from public.workout_logs where client_id = '33333333-3333-3333-3333-333333333333') is distinct from (0) then
     raise exception 'BASARISIZ [Danisan A - Danisan B workout_logs goremez]: beklenen %, gelen %',
-      0, (select count(*) from public.workout_logs where student_id = '33333333-3333-3333-3333-333333333333');
+      0, (select count(*) from public.workout_logs where client_id = '33333333-3333-3333-3333-333333333333');
   end if;
   raise notice 'GECTI [Danisan A - Danisan B workout_logs goremez]';
 end $$;
@@ -200,13 +200,13 @@ declare
   v_dl_a_only  int;
 begin
   select count(*) into v_fc_total  from public.form_checks;
-  select count(*) into v_fc_a_only from public.form_checks where student_id = '22222222-2222-2222-2222-222222222222';
+  select count(*) into v_fc_a_only from public.form_checks where client_id = '22222222-2222-2222-2222-222222222222';
   if v_fc_total <= 0 or v_fc_total <= v_fc_a_only then
     raise exception 'BASARISIZ [Koc - tum form_checks gorur]: toplam=%, sadece_A=% (toplam A''dan buyuk olmali)', v_fc_total, v_fc_a_only;
   end if;
 
   select count(*) into v_dl_total  from public.daily_logs;
-  select count(*) into v_dl_a_only from public.daily_logs where student_id = '22222222-2222-2222-2222-222222222222';
+  select count(*) into v_dl_a_only from public.daily_logs where client_id = '22222222-2222-2222-2222-222222222222';
   if v_dl_total <= 0 or v_dl_total <= v_dl_a_only then
     raise exception 'BASARISIZ [Koc - tum daily_logs gorur]: toplam=%, sadece_A=% (toplam A''dan buyuk olmali)', v_dl_total, v_dl_a_only;
   end if;
@@ -226,7 +226,7 @@ do $$
 declare
   v_id uuid;
 begin
-  insert into public.daily_logs (student_id, log_date, water_lt)
+  insert into public.daily_logs (client_id, log_date, water_lt)
   values ('22222222-2222-2222-2222-222222222222', '2000-01-01', 1.50)
   returning id into v_id;
 
@@ -249,7 +249,7 @@ declare
   v_caught boolean := false;
 begin
   begin
-    insert into public.daily_logs (student_id, log_date, water_lt)
+    insert into public.daily_logs (client_id, log_date, water_lt)
     values ('33333333-3333-3333-3333-333333333333', '2000-01-02', 1.00);
   exception when insufficient_privilege then
     v_caught := true;
@@ -269,8 +269,8 @@ rollback;
 --
 -- NOT: `RETURNING ... INTO` kasıtlı olarak KULLANILMAZ. Postgres RLS'de INSERT
 -- ... RETURNING, eklenen satırı SELECT politikasıyla da doğrular; notifications_select
--- yalnızca "student_id = auth.uid() OR is_admin()" olduğundan Danışan A, koça ait
--- (student_id=koç) satırı INSERT edebilse de RETURNING ile GERİ OKUYAMAZ (ayrı,
+-- yalnızca "client_id = auth.uid() OR is_coach()" olduğundan Danışan A, koça ait
+-- (client_id=koç) satırı INSERT edebilse de RETURNING ile GERİ OKUYAMAZ (ayrı,
 -- beklenen bir RLS davranışı). Gerçek uygulama kodu da (useProgramApprovals.ts)
 -- bu insert'te `.select()` çağırmaz -> davranış eşleşiyor. Bu yüzden burada
 -- yalnızca satırın gerçekten eklendiği GET DIAGNOSTICS ROW_COUNT ile doğrulanır.
@@ -282,7 +282,7 @@ do $$
 declare
   v_rows int;
 begin
-  insert into public.notifications (student_id, message)
+  insert into public.notifications (client_id, message)
   values ('11111111-1111-1111-1111-111111111111', 'RLS testi - Danisan A''dan koca bildirim');
   get diagnostics v_rows = row_count;
 
@@ -307,7 +307,7 @@ declare
   v_caught boolean := false;
 begin
   begin
-    insert into public.notifications (student_id, message)
+    insert into public.notifications (client_id, message)
     values ('33333333-3333-3333-3333-333333333333', 'RLS testi - spam denemesi');
   exception when insufficient_privilege then
     v_caught := true;
@@ -321,7 +321,7 @@ rollback;
 
 
 -- =============================================================================
--- YAZMA YETKISI — 14) Danışan A -> kendi rolünü admin yapamaz (yetki yükseltme koruması)
+-- YAZMA YETKISI — 14) Danışan A -> kendi rolünü coach yapamaz (yetki yükseltme koruması)
 -- =============================================================================
 begin;
 set local role authenticated;
@@ -331,15 +331,15 @@ declare
   v_caught boolean := false;
 begin
   begin
-    update public.profiles set role = 'admin'::public.user_role
+    update public.profiles set role = 'coach'::public.user_role
     where id = '22222222-2222-2222-2222-222222222222';
   exception when insufficient_privilege then
     v_caught := true;
   end;
   if not v_caught then
-    raise exception 'BASARISIZ [Danisan A - kendi rolunu admin yapamaz]: beklenen RLS ihlali, hata alinmadi';
+    raise exception 'BASARISIZ [Danisan A - kendi rolunu coach yapamaz]: beklenen RLS ihlali, hata alinmadi';
   end if;
-  raise notice 'GECTI [Danisan A - kendi rolunu admin yapamaz]';
+  raise notice 'GECTI [Danisan A - kendi rolunu coach yapamaz]';
 end $$;
 rollback;
 

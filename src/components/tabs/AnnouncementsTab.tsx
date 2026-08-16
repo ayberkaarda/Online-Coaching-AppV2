@@ -12,13 +12,13 @@ import type { Notification, UserRole } from '@/types'
 export interface AnnouncementsTabProps {
   announcements: Notification[]
   userRole: UserRole | null | undefined
-  selectedStudentIds: string[]
+  selectedClientIds: string[]
 }
 
 export default function AnnouncementsTab({
   announcements,
   userRole,
-  selectedStudentIds,
+  selectedClientIds,
 }: AnnouncementsTabProps): JSX.Element {
   return (
     <div className="animate-fadeIn space-y-4">
@@ -28,7 +28,7 @@ export default function AnnouncementsTab({
         </h4>
       </div>
 
-      {userRole === 'admin' && selectedStudentIds.length > 1 ? (
+      {userRole === 'coach' && selectedClientIds.length > 1 ? (
         <p className="py-10 text-center text-sm font-bold text-brand-purple">
           Sadece 1 öğrenci seçili bırakın.
         </p>

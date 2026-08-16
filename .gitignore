@@ -58,6 +58,12 @@ __pycache__/
 .mypy_cache/
 .pytest_cache/
 
+# pytest --cov tarafından üretilir (ai_backend) — /coverage Vitest'in çıktısıdır, bu ayrı
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
 # editors
 .idea/
 .vscode/*

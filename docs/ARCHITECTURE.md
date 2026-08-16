@@ -6,6 +6,7 @@ Bu doküman "Closed-Loop Coaching Hub" platformunun sistem bağlamını, veri mo
 
 1. [Sistem Bağlamı](#1-sistem-bağlamı)
 2. [Veri Modeli](#2-veri-modeli)
+   - [2.1 Storage ve İmzalı Adresler](#21-storage-ve-i̇mzalı-adresler)
 3. [Kimlik Doğrulama ve Yetkilendirme](#3-kimlik-doğrulama-ve-yetkilendirme)
 4. [İstemci Veri Katmanı](#4-i̇stemci-veri-katmanı)
 5. [AI Proxy Tasarımı](#5-ai-proxy-tasarımı)
@@ -47,15 +48,17 @@ Sistemin dışına açılan tek yüzey Next.js'tir. FastAPI, Supabase servisleri
 
 ## 2. Veri Modeli
 
-9 tablo, tamamı `profiles`'a `student_id`/`sender_id`/`receiver_id` üzerinden 1-N ilişkilidir (`messages` kendi üzerine iki kez referans verir — gönderen ve alıcı). `exercises` ve `food_database` bağımsız, salt-okunur referans kataloglarıdır.
+9 tablo, tamamı `profiles`'a `client_id`/`sender_id`/`receiver_id` üzerinden 1-N ilişkilidir (`messages` kendi üzerine iki kez referans verir — gönderen ve alıcı). `exercises` ve `food_database` bağımsız, salt-okunur referans kataloglarıdır.
+
+> **Not (2026-08-17):** Rol yeniden adlandırması sonrası güncellendi — `student_id` kolonları `client_id` oldu, `user_role` enum'u `coach`/`client` değerlerini alıyor (bkz. `supabase/migrations/20260817090000_rename_roles.sql`).
 
 ```mermaid
 erDiagram
-  PROFILES ||--o{ NOTIFICATIONS : "student_id"
-  PROFILES ||--o{ FORM_CHECKS : "student_id"
-  PROFILES ||--o{ DAILY_LOGS : "student_id"
-  PROFILES ||--o{ WORKOUT_LOGS : "student_id"
-  PROFILES ||--o{ PROGRAM_APPROVALS : "student_id"
+  PROFILES ||--o{ NOTIFICATIONS : "client_id"
+  PROFILES ||--o{ FORM_CHECKS : "client_id"
+  PROFILES ||--o{ DAILY_LOGS : "client_id"
+  PROFILES ||--o{ WORKOUT_LOGS : "client_id"
+  PROFILES ||--o{ PROGRAM_APPROVALS : "client_id"
   PROFILES ||--o{ PROGRAM_APPROVALS : "reviewed_by (koç, opsiyonel)"
   PROFILES ||--o{ MESSAGES : "sender_id"
   PROFILES ||--o{ MESSAGES : "receiver_id"
@@ -64,8 +67,8 @@ erDiagram
     uuid id PK "auth.users.id ile aynı"
     text full_name
     text email
-    user_role role "admin=koç | student=danışan"
-    text avatar_url
+    user_role role
+    text avatar_path
     text nutrition_plan "JSON string"
     text workout_plan "JSON string"
     integer current_streak
@@ -73,29 +76,29 @@ erDiagram
   }
   NOTIFICATIONS {
     uuid id PK
-    uuid student_id FK
+    uuid client_id FK
     text title "NULL olabilir"
     text message
     boolean is_read
   }
   FORM_CHECKS {
     uuid id PK
-    uuid student_id FK
+    uuid client_id FK
     numeric current_weight
-    text front_pose_url
-    text back_pose_url
+    text front_pose_path
+    text back_pose_path
   }
   DAILY_LOGS {
     uuid id PK
-    uuid student_id FK
-    date log_date "UNIQUE(student_id, log_date)"
+    uuid client_id FK
+    date log_date "UNIQUE(client_id, log_date)"
     numeric water_lt
     integer sodium_mg
     jsonb macros
   }
   WORKOUT_LOGS {
     uuid id PK
-    uuid student_id FK
+    uuid client_id FK
     text exercise_name
     numeric weight_kg
     integer reps
@@ -103,7 +106,7 @@ erDiagram
   }
   PROGRAM_APPROVALS {
     uuid id PK
-    uuid student_id FK
+    uuid client_id FK
     jsonb workout_data
     approval_status status "pending|approved|rejected"
     uuid reviewed_by FK
@@ -130,20 +133,31 @@ erDiagram
   }
 ```
 
-Enum'lar: `user_role ('admin' | 'student')`, `approval_status ('pending' | 'approved' | 'rejected')`. Şemanın tam DDL'i için `supabase/migrations/20260816090000_initial_schema.sql`; RLS matrisi ve storage politikaları için [`../supabase/README.md`](../supabase/README.md).
+Enum'lar: `user_role ('coach' | 'client')`, `approval_status ('pending' | 'approved' | 'rejected')`. `user_role` değerleri başlangıçta `admin`/`student` olarak tanımlanmıştı, 2026-08-17'de `coach`/`client`'a yeniden adlandırıldı (bkz. `supabase/migrations/20260817090000_rename_roles.sql`). Şemanın tam DDL'i için `supabase/migrations/20260816090000_initial_schema.sql`; RLS matrisi ve storage politikaları için [`../supabase/README.md`](../supabase/README.md).
+
+### 2.1 Storage ve İmzalı Adresler
+
+`avatars` ve `form-checks-media` bucket'ları **private**'tır (`public = false`,
+`supabase/migrations/20260817100000_private_storage.sql`). Yukarıdaki `form_checks.front_pose_path` / `back_pose_path` ve `profiles.avatar_path` kolonları tam URL değil, bucket içi **yol** saklar (ör. `poses/<uid>-<uuid>.jpg`) — önceki `*_url` sürümleri `getPublicUrl()` çıktısını, yani tam ve kimlik doğrulamasız erişilebilir bir adresi, doğrudan veritabanına yazıyordu.
+
+Okuma akışı: istemci `src/lib/storage.ts` üzerinden `createSignedUrl(bucket, path)` (tekil) veya `createSignedUrls(bucket, paths)` (toplu — koç panelindeki liste görünümlerinde N+1 istek üretmemek için) çağırır. Storage API, imzayı üretmeden **önce** `storage.objects` üzerindeki SELECT politikasıyla ("sahibi veya koç") yetkiyi doğrular; politika geçmezse imza hiç üretilmez. Üretilen adres `SIGNED_URL_TTL_SECONDS = 3600` (1 saat) sonra geçersiz olur — `active_planprogram.md` I-4 değişmezinin "TTL ≤ 1 saat" şartı budur. İmzalı adres içeren TanStack Query sorguları `staleTime`'ı `SIGNED_URL_STALE_TIME_MS` (TTL'in yarısı, 30 dk) ile sınırlar ki önbellekteki adres süresi dolmadan tazelensin.
+
+`src/lib/storage.ts` **asla fırlatmaz**: dosya yok, yetki yok veya beklenmedik bir hata olursa fonksiyonlar `null` (tekil) veya eksik giriş (toplu — `Map`'te yer almaz) döner; çağıran hook (`useFormChecks`, `useProfile`/`useProfiles`) bunu placeholder'a çevirir, sorguyu patlatmaz. `supabase/seed.sql`'deki poz yolları storage'da fiilen var olmadığı için bu yol yerel geliştirmede bilinçli olarak tetiklenir.
 
 ---
 
 ## 3. Kimlik Doğrulama ve Yetkilendirme
 
-**Akış:** Supabase Auth (GoTrue) → oturum JWT'si (tarayıcıda `supabase-js` tarafından çerezde/localStorage'da tutulur) → her Postgres isteğinde JWT `auth.uid()` olarak Postgres oturumuna enjekte edilir → RLS politikaları `auth.uid()`'i satır sahipliğiyle (`student_id = auth.uid()`) veya `is_admin()` çağrısıyla karşılaştırır.
+> **Not (2026-08-17):** Rol yeniden adlandırması sonrası güncellendi — `is_admin()` fonksiyonu `is_coach()` oldu, `student_id` kolonları `client_id` oldu (bkz. `supabase/migrations/20260817090000_rename_roles.sql`). Fonksiyon adı değişse de imzası ve `SECURITY DEFINER` davranışı korundu; 34 politika OID üzerinden otomatik takip etti.
 
-**Neden `is_admin()` / `profile_role()` `SECURITY DEFINER`'dır (özyineleme koruması):**
+**Akış:** Supabase Auth (GoTrue) → oturum JWT'si (tarayıcıda `supabase-js` tarafından çerezde/localStorage'da tutulur) → her Postgres isteğinde JWT `auth.uid()` olarak Postgres oturumuna enjekte edilir → RLS politikaları `auth.uid()`'i satır sahipliğiyle (`client_id = auth.uid()`) veya `is_coach()` çağrısıyla karşılaştırır.
+
+**Neden `is_coach()` / `profile_role()` `SECURITY DEFINER`'dır (özyineleme koruması):**
 `profiles` tablosunun kendi RLS politikaları "bu satırın sahibi misin ya da koç musun" sorusunu cevaplamak için `profiles` tablosuna bakmak zorunda (rol bilgisi orada). Eğer bu kontrolü yapan fonksiyon `SECURITY INVOKER` (varsayılan) olsaydı, fonksiyon içindeki `select ... from public.profiles` sorgusu **yine `profiles` üzerindeki aynı RLS politikasını tetikler** — bu da o politikanın tekrar fonksiyonu çağırmasına, o da tekrar politikayı tetiklemesine yol açar ve Postgres `infinite recursion detected in policy for relation "profiles"` hatasıyla patlar. `SECURITY DEFINER` fonksiyonu, fonksiyonu tanımlayan rolün (genelde tablo sahibi) yetkisiyle çalıştırır ve bu çağrı RLS'i tetiklemez; böylece politika kendi içinde döngüye girmeden "çağıran koç mu?" sorusuna güvenle cevap verebilir. Aynı gerekçeyle `profile_role()` de `profiles` UPDATE politikasının `WITH CHECK` ifadesinde (rol yükseltmesini engellemek için) `SECURITY DEFINER` olarak tanımlanmıştır.
 
 Her iki fonksiyon da `stable`'dır (tek sorgu içinde tekrar hesaplanmaz), `search_path`'i `public, pg_temp` ile sabitlenmiştir (arama yolu enjeksiyonuna karşı) ve yürütme izni yalnızca `authenticated` ve `service_role`'e verilmiştir (`revoke all ... from public` sonrası).
 
-**Yetki yükseltme koruması:** `profiles` UPDATE politikasının `WITH CHECK` ifadesi `role = public.profile_role(auth.uid())` kontrolü yapar — bir danışan kendi profilini güncelleyebilir ama rolünü `admin`'e çeviremez; yalnızca koç rol değiştirebilir.
+**Yetki yükseltme koruması:** `profiles` UPDATE politikasının `WITH CHECK` ifadesi `role = public.profile_role(auth.uid())` kontrolü yapar — bir danışan kendi profilini güncelleyebilir ama rolünü `coach`'a çeviremez; yalnızca koç rol değiştirebilir.
 
 **Sunucu tarafı ayrıcalıklı erişim (kaldırıldı, Faz 2'de geri gelecek):** `SUPABASE_SERVICE_ROLE_KEY` RLS'yi tamamen bypass eder. Bunu kullanan `src/lib/supabase/admin.ts` istemcisi ve onu tüketen tek yer olan dört server action (`src/app/actions.ts`: `createStudentAction`, `deleteStudentAction`, `sendNotificationAction`, `submitFormCheckAction`) hiçbir yerden çağrılmadığı tespit edildiği için kaldırıldı (bkz. `docs/DISCOVERY.md` §2.5, §15.2 #3) — mevcut UI aynı işleri `src/hooks/*` üzerinden anon key + kullanıcı JWT'siyle, RLS altında yapıyor. Uygulama kodunda şu an service_role kullanan hiçbir yer yok. Koçun yeni danışan hesabı oluşturması Faz 2'de koç-danışan akışıyla birlikte yeniden kurulacak; o akış geldiğinde **çağıranın gerçekten koç olduğunu** kendisi de doğrulamalıdır (service_role RLS'i atladığı için, yetki kontrolü uygulama kodunun sorumluluğuna geçer).
 
@@ -207,46 +221,12 @@ Bu tasarımda 502/503 ayrımı kasıtlıdır: 503 "servise hiç ulaşılamadı" 
 
 ---
 
-## 7. Karar Kayıtları (ADR-lite)
+## 7. Karar Kayıtları (ADR)
 
-### ADR-1: TypeScript strict moduna geçiş
+Mimari kararlar artık bu dosyada değil, [`docs/adr/`](adr/README.md) altında ayrı
+dosyalarda tutulur — her karar kendi `NNNN-kebab-slug.md` dosyasında, "Bağlam / Karar /
+Sonuçlar" formatıyla belgelenir. Mevcut kararların indeksi ve numaralandırma/durum
+kuralları için [`docs/adr/README.md`](adr/README.md) dosyasına bakın.
 
-**Durum:** Kabul edildi (devam eden migrasyon).
-**Bağlam:** Proje düz JavaScript (`.js`) olarak başladı; `src/` altı paralel olarak `.ts`/`.tsx`'e taşınıyor.
-**Karar:** `tsconfig.json`'da `strict: true`, `noUncheckedIndexedAccess`, `noImplicitOverride`, `noUnusedLocals/Parameters` açık; `allowJs: false`.
-**Sonuç:** Derleme zamanında yakalanan hata sınıfı genişler (özellikle `undefined`/`null` erişimleri); geçiş dönemi boyunca `.js` ve `.ts` dosyaları bir arada bulunur, `db:types` gibi araçlar (`src/types/database.ts`) bu geçişi kolaylaştırır.
-
-### ADR-2: Sunucu state yönetimi için TanStack Query seçimi
-
-**Durum:** Kabul edildi.
-**Bağlam:** Supabase verisi + Realtime + AI proxy sonuçları için tutarlı bir istemci-taraflı cache/senkronizasyon katmanı gerekiyordu.
-**Karar:** Redux/SWR yerine TanStack Query; merkezi `queryKeys` fabrikası, tip güvenli `staleTime`/`retry` politikaları ve Realtime event'lerinin `invalidateQueries` ile köprülenmesi.
-**Sonuç:** Veri çekme mantığı bileşenlerden hook'lara (`src/hooks/`) taşındı; manuel `useState`/`useEffect` tabanlı veri çekimi ortadan kalktı.
-
-### ADR-3: Veritabanı rol enum değerlerinin (`admin`/`student`) korunması
-
-**Durum:** Kabul edildi.
-**Bağlam:** Ürün dilinde roller "koç" ve "danışan" olarak anılıyor; ancak veritabanı ve mevcut satırlar `admin`/`student` enum değerlerini kullanıyor.
-**Karar:** Enum değerlerini yeniden adlandırmak yerine (bu, `ALTER TYPE ... RENAME VALUE` + tüm bağımlı politika/fonksiyonların gözden geçirilmesini gerektirirdi ve geriye dönük veri riski taşırdı) yalnızca UI/dokümantasyon seviyesinde bir terim eşlemesi yapıldı.
-**Sonuç:** RLS politikaları, RPC imzaları (`is_admin`, `profile_role`) ve mevcut satırlar değişmeden kalır; "koç = admin, danışan = student" eşlemesi kod tabanı genelinde (bu doküman dahil) açıkça belirtilir.
-
-### ADR-4: AI servisine erişimin Next.js proxy'si üzerinden zorunlu kılınması
-
-**Durum:** Kabul edildi.
-**Bağlam:** FastAPI servisinin bağımsız, ölçeklenebilir bir servis olarak konuşlanması gerekiyordu ama tarayıcıdan doğrudan erişim güvenlik ve gözlemlenebilirlik riskleri taşıyordu.
-**Karar:** `src/app/api/ai/*` route'ları tek giriş noktası; detaylar için bkz. [Bölüm 5](#5-ai-proxy-tasarımı).
-**Sonuç:** FastAPI'nin `CORS_ORIGINS`'i tek bir origin'e (Next.js) kilitlenebildi; `API_KEY` tarayıcıya hiç gitmiyor; tüm istekler `X-Request-ID` ile izlenebiliyor.
-
-### ADR-5: Bellek içi rate limiter'ın sınırı
-
-**Durum:** Kabul edildi (bilinen kısıtla).
-**Bağlam:** `src/lib/rate-limit.ts` ve FastAPI `slowapi`'nin varsayılan `MemoryStorage`'ı, sayaçları process belleğinde tutar.
-**Karar:** Tek-instance dağıtımlar (mevcut hedef: Vercel'de tek Next.js fonksiyonu havuzu, Railway/Fly.io'da tek FastAPI instance'ı) için bellek içi sayaç yeterli ve ek altyapı (Redis) gerektirmiyor.
-**Sonuç / bilinen kısıt:** **Çoklu instance'a (yatay ölçekleme, birden fazla FastAPI/Next.js süreci) geçildiğinde bu limiter işe yaramaz hale gelir** — her instance kendi sayacını tutar, gerçek toplam istek sayısı `N × limit`'e kadar çıkabilir. Yatay ölçekleme gündeme geldiğinde paylaşılan bir sayaç deposu (Redis, Upstash) zorunludur; bu, mevcut kod tabanında **yapılmamıştır**.
-
-### ADR-6: `next-pwa`'nın korunması
-
-**Durum:** Kabul edildi.
-**Bağlam:** Danışanların antrenman sırasında (spor salonunda, zayıf bağlantıda) `workout_logs`/`profiles` verisine erişebilmesi gerekiyor.
-**Karar:** `next-pwa` service worker'ı korunur; yalnızca `workout_logs` ve `profiles` REST çağrıları `NetworkFirst` ile 1 hafta önbelleklenir, Storage nesneleri (form-check fotoğrafları) kasıtlı olarak **hiç önbelleklenmez** (`NetworkOnly`) — cihaz hafızasını ve kullanıcı fotoğraflarının çevrimdışı sızma riskini sınırlamak için.
-**Sonuç:** `next.config.mjs` `withPWA(...)` sarmalayıcısı üretimde aktif, geliştirmede (`NODE_ENV === 'development'`) devre dışı; App Router hydration script'i nedeniyle CSP `script-src` içinde `'unsafe-inline'` gereksinimi doğdu (nonce tabanlı CSP'ye geçiş ayrı bir iyileştirme olarak `next.config.mjs` içinde TODO ile işaretli).
+Yeni bir mimari karar alındığında bu bölüme değil, doğrudan `docs/adr/` altına yeni bir
+ADR dosyası eklenmelidir.

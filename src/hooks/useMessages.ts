@@ -192,16 +192,16 @@ export function usePresence(currentUserId?: string) {
   return { isOnline }
 }
 
-/** Danışanın sohbet edeceği koçun (role = 'admin') id'si. */
-export function useAdminId() {
+/** Danışanın sohbet edeceği koçun (role = 'coach') id'si. */
+export function useCoachId() {
   return useQuery({
-    queryKey: queryKeys.adminId(),
+    queryKey: queryKeys.coachId(),
     staleTime: 30 * 60_000,
     queryFn: async (): Promise<string | null> => {
       const { data, error } = await supabase
         .from('profiles')
         .select('id')
-        .eq('role', 'admin')
+        .eq('role', 'coach')
         .order('created_at', { ascending: true })
         .limit(1)
         .maybeSingle()

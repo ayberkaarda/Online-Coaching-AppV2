@@ -19,7 +19,7 @@ export interface NutritionTabProps {
   targetId: string | undefined
   currentUserId: string | undefined
   userRole: UserRole | null | undefined
-  selectedStudentIds: string[]
+  selectedClientIds: string[]
   onDownloadImage: () => void
 }
 
@@ -40,7 +40,7 @@ export default function NutritionTab({
   targetId,
   currentUserId,
   userRole,
-  selectedStudentIds,
+  selectedClientIds,
   onDownloadImage,
 }: NutritionTabProps): JSX.Element {
   const foodsQuery = useFoods()
@@ -196,14 +196,14 @@ export default function NutritionTab({
 
   // --- Kaydetme ---------------------------------------------------------------
   const handleSaveProgram = (): void => {
-    const studentIds =
-      userRole === 'admin' ? selectedStudentIds : currentUserId ? [currentUserId] : []
-    if (studentIds.length === 0) {
+    const clientIds =
+      userRole === 'coach' ? selectedClientIds : currentUserId ? [currentUserId] : []
+    if (clientIds.length === 0) {
       toast.error('Öğrenci seçin!')
       return
     }
     // Başarı/hata toast'ı hook içinde gösterilir.
-    savePlan.mutate({ studentIds, plan: nutritionData })
+    savePlan.mutate({ clientIds, plan: nutritionData })
   }
 
   const handleDownloadCsv = (): void => {

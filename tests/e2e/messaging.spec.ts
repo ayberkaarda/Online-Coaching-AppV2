@@ -1,7 +1,7 @@
 // Mesajlaşma akışı: danışan <-> koç sohbeti (regresyon koruması).
 //
 // ARKA PLAN: `profiles_select` RLS politikası danışanın koçun profil satırını
-// görmesine izin vermiyordu. Zincir: useAdminId() null döner -> MessagesTab'da
+// görmesine izin vermiyordu. Zincir: useCoachId() null döner -> MessagesTab'da
 // chatPartnerId boş kalır -> danışan hiç sohbet edemez. Bu hata hiçbir testte
 // yakalanmıyordu çünkü mesajlaşma akışı test edilmiyordu.
 // `supabase/migrations/20260816100000_fix_rls_visibility.sql` bunu düzeltti.
@@ -112,7 +112,7 @@ test.describe('Mesajlaşma Akışı', () => {
     await page.getByRole('tab', { name: /sohbet/i }).click()
 
     // NOT (kaynağa uydurmak zorunda kalınan beklenti): MessagesTab.tsx kendi
-    // içinde `userRole === 'admin' && selectedStudentIds.length !== 1` durumunda
+    // içinde `userRole === 'coach' && selectedClientIds.length !== 1` durumunda
     // "Sohbet etmek için sadece 1 öğrenci seçili bırakın." metnini basıyor
     // (bkz. src/components/tabs/MessagesTab.tsx, satır ~63-69). Ancak HİÇ
     // öğrenci seçilmediğinde (length === 0) DashboardTabs.tsx bu bileşeni hiç

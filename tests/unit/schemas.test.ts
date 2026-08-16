@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   aiDietSchema,
   aiWorkoutSchema,
-  createStudentSchema,
+  createClientSchema,
   dailyLogSchema,
   formatZodError,
   formCheckSchema,
@@ -115,19 +115,19 @@ describe('notificationSchema', () => {
   })
 })
 
-describe('createStudentSchema', () => {
+describe('createClientSchema', () => {
   const base = { email: 'test@example.com', password: 'password1', fullName: 'Ali Veli' }
 
   it('geçerli girdiyle geçer', () => {
-    expect(createStudentSchema.safeParse(base).success).toBe(true)
+    expect(createClientSchema.safeParse(base).success).toBe(true)
   })
 
   it('kısa şifrede düşer', () => {
-    expect(createStudentSchema.safeParse({ ...base, password: 'abc1234' }).success).toBe(false)
+    expect(createClientSchema.safeParse({ ...base, password: 'abc1234' }).success).toBe(false)
   })
 
   it('kısa fullName’de düşer', () => {
-    expect(createStudentSchema.safeParse({ ...base, fullName: 'A' }).success).toBe(false)
+    expect(createClientSchema.safeParse({ ...base, fullName: 'A' }).success).toBe(false)
   })
 })
 

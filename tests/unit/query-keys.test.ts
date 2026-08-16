@@ -40,7 +40,7 @@ describe('queryKeys fabrika fonksiyonları', () => {
       queryKeys.foods(),
       queryKeys.lastCheckins(),
       queryKeys.recommendations(),
-      queryKeys.adminId(),
+      queryKeys.coachId(),
     ]
     const prefixes = keys.map((k) => k[0])
     expect(new Set(prefixes).size).toBe(prefixes.length)
@@ -86,8 +86,8 @@ describe('queryKeys fabrika fonksiyonları', () => {
     expect(queryKeys.recommendations('s1').slice(0, queryKeyRoots.recommendations.length)).toEqual([
       ...queryKeyRoots.recommendations,
     ])
-    expect(queryKeys.adminId().slice(0, queryKeyRoots.adminId.length)).toEqual([
-      ...queryKeyRoots.adminId,
+    expect(queryKeys.coachId().slice(0, queryKeyRoots.coachId.length)).toEqual([
+      ...queryKeyRoots.coachId,
     ])
   })
 })

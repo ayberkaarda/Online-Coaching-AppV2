@@ -2,6 +2,10 @@
 
 // Haftalık form check: öğrenci kilo + podyum fotoğrafı gönderir,
 // geçmiş kayıtlar listelenir ve öncesi/sonrası kıyaslaması yapılabilir.
+//
+// Fotoğraflar PRIVATE bucket'tadır: `useFormChecks` her satır için süreli imzalı
+// adres (`frontPoseSignedUrl`) üretir. Adres `null` ise (dosya yok / erişim yok)
+// kırık görsel yerine boş durum / placeholder gösterilir.
 
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useState } from 'react'
@@ -19,14 +23,14 @@ export interface FormCheckTabProps {
   targetId: string | undefined
   currentUserId: string | undefined
   userRole: UserRole | null | undefined
-  selectedStudentIds: string[]
+  selectedClientIds: string[]
 }
 
 export default function FormCheckTab({
   targetId,
   currentUserId,
   userRole,
-  selectedStudentIds,
+  selectedClientIds,
 }: FormCheckTabProps): JSX.Element {
   const { data, isLoading, isError, error, refetch } = useFormChecks(targetId)
   const submitFormCheck = useSubmitFormCheck()
@@ -83,7 +87,7 @@ export default function FormCheckTab({
 
     // Başarı/hata toast'ı hook içinde gösterilir.
     await submitFormCheck.mutateAsync({
-      studentId: currentUserId,
+      clientId: currentUserId,
       currentWeight: values.weight,
       frontFile: poseFile,
       notes: 'Yeni form',
@@ -123,7 +127,7 @@ export default function FormCheckTab({
         )}
       </div>
 
-      {userRole === 'student' && !compareMode && (
+      {userRole === 'client' && !compareMode && (
         <form
           onSubmit={onSubmit}
           noValidate
@@ -195,7 +199,7 @@ export default function FormCheckTab({
         </form>
       )}
 
-      {userRole === 'admin' && selectedStudentIds.length > 1 ? (
+      {userRole === 'coach' && selectedClientIds.length > 1 ? (
         <p className="py-10 text-center text-sm font-bold text-brand-purple">
           Sadece 1 öğrenci seçili bırakın.
         </p>
@@ -231,9 +235,9 @@ export default function FormCheckTab({
                   ))}
                 </select>
                 <div className="relative aspect-[3/4] w-full overflow-hidden rounded-2xl border-4 border-gray-200 shadow-lg dark:border-zinc-800">
-                  {beforeCheck?.front_pose_url ? (
+                  {beforeCheck?.frontPoseSignedUrl ? (
                     <img
-                      src={beforeCheck.front_pose_url}
+                      src={beforeCheck.frontPoseSignedUrl}
                       alt={`Öncesi: ${formatDateTR(beforeCheck.created_at)}, ${beforeCheck.current_weight} kg`}
                       loading="lazy"
                       className="h-full w-full object-cover"
@@ -263,9 +267,9 @@ export default function FormCheckTab({
                   ))}
                 </select>
                 <div className="relative aspect-[3/4] w-full overflow-hidden rounded-2xl border-4 border-brand-purple shadow-lg">
-                  {afterCheck?.front_pose_url ? (
+                  {afterCheck?.frontPoseSignedUrl ? (
                     <img
-                      src={afterCheck.front_pose_url}
+                      src={afterCheck.frontPoseSignedUrl}
                       alt={`Sonrası: ${formatDateTR(afterCheck.created_at)}, ${afterCheck.current_weight} kg`}
                       loading="lazy"
                       className="h-full w-full object-cover"
@@ -283,9 +287,9 @@ export default function FormCheckTab({
                   key={check.id}
                   className="flex items-center gap-4 rounded-2xl border bg-gray-50 p-4 shadow-sm transition-transform hover:scale-[1.02] dark:bg-zinc-950"
                 >
-                  {check.front_pose_url ? (
+                  {check.frontPoseSignedUrl ? (
                     <img
-                      src={check.front_pose_url}
+                      src={check.frontPoseSignedUrl}
                       alt={`${formatDateTR(check.created_at)} tarihli form fotoğrafı`}
                       loading="lazy"
                       className="h-20 w-20 rounded-xl object-cover"

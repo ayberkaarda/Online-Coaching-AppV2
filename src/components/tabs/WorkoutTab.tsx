@@ -9,8 +9,8 @@ import { toast } from 'sonner'
 
 import { QueryState, SkeletonTable } from '@/components/ui'
 import {
-  useAdminId,
   useApproveProgram,
+  useCoachId,
   useCreateWorkoutLogs,
   useExercises,
   useGenerateWorkout,
@@ -35,7 +35,7 @@ export interface WorkoutTabProps {
   targetId: string | undefined
   currentUserId: string | undefined
   userRole: UserRole | null | undefined
-  selectedStudentIds: string[]
+  selectedClientIds: string[]
   onDownloadImage: () => void
 }
 
@@ -104,13 +104,13 @@ export default function WorkoutTab({
   targetId,
   currentUserId,
   userRole,
-  selectedStudentIds,
+  selectedClientIds,
   onDownloadImage,
 }: WorkoutTabProps): JSX.Element {
   const exercisesQuery = useExercises()
   const planQuery = useWorkoutPlan(targetId)
   const approvalsQuery = usePendingApprovals(targetId)
-  const { data: adminId } = useAdminId()
+  const { data: coachId } = useCoachId()
 
   const savePlan = useSaveWorkoutPlan()
   const submitForApproval = useSubmitProgramForApproval()
@@ -144,7 +144,7 @@ export default function WorkoutTab({
     )
   }
 
-  const isWaitingMyApproval = userRole === 'student' && pendingApprovals.length > 0
+  const isWaitingMyApproval = userRole === 'client' && pendingApprovals.length > 0
 
   // --- AI antrenör ------------------------------------------------------------
   const [smartSplit, setSmartSplit] = useState('')
@@ -186,9 +186,9 @@ export default function WorkoutTab({
 
     // Bildirim koça gider; koç bulunamazsa onay kaydı yine de oluşturulur.
     submitForApproval.mutate({
-      studentId: currentUserId,
+      clientId: currentUserId,
       plan: workoutData,
-      ...(adminId ? { coachId: adminId } : {}),
+      ...(coachId ? { coachId } : {}),
     })
   }
 
@@ -196,20 +196,20 @@ export default function WorkoutTab({
     if (!firstApproval) return
     approveProgram.mutate({
       approvalId: firstApproval.id,
-      studentId: firstApproval.student_id,
+      clientId: firstApproval.client_id,
       plan: jsonToWorkoutPlan(firstApproval.workout_data),
       ...(currentUserId ? { reviewerId: currentUserId } : {}),
     })
   }
 
   const handleSaveProgram = (): void => {
-    const studentIds =
-      userRole === 'admin' ? selectedStudentIds : currentUserId ? [currentUserId] : []
-    if (studentIds.length === 0) {
+    const clientIds =
+      userRole === 'coach' ? selectedClientIds : currentUserId ? [currentUserId] : []
+    if (clientIds.length === 0) {
       toast.error('Öğrenci seçin!')
       return
     }
-    savePlan.mutate({ studentIds, plan: workoutData })
+    savePlan.mutate({ clientIds, plan: workoutData })
   }
 
   // --- Sürükle-bırak + klavye alternatifi -------------------------------------
@@ -348,7 +348,7 @@ export default function WorkoutTab({
       return
     }
     // Başarı/hata toast'ı hook içinde gösterilir.
-    await createWorkoutLogs.mutateAsync({ studentId: currentUserId, sets: completedSets })
+    await createWorkoutLogs.mutateAsync({ clientId: currentUserId, sets: completedSets })
     setIsLiveWorkout(false)
   }
 
@@ -517,7 +517,7 @@ export default function WorkoutTab({
 
   return (
     <div className="animate-fadeIn space-y-8">
-      {userRole === 'admin' && firstApproval ? (
+      {userRole === 'coach' && firstApproval ? (
         <div className="rounded-2xl border border-orange-200 bg-orange-50 p-5 shadow-sm dark:bg-orange-900/20">
           <h4 className="mb-2 flex items-center gap-2 font-black text-orange-600">
             <span aria-hidden="true">⚠️</span> ONAY BEKLEYEN PROGRAM VAR
@@ -551,7 +551,7 @@ export default function WorkoutTab({
           Haftalık Antrenman Planı
         </h4>
         <div className="flex gap-2">
-          {userRole === 'student' && !isWaitingMyApproval && (
+          {userRole === 'client' && !isWaitingMyApproval && (
             <button
               type="button"
               onClick={startLiveWorkout}
@@ -570,8 +570,8 @@ export default function WorkoutTab({
         </div>
       </div>
 
-      {/* isWaitingMyApproval yalnızca userRole === 'student' iken true olabilir (bkz. tanım),
-          bu yüzden ek bir 'admin' kontrolü gereksizdir — koç için bu blok zaten görünür. */}
+      {/* isWaitingMyApproval yalnızca userRole === 'client' iken true olabilir (bkz. tanım),
+          bu yüzden ek bir 'coach' kontrolü gereksizdir — koç için bu blok zaten görünür. */}
       {!isWaitingMyApproval && (
         <div className="mb-6 flex flex-col items-start gap-4 rounded-2xl border border-blue-500/20 bg-gradient-to-br from-blue-500/10 to-brand-purple/5 p-5 shadow-sm md:flex-row">
           <div className="pt-2 text-4xl" aria-hidden="true">
@@ -625,7 +625,7 @@ export default function WorkoutTab({
       <div className="flex flex-col gap-6 lg:flex-row">
         <div
           className={`w-full ${
-            userRole === 'admin' ? 'lg:w-2/3' : ''
+            userRole === 'coach' ? 'lg:w-2/3' : ''
           } h-fit overflow-x-auto rounded-xl border border-gray-200 dark:border-zinc-800`}
         >
           <QueryState
@@ -661,7 +661,7 @@ export default function WorkoutTab({
                       </label>
                       <textarea
                         id={`workout-${day}`}
-                        disabled={userRole === 'student' && isWaitingMyApproval}
+                        disabled={userRole === 'client' && isWaitingMyApproval}
                         value={workoutData[day]}
                         onChange={(e) => {
                           const value = e.target.value
@@ -671,7 +671,7 @@ export default function WorkoutTab({
                         onDragLeave={handleDragLeave}
                         onDrop={(e) => handleDrop(e, day)}
                         placeholder={
-                          userRole === 'admin'
+                          userRole === 'coach'
                             ? 'Manuel yazabilir veya sağdan sürükleyebilirsiniz...'
                             : ''
                         }
@@ -689,7 +689,7 @@ export default function WorkoutTab({
           </QueryState>
         </div>
 
-        {userRole === 'admin' && (
+        {userRole === 'coach' && (
           <div className="sticky top-4 h-fit w-full rounded-2xl border bg-gray-50 p-5 dark:bg-zinc-900 lg:w-1/3">
             <h4 className="mb-2 flex items-center gap-2 text-sm font-black">
               <span aria-hidden="true">📚</span> Egzersiz Kütüphanesi
@@ -781,7 +781,7 @@ export default function WorkoutTab({
         )}
       </div>
 
-      {userRole === 'admin' ? (
+      {userRole === 'coach' ? (
         <button
           type="button"
           onClick={handleSaveProgram}

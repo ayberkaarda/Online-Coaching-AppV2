@@ -22,8 +22,8 @@ function makeProfile(overrides: Partial<Profile> = {}): Profile {
     id: 'p-1',
     full_name: 'Test Kullanıcı',
     email: 'test@example.com',
-    role: 'student',
-    avatar_url: null,
+    role: 'client',
+    avatar_path: null,
     nutrition_plan: null,
     workout_plan: null,
     current_streak: 0,
@@ -53,13 +53,13 @@ function mockSendNotification(
 
 // notificationSchema, target alanı için "all" veya geçerli bir UUID bekliyor;
 // bu yüzden sahte öğrenci id'leri gerçekçi UUID v4 formatında olmalı.
-const STUDENT_1_ID = '11111111-1111-4111-8111-111111111111'
-const STUDENT_2_ID = '22222222-2222-4222-8222-222222222222'
+const CLIENT_1_ID = '11111111-1111-4111-8111-111111111111'
+const CLIENT_2_ID = '22222222-2222-4222-8222-222222222222'
 
-const students: Profile[] = [
-  makeProfile({ id: 'coach-1', role: 'admin', full_name: 'Deniz Koç' }),
-  makeProfile({ id: STUDENT_1_ID, role: 'student', full_name: 'Ahmet Yılmaz' }),
-  makeProfile({ id: STUDENT_2_ID, role: 'student', full_name: 'Elif Demir' }),
+const clients: Profile[] = [
+  makeProfile({ id: 'coach-1', role: 'coach', full_name: 'Deniz Koç' }),
+  makeProfile({ id: CLIENT_1_ID, role: 'client', full_name: 'Ahmet Yılmaz' }),
+  makeProfile({ id: CLIENT_2_ID, role: 'client', full_name: 'Elif Demir' }),
 ]
 
 describe('NotificationForm', () => {
@@ -68,7 +68,7 @@ describe('NotificationForm', () => {
     vi.mocked(useSendNotification).mockReturnValue(mutation)
     const user = userEvent.setup()
 
-    render(<NotificationForm students={students} />)
+    render(<NotificationForm clients={clients} />)
 
     await user.type(screen.getByLabelText('MESAJ DETAYI'), 'Sadece mesaj dolduruldu.')
     await user.click(screen.getByRole('button', { name: 'Gönder' }))
@@ -78,12 +78,12 @@ describe('NotificationForm', () => {
     expect(mutation.mutateAsync).not.toHaveBeenCalled()
   })
 
-  it('geçerli form + target="all" ile mutation admin olmayan tüm öğrencilerin id\'leriyle çağrılır', async () => {
+  it('geçerli form + target="all" ile mutation coach olmayan tüm öğrencilerin id\'leriyle çağrılır', async () => {
     const mutation = mockSendNotification()
     vi.mocked(useSendNotification).mockReturnValue(mutation)
     const user = userEvent.setup()
 
-    render(<NotificationForm students={students} />)
+    render(<NotificationForm clients={clients} />)
 
     await user.type(screen.getByLabelText('BAŞLIK'), 'Yeni Duyuru')
     await user.type(screen.getByLabelText('MESAJ DETAYI'), 'Herkese mesaj.')
@@ -91,27 +91,27 @@ describe('NotificationForm', () => {
 
     await waitFor(() => expect(mutation.mutateAsync).toHaveBeenCalledTimes(1))
     expect(mutation.mutateAsync).toHaveBeenCalledWith({
-      studentIds: [STUDENT_1_ID, STUDENT_2_ID],
+      clientIds: [CLIENT_1_ID, CLIENT_2_ID],
       title: 'Yeni Duyuru',
       message: 'Herkese mesaj.',
     })
   })
 
-  it('tek öğrenci seçilince mutation studentIds: [seçilenId] ile çağrılır', async () => {
+  it('tek öğrenci seçilince mutation clientIds: [seçilenId] ile çağrılır', async () => {
     const mutation = mockSendNotification()
     vi.mocked(useSendNotification).mockReturnValue(mutation)
     const user = userEvent.setup()
 
-    render(<NotificationForm students={students} />)
+    render(<NotificationForm clients={clients} />)
 
-    await user.selectOptions(screen.getByLabelText('KİME'), STUDENT_1_ID)
+    await user.selectOptions(screen.getByLabelText('KİME'), CLIENT_1_ID)
     await user.type(screen.getByLabelText('BAŞLIK'), 'Özel Not')
     await user.type(screen.getByLabelText('MESAJ DETAYI'), 'Sadece sana.')
     await user.click(screen.getByRole('button', { name: 'Gönder' }))
 
     await waitFor(() => expect(mutation.mutateAsync).toHaveBeenCalledTimes(1))
     expect(mutation.mutateAsync).toHaveBeenCalledWith({
-      studentIds: [STUDENT_1_ID],
+      clientIds: [CLIENT_1_ID],
       title: 'Özel Not',
       message: 'Sadece sana.',
     })
@@ -121,7 +121,7 @@ describe('NotificationForm', () => {
     const mutation = mockSendNotification({ isPending: true })
     vi.mocked(useSendNotification).mockReturnValue(mutation)
 
-    render(<NotificationForm students={students} />)
+    render(<NotificationForm clients={clients} />)
 
     const button = screen.getByRole('button', { name: 'Gönderiliyor...' })
     expect(button).toBeDisabled()
@@ -131,7 +131,7 @@ describe('NotificationForm', () => {
     const mutation = mockSendNotification()
     vi.mocked(useSendNotification).mockReturnValue(mutation)
 
-    render(<NotificationForm students={students} />)
+    render(<NotificationForm clients={clients} />)
 
     expect(screen.getByLabelText('KİME')).toBeInTheDocument()
     expect(screen.getByLabelText('BAŞLIK')).toBeInTheDocument()

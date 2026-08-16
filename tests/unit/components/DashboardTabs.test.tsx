@@ -61,8 +61,8 @@ function makeProfile(overrides: Partial<Profile> = {}): Profile {
     id: 'std-1',
     full_name: 'Ahmet Yılmaz',
     email: 'client1@example.com',
-    role: 'student',
-    avatar_url: null,
+    role: 'client',
+    avatar_path: null,
     nutrition_plan: null,
     workout_plan: null,
     current_streak: 0,
@@ -82,7 +82,7 @@ describe('DashboardTabs', () => {
   it('sekme listesi role="tablist", her sekme role="tab" ve aktif sekmede aria-selected="true" olur', () => {
     setupDefaultHooks()
 
-    render(<DashboardTabs currentUserId="std-1" userRole="student" students={[]} />)
+    render(<DashboardTabs currentUserId="std-1" userRole="client" clients={[]} />)
 
     expect(screen.getByRole('tablist')).toBeInTheDocument()
     const tabs = screen.getAllByRole('tab')
@@ -101,7 +101,7 @@ describe('DashboardTabs', () => {
   it('sekmeye tıklayınca ilgili tabpanel içeriği değişir', () => {
     setupDefaultHooks()
 
-    render(<DashboardTabs currentUserId="std-1" userRole="student" students={[]} />)
+    render(<DashboardTabs currentUserId="std-1" userRole="client" clients={[]} />)
 
     expect(screen.getByText('FORM_CHECK_TAB')).toBeInTheDocument()
     expect(screen.queryByText('DAILY_LOG_TAB')).not.toBeInTheDocument()
@@ -118,7 +118,7 @@ describe('DashboardTabs', () => {
   it('klavye navigasyonu: ArrowRight/ArrowLeft/Home/End ile aktif sekme ve odak değişir', () => {
     setupDefaultHooks()
 
-    render(<DashboardTabs currentUserId="std-1" userRole="student" students={[]} />)
+    render(<DashboardTabs currentUserId="std-1" userRole="client" clients={[]} />)
 
     const tablist = screen.getByRole('tablist')
 
@@ -144,10 +144,10 @@ describe('DashboardTabs', () => {
     expect(messagesTab).toHaveFocus()
   })
 
-  it('userRole="admin" ve hiç öğrenci seçili değilken uyarı mesajı görünür', () => {
+  it('userRole="coach" ve hiç öğrenci seçili değilken uyarı mesajı görünür', () => {
     setupDefaultHooks()
 
-    render(<DashboardTabs currentUserId="coach-1" userRole="admin" students={[]} />)
+    render(<DashboardTabs currentUserId="coach-1" userRole="coach" clients={[]} />)
 
     expect(
       screen.getByText('Lütfen yukarıdaki panelden en az bir öğrenci seçin.')
@@ -155,13 +155,13 @@ describe('DashboardTabs', () => {
     expect(screen.queryByText('FORM_CHECK_TAB')).not.toBeInTheDocument()
   })
 
-  it('userRole="student" iken streak başlığı görünür', () => {
+  it('userRole="client" iken streak başlığı görünür', () => {
     vi.mocked(useProfile).mockReturnValue(
       mockProfileQuery({ data: makeProfile({ current_streak: 9 }) })
     )
     vi.mocked(useNotifications).mockReturnValue(mockNotificationsQuery())
 
-    render(<DashboardTabs currentUserId="std-1" userRole="student" students={[]} />)
+    render(<DashboardTabs currentUserId="std-1" userRole="client" clients={[]} />)
 
     expect(screen.getByText(/GÜNLÜK SERİ/)).toBeInTheDocument()
     expect(screen.getByText('9 GÜN')).toBeInTheDocument()

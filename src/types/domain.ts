@@ -1,6 +1,6 @@
 // Uygulama alan (domain) tipleri: veritabanı satırlarının okunabilir takma adları,
 // haftalık plan yapıları ve bunlar için güvenli parse/normalize yardımcıları.
-// Rol modeli: 'admin' = KOÇ, 'student' = DANIŞAN.
+// Rol modeli: 'coach' = KOÇ, 'client' = DANIŞAN.
 
 import type { Enums, Json, Tables } from './database'
 
@@ -186,7 +186,7 @@ export function isDayName(v: string): v is DayName {
   return (DAY_NAMES as readonly string[]).includes(v)
 }
 
-/** 'admin' = koç. Yetki kontrollerinde tek doğruluk kaynağı. */
-export function isAdmin(role: UserRole | null | undefined): boolean {
-  return role === 'admin'
+/** 'coach' = koç. Yetki kontrollerinde tek doğruluk kaynağı. */
+export function isCoach(role: UserRole | null | undefined): boolean {
+  return role === 'coach'
 }

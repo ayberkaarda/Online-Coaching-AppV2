@@ -24,7 +24,7 @@ export function useNotifications(userId?: string, opts?: NotificationQueryOption
       let query = supabase
         .from('notifications')
         .select('*')
-        .eq('student_id', userId ?? '')
+        .eq('client_id', userId ?? '')
 
       if (opts?.unreadOnly) query = query.eq('is_read', false)
 
@@ -64,7 +64,7 @@ export function useMarkNotificationRead() {
 
 export interface SendNotificationInput {
   /** Tek alıcı için tek elemanlı dizi, toplu duyuru için tüm öğrenci id'leri. */
-  studentIds: string[]
+  clientIds: string[]
   title?: string | null
   message: string
 }
@@ -73,13 +73,13 @@ export function useSendNotification() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async ({ studentIds, title, message }: SendNotificationInput): Promise<number> => {
-      if (studentIds.length === 0) {
+    mutationFn: async ({ clientIds, title, message }: SendNotificationInput): Promise<number> => {
+      if (clientIds.length === 0) {
         throw new Error('En az bir alıcı seçmelisiniz.')
       }
 
-      const rows: TablesInsert<'notifications'>[] = studentIds.map((studentId) => ({
-        student_id: studentId,
+      const rows: TablesInsert<'notifications'>[] = clientIds.map((clientId) => ({
+        client_id: clientId,
         title: title ?? null,
         message,
       }))

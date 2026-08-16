@@ -24,7 +24,7 @@ class RecommendationRequest(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    student_id: str | None = None
+    client_id: str | None = None
     goal: Goal
     recent_weights: list[float] = Field(default_factory=list, max_length=365)
     recent_macros: list[MacroSample] = Field(default_factory=list, max_length=365)

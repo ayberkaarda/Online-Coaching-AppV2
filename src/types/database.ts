@@ -1,7 +1,3 @@
-// Bu dosya `npm run db:types` ile üretilmiştir — ELLE DÜZENLEMEYİN.
-// Şema değiştiğinde yeniden üretin:
-//   npx supabase start && npm run db:types
-
 export type Json =
   | string
   | number
@@ -15,36 +11,36 @@ export type Database = {
     Tables: {
       daily_logs: {
         Row: {
+          client_id: string
           created_at: string
           id: string
           log_date: string
           macros: Json
           sodium_mg: number | null
-          student_id: string
           water_lt: number | null
         }
         Insert: {
+          client_id: string
           created_at?: string
           id?: string
           log_date?: string
           macros?: Json
           sodium_mg?: number | null
-          student_id: string
           water_lt?: number | null
         }
         Update: {
+          client_id?: string
           created_at?: string
           id?: string
           log_date?: string
           macros?: Json
           sodium_mg?: number | null
-          student_id?: string
           water_lt?: number | null
         }
         Relationships: [
           {
-            foreignKeyName: "daily_logs_student_id_fkey"
-            columns: ["student_id"]
+            foreignKeyName: "daily_logs_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -101,36 +97,36 @@ export type Database = {
       }
       form_checks: {
         Row: {
-          back_pose_url: string | null
+          back_pose_path: string | null
+          client_id: string
           created_at: string
           current_weight: number
-          front_pose_url: string | null
+          front_pose_path: string | null
           id: string
           notes: string | null
-          student_id: string
         }
         Insert: {
-          back_pose_url?: string | null
+          back_pose_path?: string | null
+          client_id: string
           created_at?: string
           current_weight: number
-          front_pose_url?: string | null
+          front_pose_path?: string | null
           id?: string
           notes?: string | null
-          student_id: string
         }
         Update: {
-          back_pose_url?: string | null
+          back_pose_path?: string | null
+          client_id?: string
           created_at?: string
           current_weight?: number
-          front_pose_url?: string | null
+          front_pose_path?: string | null
           id?: string
           notes?: string | null
-          student_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "form_checks_student_id_fkey"
-            columns: ["student_id"]
+            foreignKeyName: "form_checks_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -181,33 +177,33 @@ export type Database = {
       }
       notifications: {
         Row: {
+          client_id: string
           created_at: string
           id: string
           is_read: boolean
           message: string
-          student_id: string
           title: string | null
         }
         Insert: {
+          client_id: string
           created_at?: string
           id?: string
           is_read?: boolean
           message: string
-          student_id: string
           title?: string | null
         }
         Update: {
+          client_id?: string
           created_at?: string
           id?: string
           is_read?: boolean
           message?: string
-          student_id?: string
           title?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "notifications_student_id_fkey"
-            columns: ["student_id"]
+            foreignKeyName: "notifications_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -216,7 +212,7 @@ export type Database = {
       }
       profiles: {
         Row: {
-          avatar_url: string | null
+          avatar_path: string | null
           created_at: string
           current_streak: number
           email: string | null
@@ -229,7 +225,7 @@ export type Database = {
           workout_plan: string | null
         }
         Insert: {
-          avatar_url?: string | null
+          avatar_path?: string | null
           created_at?: string
           current_streak?: number
           email?: string | null
@@ -242,7 +238,7 @@ export type Database = {
           workout_plan?: string | null
         }
         Update: {
-          avatar_url?: string | null
+          avatar_path?: string | null
           created_at?: string
           current_streak?: number
           email?: string | null
@@ -258,43 +254,43 @@ export type Database = {
       }
       program_approvals: {
         Row: {
+          client_id: string
           created_at: string
           id: string
           reviewed_at: string | null
           reviewed_by: string | null
           status: Database["public"]["Enums"]["approval_status"]
-          student_id: string
           workout_data: Json
         }
         Insert: {
+          client_id: string
           created_at?: string
           id?: string
           reviewed_at?: string | null
           reviewed_by?: string | null
           status?: Database["public"]["Enums"]["approval_status"]
-          student_id: string
           workout_data: Json
         }
         Update: {
+          client_id?: string
           created_at?: string
           id?: string
           reviewed_at?: string | null
           reviewed_by?: string | null
           status?: Database["public"]["Enums"]["approval_status"]
-          student_id?: string
           workout_data?: Json
         }
         Relationships: [
           {
-            foreignKeyName: "program_approvals_reviewed_by_fkey"
-            columns: ["reviewed_by"]
+            foreignKeyName: "program_approvals_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "program_approvals_student_id_fkey"
-            columns: ["student_id"]
+            foreignKeyName: "program_approvals_reviewed_by_fkey"
+            columns: ["reviewed_by"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -303,36 +299,36 @@ export type Database = {
       }
       workout_logs: {
         Row: {
+          client_id: string
           created_at: string
           exercise_name: string
           id: string
           reps: number | null
           rpe: number | null
-          student_id: string
           weight_kg: number | null
         }
         Insert: {
+          client_id: string
           created_at?: string
           exercise_name: string
           id?: string
           reps?: number | null
           rpe?: number | null
-          student_id: string
           weight_kg?: number | null
         }
         Update: {
+          client_id?: string
           created_at?: string
           exercise_name?: string
           id?: string
           reps?: number | null
           rpe?: number | null
-          student_id?: string
           weight_kg?: number | null
         }
         Relationships: [
           {
-            foreignKeyName: "workout_logs_student_id_fkey"
-            columns: ["student_id"]
+            foreignKeyName: "workout_logs_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -345,7 +341,8 @@ export type Database = {
     }
     Functions: {
       increment_streak: { Args: { user_id: string }; Returns: number }
-      is_admin: { Args: { uid?: string }; Returns: boolean }
+      is_coach: { Args: { uid?: string }; Returns: boolean }
+      is_coach_profile: { Args: { target: string }; Returns: boolean }
       profile_role: {
         Args: { uid?: string }
         Returns: Database["public"]["Enums"]["user_role"]
@@ -353,7 +350,7 @@ export type Database = {
     }
     Enums: {
       approval_status: "pending" | "approved" | "rejected"
-      user_role: "admin" | "student"
+      user_role: "coach" | "client"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -482,7 +479,7 @@ export const Constants = {
   public: {
     Enums: {
       approval_status: ["pending", "approved", "rejected"],
-      user_role: ["admin", "student"],
+      user_role: ["coach", "client"],
     },
   },
 } as const

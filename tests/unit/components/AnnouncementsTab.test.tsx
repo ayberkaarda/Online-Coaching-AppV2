@@ -14,7 +14,7 @@ afterEach(() => {
 function makeNotification(overrides: Partial<Notification> = {}): Notification {
   return {
     id: 'n-1',
-    student_id: 's-1',
+    client_id: 's-1',
     title: 'Başlık',
     message: 'Bir mesaj',
     is_read: false,
@@ -25,7 +25,7 @@ function makeNotification(overrides: Partial<Notification> = {}): Notification {
 
 describe('AnnouncementsTab', () => {
   it('boş dizi verildiğinde boş durum metni görünür', () => {
-    render(<AnnouncementsTab announcements={[]} userRole="student" selectedStudentIds={[]} />)
+    render(<AnnouncementsTab announcements={[]} userRole="client" selectedClientIds={[]} />)
 
     expect(screen.getByText('Duyuru bulunmuyor.')).toBeInTheDocument()
   })
@@ -37,7 +37,7 @@ describe('AnnouncementsTab', () => {
     ]
 
     render(
-      <AnnouncementsTab announcements={announcements} userRole="student" selectedStudentIds={[]} />
+      <AnnouncementsTab announcements={announcements} userRole="client" selectedClientIds={[]} />
     )
 
     expect(screen.getByText('İlk duyuru mesajı')).toBeInTheDocument()
@@ -50,7 +50,7 @@ describe('AnnouncementsTab', () => {
     ]
 
     render(
-      <AnnouncementsTab announcements={announcements} userRole="student" selectedStudentIds={[]} />
+      <AnnouncementsTab announcements={announcements} userRole="client" selectedClientIds={[]} />
     )
 
     expect(screen.getByText('Önemli Duyuru')).toBeInTheDocument()
@@ -60,21 +60,21 @@ describe('AnnouncementsTab', () => {
     const announcements = [makeNotification({ id: 'n-1', title: null, message: 'Başlıksız mesaj' })]
 
     const { container } = render(
-      <AnnouncementsTab announcements={announcements} userRole="student" selectedStudentIds={[]} />
+      <AnnouncementsTab announcements={announcements} userRole="client" selectedClientIds={[]} />
     )
 
     expect(screen.getByText('Başlıksız mesaj')).toBeInTheDocument()
     expect(container.querySelector('h5')).not.toBeInTheDocument()
   })
 
-  it('admin rolünde birden fazla öğrenci seçiliyken uyarı görünür ve liste render edilmez', () => {
+  it('coach rolünde birden fazla öğrenci seçiliyken uyarı görünür ve liste render edilmez', () => {
     const announcements = [makeNotification({ id: 'n-1', message: 'Görünmemeli' })]
 
     render(
       <AnnouncementsTab
         announcements={announcements}
-        userRole="admin"
-        selectedStudentIds={['a', 'b']}
+        userRole="coach"
+        selectedClientIds={['a', 'b']}
       />
     )
 
@@ -82,11 +82,11 @@ describe('AnnouncementsTab', () => {
     expect(screen.queryByText('Görünmemeli')).not.toBeInTheDocument()
   })
 
-  it('admin rolünde tek öğrenci seçiliyken liste normal render edilir', () => {
+  it('coach rolünde tek öğrenci seçiliyken liste normal render edilir', () => {
     const announcements = [makeNotification({ id: 'n-1', message: 'Görünmeli' })]
 
     render(
-      <AnnouncementsTab announcements={announcements} userRole="admin" selectedStudentIds={['a']} />
+      <AnnouncementsTab announcements={announcements} userRole="coach" selectedClientIds={['a']} />
     )
 
     expect(screen.getByText('Görünmeli')).toBeInTheDocument()
@@ -97,7 +97,7 @@ describe('AnnouncementsTab', () => {
     const announcements = [makeNotification({ id: 'n-1', created_at: createdAt })]
 
     render(
-      <AnnouncementsTab announcements={announcements} userRole="student" selectedStudentIds={[]} />
+      <AnnouncementsTab announcements={announcements} userRole="client" selectedClientIds={[]} />
     )
 
     const expected = new Date(createdAt).toLocaleDateString('tr-TR')

@@ -1,6 +1,6 @@
 'use client'
 
-// Kullanıcı yönetim merkezi (yalnızca admin). Not: istemci tarafı kontrol yalnızca UX
+// Kullanıcı yönetim merkezi (yalnızca koç). Not: istemci tarafı kontrol yalnızca UX
 // içindir; gerçek yetkilendirme Supabase RLS'tedir (bkz. supabase/migrations/20260816090200_rls_policies.sql).
 
 import { useRouter } from 'next/navigation'
@@ -9,7 +9,7 @@ import { useEffect } from 'react'
 
 import { useProfile, useProfiles, useSession } from '@/hooks'
 import { QueryState, SkeletonCard } from '@/components/ui'
-import { AdminUserManagement } from '@/components/AdminUserManagement'
+import { CoachUserManagement } from '@/components/CoachUserManagement'
 import { ThemeToggle } from '@/components/ThemeToggle'
 
 export default function UsersPage(): JSX.Element {
@@ -18,9 +18,9 @@ export default function UsersPage(): JSX.Element {
   const { data: session, isLoading: isSessionLoading } = useSession()
   const userId = session?.user.id
   const { data: profile, isLoading: isProfileLoading } = useProfile(userId)
-  const isAdmin = profile?.role === 'admin'
+  const isCoach = profile?.role === 'coach'
 
-  const { data: students, isLoading: isStudentsLoading, isError, error, refetch } = useProfiles()
+  const { data: clients, isLoading: isClientsLoading, isError, error, refetch } = useProfiles()
 
   useEffect(() => {
     if (isSessionLoading) return
@@ -28,12 +28,12 @@ export default function UsersPage(): JSX.Element {
       router.replace('/login')
       return
     }
-    if (!isProfileLoading && profile && !isAdmin) {
+    if (!isProfileLoading && profile && !isCoach) {
       router.replace('/')
     }
-  }, [isSessionLoading, session, isProfileLoading, profile, isAdmin, router])
+  }, [isSessionLoading, session, isProfileLoading, profile, isCoach, router])
 
-  const isLoading = isSessionLoading || isProfileLoading || isStudentsLoading
+  const isLoading = isSessionLoading || isProfileLoading || isClientsLoading
 
   return (
     <main id="main-content" className="container relative mx-auto max-w-6xl px-4 py-12 sm:px-6">
@@ -70,7 +70,7 @@ export default function UsersPage(): JSX.Element {
           </div>
         }
       >
-        <AdminUserManagement students={students ?? []} />
+        <CoachUserManagement clients={clients ?? []} />
       </QueryState>
     </main>
   )

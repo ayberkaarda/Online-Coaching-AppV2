@@ -3,53 +3,74 @@
 // Form check (haftalık kilo + poz fotoğrafı) hook'ları.
 // Fotoğraflar `form-checks-media` bucket'ında `poses/<uid>-<uuid>.<ext>` yoluna yüklenir;
 // storage RLS politikaları tam olarak bu ön eki bekler.
+//
+// MAHREMİYET: Bucket PRIVATE'tır. Veritabanı kolonları (`front_pose_path`,
+// `back_pose_path`) tam URL değil YOL saklar; okuma anında süreli imzalı adres
+// üretilir (bkz. src/lib/storage.ts).
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 
 import { logger } from '@/lib/logger'
 import { queryKeyRoots, queryKeys } from '@/lib/query/keys'
+import { FORM_CHECK_BUCKET, SIGNED_URL_STALE_TIME_MS, createSignedUrls } from '@/lib/storage'
 import { supabase } from '@/lib/supabase/client'
 import type { FormCheck } from '@/types'
 
-const FORM_CHECK_BUCKET = 'form-checks-media'
+/** Form check satırı + poz fotoğrafları için üretilmiş imzalı adresler. */
+export interface FormCheckWithUrls extends FormCheck {
+  /** `front_pose_path` için imzalı adres; dosya yoksa/erişilemiyorsa `null`. */
+  frontPoseSignedUrl: string | null
+  /** `back_pose_path` için imzalı adres; dosya yoksa/erişilemiyorsa `null`. */
+  backPoseSignedUrl: string | null
+}
 
-export function useFormChecks(studentId?: string) {
+export function useFormChecks(clientId?: string) {
   return useQuery({
-    queryKey: queryKeys.formChecks(studentId),
-    enabled: Boolean(studentId),
-    queryFn: async (): Promise<FormCheck[]> => {
+    queryKey: queryKeys.formChecks(clientId),
+    enabled: Boolean(clientId),
+    // İmzalı adresler TTL'lidir; kayıt, adres süresi dolmadan (TTL/2) bayatlar.
+    staleTime: SIGNED_URL_STALE_TIME_MS,
+    queryFn: async (): Promise<FormCheckWithUrls[]> => {
       const { data, error } = await supabase
         .from('form_checks')
         .select('*')
-        .eq('student_id', studentId ?? '')
+        .eq('client_id', clientId ?? '')
         .order('created_at', { ascending: false })
       if (error) throw new Error(error.message)
-      return data
+
+      // Tüm yollar TEK istekte imzalanır (fotoğraf başına ayrı istek yok).
+      const signed = await createSignedUrls(
+        FORM_CHECK_BUCKET,
+        data.flatMap((row) => [row.front_pose_path, row.back_pose_path])
+      )
+
+      return data.map((row) => ({
+        ...row,
+        frontPoseSignedUrl: row.front_pose_path ? (signed.get(row.front_pose_path) ?? null) : null,
+        backPoseSignedUrl: row.back_pose_path ? (signed.get(row.back_pose_path) ?? null) : null,
+      }))
     },
   })
 }
 
 export interface SubmitFormCheckInput {
-  studentId: string
+  clientId: string
   currentWeight: number
   frontFile: File
   backFile?: File
   notes?: string
 }
 
-async function uploadPose(studentId: string, file: File): Promise<string> {
+/** Pozu yükler ve bucket İÇİNDEKİ YOLU döner (tam URL değil — kolonlar yol saklar). */
+async function uploadPose(clientId: string, file: File): Promise<string> {
   const extension = file.name.split('.').pop()?.toLowerCase() || 'jpg'
-  const path = `poses/${studentId}-${crypto.randomUUID()}.${extension}`
+  const path = `poses/${clientId}-${crypto.randomUUID()}.${extension}`
 
   const { error } = await supabase.storage.from(FORM_CHECK_BUCKET).upload(path, file)
   if (error) throw new Error(error.message)
 
-  const {
-    data: { publicUrl },
-  } = supabase.storage.from(FORM_CHECK_BUCKET).getPublicUrl(path)
-
-  return publicUrl
+  return path
 }
 
 export function useSubmitFormCheck() {
@@ -57,22 +78,22 @@ export function useSubmitFormCheck() {
 
   return useMutation({
     mutationFn: async ({
-      studentId,
+      clientId,
       currentWeight,
       frontFile,
       backFile,
       notes,
     }: SubmitFormCheckInput): Promise<FormCheck> => {
-      const frontUrl = await uploadPose(studentId, frontFile)
-      const backUrl = backFile ? await uploadPose(studentId, backFile) : null
+      const frontPath = await uploadPose(clientId, frontFile)
+      const backPath = backFile ? await uploadPose(clientId, backFile) : null
 
       const { data, error } = await supabase
         .from('form_checks')
         .insert({
-          student_id: studentId,
+          client_id: clientId,
           current_weight: currentWeight,
-          front_pose_url: frontUrl,
-          back_pose_url: backUrl,
+          front_pose_path: frontPath,
+          back_pose_path: backPath,
           notes: notes ?? null,
         })
         .select()
@@ -80,16 +101,16 @@ export function useSubmitFormCheck() {
       if (error) throw new Error(error.message)
 
       // Seri (streak) güncellemesi kritik değildir: hata akışı bozmaz, sadece loglanır.
-      const { error: rpcError } = await supabase.rpc('increment_streak', { user_id: studentId })
+      const { error: rpcError } = await supabase.rpc('increment_streak', { user_id: clientId })
       if (rpcError) {
         logger.warn({ err: rpcError.message }, 'increment_streak RPC başarısız')
       }
 
       return data
     },
-    onSuccess: (_formCheck, { studentId }) => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.formChecks(studentId) })
-      void queryClient.invalidateQueries({ queryKey: queryKeys.profile(studentId) })
+    onSuccess: (_formCheck, { clientId }) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.formChecks(clientId) })
+      void queryClient.invalidateQueries({ queryKey: queryKeys.profile(clientId) })
       void queryClient.invalidateQueries({ queryKey: queryKeyRoots.lastCheckins })
       toast.success('Formunuz koçunuza iletildi.')
     },
@@ -99,25 +120,25 @@ export function useSubmitFormCheck() {
   })
 }
 
-/** Öğrenci id'si -> son form check tarihi (ISO). Koç panelinde takip için. */
+/** Danışan id'si -> son form check tarihi (ISO). Koç panelinde takip için. */
 export function useLastCheckins() {
   return useQuery({
     queryKey: queryKeys.lastCheckins(),
     queryFn: async (): Promise<Record<string, string>> => {
       const { data, error } = await supabase
         .from('form_checks')
-        .select('student_id, created_at')
+        .select('client_id, created_at')
         .order('created_at', { ascending: false })
       if (error) throw new Error(error.message)
 
-      const lastByStudent: Record<string, string> = {}
+      const lastByClient: Record<string, string> = {}
       for (const row of data) {
         // Sonuç azalan sırada geldiği için ilk görülen kayıt en yenisidir.
-        if (!lastByStudent[row.student_id]) {
-          lastByStudent[row.student_id] = row.created_at
+        if (!lastByClient[row.client_id]) {
+          lastByClient[row.client_id] = row.created_at
         }
       }
-      return lastByStudent
+      return lastByClient
     },
   })
 }

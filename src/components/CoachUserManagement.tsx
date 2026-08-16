@@ -18,7 +18,7 @@ import {
   YAxis,
 } from 'recharts'
 
-import { SkeletonCard, SkeletonChart } from '@/components/ui'
+import { EmptyState, SkeletonCard, SkeletonChart } from '@/components/ui'
 import {
   useDailyLogs,
   useFormChecks,
@@ -26,17 +26,18 @@ import {
   useSendNotification,
   useUpdateProfile,
 } from '@/hooks'
+import type { ProfileWithAvatar } from '@/hooks/useProfile'
 import { daysSince, formatDateTR } from '@/lib/utils'
-import type { Profile } from '@/types'
 
-export interface AdminUserManagementProps {
-  students: Profile[]
+export interface CoachUserManagementProps {
+  /** `useProfiles()` çıktısı: profil satırı + avatar için imzalı adres. */
+  clients: ProfileWithAvatar[]
 }
 
 type WeightPeriod = 'week' | 'month' | 'all'
 
-export function AdminUserManagement({ students }: AdminUserManagementProps): JSX.Element {
-  const [selectedStudent, setSelectedStudent] = useState<Profile | null>(null)
+export function CoachUserManagement({ clients }: CoachUserManagementProps): JSX.Element {
+  const [selectedClient, setSelectedClient] = useState<ProfileWithAvatar | null>(null)
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
   const [weightChartPeriod, setWeightChartPeriod] = useState<WeightPeriod>('month')
   // Kıyaslama seçimleri türetilmiş değer; state yalnızca kullanıcının manuel seçimini (override) tutar.
@@ -49,11 +50,11 @@ export function AdminUserManagement({ students }: AdminUserManagementProps): JSX
   const [workoutDraft, setWorkoutDraft] = useState('')
 
   // Prop değişince state'i ayarlamanın resmî React kalıbı: effect yerine render sırasında senkronlama.
-  const [prevStudentId, setPrevStudentId] = useState<string | null>(selectedStudent?.id ?? null)
-  if ((selectedStudent?.id ?? null) !== prevStudentId) {
-    setPrevStudentId(selectedStudent?.id ?? null)
-    setNutritionDraft(selectedStudent?.nutrition_plan ?? '')
-    setWorkoutDraft(selectedStudent?.workout_plan ?? '')
+  const [prevClientId, setPrevClientId] = useState<string | null>(selectedClient?.id ?? null)
+  if ((selectedClient?.id ?? null) !== prevClientId) {
+    setPrevClientId(selectedClient?.id ?? null)
+    setNutritionDraft(selectedClient?.nutrition_plan ?? '')
+    setWorkoutDraft(selectedClient?.workout_plan ?? '')
     setBeforePoseOverride(null)
     setAfterPoseOverride(null)
   }
@@ -64,8 +65,8 @@ export function AdminUserManagement({ students }: AdminUserManagementProps): JSX
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const { data: lastCheckins } = useLastCheckins()
-  const formChecksQuery = useFormChecks(selectedStudent?.id)
-  const dailyLogsQuery = useDailyLogs(selectedStudent?.id)
+  const formChecksQuery = useFormChecks(selectedClient?.id)
+  const dailyLogsQuery = useDailyLogs(selectedClient?.id)
   const sendNotification = useSendNotification()
   const updateProfile = useUpdateProfile()
 
@@ -98,7 +99,7 @@ export function AdminUserManagement({ students }: AdminUserManagementProps): JSX
     triggerRef.current?.focus()
     // Önceki bekleyen timer varsa iptal edilir, unmount'ta da temizlenmesi için ref'te saklanır.
     if (closeTimerRef.current) clearTimeout(closeTimerRef.current)
-    closeTimerRef.current = setTimeout(() => setSelectedStudent(null), 300)
+    closeTimerRef.current = setTimeout(() => setSelectedClient(null), 300)
   }, [])
 
   // Bileşen unmount olursa bekleyen kapanma timer'ı temizlenir; gövdede setState yok.
@@ -131,17 +132,17 @@ export function AdminUserManagement({ students }: AdminUserManagementProps): JSX
     if (isDrawerOpen) closeButtonRef.current?.focus()
   }, [isDrawerOpen])
 
-  const openDrawer = (student: Profile, trigger: HTMLButtonElement): void => {
+  const openDrawer = (client: ProfileWithAvatar, trigger: HTMLButtonElement): void => {
     triggerRef.current = trigger
-    setSelectedStudent(student)
+    setSelectedClient(client)
     setIsDrawerOpen(true)
   }
 
   const sendCheckinReminder = (): void => {
-    if (!selectedStudent) return
+    if (!selectedClient) return
     // Başarı/hata toast'ı hook içinde gösterilir.
     sendNotification.mutate({
-      studentIds: [selectedStudent.id],
+      clientIds: [selectedClient.id],
       title: '⚠️ Check-in Zamanı!',
       message:
         'Koçunuz güncel formunuzu bekliyor. Lütfen kilonuzu ve form fotoğraflarınızı sisteme yükleyin.',
@@ -149,8 +150,8 @@ export function AdminUserManagement({ students }: AdminUserManagementProps): JSX
   }
 
   /** 7 günden eskiyse veya hiç form yoksa kırmızı. */
-  const isCheckinLate = (studentId: string): boolean => {
-    const lastDate = lastCheckins?.[studentId]
+  const isCheckinLate = (clientId: string): boolean => {
+    const lastDate = lastCheckins?.[clientId]
     if (!lastDate) return true
     // Render saf kalsın diye "şimdi" argümanı Date.now() yerine state'teki `nowMs`'ten üretilir.
     return daysSince(lastDate, new Date(nowMs)) > 7
@@ -187,7 +188,7 @@ export function AdminUserManagement({ students }: AdminUserManagementProps): JSX
 
   const beforePose = poses.find((p) => p.id === beforePoseId)
   const afterPose = poses.find((p) => p.id === afterPoseId)
-  const adminStudents = students.filter((s) => s.role !== 'admin')
+  const clientCards = clients.filter((c) => c.role !== 'coach')
   const isLoading = formChecksQuery.isLoading || dailyLogsQuery.isLoading
 
   return (
@@ -195,18 +196,18 @@ export function AdminUserManagement({ students }: AdminUserManagementProps): JSX
       <h3 className="mb-6 text-xl font-black text-gray-800 dark:text-zinc-200">Öğrenci Portföyü</h3>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
-        {adminStudents.map((student) => {
-          const late = isCheckinLate(student.id)
+        {clientCards.map((client) => {
+          const late = isCheckinLate(client.id)
           return (
             <button
               type="button"
-              key={student.id}
+              key={client.id}
               onClick={(event) => {
                 // Drawer açılırken filtre eşiği bayatlamasın diye "şimdi" tazelenir.
                 // Bu çağrı satır içi event handler'da olmalı; bileşen gövdesindeki bir
                 // fonksiyona taşınırsa react-hooks/purity kuralı render kapsamı sayar.
                 setNowMs(Date.now())
-                openDrawer(student, event.currentTarget)
+                openDrawer(client, event.currentTarget)
               }}
               className="group relative w-full cursor-pointer rounded-2xl border border-gray-100 bg-white p-5 text-left shadow-sm transition-all hover:border-brand-purple dark:border-zinc-800 dark:bg-[#16161d] dark:hover:border-brand-purple"
             >
@@ -221,22 +222,23 @@ export function AdminUserManagement({ students }: AdminUserManagementProps): JSX
 
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border border-brand-purple/20 bg-brand-purple/10 text-lg font-black text-brand-purple">
-                  {student.avatar_url ? (
+                  {/* Private bucket: imzalı adres yoksa baş harf gösterilir (kırık görsel yok). */}
+                  {client.avatarSignedUrl ? (
                     <img
-                      src={student.avatar_url}
+                      src={client.avatarSignedUrl}
                       alt=""
                       loading="lazy"
                       className="h-full w-full object-cover"
                     />
                   ) : (
-                    (student.full_name ?? '?').charAt(0).toUpperCase()
+                    (client.full_name ?? '?').charAt(0).toUpperCase()
                   )}
                 </div>
                 <div>
                   <h4 className="font-bold text-gray-800 transition-colors group-hover:text-brand-purple dark:text-zinc-200">
-                    {student.full_name}
+                    {client.full_name}
                   </h4>
-                  <p className="text-xs text-gray-500">{student.email}</p>
+                  <p className="text-xs text-gray-500">{client.email}</p>
                 </div>
               </div>
             </button>
@@ -259,20 +261,20 @@ export function AdminUserManagement({ students }: AdminUserManagementProps): JSX
         <div
           role="dialog"
           aria-modal="true"
-          aria-labelledby="student-drawer-title"
+          aria-labelledby="client-drawer-title"
           className={`absolute right-0 top-0 h-full w-full max-w-2xl transform overflow-y-auto border-l border-zinc-200 bg-slate-50 shadow-2xl transition-transform duration-300 ease-in-out dark:border-zinc-800 dark:bg-[#0f0f12] ${
             isDrawerOpen ? 'translate-x-0' : 'translate-x-full'
           }`}
         >
-          {selectedStudent && (
+          {selectedClient && (
             <div className="space-y-8 p-6 pb-24 md:p-8">
               <div className="flex items-center justify-between border-b pb-4 dark:border-zinc-800">
                 <div>
                   <h2
-                    id="student-drawer-title"
+                    id="client-drawer-title"
                     className="bg-gradient-to-r from-brand-purple to-purple-500 bg-clip-text text-2xl font-black text-transparent"
                   >
-                    {selectedStudent.full_name}
+                    {selectedClient.full_name}
                   </h2>
                   <button
                     type="button"
@@ -482,11 +484,11 @@ export function AdminUserManagement({ students }: AdminUserManagementProps): JSX
                       </h3>
                       <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                         <div className="space-y-3">
-                          <label htmlFor="admin-before-pose" className="sr-only">
+                          <label htmlFor="coach-before-pose" className="sr-only">
                             Öncesi kaydını seç
                           </label>
                           <select
-                            id="admin-before-pose"
+                            id="coach-before-pose"
                             value={beforePoseId}
                             onChange={(e) => setBeforePoseOverride(e.target.value)}
                             className="w-full rounded-xl border bg-gray-50 p-3 text-sm font-bold focus:border-brand-purple focus:outline-none dark:border-zinc-800 dark:bg-zinc-950"
@@ -497,10 +499,10 @@ export function AdminUserManagement({ students }: AdminUserManagementProps): JSX
                               </option>
                             ))}
                           </select>
-                          {beforePose?.front_pose_url ? (
+                          {beforePose?.frontPoseSignedUrl ? (
                             <div className="relative aspect-[3/4] w-full overflow-hidden rounded-2xl border-2 border-gray-200 dark:border-zinc-800">
                               <img
-                                src={beforePose.front_pose_url}
+                                src={beforePose.frontPoseSignedUrl}
                                 alt={`Öncesi: ${formatDateTR(beforePose.created_at)}, ${beforePose.current_weight} kg`}
                                 loading="lazy"
                                 className="h-full w-full object-cover"
@@ -514,14 +516,20 @@ export function AdminUserManagement({ students }: AdminUserManagementProps): JSX
                                 </p>
                               </div>
                             </div>
-                          ) : null}
+                          ) : (
+                            // İmzalı adres üretilemedi (dosya yok/erişim yok) — kırık görsel yerine boş durum.
+                            <EmptyState
+                              icon="🖼️"
+                              title="Bu kayıt için fotoğraf görüntülenemiyor."
+                            />
+                          )}
                         </div>
                         <div className="space-y-3">
-                          <label htmlFor="admin-after-pose" className="sr-only">
+                          <label htmlFor="coach-after-pose" className="sr-only">
                             Sonrası kaydını seç
                           </label>
                           <select
-                            id="admin-after-pose"
+                            id="coach-after-pose"
                             value={afterPoseId}
                             onChange={(e) => setAfterPoseOverride(e.target.value)}
                             className="w-full rounded-xl border border-brand-purple bg-brand-purple/5 p-3 text-sm font-bold text-brand-purple focus:outline-none dark:bg-brand-purple/10"
@@ -532,10 +540,10 @@ export function AdminUserManagement({ students }: AdminUserManagementProps): JSX
                               </option>
                             ))}
                           </select>
-                          {afterPose?.front_pose_url ? (
+                          {afterPose?.frontPoseSignedUrl ? (
                             <div className="relative aspect-[3/4] w-full overflow-hidden rounded-2xl border-2 border-brand-purple">
                               <img
-                                src={afterPose.front_pose_url}
+                                src={afterPose.frontPoseSignedUrl}
                                 alt={`Sonrası: ${formatDateTR(afterPose.created_at)}, ${afterPose.current_weight} kg`}
                                 loading="lazy"
                                 className="h-full w-full object-cover"
@@ -549,7 +557,12 @@ export function AdminUserManagement({ students }: AdminUserManagementProps): JSX
                                 </p>
                               </div>
                             </div>
-                          ) : null}
+                          ) : (
+                            <EmptyState
+                              icon="🖼️"
+                              title="Bu kayıt için fotoğraf görüntülenemiyor."
+                            />
+                          )}
                         </div>
                       </div>
                       {beforePose && afterPose && (
@@ -577,13 +590,13 @@ export function AdminUserManagement({ students }: AdminUserManagementProps): JSX
                   <div className="grid grid-cols-1 gap-6 border-t pt-6 dark:border-zinc-800">
                     <div className="space-y-2">
                       <label
-                        htmlFor="admin-nutrition-editor"
+                        htmlFor="coach-nutrition-editor"
                         className="text-xs font-bold uppercase tracking-wider text-brand-purple"
                       >
                         Beslenme Programı (Admin Editörü)
                       </label>
                       <textarea
-                        id="admin-nutrition-editor"
+                        id="coach-nutrition-editor"
                         value={nutritionDraft}
                         onChange={(e) => setNutritionDraft(e.target.value)}
                         className="h-32 w-full rounded-xl border bg-white p-4 text-sm focus:border-brand-purple focus:outline-none dark:border-zinc-800 dark:bg-zinc-950"
@@ -592,7 +605,7 @@ export function AdminUserManagement({ students }: AdminUserManagementProps): JSX
                         type="button"
                         onClick={() =>
                           updateProfile.mutate({
-                            id: selectedStudent.id,
+                            id: selectedClient.id,
                             values: { nutrition_plan: nutritionDraft },
                           })
                         }
@@ -604,13 +617,13 @@ export function AdminUserManagement({ students }: AdminUserManagementProps): JSX
                     </div>
                     <div className="space-y-2">
                       <label
-                        htmlFor="admin-workout-editor"
+                        htmlFor="coach-workout-editor"
                         className="text-xs font-bold uppercase tracking-wider text-emerald-500"
                       >
                         Antrenman Programı (Admin Editörü)
                       </label>
                       <textarea
-                        id="admin-workout-editor"
+                        id="coach-workout-editor"
                         value={workoutDraft}
                         onChange={(e) => setWorkoutDraft(e.target.value)}
                         className="h-32 w-full rounded-xl border bg-white p-4 text-sm focus:border-emerald-500 focus:outline-none dark:border-zinc-800 dark:bg-zinc-950"
@@ -619,7 +632,7 @@ export function AdminUserManagement({ students }: AdminUserManagementProps): JSX
                         type="button"
                         onClick={() =>
                           updateProfile.mutate({
-                            id: selectedStudent.id,
+                            id: selectedClient.id,
                             values: { workout_plan: workoutDraft },
                           })
                         }

@@ -176,82 +176,107 @@ supabase-js ile yapıyor. **Sonuç: dosya ve `admin.ts` kaldırıldı (bkz. yuka
 
 ## 3. Bileşen envanteri
 
+> 2026-08-17'de Faz 1a (rol yeniden adlandırma + storage mahremiyeti) sonrası güncellendi.
+
 `src/components/` altında 15 `.tsx` + 1 barrel (`ui/index.ts`).
 
-| Bileşen                                                                      | Dosya                                            | Props                                                                                              | Kullandığı hook'lar                                                                                                                                                                                             | Sorumluluk                                                                                                                                                          |
-| ---------------------------------------------------------------------------- | ------------------------------------------------ | -------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `AdminUserManagement`                                                        | `components/AdminUserManagement.tsx` (641 satır) | `students: Profile[]`                                                                              | `useDailyLogs`, `useFormChecks`, `useLastCheckins`, `useSendNotification`, `useUpdateProfile`, `useState/useEffect/useMemo/useCallback`                                                                         | Koç paneli öğrenci portföyü: kart listesi + detay çekmecesi (kilo trendi, makro grafiği, öncesi/sonrası kıyaslama, program editörleri). Grafikler **recharts** ile. |
-| `DashboardTabs`                                                              | `components/DashboardTabs.tsx` (470)             | `currentUserId`, `userRole`, `students`                                                            | `useProfile`, `useNotifications`, `useState/useRef`                                                                                                                                                             | Sekme kabuğu (7 sekme), koç için öğrenci arama/seçme/sayfalama (5/sayfa), öğrenci için streak başlığı, `html2canvas` ile görsel dışa aktarım (dinamik import).      |
-| `NotificationForm`                                                           | `components/NotificationForm.tsx` (155)          | `students: Profile[]`                                                                              | `useSendNotification` (+ react-hook-form)                                                                                                                                                                       | Koçun tek öğrenciye veya tümüne duyuru göndermesi; `notificationSchema` ile doğrulama.                                                                              |
-| `ThemeToggle`                                                                | `components/ThemeToggle.tsx` (54)                | Yok                                                                                                | `useTheme` (next-themes), `useSyncExternalStore`                                                                                                                                                                | Açık/koyu tema anahtarı; hidrasyon uyuşmazlığını `useSyncExternalStore` ile önler.                                                                                  |
-| `AnnouncementsTab`                                                           | `components/tabs/AnnouncementsTab.tsx` (74)      | `announcements`, `userRole`, `selectedStudentIds`                                                  | (veri prop ile gelir; tipi `useNotifications` çıktısı)                                                                                                                                                          | Son 30 günün duyuru listesi.                                                                                                                                        |
-| `DailyLogTab`                                                                | `components/tabs/DailyLogTab.tsx` (290)          | `targetId`, `currentUserId`, `userRole`, `selectedStudentIds`                                      | `useDailyLogs`, `useCreateDailyLog`                                                                                                                                                                             | Günlük su/sodyum/makro formu + geçmiş kayıtlar; kayıt UPSERT'tir.                                                                                                   |
-| `FormCheckTab`                                                               | `components/tabs/FormCheckTab.tsx` (317)         | aynı 4 prop                                                                                        | `useFormChecks`, `useSubmitFormCheck`, `useState`                                                                                                                                                               | Haftalık kilo + poz fotoğrafı gönderimi, geçmiş ve öncesi/sonrası kıyaslama.                                                                                        |
-| `MessagesTab`                                                                | `components/tabs/MessagesTab.tsx` (181)          | aynı 4 prop                                                                                        | `useAdminId`, `useMessages`, `usePresence`, `useSendMessage`, `useState/useEffect`                                                                                                                              | Koç ↔ danışan birebir sohbeti, realtime + presence + optimistic gönderim.                                                                                           |
-| `NutritionTab`                                                               | `components/tabs/NutritionTab.tsx` (559)         | 4 prop + `onDownloadImage: () => void`                                                             | `useFoods`, `useNutritionPlan`, `useSaveNutritionPlan`, `useGenerateDiet`, `useState/useMemo`                                                                                                                   | Haftalık beslenme planı editörü, AI diyet üretimi, oto-tamamlamalı hızlı besin ekleme, gün bazlı kalori hesabı.                                                     |
-| `StatsTab`                                                                   | `components/tabs/StatsTab.tsx` (119)             | `targetId`, `userRole`, `selectedStudentIds`                                                       | `useFormChecks`                                                                                                                                                                                                 | Form check kayıtlarından kilo değişim grafiği (Chart.js) + ekran okuyucu için metin özeti.                                                                          |
-| `WorkoutTab`                                                                 | `components/tabs/WorkoutTab.tsx` (813)           | 4 prop + `onDownloadImage`                                                                         | `useWorkoutPlan`, `useSaveWorkoutPlan`, `useExercises`, `useWorkoutLogs`, `useCreateWorkoutLogs`, `usePendingApprovals`, `useSubmitProgramForApproval`, `useApproveProgram`, `useAdminId`, `useGenerateWorkout` | Haftalık antrenman planı: AI üretimi, sürükle-bırak egzersiz kütüphanesi, koç onay akışı, canlı "gym modu" set takibi.                                              |
-| `EmptyState`                                                                 | `components/ui/EmptyState.tsx` (31)              | `icon?`, `title`, `description?`, `action?`                                                        | —                                                                                                                                                                                                               | Nötr boş durum kutusu.                                                                                                                                              |
-| `ErrorBoundary`                                                              | `components/ui/ErrorBoundary.tsx` (76)           | `children`, `fallback?`, `onError?`                                                                | — (sınıf bileşeni)                                                                                                                                                                                              | React hata sınırı; hata detayı yalnızca development'ta gösterilir.                                                                                                  |
-| `QueryState`                                                                 | `components/ui/QueryState.tsx` (67)              | `isLoading`, `isError`, `error?`, `isEmpty?`, `skeleton?`, `emptyMessage?`, `onRetry?`, `children` | —                                                                                                                                                                                                               | Yükleniyor/hata/boş/veri durumlarını tek yerden yöneten sarmalayıcı.                                                                                                |
-| `Skeleton`, `SkeletonText`, `SkeletonCard`, `SkeletonTable`, `SkeletonChart` | `components/ui/Skeleton.tsx` (86)                | `className?` / `lines?` / `rows?`,`cols?` / (yok)                                                  | —                                                                                                                                                                                                               | Yükleme iskeletleri (5 export); kapsayıcıda `role="status"`, görsel parçalarda `aria-hidden`.                                                                       |
+| Bileşen                                                                      | Dosya                                            | Props                                                                                                     | Kullandığı hook'lar                                                                                                                                                                                             | Sorumluluk                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| ---------------------------------------------------------------------------- | ------------------------------------------------ | --------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `CoachUserManagement`                                                        | `components/CoachUserManagement.tsx` (654 satır) | `clients: ProfileWithAvatar[]`                                                                            | `useDailyLogs`, `useFormChecks`, `useLastCheckins`, `useSendNotification`, `useUpdateProfile`, `useState/useEffect/useMemo/useCallback/useRef`                                                                  | Koç paneli öğrenci portföyü: kart listesi + detay çekmecesi (kilo trendi, makro grafiği, öncesi/sonrası kıyaslama, program editörleri). Grafikler **recharts** ile. Avatarlar ve poz fotoğrafları private bucket'lardan gelen imzalı adreslerle (`avatarSignedUrl`, `frontPoseSignedUrl`) gösterilir; adres `null` ise baş harf / `EmptyState` placeholder'a düşülür. Eskiden `AdminUserManagement.tsx` (rol yeniden adlandırmasıyla dosya + bileşen adı + props tipi değişti). |
+| `DashboardTabs`                                                              | `components/DashboardTabs.tsx` (469)             | `currentUserId: string \| undefined`, `userRole: UserRole \| null \| undefined`, `clients: Profile[]`     | `useProfile`, `useNotifications`, `useState/useRef`                                                                                                                                                             | Sekme kabuğu (7 sekme), koç için öğrenci arama/seçme (`selectedClientIds`, eskiden `selectedStudentIds`) / sayfalama (5/sayfa), öğrenci için streak başlığı, `html2canvas` ile görsel dışa aktarım (dinamik import).                                                                                                                                                                                                                                                            |
+| `NotificationForm`                                                           | `components/NotificationForm.tsx` (155)          | `clients: Profile[]`                                                                                      | `useSendNotification` (+ react-hook-form)                                                                                                                                                                       | Koçun tek öğrenciye veya tümüne duyuru göndermesi; `notificationSchema` ile doğrulama.                                                                                                                                                                                                                                                                                                                                                                                          |
+| `ThemeToggle`                                                                | `components/ThemeToggle.tsx` (54)                | Yok                                                                                                       | `useTheme` (next-themes), `useSyncExternalStore`                                                                                                                                                                | Açık/koyu tema anahtarı; hidrasyon uyuşmazlığını `useSyncExternalStore` ile önler.                                                                                                                                                                                                                                                                                                                                                                                              |
+| `AnnouncementsTab`                                                           | `components/tabs/AnnouncementsTab.tsx` (74)      | `announcements: Notification[]`, `userRole: UserRole \| null \| undefined`, `selectedClientIds: string[]` | (veri prop ile gelir; tipi `useNotifications` çıktısı)                                                                                                                                                          | Son 30 günün duyuru listesi.                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `DailyLogTab`                                                                | `components/tabs/DailyLogTab.tsx` (290)          | `targetId`, `currentUserId`, `userRole`, `selectedClientIds`                                              | `useDailyLogs`, `useCreateDailyLog`                                                                                                                                                                             | Günlük su/sodyum/makro formu + geçmiş kayıtlar; kayıt UPSERT'tir (`client_id, log_date`).                                                                                                                                                                                                                                                                                                                                                                                       |
+| `FormCheckTab`                                                               | `components/tabs/FormCheckTab.tsx` (321)         | aynı 4 prop                                                                                               | `useFormChecks`, `useSubmitFormCheck`, `useState`                                                                                                                                                               | Haftalık kilo + poz fotoğrafı gönderimi, geçmiş ve öncesi/sonrası kıyaslama; fotoğraflar `useFormChecks`'ten gelen imzalı adreslerle (`frontPoseSignedUrl`/`backPoseSignedUrl`) gösterilir, adres yoksa `EmptyState` placeholder.                                                                                                                                                                                                                                               |
+| `MessagesTab`                                                                | `components/tabs/MessagesTab.tsx` (181)          | aynı 4 prop                                                                                               | `useCoachId`, `useMessages`, `usePresence`, `useSendMessage`, `useState/useEffect/useRef`                                                                                                                       | Koç ↔ danışan birebir sohbeti, realtime + presence + optimistic gönderim.                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `NutritionTab`                                                               | `components/tabs/NutritionTab.tsx` (559)         | 4 prop + `onDownloadImage: () => void`                                                                    | `useFoods`, `useNutritionPlan`, `useSaveNutritionPlan`, `useGenerateDiet`, `useState/useMemo`                                                                                                                   | Haftalık beslenme planı editörü, AI diyet üretimi, oto-tamamlamalı hızlı besin ekleme, gün bazlı kalori hesabı.                                                                                                                                                                                                                                                                                                                                                                 |
+| `StatsTab`                                                                   | `components/tabs/StatsTab.tsx` (119)             | `targetId`, `userRole`, `selectedClientIds`                                                               | `useFormChecks`                                                                                                                                                                                                 | Form check kayıtlarından kilo değişim grafiği (Chart.js) + ekran okuyucu için metin özeti.                                                                                                                                                                                                                                                                                                                                                                                      |
+| `WorkoutTab`                                                                 | `components/tabs/WorkoutTab.tsx` (813)           | 4 prop + `onDownloadImage`                                                                                | `useWorkoutPlan`, `useSaveWorkoutPlan`, `useExercises`, `useWorkoutLogs`, `useCreateWorkoutLogs`, `usePendingApprovals`, `useSubmitProgramForApproval`, `useApproveProgram`, `useCoachId`, `useGenerateWorkout` | Haftalık antrenman planı: AI üretimi, sürükle-bırak egzersiz kütüphanesi, koç onay akışı, canlı "gym modu" set takibi.                                                                                                                                                                                                                                                                                                                                                          |
+| `EmptyState`                                                                 | `components/ui/EmptyState.tsx` (31)              | `icon?: ReactNode`, `title`, `description?`, `action?: ReactNode`                                         | —                                                                                                                                                                                                               | Nötr boş durum kutusu.                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `ErrorBoundary`                                                              | `components/ui/ErrorBoundary.tsx` (76)           | `children`, `fallback?`, `onError?`                                                                       | — (sınıf bileşeni)                                                                                                                                                                                              | React hata sınırı; hata detayı yalnızca development'ta gösterilir.                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `QueryState`                                                                 | `components/ui/QueryState.tsx` (67)              | `isLoading`, `isError`, `error?`, `isEmpty?`, `skeleton?`, `emptyMessage?`, `onRetry?`, `children`        | —                                                                                                                                                                                                               | Yükleniyor/hata/boş/veri durumlarını tek yerden yöneten sarmalayıcı.                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `Skeleton`, `SkeletonText`, `SkeletonCard`, `SkeletonTable`, `SkeletonChart` | `components/ui/Skeleton.tsx` (86)                | `className?` / `lines?` / `rows?`,`cols?` / (yok)                                                         | —                                                                                                                                                                                                               | Yükleme iskeletleri (5 export); kapsayıcıda `role="status"`, görsel parçalarda `aria-hidden`.                                                                                                                                                                                                                                                                                                                                                                                   |
 
 **Mimari gözlem:** Hiçbir bileşen doğrudan `supabase.from(...)` çağırmıyor. Veri erişimi
-tamamen `src/hooks/*` (10 dosya) içinde toplanmış (grep ile doğrulandı); `src/app/actions.ts`
-o sırada da veri erişimini kendi başına, hiç çağrılmadan tekrarlıyordu ve bu envanterin
-tespitinin ardından kaldırıldı (bkz. §2.5). Bu, `active_planprogram.md` AC-2.4'ün ruhuna uygun
-bir başlangıç noktasıdır.
+tamamen `src/hooks/*` (11 dosya) içinde toplanmış (grep ile doğrulandı); `src/app/actions.ts`
+ve `src/lib/supabase/admin.ts` o sırada veri erişimini kendi başına, hiç çağrılmadan tekrarlıyordu
+ve bu envanterin tespitinin ardından ikisi de **kaldırıldı (ölü kod)** — bkz. §2.5. Bu,
+`active_planprogram.md` AC-2.4'ün ruhuna uygun bir başlangıç noktasıdır.
 
 ---
 
 ## 4. Hook envanteri
+
+> 2026-08-17'de Faz 1a (rol yeniden adlandırma + storage mahremiyeti) sonrası güncellendi.
 
 `src/hooks/` altında 11 modül + `index.ts` barrel; toplam **35 export edilen hook**.
 Tümü `'use client'`. Hepsi `@/lib/query/keys` içindeki anahtar fabrikalarını kullanır;
 elle dizi yazan tek yer `usePlans.ts` (mevcut anahtarı `[...queryKeys.profile(id), 'workout-plan']`
 biçiminde genişletir).
 
-| Hook                          | Dosya                    | Tip                       | Girdi                                                      | Dönüş                                    | Dokunduğu tablo(lar)                                                     |
-| ----------------------------- | ------------------------ | ------------------------- | ---------------------------------------------------------- | ---------------------------------------- | ------------------------------------------------------------------------ |
-| `useSession`                  | `useSession.ts`          | query                     | —                                                          | `Session \| null`                        | (auth)                                                                   |
-| `useSignIn`                   | `useSession.ts`          | mutation                  | `{email,password}`                                         | `Session`                                | (auth)                                                                   |
-| `useSignOut`                  | `useSession.ts`          | mutation                  | —                                                          | `void`                                   | (auth) — `queryClient.clear()` + `offline-*`/`workbox-*` cache temizliği |
-| `useUpdatePassword`           | `useSession.ts`          | mutation                  | `password: string`                                         | `void`                                   | (auth)                                                                   |
-| `useProfile`                  | `useProfile.ts`          | query                     | `userId?`                                                  | `Profile`                                | `profiles`                                                               |
-| `useProfiles`                 | `useProfile.ts`          | query                     | —                                                          | `Profile[]`                              | `profiles`                                                               |
-| `useUpdateProfile`            | `useProfile.ts`          | mutation                  | `{id, values}`                                             | `Profile`                                | `profiles`                                                               |
-| `useUploadAvatar`             | `useProfile.ts`          | mutation                  | `{userId, file}`                                           | `publicUrl: string`                      | `profiles` + storage `avatars`                                           |
-| `useNotifications`            | `useNotifications.ts`    | query                     | `userId?`, `{unreadOnly?, sinceDays?}`                     | `Notification[]`                         | `notifications`                                                          |
-| `useMarkNotificationRead`     | `useNotifications.ts`    | mutation                  | `{id, userId?}`                                            | `void`                                   | `notifications`                                                          |
-| `useSendNotification`         | `useNotifications.ts`    | mutation                  | `{studentIds[], title?, message}`                          | `count: number`                          | `notifications`                                                          |
-| `useFormChecks`               | `useFormChecks.ts`       | query                     | `studentId?`                                               | `FormCheck[]`                            | `form_checks`                                                            |
-| `useSubmitFormCheck`          | `useFormChecks.ts`       | mutation                  | `{studentId, currentWeight, frontFile, backFile?, notes?}` | `FormCheck`                              | `form_checks` + storage `form-checks-media` + RPC `increment_streak`     |
-| `useLastCheckins`             | `useFormChecks.ts`       | query                     | —                                                          | `Record<studentId, ISO tarih>`           | `form_checks`                                                            |
-| `useDailyLogs`                | `useDailyLogs.ts`        | query                     | `studentId?`                                               | `DailyLog[]` (`macros` parse edilmiş)    | `daily_logs`                                                             |
-| `useCreateDailyLog`           | `useDailyLogs.ts`        | mutation (upsert)         | `{studentId, water_lt, sodium_mg, macros, log_date?}`      | `DailyLog`                               | `daily_logs` — `onConflict: 'student_id,log_date'`                       |
-| `useWorkoutLogs`              | `useWorkoutLogs.ts`      | query                     | `studentId?`                                               | `WorkoutLog[]`                           | `workout_logs`                                                           |
-| `useCreateWorkoutLog`         | `useWorkoutLogs.ts`      | mutation                  | `{studentId, exercise_name, weight_kg?, reps?, rpe?}`      | `WorkoutLog`                             | `workout_logs`                                                           |
-| `useCreateWorkoutLogs`        | `useWorkoutLogs.ts`      | mutation                  | `{studentId, sets[]}`                                      | `count: number`                          | `workout_logs` (toplu insert)                                            |
-| `usePendingApprovals`         | `useProgramApprovals.ts` | query                     | `studentId?`                                               | `ProgramApproval[]` (`status='pending'`) | `program_approvals`                                                      |
-| `useSubmitProgramForApproval` | `useProgramApprovals.ts` | mutation                  | `{studentId, plan, coachId?}`                              | `ProgramApproval`                        | `program_approvals` + `notifications`                                    |
-| `useApproveProgram`           | `useProgramApprovals.ts` | mutation                  | `{approvalId, studentId, plan, reviewerId?}`               | `void`                                   | `profiles` + `program_approvals` + `notifications`                       |
-| `useMessages`                 | `useMessages.ts`         | query + realtime          | `currentUserId?`, `partnerId?`                             | `Message[]` (eskiden yeniye)             | `messages` — `postgres_changes` INSERT aboneliği                         |
-| `useSendMessage`              | `useMessages.ts`         | mutation (optimistic)     | `{senderId, receiverId, message}`                          | `Message`                                | `messages`                                                               |
-| `usePresence`                 | `useMessages.ts`         | diğer (realtime presence) | `currentUserId?`                                           | `{ isOnline(userId) }`                   | — (`global-presence` kanalı)                                             |
-| `useAdminId`                  | `useMessages.ts`         | query                     | —                                                          | `string \| null`                         | `profiles` (`role='admin'`, en eski)                                     |
-| `useExercises`                | `useCatalog.ts`          | query                     | —                                                          | `Exercise[]`                             | `exercises` (staleTime 30 dk)                                            |
-| `useFoods`                    | `useCatalog.ts`          | query                     | —                                                          | `FoodItem[]`                             | `food_database` (staleTime 30 dk)                                        |
-| `useWorkoutPlan`              | `usePlans.ts`            | query                     | `studentId?`                                               | `WorkoutPlan`                            | `profiles.workout_plan`                                                  |
-| `useNutritionPlan`            | `usePlans.ts`            | query                     | `studentId?`                                               | `NutritionPlan`                          | `profiles.nutrition_plan`                                                |
-| `useSaveWorkoutPlan`          | `usePlans.ts`            | mutation                  | `{studentIds[], plan}`                                     | `count`                                  | `profiles` (`.in('id', ids)` — tek sorgu)                                |
-| `useSaveNutritionPlan`        | `usePlans.ts`            | mutation                  | `{studentIds[], plan}`                                     | `count`                                  | `profiles`                                                               |
-| `useGenerateWorkout`          | `useAi.ts`               | mutation                  | `WorkoutGenerateInput`                                     | `WorkoutGenerateResult`                  | — (`POST /api/ai/workout`)                                               |
-| `useGenerateDiet`             | `useAi.ts`               | mutation                  | `DietGenerateInput`                                        | `DietGenerateResult`                     | — (`POST /api/ai/nutrition`)                                             |
-| `useRecommendations`          | `useAi.ts`               | mutation                  | `RecommendationInput`                                      | `RecommendationResult`                   | — (`POST /api/ai/recommendations`)                                       |
+| Hook                          | Dosya                    | Tip                       | Girdi                                                     | Dönüş                                                                           | Dokunduğu tablo(lar)                                                                        |
+| ----------------------------- | ------------------------ | ------------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `useSession`                  | `useSession.ts`          | query                     | —                                                         | `Session \| null`                                                               | (auth)                                                                                      |
+| `useSignIn`                   | `useSession.ts`          | mutation                  | `{email,password}`                                        | `Session`                                                                       | (auth)                                                                                      |
+| `useSignOut`                  | `useSession.ts`          | mutation                  | —                                                         | `void`                                                                          | (auth) — `queryClient.clear()` + `offline-*`/`workbox-*` cache temizliği                    |
+| `useUpdatePassword`           | `useSession.ts`          | mutation                  | `password: string`                                        | `void`                                                                          | (auth)                                                                                      |
+| `useProfile`                  | `useProfile.ts`          | query                     | `userId?`                                                 | `ProfileWithAvatar` (`Profile` + `avatarSignedUrl: string \| null`)             | `profiles` + storage `avatars` (imzalı adres)                                               |
+| `useProfiles`                 | `useProfile.ts`          | query                     | —                                                         | `ProfileWithAvatar[]`                                                           | `profiles` + storage `avatars` (tüm avatarlar TEK istekte `createSignedUrls` ile imzalanır) |
+| `useUpdateProfile`            | `useProfile.ts`          | mutation                  | `{id, values}`                                            | `ProfileWithAvatar`                                                             | `profiles`                                                                                  |
+| `useUploadAvatar`             | `useProfile.ts`          | mutation                  | `{userId, file}`                                          | `path: string` (bucket içi **yol**, tam URL değil)                              | `profiles` (`avatar_path`) + storage `avatars`                                              |
+| `useNotifications`            | `useNotifications.ts`    | query                     | `userId?`, `{unreadOnly?, sinceDays?}`                    | `Notification[]`                                                                | `notifications`                                                                             |
+| `useMarkNotificationRead`     | `useNotifications.ts`    | mutation                  | `{id, userId?}`                                           | `void`                                                                          | `notifications`                                                                             |
+| `useSendNotification`         | `useNotifications.ts`    | mutation                  | `{clientIds[], title?, message}`                          | `count: number`                                                                 | `notifications`                                                                             |
+| `useFormChecks`               | `useFormChecks.ts`       | query                     | `clientId?`                                               | `FormCheckWithUrls[]` (`FormCheck` + `frontPoseSignedUrl`, `backPoseSignedUrl`) | `form_checks` + storage `form-checks-media` (tüm pozlar TEK istekte imzalanır)              |
+| `useSubmitFormCheck`          | `useFormChecks.ts`       | mutation                  | `{clientId, currentWeight, frontFile, backFile?, notes?}` | `FormCheck`                                                                     | `form_checks` + storage `form-checks-media` + RPC `increment_streak`                        |
+| `useLastCheckins`             | `useFormChecks.ts`       | query                     | —                                                         | `Record<clientId, ISO tarih>`                                                   | `form_checks`                                                                               |
+| `useDailyLogs`                | `useDailyLogs.ts`        | query                     | `clientId?`                                               | `DailyLog[]` (`macros` parse edilmiş)                                           | `daily_logs`                                                                                |
+| `useCreateDailyLog`           | `useDailyLogs.ts`        | mutation (upsert)         | `{clientId, water_lt, sodium_mg, macros, log_date?}`      | `DailyLog`                                                                      | `daily_logs` — `onConflict: 'client_id,log_date'`                                           |
+| `useWorkoutLogs`              | `useWorkoutLogs.ts`      | query                     | `clientId?`                                               | `WorkoutLog[]`                                                                  | `workout_logs`                                                                              |
+| `useCreateWorkoutLog`         | `useWorkoutLogs.ts`      | mutation                  | `{clientId, exercise_name, weight_kg?, reps?, rpe?}`      | `WorkoutLog`                                                                    | `workout_logs`                                                                              |
+| `useCreateWorkoutLogs`        | `useWorkoutLogs.ts`      | mutation                  | `{clientId, sets[]}`                                      | `count: number`                                                                 | `workout_logs` (toplu insert)                                                               |
+| `usePendingApprovals`         | `useProgramApprovals.ts` | query                     | `clientId?`                                               | `ProgramApproval[]` (`status='pending'`)                                        | `program_approvals`                                                                         |
+| `useSubmitProgramForApproval` | `useProgramApprovals.ts` | mutation                  | `{clientId, plan, coachId?}`                              | `ProgramApproval`                                                               | `program_approvals` + `notifications`                                                       |
+| `useApproveProgram`           | `useProgramApprovals.ts` | mutation                  | `{approvalId, clientId, plan, reviewerId?}`               | `void`                                                                          | `profiles` + `program_approvals` + `notifications`                                          |
+| `useMessages`                 | `useMessages.ts`         | query + realtime          | `currentUserId?`, `partnerId?`                            | `Message[]` (eskiden yeniye)                                                    | `messages` — `postgres_changes` INSERT aboneliği                                            |
+| `useSendMessage`              | `useMessages.ts`         | mutation (optimistic)     | `{senderId, receiverId, message}`                         | `Message`                                                                       | `messages`                                                                                  |
+| `usePresence`                 | `useMessages.ts`         | diğer (realtime presence) | `currentUserId?`                                          | `{ isOnline(userId) }`                                                          | — (`global-presence` kanalı)                                                                |
+| `useCoachId`                  | `useMessages.ts`         | query                     | —                                                         | `string \| null`                                                                | `profiles` (`role='coach'`, en eski) — eskiden `useAdminId` (`role='admin'`)                |
+| `useExercises`                | `useCatalog.ts`          | query                     | —                                                         | `Exercise[]`                                                                    | `exercises` (staleTime 30 dk)                                                               |
+| `useFoods`                    | `useCatalog.ts`          | query                     | —                                                         | `FoodItem[]`                                                                    | `food_database` (staleTime 30 dk)                                                           |
+| `useWorkoutPlan`              | `usePlans.ts`            | query                     | `clientId?`                                               | `WorkoutPlan`                                                                   | `profiles.workout_plan`                                                                     |
+| `useNutritionPlan`            | `usePlans.ts`            | query                     | `clientId?`                                               | `NutritionPlan`                                                                 | `profiles.nutrition_plan`                                                                   |
+| `useSaveWorkoutPlan`          | `usePlans.ts`            | mutation                  | `{clientIds[], plan}`                                     | `count`                                                                         | `profiles` (`.in('id', ids)` — tek sorgu)                                                   |
+| `useSaveNutritionPlan`        | `usePlans.ts`            | mutation                  | `{clientIds[], plan}`                                     | `count`                                                                         | `profiles`                                                                                  |
+| `useGenerateWorkout`          | `useAi.ts`               | mutation                  | `WorkoutGenerateInput`                                    | `WorkoutGenerateResult`                                                         | — (`POST /api/ai/workout`)                                                                  |
+| `useGenerateDiet`             | `useAi.ts`               | mutation                  | `DietGenerateInput`                                       | `DietGenerateResult`                                                            | — (`POST /api/ai/nutrition`)                                                                |
+| `useRecommendations`          | `useAi.ts`               | mutation                  | `RecommendationInput`                                     | `RecommendationResult`                                                          | — (`POST /api/ai/recommendations`)                                                          |
 
 Ortak desenler: Supabase `{data, error}` sonucu hata varsa `throw new Error(error.message)`;
 kullanıcıya geri bildirim `sonner` toast'ları ile; mutasyon sonrası ilgili `queryKey` kökleri
-invalidate edilir. `useSendMessage` tek optimistic mutasyondur (rollback context'li).
+invalidate edilir. `useSendMessage` tek optimistic mutasyondur (rollback context'li). İmzalı
+adres döndüren sorgular (`useProfile`, `useProfiles`, `useUpdateProfile`, `useFormChecks`)
+`staleTime`'ı `SIGNED_URL_STALE_TIME_MS` (`src/lib/storage.ts`, TTL/2) ile sınırlar; böylece
+önbellekteki kayıt, içindeki adresin süresi dolmadan bayatlar ve bir sonraki kullanımda taze
+imza üretilir.
+
+### 4.1 `src/lib/storage.ts` — imzalı (signed) adres yardımcıları
+
+Faz 1a'da eklenen yeni modül. `avatars` ve `form-checks-media` bucket'ları artık PRIVATE
+olduğu için (bkz. `supabase/migrations/20260817100000_private_storage.sql`), veritabanı
+kolonları (`avatar_path`, `front_pose_path`, `back_pose_path`) tam URL değil **yol** saklar;
+görüntüleme anında bu modülle süreli imzalı adres üretilir. Yukarıdaki `useProfile`,
+`useProfiles`, `useFormChecks` bu modülü kullanır.
+
+| Export                            | Tip                                                                                  | Açıklama                                                                                         |
+| --------------------------------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ |
+| `AVATAR_BUCKET`                   | `'avatars'` sabiti                                                                   | Avatar bucket adı.                                                                               |
+| `FORM_CHECK_BUCKET`               | `'form-checks-media'` sabiti                                                         | Form check fotoğraf bucket adı.                                                                  |
+| `SIGNED_URL_TTL_SECONDS`          | `3600` sabiti                                                                        | İmzalı adresin geçerlilik süresi (saniye).                                                       |
+| `SIGNED_URL_STALE_TIME_MS`        | `(TTL/2) * 1000` sabiti                                                              | İmzalı adres içeren React Query sorguları için `staleTime`; TTL'in yarısı.                       |
+| `createSignedUrl(bucket, path)`   | `(string, string \| null \| undefined) => Promise<string \| null>`                   | Tek yol için imzalı adres üretir; hata/boş yol durumunda **fırlatmaz**, `null` döner (loglanır). |
+| `createSignedUrls(bucket, paths)` | `(string, readonly (string \| null \| undefined)[]) => Promise<Map<string, string>>` | Birden çok yolu TEK istekte imzalar (N+1 önlenir); üretilemeyen yollar haritada yer almaz.       |
 
 ---
 
@@ -385,15 +410,15 @@ Sabitler: `DAY_NAMES` (Pazartesi…Pazar), `EMPTY_WORKOUT_PLAN`, `EMPTY_NUTRITIO
 
 Yardımcı fonksiyonlar:
 
-| Fonksiyon                 | Davranış                                                                                                                    |
-| ------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `parseMacros(value)`      | `Json`/string/null girdiyi güvenle `{protein, carb, fat}`'a çevirir; parse edilemeyen değerler 0 olur.                      |
-| `parseWorkoutPlan(raw)`   | `profiles.workout_plan` JSON string'ini `Record<DayName, string>`'e çevirir; bozuk JSON veya eksik gün → boş haftalık plan. |
-| `parseNutritionPlan(raw)` | `profiles.nutrition_plan`'ı `Record<DayName, {items, total}>`'a çevirir; eksik günler `{items:'', total:0}` ile tamamlanır. |
-| `isDayName(v)`            | Type guard.                                                                                                                 |
-| `isAdmin(role)`           | `role === 'admin'`. Yetki kontrollerinde tek doğruluk kaynağı.                                                              |
+| Fonksiyon                           | Davranış                                                                                                                    |
+| ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `parseMacros(value)`                | `Json`/string/null girdiyi güvenle `{protein, carb, fat}`'a çevirir; parse edilemeyen değerler 0 olur.                      |
+| `parseWorkoutPlan(raw)`             | `profiles.workout_plan` JSON string'ini `Record<DayName, string>`'e çevirir; bozuk JSON veya eksik gün → boş haftalık plan. |
+| `parseNutritionPlan(raw)`           | `profiles.nutrition_plan`'ı `Record<DayName, {items, total}>`'a çevirir; eksik günler `{items:'', total:0}` ile tamamlanır. |
+| `isDayName(v)`                      | Type guard.                                                                                                                 |
+| `isCoach(role)` (eskiden `isAdmin`) | `role === 'coach'` (eskiden `role === 'admin'`). Yetki kontrollerinde tek doğruluk kaynağı.                                 |
 
-Dosyanın başındaki rol sözleşmesi: **`'admin'` = KOÇ, `'student'` = DANIŞAN.**
+Dosyanın başındaki rol sözleşmesi (2026-08-17'de güncellendi, bkz. `supabase/migrations/20260817090000_rename_roles.sql`): **`'coach'` = KOÇ, `'client'` = DANIŞAN** (eskiden `'admin'` = KOÇ, `'student'` = DANIŞAN).
 
 `src/types/index.ts` her ikisini de re-export eder (`@/types`).
 
@@ -401,16 +426,18 @@ Dosyanın başındaki rol sözleşmesi: **`'admin'` = KOÇ, `'student'` = DANIŞ
 
 ## 7. Veritabanı şeması (canlı veritabanından çıkarıldı)
 
+> **2026-08-17'de rol yeniden adlandırması sonrası güncellendi (bkz. `supabase/migrations/20260817090000_rename_roles.sql`).** Bu bölüm 2026-08-16'da çıkarılan envanterin üzerine güncellenmiştir: `user_role` enum'u `admin`/`student` idi, artık `coach`/`client`; aşağıdaki 5 tabloda `student_id` kolonu `client_id` oldu (`notifications`, `form_checks`, `daily_logs`, `workout_logs`, `program_approvals`); bağlı indeks/kısıt adları da hizalandı. Politika **sayıları ve ifadeleri** değişmedi (37 public + 8 storage) — yalnızca isimler.
+
 **9 tablo, 2 enum, 37 public RLS politikası, 8 storage politikası, 6 fonksiyon, 3 proje
 trigger'ı, 2 storage bucket.** Tüm public tablolarda `relrowsecurity = true`,
 `relforcerowsecurity = false`.
 
 **Enum'lar**
 
-| Enum              | Değerler (sıralı)                 |
-| ----------------- | --------------------------------- |
-| `user_role`       | `admin`, `student`                |
-| `approval_status` | `pending`, `approved`, `rejected` |
+| Enum              | Değerler (sıralı)                              |
+| ----------------- | ---------------------------------------------- |
+| `user_role`       | `coach`, `client` (eskiden `admin`, `student`) |
+| `approval_status` | `pending`, `approved`, `rejected`              |
 
 **Kurulu eklentiler:** `pg_graphql` (graphql), `pg_net` (extensions), `pg_stat_statements`,
 `pg_trgm`, `pgcrypto`, `pgjwt`, `plpgsql`, `supabase_vault` (vault), `uuid-ossp`.
@@ -421,19 +448,19 @@ ulaşmadan `permission denied` alır).
 
 ### 7.1 `profiles`
 
-| Kolon             | Tip         | Null  | Varsayılan  | Kısıt                                         |
-| ----------------- | ----------- | ----- | ----------- | --------------------------------------------- |
-| `id`              | uuid        | HAYIR | —           | PK; FK → `auth.users(id)` ON DELETE CASCADE   |
-| `full_name`       | text        | HAYIR | `''::text`  |                                               |
-| `email`           | text        | EVET  | —           |                                               |
-| `role`            | `user_role` | HAYIR | `'student'` |                                               |
-| `avatar_url`      | text        | EVET  | —           |                                               |
-| `nutrition_plan`  | text        | EVET  | —           | JSON string olarak beslenme planı             |
-| `workout_plan`    | text        | EVET  | —           | JSON string olarak antrenman planı            |
-| `current_streak`  | integer     | HAYIR | `0`         |                                               |
-| `last_checkin_at` | timestamptz | EVET  | —           |                                               |
-| `created_at`      | timestamptz | HAYIR | `now()`     |                                               |
-| `updated_at`      | timestamptz | HAYIR | `now()`     | `set_profiles_updated_at` trigger'ı günceller |
+| Kolon             | Tip         | Null  | Varsayılan                       | Kısıt                                                                                                                                              |
+| ----------------- | ----------- | ----- | -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`              | uuid        | HAYIR | —                                | PK; FK → `auth.users(id)` ON DELETE CASCADE                                                                                                        |
+| `full_name`       | text        | HAYIR | `''::text`                       |                                                                                                                                                    |
+| `email`           | text        | EVET  | —                                |                                                                                                                                                    |
+| `role`            | `user_role` | HAYIR | `'client'` (eskiden `'student'`) |                                                                                                                                                    |
+| `avatar_path`     | text        | EVET  | —                                | Bucket içi YOL (eskiden `avatar_url`, tam public URL); okuma anında `src/lib/storage.ts` ile imzalanır — bkz. `20260817100000_private_storage.sql` |
+| `nutrition_plan`  | text        | EVET  | —                                | JSON string olarak beslenme planı                                                                                                                  |
+| `workout_plan`    | text        | EVET  | —                                | JSON string olarak antrenman planı                                                                                                                 |
+| `current_streak`  | integer     | HAYIR | `0`                              |                                                                                                                                                    |
+| `last_checkin_at` | timestamptz | EVET  | —                                |                                                                                                                                                    |
+| `created_at`      | timestamptz | HAYIR | `now()`                          |                                                                                                                                                    |
+| `updated_at`      | timestamptz | HAYIR | `now()`                          | `set_profiles_updated_at` trigger'ı günceller                                                                                                      |
 
 İndeksler: `profiles_pkey`, `profiles_role_idx (role)`, `profiles_created_at_idx (created_at DESC)`.
 **`coach_id` kolonu yoktur.**
@@ -443,45 +470,53 @@ ulaşmadan `permission denied` alır).
 | Kolon        | Tip         | Null  | Varsayılan          | Kısıt                                                      |
 | ------------ | ----------- | ----- | ------------------- | ---------------------------------------------------------- |
 | `id`         | uuid        | HAYIR | `gen_random_uuid()` | PK                                                         |
-| `student_id` | uuid        | HAYIR | —                   | FK → `profiles(id)` CASCADE                                |
-| `log_date`   | date        | HAYIR | `CURRENT_DATE`      | UNIQUE `(student_id, log_date)`                            |
+| `client_id`  | uuid        | HAYIR | —                   | FK → `profiles(id)` CASCADE                                |
+| `log_date`   | date        | HAYIR | `CURRENT_DATE`      | UNIQUE `(client_id, log_date)`                             |
 | `water_lt`   | numeric     | EVET  | —                   | CHECK: NULL veya 0 ≤ x ≤ 20                                |
 | `sodium_mg`  | integer     | EVET  | —                   | CHECK: NULL veya 0 ≤ x ≤ 50000                             |
 | `macros`     | jsonb       | HAYIR | `'{}'::jsonb`       | Şema doğrulaması yok (uygulama `{protein,carb,fat}` yazar) |
 | `created_at` | timestamptz | HAYIR | `now()`             |                                                            |
 
-İndeksler: `daily_logs_pkey`, `daily_logs_student_date_uniq (student_id, log_date)` UNIQUE,
-`daily_logs_student_date_idx (student_id, log_date DESC)`.
+İndeksler: `daily_logs_pkey`, `daily_logs_client_date_uniq (client_id, log_date)` UNIQUE
+(eskiden `daily_logs_student_date_uniq`), `daily_logs_client_date_idx (client_id, log_date DESC)`
+(eskiden `daily_logs_student_date_idx`).
 
 ### 7.3 `workout_logs`
 
 | Kolon           | Tip         | Null  | Varsayılan          | Kısıt                                                                  |
 | --------------- | ----------- | ----- | ------------------- | ---------------------------------------------------------------------- |
 | `id`            | uuid        | HAYIR | `gen_random_uuid()` | PK                                                                     |
-| `student_id`    | uuid        | HAYIR | —                   | FK → `profiles(id)` CASCADE                                            |
+| `client_id`     | uuid        | HAYIR | —                   | FK → `profiles(id)` CASCADE                                            |
 | `exercise_name` | text        | HAYIR | —                   | Serbest metin (katalog FK'si yok)                                      |
 | `weight_kg`     | numeric     | EVET  | —                   | CHECK: NULL veya ≥ 0 (ölçek/hassasiyet belirtilmemiş)                  |
 | `reps`          | integer     | EVET  | —                   | CHECK: NULL veya > 0                                                   |
 | `rpe`           | integer     | EVET  | —                   | CHECK: NULL veya 1 ≤ x ≤ 10 (**integer**, plan `numeric(3,1)` istiyor) |
 | `created_at`    | timestamptz | HAYIR | `now()`             |                                                                        |
 
-İndeksler: `workout_logs_pkey`, `workout_logs_student_recent_idx (student_id, created_at DESC)`,
-`workout_logs_exercise_idx (student_id, exercise_name, created_at DESC)`.
+İndeksler: `workout_logs_pkey`, `workout_logs_client_recent_idx (client_id, created_at DESC)`
+(eskiden `workout_logs_student_recent_idx`),
+`workout_logs_exercise_idx (client_id, exercise_name, created_at DESC)`.
 
 ### 7.4 `form_checks`
 
-| Kolon            | Tip         | Null  | Varsayılan          | Kısıt                                   |
-| ---------------- | ----------- | ----- | ------------------- | --------------------------------------- |
-| `id`             | uuid        | HAYIR | `gen_random_uuid()` | PK                                      |
-| `student_id`     | uuid        | HAYIR | —                   | FK → `profiles(id)` CASCADE             |
-| `current_weight` | numeric     | HAYIR | —                   | CHECK: 0 < x < 500                      |
-| `front_pose_url` | text        | EVET  | —                   | **Tam public URL** saklıyor (yol değil) |
-| `back_pose_url`  | text        | EVET  | —                   | Aynı                                    |
-| `notes`          | text        | EVET  | —                   |                                         |
-| `created_at`     | timestamptz | HAYIR | `now()`             |                                         |
+| Kolon             | Tip         | Null  | Varsayılan          | Kısıt                                                     |
+| ----------------- | ----------- | ----- | ------------------- | --------------------------------------------------------- |
+| `id`              | uuid        | HAYIR | `gen_random_uuid()` | PK                                                        |
+| `client_id`       | uuid        | HAYIR | —                   | FK → `profiles(id)` CASCADE                               |
+| `current_weight`  | numeric     | HAYIR | —                   | CHECK: 0 < x < 500                                        |
+| `front_pose_path` | text        | EVET  | —                   | Bucket içi YOL (eskiden `front_pose_url`, tam public URL) |
+| `back_pose_path`  | text        | EVET  | —                   | Aynı (eskiden `back_pose_url`)                            |
+| `notes`           | text        | EVET  | —                   |                                                           |
+| `created_at`      | timestamptz | HAYIR | `now()`             |                                                           |
 
-İndeksler: `form_checks_pkey`, `form_checks_student_recent_idx (student_id, created_at DESC)`.
+İndeksler: `form_checks_pkey`, `form_checks_client_recent_idx (client_id, created_at DESC)`
+(eskiden `form_checks_student_recent_idx`).
 **`status`, `coach_feedback`, `reviewed_at` kolonları yoktur.**
+
+> **2026-08-17'de storage mahremiyeti sonrası güncellendi** (bkz.
+> `supabase/migrations/20260817100000_private_storage.sql`): `front_pose_url`/`back_pose_url`
+> → `front_pose_path`/`back_pose_path` yeniden adlandırıldı, mevcut tam public URL'ler yola
+> dönüştürüldü. Bkz. §8.3 ve §9.3.
 
 ### 7.5 `messages`
 
@@ -503,21 +538,22 @@ ulaşmadan `permission denied` alır).
 | Kolon        | Tip         | Null  | Varsayılan          | Kısıt                               |
 | ------------ | ----------- | ----- | ------------------- | ----------------------------------- |
 | `id`         | uuid        | HAYIR | `gen_random_uuid()` | PK                                  |
-| `student_id` | uuid        | HAYIR | —                   | FK → `profiles(id)` CASCADE (alıcı) |
+| `client_id`  | uuid        | HAYIR | —                   | FK → `profiles(id)` CASCADE (alıcı) |
 | `title`      | text        | EVET  | —                   |                                     |
 | `message`    | text        | HAYIR | —                   |                                     |
 | `is_read`    | boolean     | HAYIR | `false`             |                                     |
 | `created_at` | timestamptz | HAYIR | `now()`             |                                     |
 
-İndeksler: `notifications_pkey`, `notifications_student_recent_idx (student_id, created_at DESC)`,
-`notifications_student_unread_idx (student_id, is_read)`.
+İndeksler: `notifications_pkey`, `notifications_client_recent_idx (client_id, created_at DESC)`
+(eskiden `notifications_student_recent_idx`),
+`notifications_client_unread_idx (client_id, is_read)` (eskiden `notifications_student_unread_idx`).
 
 ### 7.7 `program_approvals`
 
 | Kolon          | Tip               | Null  | Varsayılan          | Kısıt                                      |
 | -------------- | ----------------- | ----- | ------------------- | ------------------------------------------ |
 | `id`           | uuid              | HAYIR | `gen_random_uuid()` | PK                                         |
-| `student_id`   | uuid              | HAYIR | —                   | FK → `profiles(id)` CASCADE                |
+| `client_id`    | uuid              | HAYIR | —                   | FK → `profiles(id)` CASCADE                |
 | `workout_data` | jsonb             | HAYIR | —                   |                                            |
 | `status`       | `approval_status` | HAYIR | `'pending'`         |                                            |
 | `reviewed_by`  | uuid              | EVET  | —                   | FK → `profiles(id)` ON DELETE **SET NULL** |
@@ -525,7 +561,7 @@ ulaşmadan `permission denied` alır).
 | `created_at`   | timestamptz       | HAYIR | `now()`             |                                            |
 
 İndeksler: `program_approvals_pkey`, `program_approvals_pending_idx (status, created_at DESC)`,
-`program_approvals_student_status_idx (student_id, status)`.
+`program_approvals_client_status_idx (client_id, status)` (eskiden `program_approvals_student_status_idx`).
 
 ### 7.8 `exercises` (referans kataloğu)
 
@@ -558,13 +594,13 @@ ulaşmadan `permission denied` alır).
 | Kaynak                          | Hedef           | Silme davranışı |
 | ------------------------------- | --------------- | --------------- |
 | `profiles.id`                   | `auth.users.id` | CASCADE         |
-| `daily_logs.student_id`         | `profiles.id`   | CASCADE         |
-| `workout_logs.student_id`       | `profiles.id`   | CASCADE         |
-| `form_checks.student_id`        | `profiles.id`   | CASCADE         |
+| `daily_logs.client_id`          | `profiles.id`   | CASCADE         |
+| `workout_logs.client_id`        | `profiles.id`   | CASCADE         |
+| `form_checks.client_id`         | `profiles.id`   | CASCADE         |
 | `messages.sender_id`            | `profiles.id`   | CASCADE         |
 | `messages.receiver_id`          | `profiles.id`   | CASCADE         |
-| `notifications.student_id`      | `profiles.id`   | CASCADE         |
-| `program_approvals.student_id`  | `profiles.id`   | CASCADE         |
+| `notifications.client_id`       | `profiles.id`   | CASCADE         |
+| `program_approvals.client_id`   | `profiles.id`   | CASCADE         |
 | `program_approvals.reviewed_by` | `profiles.id`   | SET NULL        |
 
 Her FK'nin altında bir indeks vardır (ya composite indeksin ilk kolonu olarak ya da PK olarak);
@@ -572,11 +608,11 @@ tek istisna `messages.receiver_id` — onun için ayrı `messages_receiver_recen
 
 ### 7.11 Yerel yığındaki veri (seed sonrası, doğrulandı)
 
-`auth.users` 3 · `profiles` 3 (1 admin + 2 student) · `daily_logs` 28 · `workout_logs` 40 ·
+`auth.users` 3 · `profiles` 3 (1 coach + 2 client, eskiden "1 admin + 2 student") · `daily_logs` 28 · `workout_logs` 40 ·
 `form_checks` 12 · `messages` 8 · `notifications` 6 · `program_approvals` 2 · `exercises` 10 ·
 `food_database` 10 · `storage.objects` 0.
 
-Demo hesaplar (`supabase/seed.sql`, yalnız yerel): `coach@example.com` (admin),
+Demo hesaplar (`supabase/seed.sql`, yalnız yerel): `coach@example.com` (coach),
 `client1@example.com`, `client2@example.com` — parola hepsinde `Passw0rd!23`.
 
 **Dikkat:** `data/` altındaki CSV'ler (8,7 MB `exercises.csv` dahil) hiçbir migration/seed
@@ -586,13 +622,15 @@ tarafından import **edilmiyor**; tablolarda yalnız 10'ar demo satır var.
 
 ## 8. RLS politika matrisi (canlı veritabanından)
 
+> **2026-08-17'de rol yeniden adlandırması sonrası güncellendi (bkz. `supabase/migrations/20260817090000_rename_roles.sql`).** `is_admin()` fonksiyonu `is_coach()` oldu (OID korunduğu için tüm politika ifadeleri otomatik takip etti), `student_id` kolonları `client_id` oldu, `*_admin` son ekli politika adları `*_coach` olarak yeniden adlandırıldı (kozmetik, ifadeler değişmedi). Politika sayısı ve mantığı bu oturumda **değişmedi** — yalnızca isimler.
+
 Kaynak: `SELECT ... FROM pg_policies WHERE schemaname IN ('public','storage')`.
 Tüm public politikalar yalnız `{authenticated}` rolüne verilmiştir. `anon` rolüne public
 şemada hiç grant verilmediği için erişimi tablo düzeyinde kapalıdır.
 
 ### 8.1 Özet matris
 
-`Ö` = satırın sahibi (`student_id`/`sender_id`/`id` = `auth.uid()`), `A` = `is_admin()` (koç),
+`Ö` = satırın sahibi (`client_id`/`sender_id`/`id` = `auth.uid()`), `A` = `is_coach()` (koç, eskiden `is_admin()`),
 `H` = herkes (authenticated), `—` = politika yok.
 
 | Tablo               | SELECT                     | INSERT             | UPDATE                          | DELETE          |
@@ -609,69 +647,88 @@ Tüm public politikalar yalnız `{authenticated}` rolüne verilmiştir. `anon` r
 
 **Asimetri (önemli):** Koç, danışan adına **INSERT yapamaz** (`daily_logs`, `workout_logs`,
 `form_checks`, `program_approvals` INSERT politikaları katı `= auth.uid()` kontrolüdür),
-ancak aynı satırları UPDATE/DELETE edebilir. Bu, canlı testle doğrulandı.
+ancak aynı satırları UPDATE/DELETE edebilir. Bu, canlı testle doğrulandı (rol yeniden
+adlandırmasından önce; mantık değişmedi, yalnızca kolon/fonksiyon adları güncellendi).
 
 ### 8.2 Tam politika listesi — `public` (37 adet)
 
-| Tablo               | Politika                         | Komut  | USING                                                              | WITH CHECK                                            |
-| ------------------- | -------------------------------- | ------ | ------------------------------------------------------------------ | ----------------------------------------------------- |
-| `daily_logs`        | `daily_logs_select`              | SELECT | `student_id = auth.uid() OR is_admin()`                            | —                                                     |
-| `daily_logs`        | `daily_logs_insert`              | INSERT | —                                                                  | `student_id = auth.uid()`                             |
-| `daily_logs`        | `daily_logs_update`              | UPDATE | `student_id = auth.uid() OR is_admin()`                            | aynı                                                  |
-| `daily_logs`        | `daily_logs_delete`              | DELETE | `student_id = auth.uid() OR is_admin()`                            | —                                                     |
-| `workout_logs`      | `workout_logs_select`            | SELECT | `student_id = auth.uid() OR is_admin()`                            | —                                                     |
-| `workout_logs`      | `workout_logs_insert`            | INSERT | —                                                                  | `student_id = auth.uid()`                             |
-| `workout_logs`      | `workout_logs_update`            | UPDATE | `student_id = auth.uid() OR is_admin()`                            | aynı                                                  |
-| `workout_logs`      | `workout_logs_delete`            | DELETE | `student_id = auth.uid() OR is_admin()`                            | —                                                     |
-| `form_checks`       | `form_checks_select`             | SELECT | `student_id = auth.uid() OR is_admin()`                            | —                                                     |
-| `form_checks`       | `form_checks_insert`             | INSERT | —                                                                  | `student_id = auth.uid()`                             |
-| `form_checks`       | `form_checks_update`             | UPDATE | `student_id = auth.uid() OR is_admin()`                            | aynı                                                  |
-| `form_checks`       | `form_checks_delete`             | DELETE | `student_id = auth.uid() OR is_admin()`                            | —                                                     |
-| `program_approvals` | `program_approvals_select`       | SELECT | `student_id = auth.uid() OR is_admin()`                            | —                                                     |
-| `program_approvals` | `program_approvals_insert`       | INSERT | —                                                                  | `student_id = auth.uid()`                             |
-| `program_approvals` | `program_approvals_update_admin` | UPDATE | `is_admin()`                                                       | `is_admin()`                                          |
-| `program_approvals` | `program_approvals_delete`       | DELETE | `student_id = auth.uid() OR is_admin()`                            | —                                                     |
-| `notifications`     | `notifications_select`           | SELECT | `student_id = auth.uid() OR is_admin()`                            | —                                                     |
-| `notifications`     | `notifications_insert`           | INSERT | —                                                                  | `is_admin() OR student_id = auth.uid()`               |
-| `notifications`     | `notifications_update`           | UPDATE | `student_id = auth.uid() OR is_admin()`                            | aynı                                                  |
-| `notifications`     | `notifications_delete_admin`     | DELETE | `is_admin()`                                                       | —                                                     |
-| `messages`          | `messages_select`                | SELECT | `sender_id = auth.uid() OR receiver_id = auth.uid() OR is_admin()` | —                                                     |
-| `messages`          | `messages_insert`                | INSERT | —                                                                  | `sender_id = auth.uid()`                              |
-| `messages`          | `messages_update_receiver`       | UPDATE | `receiver_id = auth.uid()`                                         | aynı                                                  |
-| `messages`          | `messages_delete`                | DELETE | `sender_id = auth.uid() OR is_admin()`                             | —                                                     |
-| `profiles`          | `profiles_select`                | SELECT | `id = auth.uid() OR is_admin()`                                    | —                                                     |
-| `profiles`          | `profiles_insert_admin`          | INSERT | —                                                                  | `is_admin()`                                          |
-| `profiles`          | `profiles_update_self`           | UPDATE | `id = auth.uid()`                                                  | `id = auth.uid() AND role = profile_role(auth.uid())` |
-| `profiles`          | `profiles_update_admin`          | UPDATE | `is_admin()`                                                       | `is_admin()`                                          |
-| `profiles`          | `profiles_delete_admin`          | DELETE | `is_admin()`                                                       | —                                                     |
-| `exercises`         | `exercises_select`               | SELECT | `true`                                                             | —                                                     |
-| `exercises`         | `exercises_insert_admin`         | INSERT | —                                                                  | `is_admin()`                                          |
-| `exercises`         | `exercises_update_admin`         | UPDATE | `is_admin()`                                                       | `is_admin()`                                          |
-| `exercises`         | `exercises_delete_admin`         | DELETE | `is_admin()`                                                       | —                                                     |
-| `food_database`     | `food_database_select`           | SELECT | `true`                                                             | —                                                     |
-| `food_database`     | `food_database_insert_admin`     | INSERT | —                                                                  | `is_admin()`                                          |
-| `food_database`     | `food_database_update_admin`     | UPDATE | `is_admin()`                                                       | `is_admin()`                                          |
-| `food_database`     | `food_database_delete_admin`     | DELETE | `is_admin()`                                                       | —                                                     |
+Politika adları 2026-08-17'de `*_admin` → `*_coach` olarak yeniden adlandırıldı (kozmetik); USING/WITH CHECK ifadelerindeki `student_id` → `client_id`, `is_admin()` → `is_coach()` oldu (OID/attnum korunduğu için otomatik). Eski adlar parantez içinde not düşülmüştür.
+
+| Tablo               | Politika                                                   | Komut  | USING                                                              | WITH CHECK                                            |
+| ------------------- | ---------------------------------------------------------- | ------ | ------------------------------------------------------------------ | ----------------------------------------------------- |
+| `daily_logs`        | `daily_logs_select`                                        | SELECT | `client_id = auth.uid() OR is_coach()`                             | —                                                     |
+| `daily_logs`        | `daily_logs_insert`                                        | INSERT | —                                                                  | `client_id = auth.uid()`                              |
+| `daily_logs`        | `daily_logs_update`                                        | UPDATE | `client_id = auth.uid() OR is_coach()`                             | aynı                                                  |
+| `daily_logs`        | `daily_logs_delete`                                        | DELETE | `client_id = auth.uid() OR is_coach()`                             | —                                                     |
+| `workout_logs`      | `workout_logs_select`                                      | SELECT | `client_id = auth.uid() OR is_coach()`                             | —                                                     |
+| `workout_logs`      | `workout_logs_insert`                                      | INSERT | —                                                                  | `client_id = auth.uid()`                              |
+| `workout_logs`      | `workout_logs_update`                                      | UPDATE | `client_id = auth.uid() OR is_coach()`                             | aynı                                                  |
+| `workout_logs`      | `workout_logs_delete`                                      | DELETE | `client_id = auth.uid() OR is_coach()`                             | —                                                     |
+| `form_checks`       | `form_checks_select`                                       | SELECT | `client_id = auth.uid() OR is_coach()`                             | —                                                     |
+| `form_checks`       | `form_checks_insert`                                       | INSERT | —                                                                  | `client_id = auth.uid()`                              |
+| `form_checks`       | `form_checks_update`                                       | UPDATE | `client_id = auth.uid() OR is_coach()`                             | aynı                                                  |
+| `form_checks`       | `form_checks_delete`                                       | DELETE | `client_id = auth.uid() OR is_coach()`                             | —                                                     |
+| `program_approvals` | `program_approvals_select`                                 | SELECT | `client_id = auth.uid() OR is_coach()`                             | —                                                     |
+| `program_approvals` | `program_approvals_insert`                                 | INSERT | —                                                                  | `client_id = auth.uid()`                              |
+| `program_approvals` | `program_approvals_update_coach` (eskiden `_update_admin`) | UPDATE | `is_coach()`                                                       | `is_coach()`                                          |
+| `program_approvals` | `program_approvals_delete`                                 | DELETE | `client_id = auth.uid() OR is_coach()`                             | —                                                     |
+| `notifications`     | `notifications_select`                                     | SELECT | `client_id = auth.uid() OR is_coach()`                             | —                                                     |
+| `notifications`     | `notifications_insert`                                     | INSERT | —                                                                  | `is_coach() OR client_id = auth.uid()`                |
+| `notifications`     | `notifications_update`                                     | UPDATE | `client_id = auth.uid() OR is_coach()`                             | aynı                                                  |
+| `notifications`     | `notifications_delete_coach` (eskiden `_delete_admin`)     | DELETE | `is_coach()`                                                       | —                                                     |
+| `messages`          | `messages_select`                                          | SELECT | `sender_id = auth.uid() OR receiver_id = auth.uid() OR is_coach()` | —                                                     |
+| `messages`          | `messages_insert`                                          | INSERT | —                                                                  | `sender_id = auth.uid()`                              |
+| `messages`          | `messages_update_receiver`                                 | UPDATE | `receiver_id = auth.uid()`                                         | aynı                                                  |
+| `messages`          | `messages_delete`                                          | DELETE | `sender_id = auth.uid() OR is_coach()`                             | —                                                     |
+| `profiles`          | `profiles_select`                                          | SELECT | `id = auth.uid() OR is_coach()`                                    | —                                                     |
+| `profiles`          | `profiles_insert_coach` (eskiden `_insert_admin`)          | INSERT | —                                                                  | `is_coach()`                                          |
+| `profiles`          | `profiles_update_self`                                     | UPDATE | `id = auth.uid()`                                                  | `id = auth.uid() AND role = profile_role(auth.uid())` |
+| `profiles`          | `profiles_update_coach` (eskiden `_update_admin`)          | UPDATE | `is_coach()`                                                       | `is_coach()`                                          |
+| `profiles`          | `profiles_delete_coach` (eskiden `_delete_admin`)          | DELETE | `is_coach()`                                                       | —                                                     |
+| `exercises`         | `exercises_select`                                         | SELECT | `true`                                                             | —                                                     |
+| `exercises`         | `exercises_insert_coach` (eskiden `_insert_admin`)         | INSERT | —                                                                  | `is_coach()`                                          |
+| `exercises`         | `exercises_update_coach` (eskiden `_update_admin`)         | UPDATE | `is_coach()`                                                       | `is_coach()`                                          |
+| `exercises`         | `exercises_delete_coach` (eskiden `_delete_admin`)         | DELETE | `is_coach()`                                                       | —                                                     |
+| `food_database`     | `food_database_select`                                     | SELECT | `true`                                                             | —                                                     |
+| `food_database`     | `food_database_insert_coach` (eskiden `_insert_admin`)     | INSERT | —                                                                  | `is_coach()`                                          |
+| `food_database`     | `food_database_update_coach` (eskiden `_update_admin`)     | UPDATE | `is_coach()`                                                       | `is_coach()`                                          |
+| `food_database`     | `food_database_delete_coach` (eskiden `_delete_admin`)     | DELETE | `is_coach()`                                                       | —                                                     |
 
 Rol yükseltmesini engelleyen mekanizma `profiles_update_self`'in `WITH CHECK` ifadesidir:
 `role` alanı `profile_role(auth.uid())` ile aynı kalmak zorundadır.
 
 ### 8.3 Storage politikaları (8 adet, `storage.objects`)
 
-| Bucket              | Politika                  | Komut  | Roller                  | Koşul                                          |
-| ------------------- | ------------------------- | ------ | ----------------------- | ---------------------------------------------- |
-| `avatars`           | `avatars_public_read`     | SELECT | `anon`, `authenticated` | `bucket_id = 'avatars'`                        |
-| `avatars`           | `avatars_insert_own`      | INSERT | `authenticated`         | `bucket_id='avatars' AND (name LIKE auth.uid() |     | '-%' OR is_admin())` |
-| `avatars`           | `avatars_update_own`      | UPDATE | `authenticated`         | aynı koşul (USING + WITH CHECK)                |
-| `avatars`           | `avatars_delete_own`      | DELETE | `authenticated`         | aynı koşul                                     |
-| `form-checks-media` | `form_checks_public_read` | SELECT | `anon`, `authenticated` | `bucket_id = 'form-checks-media'`              |
-| `form-checks-media` | `form_checks_insert_own`  | INSERT | `authenticated`         | `name LIKE 'poses/'                            |     | auth.uid()           |     | '-%' OR is_admin()` |
-| `form-checks-media` | `form_checks_update_own`  | UPDATE | `authenticated`         | aynı koşul                                     |
-| `form-checks-media` | `form_checks_delete_own`  | DELETE | `authenticated`         | aynı koşul                                     |
+`is_admin()` çağrıları da OID korunduğu için 2026-08-17'de otomatik `is_coach()`'a döndü (bkz. §8 üstü not).
 
-**Kritik:** Okuma politikaları `anon` rolünü de kapsıyor **ve** iki bucket da `public = true`.
-Danışan vücut fotoğrafları, URL'yi bilen herkese açıktır. Bu `active_planprogram.md` I-4
-değişmezini doğrudan ihlal eder.
+> **2026-08-17'de storage mahremiyeti sonrası ayrıca güncellendi**
+> (bkz. `supabase/migrations/20260817100000_private_storage.sql`). Bu envanterin ilk hâli
+> (2026-08-16) aşağıdaki tablonun "herkese açık okuma" satırlarını doğru şekilde yakalamıştı —
+> o iki SELECT politikası artık **yok**; tablo doğrudan güncel duruma yazılmıştır, tarihsel
+> kayıt olarak korunmamıştır.
+
+| Bucket              | Politika                          | Komut  | Roller          | Koşul                                                  |
+| ------------------- | --------------------------------- | ------ | --------------- | ------------------------------------------------------ |
+| `avatars`           | `avatars_select_own_or_coach`     | SELECT | `authenticated` | `bucket_id='avatars' AND (name LIKE auth.uid()         |            | '-%' OR is_coach())` |
+| `avatars`           | `avatars_insert_own`              | INSERT | `authenticated` | `bucket_id='avatars' AND (name LIKE auth.uid()         |            | '-%' OR is_coach())` |
+| `avatars`           | `avatars_update_own`              | UPDATE | `authenticated` | aynı koşul (USING + WITH CHECK)                        |
+| `avatars`           | `avatars_delete_own`              | DELETE | `authenticated` | aynı koşul                                             |
+| `form-checks-media` | `form_checks_select_own_or_coach` | SELECT | `authenticated` | `bucket_id='form-checks-media' AND (name LIKE 'poses/' | auth.uid() | '-%' OR is_coach())` |
+| `form-checks-media` | `form_checks_insert_own`          | INSERT | `authenticated` | `name LIKE 'poses/'                                    |            | auth.uid()           |     | '-%' OR is_coach()` |
+| `form-checks-media` | `form_checks_update_own`          | UPDATE | `authenticated` | aynı koşul                                             |
+| `form-checks-media` | `form_checks_delete_own`          | DELETE | `authenticated` | aynı koşul                                             |
+
+**Eski durum (2026-08-16, artık geçersiz — bkz. `docs/PROGRESS.md` §15.1):**
+`avatars_public_read` ve `form_checks_public_read` adlı iki SELECT politikası `anon` +
+`authenticated` rollerine, herhangi bir sahiplik koşulu olmadan `bucket_id = '<bucket>'` ile
+okuma veriyordu; iki bucket da `public = true` idi. Bu, `active_planprogram.md` I-4
+değişmezini doğrudan ihlal ediyordu — danışan vücut fotoğrafları URL'yi bilen herkese açıktı.
+
+**Güncel durum (2026-08-17):** Okuma artık yalnızca **sahibi veya koç** için, yalnız
+`authenticated` rolüne açık; `anon` rolü hiçbir nesneyi okuyamaz. İki bucket da
+`public = false`. Storage API `createSignedUrl` çağrısında imzayı üretmeden önce bu SELECT
+politikasıyla yetkiyi doğrular; imzalı adres üretildikten sonra token'ın kendisi yetkidir ve
+`SIGNED_URL_TTL_SECONDS = 3600` sonra geçersiz olur.
 
 ### 8.4 Doğrulanmış davranış (bu oturumda `set local role` ile yeniden test edildi)
 
@@ -706,18 +763,20 @@ değişmezini doğrudan ihlal eder.
 
 ### 9.1 `public` şemasındaki fonksiyonlar (6)
 
-| Fonksiyon            | İmza                            | Dönüş       | SECURITY DEFINER | Volatilite | `search_path`     |
-| -------------------- | ------------------------------- | ----------- | ---------------- | ---------- | ----------------- |
-| `is_admin`           | `(uid uuid DEFAULT auth.uid())` | boolean     | **EVET**         | STABLE     | `public, pg_temp` |
-| `profile_role`       | `(uid uuid DEFAULT auth.uid())` | `user_role` | **EVET**         | STABLE     | `public, pg_temp` |
-| `increment_streak`   | `(user_id uuid)`                | integer     | **EVET**         | VOLATILE   | `public, pg_temp` |
-| `handle_new_user`    | `()`                            | trigger     | **EVET**         | VOLATILE   | `public, pg_temp` |
-| `sync_profile_email` | `()`                            | trigger     | **EVET**         | VOLATILE   | `public, pg_temp` |
-| `set_updated_at`     | `()`                            | trigger     | HAYIR            | VOLATILE   | `public, pg_temp` |
+> **2026-08-17'de rol yeniden adlandırması sonrası güncellendi (bkz. `supabase/migrations/20260817090000_rename_roles.sql`).** `is_admin(uuid)` fonksiyonu `is_coach(uuid)` olarak yeniden adlandırıldı (OID korunur, imza aynı kalır). Ayrıca `increment_streak()` gövdesi **elle** güncellendi — plpgsql içinden fonksiyonu ad ile çağırıyordu (OID ile değil), aksi halde yeniden adlandırma sonrası çalışma zamanında `function public.is_admin() does not exist` hatasıyla kırılırdı.
+
+| Fonksiyon                       | İmza                            | Dönüş       | SECURITY DEFINER | Volatilite | `search_path`     |
+| ------------------------------- | ------------------------------- | ----------- | ---------------- | ---------- | ----------------- |
+| `is_coach` (eskiden `is_admin`) | `(uid uuid DEFAULT auth.uid())` | boolean     | **EVET**         | STABLE     | `public, pg_temp` |
+| `profile_role`                  | `(uid uuid DEFAULT auth.uid())` | `user_role` | **EVET**         | STABLE     | `public, pg_temp` |
+| `increment_streak`              | `(user_id uuid)`                | integer     | **EVET**         | VOLATILE   | `public, pg_temp` |
+| `handle_new_user`               | `()`                            | trigger     | **EVET**         | VOLATILE   | `public, pg_temp` |
+| `sync_profile_email`            | `()`                            | trigger     | **EVET**         | VOLATILE   | `public, pg_temp` |
+| `set_updated_at`                | `()`                            | trigger     | HAYIR            | VOLATILE   | `public, pg_temp` |
 
 **`SECURITY DEFINER` gerekçeleri:**
 
-- `is_admin()` / `profile_role()` — `profiles` üzerindeki RLS politikaları bu fonksiyonları
+- `is_coach()` / `profile_role()` (eskiden `is_admin()`) — `profiles` üzerindeki RLS politikaları bu fonksiyonları
   çağırır. `SECURITY INVOKER` olsalardı politika içinden `profiles`'a yapılan sorgu aynı
   politikayı tekrar tetikler ve Postgres
   `infinite recursion detected in policy for relation "profiles"` hatası verirdi. Migration
@@ -725,13 +784,13 @@ değişmezini doğrudan ihlal eder.
 - `increment_streak()` — `profiles.current_streak`/`last_checkin_at` alanlarını günceller;
   `profiles_update_self` politikası bu alanları izinli kılsa da fonksiyon `FOR UPDATE` kilidiyle
   atomik okuma-yazma yapar. Kendi içinde yetki kontrolü **vardır**:
-  `auth.uid() = user_id OR public.is_admin()` değilse `42501` fırlatır; `user_id NULL` ise
+  `auth.uid() = user_id OR public.is_coach()` (eskiden `public.is_admin()`) değilse `42501` fırlatır; `user_id NULL` ise
   `22023`; profil yoksa `P0002`. Aynı gün ikinci check-in seriyi artırmaz (`greatest(streak, 1)`),
   dünkü check-in varsa +1, aksi halde 1'e sıfırlanır.
 - `handle_new_user()` — `auth.users` üzerinde AFTER INSERT çalışır ve `public.profiles`'a yazar;
   `auth` şemasındaki trigger'ın public tabloya yazabilmesi için definer olmalıdır. Geçersiz
   `raw_user_meta_data->>'role'` değeri gelirse `invalid_text_representation` yakalanır ve
-  `'student'`'a düşülür; `ON CONFLICT (id) DO NOTHING` ile servis rolünün ayrıca profil
+  `'client'`'a düşülür (eskiden `'student'`); `ON CONFLICT (id) DO NOTHING` ile servis rolünün ayrıca profil
   eklemesine karşı korunur.
 - `sync_profile_email()` — `auth.users.email` değişince `public.profiles.email`'i günceller;
   aynı şema-geçişi gerekçesi.
@@ -752,22 +811,31 @@ değildir.)
 
 ### 9.3 Storage bucket'ları
 
-| Bucket              | `public` | `file_size_limit` | `allowed_mime_types`                                                  |
-| ------------------- | -------- | ----------------- | --------------------------------------------------------------------- |
-| `avatars`           | **true** | 5.242.880 (5 MiB) | `image/png, image/jpeg, image/jpg, image/webp, image/gif, image/avif` |
-| `form-checks-media` | **true** | 5.242.880 (5 MiB) | aynı liste                                                            |
+> **2026-08-17'de storage mahremiyeti sonrası güncellendi** (bkz.
+> `supabase/migrations/20260817100000_private_storage.sql`). Bu envanterin 2026-08-16'daki ilk
+> hâli aşağıdaki tabloda `public: true` ve `getPublicUrl()` kullanımını doğru şekilde
+> yakalamıştı — o veri artık geçersiz, tarihsel kayıt olarak korunmuyor, doğrudan güncel
+> duruma yazılmıştır.
 
-Yol sözleşmesi (uygulama kodu ile storage politikaları birebir eşleşir):
+| Bucket              | `public`  | `file_size_limit` | `allowed_mime_types`                                                  |
+| ------------------- | --------- | ----------------- | --------------------------------------------------------------------- |
+| `avatars`           | **false** | 5.242.880 (5 MiB) | `image/png, image/jpeg, image/jpg, image/webp, image/gif, image/avif` |
+| `form-checks-media` | **false** | 5.242.880 (5 MiB) | aynı liste                                                            |
+
+Yol sözleşmesi (uygulama kodu ile storage politikaları birebir eşleşir, değişmedi):
 
 | Bucket              | Yazan kod                                     | Yol biçimi                                         |
 | ------------------- | --------------------------------------------- | -------------------------------------------------- |
 | `avatars`           | `src/hooks/useProfile.ts` → `useUploadAvatar` | `<uid>-<uuid>.<ext>` (bucket **kökü**, klasör yok) |
 | `form-checks-media` | `src/hooks/useFormChecks.ts` → `uploadPose`   | `poses/<uid>-<uuid>.<ext>`                         |
 
-Her iki hook da yüklemeden sonra `getPublicUrl()` çağırır ve **tam URL'yi** veritabanına yazar
-(`profiles.avatar_url`, `form_checks.front_pose_url`/`back_pose_url`). Signed URL kullanılmıyor.
-`supabase/config.toml` genel `[storage] file_size_limit = "50MiB"` derken bucket'ların kendi
-limiti 5 MiB'dir; etkin sınır daha düşük olandır.
+Her iki hook da yüklemeden sonra dosya **yolunu** veritabanına yazar
+(`profiles.avatar_path`, `form_checks.front_pose_path`/`back_pose_path` — eskiden `*_url`
+kolonlarında `getPublicUrl()` çıktısı tam URL olarak saklanıyordu). Okuma anında
+`src/lib/storage.ts` → `createSignedUrl`/`createSignedUrls` ile imzalı adres üretilir
+(`SIGNED_URL_TTL_SECONDS = 3600`); üretilemezse (dosya yok/yetki yok) `null` döner ve UI
+placeholder gösterir. `supabase/config.toml` genel `[storage] file_size_limit = "50MiB"`
+derken bucket'ların kendi limiti 5 MiB'dir; etkin sınır daha düşük olandır.
 
 ---
 
@@ -1191,35 +1259,35 @@ numaralarıdır; `docs/PROGRESS.md` §7'de bazılarının yeniden sıralanması 
 
 ### 14.2 Veri modeli
 
-| Planın istediği                                                                                                        | Mevcut durum                                                                                                       | Boşluk                                                                                              | Faz     |
-| ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------- | ------- |
-| `profiles.role` = `coach`/`client`                                                                                     | `user_role` enum'u `admin`/`student`                                                                               | Enum yeniden adlandırma + tüm RLS/RPC/kod güncellemesi                                              | Faz 1   |
-| `profiles.coach_id` + CHECK                                                                                            | Kolon yok; tek koç varsayımı koda gömülü (`useAdminId()` en eski admini seçer)                                     | Koç-danışan ilişkisi modellenmemiş (PROGRESS §7: tek koçlu modele sadeleştirilmesi kararlaştırıldı) | Faz 1   |
-| `workout_plans` + `workout_plan_exercises` (versiyon, `is_active`, `video_url`, `target_sets/reps/weight`, `position`) | `profiles.workout_plan` **text** kolonunda JSON string                                                             | Normalize tablolar, versiyonlama ve veri migrasyonu yok                                             | Faz 1   |
-| `workout_logs` + `workout_log_sets` (`actual_reps`, `actual_weight_kg numeric(5,2)`, `rpe numeric(3,1)`)               | Tek düz `workout_logs` (`exercise_name` serbest metin, `weight_kg numeric`, `reps int`, `rpe int`)                 | Log/set ayrımı, plana FK, `completed_at`, ondalıklı RPE yok                                         | Faz 1–2 |
-| `nutrition_plans` + `nutrition_plan_meals` (kcal/makro hedefleri, CHECK ≥ 0)                                           | `profiles.nutrition_plan` text/JSON string                                                                         | Normalize tablolar yok                                                                              | Faz 1   |
-| `nutrition_logs` (`photo_path`, `ai_estimate`, `user_override`, `status`)                                              | Yok; `daily_logs` yalnız günlük toplam makro + su + sodyum tutuyor                                                 | Öğün bazlı log ve AI tahmin akışı yok                                                               | Faz 1/3 |
-| `progress_entries` (`weight_kg`, `measurements jsonb`, UNIQUE(user, date))                                             | Yok; kilo yalnız `form_checks.current_weight` içinde                                                               | Ölçüm tablosu ve günlük tekilleştirme yok                                                           | Faz 1/4 |
-| `progress_photos` (`angle` enum, private bucket path)                                                                  | Yok; `form_checks.front_pose_url`/`back_pose_url` tam public URL                                                   | Açı etiketi, ayrı tablo, private path yok                                                           | Faz 1/4 |
-| `form_checks.status` (`pending`/`reviewed`), `coach_feedback`, `reviewed_at`                                           | Tablo var, **bu üç alan yok**                                                                                      | Koç geri bildirim akışı modellenmemiş                                                               | Faz 1/2 |
-| `conversations` (UNIQUE(coach_id, client_id)) + `messages.read_at`, `kind` enum                                        | `conversations` yok; `messages` düz sender/receiver, `is_read boolean`                                             | Konuşma varlığı, `read_at`, sistem mesajı türü yok                                                  | Faz 1/2 |
-| `coach_notes`                                                                                                          | Yok                                                                                                                | Tablo yok                                                                                           | Faz 1   |
-| `health_metrics`, `sleep_sessions`, `recovery_scores`                                                                  | Hiçbiri yok                                                                                                        | Sağlık verisi ve recovery altyapısı tamamen eksik                                                   | Faz 5–6 |
-| `reminders`, `device_push_tokens`, `notification_outbox`, `reminder_dispatch_log`                                      | Yok. Uygulama içi `notifications` tablosu var (push değil)                                                         | Hatırlatma/push altyapısı yok                                                                       | Faz 7   |
-| `ai_usage_counters` (kullanıcı başına 10 analiz/gün)                                                                   | Yok; hız sınırı yalnız IP bazlı bellek içi                                                                         | Kullanıcı bazlı kalıcı kota yok                                                                     | Faz 3   |
-| Her FK'ye indeks, zaman serilerinde `(user_id, <date> DESC)`                                                           | **TAMAM** — tüm FK'lerde indeks, `daily_logs`/`workout_logs`/`form_checks`/`notifications` composite DESC indeksli | `messages(conversation_id, created_at DESC)` — kolon olmadığı için yok                              | Faz 1   |
+| Planın istediği                                                                                                        | Mevcut durum                                                                                                                                                                           | Boşluk                                                                                              | Faz             |
+| ---------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- | --------------- |
+| `profiles.role` = `coach`/`client`                                                                                     | **KAPANDI (2026-08-17):** `user_role` enum'u artık `coach`/`client` (bkz. `supabase/migrations/20260817090000_rename_roles.sql`); eskiden `admin`/`student` idi.                       | Enum yeniden adlandırma + tüm RLS/RPC/kod güncellemesi — **tamamlandı**                             | Faz 1 (kapandı) |
+| `profiles.coach_id` + CHECK                                                                                            | Kolon yok; tek koç varsayımı koda gömülü (`useAdminId()` en eski admini seçer)                                                                                                         | Koç-danışan ilişkisi modellenmemiş (PROGRESS §7: tek koçlu modele sadeleştirilmesi kararlaştırıldı) | Faz 1           |
+| `workout_plans` + `workout_plan_exercises` (versiyon, `is_active`, `video_url`, `target_sets/reps/weight`, `position`) | `profiles.workout_plan` **text** kolonunda JSON string                                                                                                                                 | Normalize tablolar, versiyonlama ve veri migrasyonu yok                                             | Faz 1           |
+| `workout_logs` + `workout_log_sets` (`actual_reps`, `actual_weight_kg numeric(5,2)`, `rpe numeric(3,1)`)               | Tek düz `workout_logs` (`exercise_name` serbest metin, `weight_kg numeric`, `reps int`, `rpe int`)                                                                                     | Log/set ayrımı, plana FK, `completed_at`, ondalıklı RPE yok                                         | Faz 1–2         |
+| `nutrition_plans` + `nutrition_plan_meals` (kcal/makro hedefleri, CHECK ≥ 0)                                           | `profiles.nutrition_plan` text/JSON string                                                                                                                                             | Normalize tablolar yok                                                                              | Faz 1           |
+| `nutrition_logs` (`photo_path`, `ai_estimate`, `user_override`, `status`)                                              | Yok; `daily_logs` yalnız günlük toplam makro + su + sodyum tutuyor                                                                                                                     | Öğün bazlı log ve AI tahmin akışı yok                                                               | Faz 1/3         |
+| `progress_entries` (`weight_kg`, `measurements jsonb`, UNIQUE(user, date))                                             | Yok; kilo yalnız `form_checks.current_weight` içinde                                                                                                                                   | Ölçüm tablosu ve günlük tekilleştirme yok                                                           | Faz 1/4         |
+| `progress_photos` (`angle` enum, private bucket path)                                                                  | Yok; `form_checks.front_pose_path`/`back_pose_path` artık private bucket YOLU saklıyor (2026-08-17'de `*_url`'den dönüştürüldü) ama ayrı bir `progress_photos` tablosu/açı etiketi yok | Açı etiketi ve ayrı tablo hâlâ yok; "private path" alt-maddesi kapandı                              | Faz 1/4         |
+| `form_checks.status` (`pending`/`reviewed`), `coach_feedback`, `reviewed_at`                                           | Tablo var, **bu üç alan yok**                                                                                                                                                          | Koç geri bildirim akışı modellenmemiş                                                               | Faz 1/2         |
+| `conversations` (UNIQUE(coach_id, client_id)) + `messages.read_at`, `kind` enum                                        | `conversations` yok; `messages` düz sender/receiver, `is_read boolean`                                                                                                                 | Konuşma varlığı, `read_at`, sistem mesajı türü yok                                                  | Faz 1/2         |
+| `coach_notes`                                                                                                          | Yok                                                                                                                                                                                    | Tablo yok                                                                                           | Faz 1           |
+| `health_metrics`, `sleep_sessions`, `recovery_scores`                                                                  | Hiçbiri yok                                                                                                                                                                            | Sağlık verisi ve recovery altyapısı tamamen eksik                                                   | Faz 5–6         |
+| `reminders`, `device_push_tokens`, `notification_outbox`, `reminder_dispatch_log`                                      | Yok. Uygulama içi `notifications` tablosu var (push değil)                                                                                                                             | Hatırlatma/push altyapısı yok                                                                       | Faz 7           |
+| `ai_usage_counters` (kullanıcı başına 10 analiz/gün)                                                                   | Yok; hız sınırı yalnız IP bazlı bellek içi                                                                                                                                             | Kullanıcı bazlı kalıcı kota yok                                                                     | Faz 3           |
+| Her FK'ye indeks, zaman serilerinde `(user_id, <date> DESC)`                                                           | **TAMAM** — tüm FK'lerde indeks, `daily_logs`/`workout_logs`/`form_checks`/`notifications` composite DESC indeksli                                                                     | `messages(conversation_id, created_at DESC)` — kolon olmadığı için yok                              | Faz 1           |
 
 ### 14.3 RLS ve storage
 
-| Planın istediği                                                                         | Mevcut durum                                                                               | Boşluk                                                                    | Faz     |
-| --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------- | ------- |
-| Koç yalnız plan tabloları / `coach_feedback` / `coach_notes` / sistem mesajlarına yazar | `is_admin()` tüm tablolarda UPDATE/DELETE veriyor; INSERT'te koç danışan adına yazamıyor   | Koç yazma yetkisi fazla geniş (UPDATE/DELETE)                             | Faz 1   |
-| İlişki `profiles.coach_id` üzerinden `EXISTS(...)` deseniyle                            | `is_admin()` deseni (tek koç varsayımı)                                                    | Çok koçlu izolasyon yok (tek koç kararı verilirse sorun değil)            | Faz 1   |
-| pgTAP/SQL tabanlı RLS test script'i, CI'da                                              | Yok; yalnız elle SQL testleri (§8.4)                                                       | Otomatik ve tekrarlanabilir RLS testi yok                                 | Faz 1   |
-| `meal-photos`, `progress-photos`, `form-checks` bucket'ları — **hepsi private**         | `avatars` ve `form-checks-media`, **ikisi de public**; `meal-photos`/`progress-photos` yok | I-4 ihlali; signed URL akışı yok                                          | Faz 1   |
-| Path sözleşmesi `<user_id>/<uuid>.<ext>`                                                | `<uid>-<uuid>.<ext>` (kök) ve `poses/<uid>-<uuid>.<ext>`                                   | Klasör tabanlı prefix yerine tire ayraçlı ad; politika `LIKE` ile eşliyor | Faz 1   |
-| Foto ≤ 10 MB, video ≤ 100 MB, MIME whitelist                                            | Bucket limiti 5 MiB, yalnız 6 görsel MIME tipi                                             | Video yükleme hiç desteklenmiyor                                          | Faz 1/2 |
-| Signed URL TTL ≤ 1 saat                                                                 | `getPublicUrl()` kullanılıyor                                                              | Signed URL üretimi yok                                                    | Faz 1   |
+| Planın istediği                                                                         | Mevcut durum                                                                                                                                                                       | Boşluk                                                                    | Faz             |
+| --------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- | --------------- |
+| Koç yalnız plan tabloları / `coach_feedback` / `coach_notes` / sistem mesajlarına yazar | `is_coach()` (eskiden `is_admin()`) tüm tablolarda UPDATE/DELETE veriyor; INSERT'te koç danışan adına yazamıyor                                                                    | Koç yazma yetkisi fazla geniş (UPDATE/DELETE)                             | Faz 1           |
+| İlişki `profiles.coach_id` üzerinden `EXISTS(...)` deseniyle                            | `is_coach()` (eskiden `is_admin()`) deseni (tek koç varsayımı)                                                                                                                     | Çok koçlu izolasyon yok (tek koç kararı verilirse sorun değil)            | Faz 1           |
+| pgTAP/SQL tabanlı RLS test script'i, CI'da                                              | Yok; yalnız elle SQL testleri (§8.4)                                                                                                                                               | Otomatik ve tekrarlanabilir RLS testi yok                                 | Faz 1           |
+| `meal-photos`, `progress-photos`, `form-checks` bucket'ları — **hepsi private**         | **KAPANDI (2026-08-17) kısmen:** `avatars` ve `form-checks-media` artık `public = false`; `meal-photos`/`progress-photos` hâlâ yok (Faz 1b'nin yeni tablolarıyla birlikte gelecek) | Yeni bucket'lar Faz 1b'de açılacak                                        | Faz 1b          |
+| Path sözleşmesi `<user_id>/<uuid>.<ext>`                                                | `<uid>-<uuid>.<ext>` (kök) ve `poses/<uid>-<uuid>.<ext>` — değişmedi                                                                                                               | Klasör tabanlı prefix yerine tire ayraçlı ad; politika `LIKE` ile eşliyor | Faz 1           |
+| Foto ≤ 10 MB, video ≤ 100 MB, MIME whitelist                                            | Bucket limiti 5 MiB, yalnız 6 görsel MIME tipi                                                                                                                                     | Video yükleme hiç desteklenmiyor                                          | Faz 1/2         |
+| Signed URL TTL ≤ 1 saat                                                                 | **KAPANDI (2026-08-17):** `src/lib/storage.ts` → `createSignedUrl`/`createSignedUrls`, `SIGNED_URL_TTL_SECONDS = 3600` (bkz. `20260817100000_private_storage.sql`)                 | Boşluk yok                                                                | Faz 1 (kapandı) |
 
 ### 14.4 API sözleşmesi ve uygulama akışları
 
@@ -1252,20 +1320,20 @@ numaralarıdır; `docs/PROGRESS.md` §7'de bazılarının yeniden sıralanması 
 Ayrıntılar için `UPGRADE_NOTES.md` §7 ve `docs/PROGRESS.md` §5'e bakın; burada yalnız güncel
 durum notlanmıştır.
 
-| Borç                                                                                   | Kaynak                            | Bu oturumdaki durum                                                                                                                                |
-| -------------------------------------------------------------------------------------- | --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Storage bucket'ları public, vücut fotoğrafları URL'yi bilen herkese açık               | UPGRADE_NOTES §7, PROGRESS §5/§6a | **Doğrulandı** — `storage.buckets.public = true` (ikisi de), SELECT politikaları `anon`'u da kapsıyor                                              |
-| `form_checks.*_pose_url` ve `profiles.avatar_url` tam URL saklıyor (yol değil)         | PROGRESS §6a                      | Doğrulandı; Faz 1'de veri dönüşümü gerekecek                                                                                                       |
-| Planlar `profiles` içinde JSON string (`text`) — sorgulanamaz, versiyonsuz             | UPGRADE_NOTES §7                  | Doğrulandı (`nutrition_plan`, `workout_plan` kolonları `text`)                                                                                     |
-| Rol enum'u `admin`/`student` (ürün dili koç/danışan)                                   | ADR-3, UPGRADE_NOTES §7           | Doğrulandı; Faz 1 şema yazımına bağlandı                                                                                                           |
-| Bellek içi rate limiter (Next middleware + FastAPI slowapi) tek instance'ta çalışır    | UPGRADE_NOTES §7                  | Her iki tarafta da doğrulandı                                                                                                                      |
-| CSP'de `script-src 'unsafe-inline'`                                                    | UPGRADE_NOTES §7                  | Doğrulandı, kodda TODO olarak işaretli                                                                                                             |
-| `next-pwa` v5 sürdürülmüyor; PWA `workout_logs` yanıtlarını 7 gün cihazda tutuyor      | UPGRADE_NOTES §7, PROGRESS §5     | `profiles` cache'i kaldırılmış; `workout_logs` 7 gün cache'i **hâlâ duruyor**; logout'ta `offline-*`/`workbox-*` temizliği eklenmiş (`useSignOut`) |
-| `src/middleware.ts` — Next 16 `proxy` konvansiyonunu istiyor                           | UPGRADE_NOTES §7, PROGRESS §6a    | Dosya hâlâ `middleware.ts`                                                                                                                         |
-| `npm audit`: 18 zafiyet (2 kritik, 13 yüksek), çoğu `next-pwa` v5 ağacından            | PROGRESS §5                       | Bu oturumda yeniden ölçülmedi — **doğrulanmadı**                                                                                                   |
-| CI'daki `e2e` job'u yerel Supabase yığını + seed gerektiriyor, workflow'da bu adım yok | PROGRESS §5                       | `ci.yml` incelendi, doğrulandı; ayrıca `e2e` yalnız `pull_request`'te koşuyor                                                                      |
-| `data/exercises.csv` 8,7 MB düz dosya                                                  | UPGRADE_NOTES §7                  | Doğrulandı (8.693.873 bayt)                                                                                                                        |
-| `src/types/database.ts` elle yazılmıştı, şemayla diff'lenmeli                          | UPGRADE_NOTES §7                  | **Kapandı** — dosya artık `db:types` çıktısı; içerik canlı şemayla kolon kolon uyumlu                                                              |
+| Borç                                                                                   | Kaynak                            | Bu oturumdaki durum                                                                                                                                                                                                               |
+| -------------------------------------------------------------------------------------- | --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Storage bucket'ları public, vücut fotoğrafları URL'yi bilen herkese açık               | UPGRADE_NOTES §7, PROGRESS §5/§6a | **KAPANDI (2026-08-17):** `storage.buckets.public = false` (ikisi de), `avatars_public_read`/`form_checks_public_read` kaldırıldı, okuma yalnız sahibi/koç + imzalı adres (bkz. `20260817100000_private_storage.sql`, §8.3, §9.3) |
+| `form_checks.*_pose_url` ve `profiles.avatar_url` tam URL saklıyor (yol değil)         | PROGRESS §6a                      | **KAPANDI (2026-08-17):** `*_url` → `*_path` yeniden adlandırıldı, mevcut satırlar aynı migration'da yola dönüştürüldü (bkz. §7.1, §7.4)                                                                                          |
+| Planlar `profiles` içinde JSON string (`text`) — sorgulanamaz, versiyonsuz             | UPGRADE_NOTES §7                  | Doğrulandı (`nutrition_plan`, `workout_plan` kolonları `text`)                                                                                                                                                                    |
+| Rol enum'u `admin`/`student` (ürün dili koç/danışan)                                   | ADR-3, UPGRADE_NOTES §7           | **KAPANDI (2026-08-17):** enum `coach`/`client`'a taşındı (`20260817090000_rename_roles.sql`)                                                                                                                                     |
+| Bellek içi rate limiter (Next middleware + FastAPI slowapi) tek instance'ta çalışır    | UPGRADE_NOTES §7                  | Her iki tarafta da doğrulandı                                                                                                                                                                                                     |
+| CSP'de `script-src 'unsafe-inline'`                                                    | UPGRADE_NOTES §7                  | Doğrulandı, kodda TODO olarak işaretli                                                                                                                                                                                            |
+| `next-pwa` v5 sürdürülmüyor; PWA `workout_logs` yanıtlarını 7 gün cihazda tutuyor      | UPGRADE_NOTES §7, PROGRESS §5     | `profiles` cache'i kaldırılmış; `workout_logs` 7 gün cache'i **hâlâ duruyor**; logout'ta `offline-*`/`workbox-*` temizliği eklenmiş (`useSignOut`)                                                                                |
+| `src/middleware.ts` — Next 16 `proxy` konvansiyonunu istiyor                           | UPGRADE_NOTES §7, PROGRESS §6a    | Dosya hâlâ `middleware.ts`                                                                                                                                                                                                        |
+| `npm audit`: 18 zafiyet (2 kritik, 13 yüksek), çoğu `next-pwa` v5 ağacından            | PROGRESS §5                       | Bu oturumda yeniden ölçülmedi — **doğrulanmadı**                                                                                                                                                                                  |
+| CI'daki `e2e` job'u yerel Supabase yığını + seed gerektiriyor, workflow'da bu adım yok | PROGRESS §5                       | `ci.yml` incelendi, doğrulandı; ayrıca `e2e` yalnız `pull_request`'te koşuyor                                                                                                                                                     |
+| `data/exercises.csv` 8,7 MB düz dosya                                                  | UPGRADE_NOTES §7                  | Doğrulandı (8.693.873 bayt)                                                                                                                                                                                                       |
+| `src/types/database.ts` elle yazılmıştı, şemayla diff'lenmeli                          | UPGRADE_NOTES §7                  | **Kapandı** — dosya artık `db:types` çıktısı; içerik canlı şemayla kolon kolon uyumlu                                                                                                                                             |
 
 ### 15.2 Bu envanterde ortaya çıkan, hiçbir yerde kayıtlı olmayan bulgular
 
@@ -1298,9 +1366,13 @@ durum notlanmıştır.
   (profiller, düz loglar, form check, mesaj); plan/versiyon, ilerleme, sağlık, recovery,
   hatırlatma ve AI vision katmanlarının **hiçbiri yok**. Monorepo ve mobil uygulama sıfırdan
   kurulacak.
-- **Faz 1 öncesi kapatılması gereken en kritik üç şey:** (1) storage private + signed URL geçişi
-(I-4 ihlali), (2) §15.2 #1 ve #2'deki RLS kaynaklı işlevsel kırıklar, (3) `/api/ai/*`
-uçlarında oturum zorunluluğu.
+- **Faz 1 öncesi kapatılması gereken en kritik üç şey (2026-08-16 durumu):** (1) storage
+private + signed URL geçişi (I-4 ihlali), (2) §15.2 #1 ve #2'deki RLS kaynaklı işlevsel
+kırıklar, (3) `/api/ai/*` uçlarında oturum zorunluluğu.
+**Güncelleme (2026-08-17):** (1) **KAPANDI** — bkz. §7.1, §7.4, §8.3, §9.3 ve
+`docs/PROGRESS.md` §3 "Faz 1a — storage mahremiyeti". (2) ve (3)'ün bu tarihteki durumu için
+bkz. `docs/PROGRESS.md` §5 (bu bölüm yalnızca storage/rol maddeleri için bu oturumda
+güncellenmiştir, (2)/(3) bu turun kapsamı dışında bırakılmıştır).
 </content>
 
 </invoke>

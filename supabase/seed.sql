@@ -8,9 +8,9 @@
 -- ##   Docker yığınında kullanın.                                            ##
 -- ##                                                                         ##
 -- ##   Demo hesaplar (parola hepsi için: Passw0rd!23)                         ##
--- ##     coach@example.com    -> role = admin   (KOÇ)                         ##
--- ##     client1@example.com  -> role = student (DANIŞAN)                     ##
--- ##     client2@example.com  -> role = student (DANIŞAN)                     ##
+-- ##     coach@example.com    -> role = coach   (KOÇ)                         ##
+-- ##     client1@example.com  -> role = client (DANIŞAN)                     ##
+-- ##     client2@example.com  -> role = client (DANIŞAN)                     ##
 -- ##                                                                         ##
 -- ##   Tüm bloklar idempotenttir: dosyayı birden çok kez çalıştırmak          ##
 -- ##   veri çoğaltmaz (ON CONFLICT DO NOTHING / NOT EXISTS koruması).         ##
@@ -55,7 +55,7 @@ values
     crypt('Passw0rd!23', gen_salt('bf')),
     now(),
     '{"provider":"email","providers":["email"]}'::jsonb,
-    '{"full_name":"Deniz Koç","role":"admin"}'::jsonb,
+    '{"full_name":"Deniz Koç","role":"coach"}'::jsonb,
     now() - interval '120 days',
     now(),
     '', '', '', ''
@@ -69,7 +69,7 @@ values
     crypt('Passw0rd!23', gen_salt('bf')),
     now(),
     '{"provider":"email","providers":["email"]}'::jsonb,
-    '{"full_name":"Ahmet Yılmaz","role":"student"}'::jsonb,
+    '{"full_name":"Ahmet Yılmaz","role":"client"}'::jsonb,
     now() - interval '90 days',
     now(),
     '', '', '', ''
@@ -83,7 +83,7 @@ values
     crypt('Passw0rd!23', gen_salt('bf')),
     now(),
     '{"provider":"email","providers":["email"]}'::jsonb,
-    '{"full_name":"Elif Demir","role":"student"}'::jsonb,
+    '{"full_name":"Elif Demir","role":"client"}'::jsonb,
     now() - interval '60 days',
     now(),
     '', '', '', ''
@@ -142,17 +142,17 @@ $$;
 
 insert into public.profiles (id, full_name, email, role)
 values
-  ('11111111-1111-1111-1111-111111111111', 'Deniz Koç',    'coach@example.com',   'admin'),
-  ('22222222-2222-2222-2222-222222222222', 'Ahmet Yılmaz', 'client1@example.com', 'student'),
-  ('33333333-3333-3333-3333-333333333333', 'Elif Demir',   'client2@example.com', 'student')
+  ('11111111-1111-1111-1111-111111111111', 'Deniz Koç',    'coach@example.com',   'coach'),
+  ('22222222-2222-2222-2222-222222222222', 'Ahmet Yılmaz', 'client1@example.com', 'client'),
+  ('33333333-3333-3333-3333-333333333333', 'Elif Demir',   'client2@example.com', 'client')
 on conflict (id) do nothing;
 
 -- Koç profili
 update public.profiles
    set full_name       = 'Deniz Koç',
        email           = 'coach@example.com',
-       role            = 'admin',
-       avatar_url      = null,
+       role            = 'coach',
+       avatar_path     = null,
        current_streak  = 0,
        last_checkin_at = null
  where id = '11111111-1111-1111-1111-111111111111';
@@ -161,8 +161,8 @@ update public.profiles
 update public.profiles
    set full_name       = 'Ahmet Yılmaz',
        email           = 'client1@example.com',
-       role            = 'student',
-       avatar_url      = null,
+       role            = 'client',
+       avatar_path     = null,
        current_streak  = 6,
        last_checkin_at = now() - interval '4 hours',
        nutrition_plan  = $json${"Pazartesi":{"items":"Yulaf Ezmesi 80g\nTavuk Göğsü 200g\nPirinç 150g\nYoğurt 200g","total":1850},"Salı":{"items":"Omlet (3 yumurta)\nTam Buğday Ekmeği 2 dilim\nTon Balığı 150g\nSalata","total":1780},"Çarşamba":{"items":"Yulaf Ezmesi 80g\nKıyma 150g\nBulgur 150g\nAyran","total":1900},"Perşembe":{"items":"Peynirli Omlet\nTavuk Göğsü 200g\nTatlı Patates 200g","total":1820},"Cuma":{"items":"Yulaf + Muz\nSomon 180g\nKinoa 120g","total":1950},"Cumartesi":{"items":"Serbest Öğün (kontrollü)\nTavuk Dürüm","total":2200},"Pazar":{"items":"Yumurta 3 adet\nMercimek Çorbası\nTavuk Salata","total":1700}}$json$,
@@ -173,8 +173,8 @@ update public.profiles
 update public.profiles
    set full_name       = 'Elif Demir',
        email           = 'client2@example.com',
-       role            = 'student',
-       avatar_url      = null,
+       role            = 'client',
+       avatar_path     = null,
        current_streak  = 2,
        last_checkin_at = now() - interval '1 day 3 hours',
        nutrition_plan  = $json${"Pazartesi":{"items":"Yulaf Ezmesi 60g\nYumurta 2 adet\nTavuk Göğsü 150g\nPirinç 120g","total":2100},"Salı":{"items":"Smoothie (muz+yulaf+süt)\nHindi Göğsü 150g\nMakarna 150g","total":2200},"Çarşamba":{"items":"Menemen\nKöfte 150g\nBulgur Pilavı 150g","total":2150},"Perşembe":{"items":"Yulaf + Fıstık Ezmesi\nSomon 150g\nTatlı Patates 200g","total":2250},"Cuma":{"items":"Peynirli Tost\nTavuk 200g\nPirinç 150g","total":2180},"Cumartesi":{"items":"Serbest Öğün\nPizza (2 dilim)","total":2400},"Pazar":{"items":"Yumurta 3 adet\nEt Sote 200g\nSalata","total":2050}}$json$,
@@ -221,14 +221,25 @@ on conflict (name) do nothing;
 -- 4) FORM CHECK'LER — danışan başına 6 hafta, kilo trendi
 --    Danışan 1: 92.40 -> 88.65 kg (yağ yakımı)
 --    Danışan 2: 61.00 -> 64.00 kg (kas kazanımı)
+--
+--    `front_pose_path` / `back_pose_path` artık tam URL değil, `form-checks-media`
+--    bucket'ındaki YOL'dur (bkz. 20260817100000_private_storage.sql). Yol biçimi
+--    storage RLS politikasıyla birebir uyumludur: `poses/<client_id>-...`.
+--    DİKKAT: Bu dosyalar storage'da FİİLEN YOKTUR. Bu bilinçli bir tercihtir —
+--    imzalı adres üretimi başarısız olur, uygulama `null` döner ve UI kırık görsel
+--    yerine placeholder gösterir. Seed verisiyle bu yol test edilmiş olur.
 -- =============================================================================
 
-insert into public.form_checks (student_id, current_weight, front_pose_url, back_pose_url, notes, created_at)
+insert into public.form_checks (client_id, current_weight, front_pose_path, back_pose_path, notes, created_at)
 select
   '22222222-2222-2222-2222-222222222222'::uuid,
   round((92.40 - (i * 0.75))::numeric, 2),
-  'https://placehold.co/600x800/png?text=Front+W' || (i + 1),
-  case when i % 2 = 0 then 'https://placehold.co/600x800/png?text=Back+W' || (i + 1) else null end,
+  'poses/22222222-2222-2222-2222-222222222222-w' || (i + 1) || '-front.jpg',
+  case
+    when i % 2 = 0
+      then 'poses/22222222-2222-2222-2222-222222222222-w' || (i + 1) || '-back.jpg'
+    else null
+  end,
   case i
     when 0 then 'Başlangıç ölçümü. Kondisyon düşük.'
     when 1 then 'Su tüketimi arttı, ödem azaldı.'
@@ -241,15 +252,19 @@ select
 from generate_series(0, 5) as i
 where not exists (
   select 1 from public.form_checks
-  where student_id = '22222222-2222-2222-2222-222222222222'::uuid
+  where client_id = '22222222-2222-2222-2222-222222222222'::uuid
 );
 
-insert into public.form_checks (student_id, current_weight, front_pose_url, back_pose_url, notes, created_at)
+insert into public.form_checks (client_id, current_weight, front_pose_path, back_pose_path, notes, created_at)
 select
   '33333333-3333-3333-3333-333333333333'::uuid,
   round((61.00 + (i * 0.60))::numeric, 2),
-  'https://placehold.co/600x800/png?text=Front+W' || (i + 1),
-  case when i % 3 = 0 then 'https://placehold.co/600x800/png?text=Back+W' || (i + 1) else null end,
+  'poses/33333333-3333-3333-3333-333333333333-w' || (i + 1) || '-front.jpg',
+  case
+    when i % 3 = 0
+      then 'poses/33333333-3333-3333-3333-333333333333-w' || (i + 1) || '-back.jpg'
+    else null
+  end,
   case i
     when 0 then 'Başlangıç ölçümü. Hedef: temiz kütle artışı.'
     when 1 then 'Kalori 200 kcal artırıldı.'
@@ -262,18 +277,18 @@ select
 from generate_series(0, 5) as i
 where not exists (
   select 1 from public.form_checks
-  where student_id = '33333333-3333-3333-3333-333333333333'::uuid
+  where client_id = '33333333-3333-3333-3333-333333333333'::uuid
 );
 
 
 -- =============================================================================
 -- 5) GÜNLÜK KAYITLAR — danışan başına son 14 gün
---    (student_id, log_date) UNIQUE olduğu için ON CONFLICT DO NOTHING yeterli.
+--    (client_id, log_date) UNIQUE olduğu için ON CONFLICT DO NOTHING yeterli.
 -- =============================================================================
 
-insert into public.daily_logs (student_id, log_date, water_lt, sodium_mg, macros, created_at)
+insert into public.daily_logs (client_id, log_date, water_lt, sodium_mg, macros, created_at)
 select
-  s.student_id,
+  s.client_id,
   (current_date - d)::date,
   round((s.base_water + ((d % 4) * 0.25))::numeric, 2),
   s.base_sodium + ((d % 5) * 220),
@@ -288,15 +303,15 @@ cross join (
   values
     ('22222222-2222-2222-2222-222222222222'::uuid, 3.00, 2200, 180, 200, 60),
     ('33333333-3333-3333-3333-333333333333'::uuid, 2.25, 1900, 120, 250, 70)
-) as s (student_id, base_water, base_sodium, base_protein, base_carb, base_fat)
-on conflict (student_id, log_date) do nothing;
+) as s (client_id, base_water, base_sodium, base_protein, base_carb, base_fat)
+on conflict (client_id, log_date) do nothing;
 
 
 -- =============================================================================
 -- 6) ANTRENMAN KAYITLARI — danışan başına 20 set
 -- =============================================================================
 
-insert into public.workout_logs (student_id, exercise_name, weight_kg, reps, rpe, created_at)
+insert into public.workout_logs (client_id, exercise_name, weight_kg, reps, rpe, created_at)
 select
   '22222222-2222-2222-2222-222222222222'::uuid,
   e.name,
@@ -313,10 +328,10 @@ cross join lateral (
 ) as e
 where not exists (
   select 1 from public.workout_logs
-  where student_id = '22222222-2222-2222-2222-222222222222'::uuid
+  where client_id = '22222222-2222-2222-2222-222222222222'::uuid
 );
 
-insert into public.workout_logs (student_id, exercise_name, weight_kg, reps, rpe, created_at)
+insert into public.workout_logs (client_id, exercise_name, weight_kg, reps, rpe, created_at)
 select
   '33333333-3333-3333-3333-333333333333'::uuid,
   e.name,
@@ -333,7 +348,7 @@ cross join lateral (
 ) as e
 where not exists (
   select 1 from public.workout_logs
-  where student_id = '33333333-3333-3333-3333-333333333333'::uuid
+  where client_id = '33333333-3333-3333-3333-333333333333'::uuid
 );
 
 
@@ -341,8 +356,8 @@ where not exists (
 -- 7) BİLDİRİMLER — danışan başına 3 adet
 -- =============================================================================
 
-insert into public.notifications (student_id, title, message, is_read, created_at)
-select v.student_id, v.title, v.message, v.is_read, v.created_at
+insert into public.notifications (client_id, title, message, is_read, created_at)
+select v.client_id, v.title, v.message, v.is_read, v.created_at
 from (
   values
     ('22222222-2222-2222-2222-222222222222'::uuid, 'Haftalık Form Check Hatırlatması', 'Bu haftanın poz fotoğraflarını ve kilonu yüklemeyi unutma.', true,  now() - interval '6 days'),
@@ -351,7 +366,7 @@ from (
     ('33333333-3333-3333-3333-333333333333'::uuid, 'Su Tüketimi',                      'Günlük su hedefin 2.5 L. Son 3 gün altında kaldın.', true,  now() - interval '4 days'),
     ('33333333-3333-3333-3333-333333333333'::uuid, 'Beslenme Planı Yenilendi',         'Kalori hedefi 2200 kcal olarak güncellendi.', false, now() - interval '1 day'),
     ('33333333-3333-3333-3333-333333333333'::uuid, null,                               '🔔 Onayına sunulan antrenman programı koç tarafından inceleniyor.', false, now() - interval '3 hours')
-) as v (student_id, title, message, is_read, created_at)
+) as v (client_id, title, message, is_read, created_at)
 where not exists (select 1 from public.notifications);
 
 
@@ -381,7 +396,7 @@ where not exists (select 1 from public.messages);
 -- 9) PROGRAM ONAY TALEPLERİ — danışan başına 1 adet 'pending'
 -- =============================================================================
 
-insert into public.program_approvals (student_id, workout_data, status, created_at)
+insert into public.program_approvals (client_id, workout_data, status, created_at)
 select
   '22222222-2222-2222-2222-222222222222'::uuid,
   jsonb_build_object(
@@ -397,10 +412,10 @@ select
   now() - interval '6 hours'
 where not exists (
   select 1 from public.program_approvals
-  where student_id = '22222222-2222-2222-2222-222222222222'::uuid
+  where client_id = '22222222-2222-2222-2222-222222222222'::uuid
 );
 
-insert into public.program_approvals (student_id, workout_data, status, created_at)
+insert into public.program_approvals (client_id, workout_data, status, created_at)
 select
   '33333333-3333-3333-3333-333333333333'::uuid,
   jsonb_build_object(
@@ -416,7 +431,7 @@ select
   now() - interval '3 hours'
 where not exists (
   select 1 from public.program_approvals
-  where student_id = '33333333-3333-3333-3333-333333333333'::uuid
+  where client_id = '33333333-3333-3333-3333-333333333333'::uuid
 );
 
 

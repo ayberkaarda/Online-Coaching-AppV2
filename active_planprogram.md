@@ -35,7 +35,11 @@ auth.uid())` pattern'i mevcut ve doğrulanmış `public.is_admin()`
 - **R4** — §3.1'e rol yeniden adlandırma maddesi eklendi: enum
   `admin`/`student` → `coach`/`client` dönüşümü **Faz 1'in şema yeniden
   yazımının parçasıdır**, ayrı iş kalemi değildir — yarım kalmış bir
-  yeniden adlandırma iki dilli bir kod tabanı bırakır.
+  yeniden adlandırma iki dilli bir kod tabanı bırakır. **UYGULANDI
+  (2026-08-17, Faz 1a):** `supabase/migrations/20260817090000_rename_roles.sql`
+  ile enum, `is_admin()`→`is_coach()` ve 5 tablodaki `student_id`→`client_id`
+  kolonları taşındı; bkz. §3.1 ve `docs/PROGRESS.md` §3 "Faz 1a — çıkış
+  kriterleri".
 - **R5** — §3.4'teki `Result<T>` sözleşmesi kaldırıldı, yerine mevcut ve
   çalışan tipli `ApiError` fırlatma modeli yazıldı; key sözleşmesi
   `src/lib/query/keys.ts`'teki gerçek şekle uyarlandı — `Result<T>` TanStack
@@ -48,7 +52,12 @@ auth.uid())` pattern'i mevcut ve doğrulanmış `public.is_admin()`
   (public bucket kalmayacak, kolonlar tam URL değil yol saklayacak, mevcut
   satırlar dönüştürülecek) + AC-1.6 — `avatars` ve `form-checks-media` şu an
   public ve `form_checks.front_pose_url` tam public URL saklıyor; I-4 fiilen
-  ihlal ediliyor.
+  ihlal ediliyor. **UYGULANDI (2026-08-17, Faz 1a):**
+  `supabase/migrations/20260817100000_private_storage.sql` ile iki bucket da
+  `public = false` yapıldı, kolonlar `*_url` → `*_path` olarak yeniden
+  adlandırılıp mevcut satırlar yola dönüştürüldü, okuma `src/lib/storage.ts`
+  üzerinden imzalı adresle (TTL 3600 sn) yapılıyor; bkz. §3.3 ve
+  `docs/PROGRESS.md` §3 "Faz 1a — storage mahremiyeti".
 - **R8** — §1.3 teknoloji tablosu güncellendi: Next.js 15 → **16 + React 19**,
   monorepo satırına "Faz 4.5" notu, build motoru satırı (`next build
 --webpack`, `next-pwa` kısıtı), grafik satırına `chart.js` ikinci kütüphane
@@ -106,12 +115,14 @@ auth.uid())` pattern'i mevcut ve doğrulanmış `public.is_admin()`
    tanımlanmamışsa: 3 seçenek + trade-off tablosu + kendi önerinle bana sor.
    Sessiz varsayım = hata.
 6. **ADR zorunluluğu.** Mimari sonucu olan her karar için ADR yaz (context /
-   decision / consequences formatı). Mevcut 6 karar `docs/ARCHITECTURE.md` §7
-   içine gömülüdür (ADR-lite, ADR-1..ADR-6); `docs/adr/` dizini henüz yok.
-   **Faz 1'in ilk işi** bu 6 kaydı `docs/adr/NNNN-<slug>.md` dosyalarına
-   ayrıştırmak ve `ARCHITECTURE.md` §7'yi yalnızca bu dosyalara link veren bir
-   indekse indirmektir. Ayrıştırmadan sonra her yeni karar doğrudan
-   `docs/adr/NNNN-<slug>.md` olarak yazılır; gömülü ADR yazımı biter.
+   decision / consequences formatı). **TAMAMLANDI (2026-08-17, Faz 1a):**
+   `docs/ARCHITECTURE.md` §7'de gömülü olan 6 "ADR-lite" kaydı `docs/adr/
+NNNN-<slug>.md` dosyalarına ayrıştırıldı (AC-1.7) ve `ARCHITECTURE.md` §7
+   yalnızca bu dosyalara link veren bir indekse indirildi; `docs/adr/` dizini
+   artık mevcut (bkz. `docs/adr/README.md`, 13 ADR — rol yeniden adlandırma
+   kararı `0013` olarak eklendi ve `0003`'ün yerini aldı). Ayrıştırmadan
+   sonraki her yeni karar doğrudan `docs/adr/NNNN-<slug>.md` olarak yazılır;
+   gömülü ADR yazımı bitti.
 7. **Hata durumunda.** Bir migration, test veya build 2 denemede düzelmiyorsa
    dur, hatayı ve denediklerini raporla; brute-force retry döngüsüne girme.
 
@@ -245,16 +256,23 @@ kısıtlarla):
 `(user_id, <date> DESC)` composite indeks; `messages(conversation_id,
 created_at DESC)`.
 
-**Rol adlandırması (Faz 1'in parçası, ayrı iş değil).** Enum değerleri şu an
-`admin`/`student` (ürün dilinde koç/danışan). `admin` → `coach`,
-`student` → `client` yeniden adlandırması **bu fazın şema yeniden yazımının
-içindedir**; sonraya bırakılmaz, ayrı bir iş kalemi olarak planlanmaz. Aynı
-migration zinciri şunları birlikte yapar: (a) `user_role` enum'unu dönüştürür,
-(b) mevcut satırları taşır, (c) `is_admin()` ve `profile_role()` gövdelerini
-günceller (fonksiyon adı ve imzası korunur — çağrı yerleri kırılmasın),
-(d) tüm istemci kodunu günceller (`src/types/domain.ts` `isAdmin()`,
-`src/hooks/**`, bileşenler, E2E seed'leri). Yarım bırakılmış bir yeniden
-adlandırma (şemada `coach`, kodda `admin`) kabul edilmez.
+**Rol adlandırması (Faz 1'in parçası, ayrı iş değil) — UYGULANDI (2026-08-17,
+Faz 1a).** Enum değerleri **artık `coach`/`client`** (öncesinde `admin`/
+`student` idi; ürün dilinde koç/danışan). `admin` → `coach`, `student` →
+`client` yeniden adlandırması `supabase/migrations/20260817090000_rename_roles.sql`
+ile gerçekleşti. Migration şunları birlikte yaptı: (a) `user_role` enum'unu
+`ALTER TYPE ... RENAME VALUE` ile dönüştürdü (veri kaybı yok, OID korunur),
+(b) mevcut satırlar otomatik yeni etikete geçti, (c) `is_admin()` fonksiyonu
+**`is_coach()` olarak yeniden adlandırıldı** — bu noktada plan aşağıda
+düzeltildiği gibi ilk yazılırken "fonksiyon adı korunur, yalnızca gövde
+değişir" öngörmüştü; gerçekleşen bundan farklı oldu (bkz. §3.2'deki
+"GÜNCELLEME" notu ve `docs/adr/0013-rollerin-coach-client-olarak-yeniden-adlandirilmasi.md`),
+(d) `increment_streak()` gövdesi ayrıca elle güncellendi (ad ile çağırıyordu,
+OID ile değil), (e) tüm istemci kodu güncellendi (`src/types/domain.ts`
+`isAdmin()` → `isCoach()`, `src/hooks/**`, bileşenler, E2E seed'leri — 38
+dosya). Yarım bırakılmış bir yeniden adlandırma (şemada `coach`, kodda
+`admin`) yaşanmadı — doğrulama: `docs/PROGRESS.md` §3 "Faz 1a — çıkış
+kriterleri".
 
 **Tek koçlu model notu.** Sistemde bir koç vardır ve tüm danışanları görür;
 `coach_id` kolonu, ona bağlı CHECK ve koç-eşleştirme mantığı bilinçli olarak
@@ -276,11 +294,19 @@ koçun danışanını göremez" katmanı yoktur.
 | service_role | bypass       | bypass                                                                                                 | Yalnızca Edge Function'lar ve `ai_backend` (I-2) |
 
 - Koç yetkisi bir ilişki kolonundan değil **rolden** doğrulanır. Politikalarda
-  mevcut ve doğrulanmış `public.is_admin()` yardımcısı kullanılır
-  (`SECURITY DEFINER`, `stable`, `set search_path = public, pg_temp`):
-  `using (student_id = auth.uid() or public.is_admin())`. JWT claim'e güvenme.
-  Faz 1'deki yeniden adlandırmadan sonra fonksiyonun gövdesi `role = 'coach'`
-  olur; adı ve imzası korunur.
+  mevcut ve doğrulanmış `public.is_coach()` (eskiden `public.is_admin()`)
+  yardımcısı kullanılır (`SECURITY DEFINER`, `stable`,
+  `set search_path = public, pg_temp`):
+  `using (client_id = auth.uid() or public.is_coach())`. JWT claim'e güvenme.
+  **GÜNCELLEME (2026-08-17, Faz 1a):** Bu satır aslında `admin`/`student`
+  taşınmadan önce "fonksiyonun adı ve imzası korunur, yalnızca gövdesi
+  `role = 'coach'` olur" diyordu; gerçekleşen uygulama bundan farklı oldu —
+  `supabase/migrations/20260817090000_rename_roles.sql` fonksiyonu da
+  `is_admin()` → `is_coach()` olarak **yeniden adlandırdı** (imza korundu,
+  ad değişti). Gerekçe: OID korunduğu için yeniden adlandırma politikaları
+  bozmuyor, ve `is_admin()` adını süresiz taşımanın okunurluk maliyeti veri
+  riski ortadan kalkınca kabul edilemez görüldü (bkz. `docs/adr/
+0013-rollerin-coach-client-olarak-yeniden-adlandirilmasi.md`).
 - **Politika özyinelemesi uyarısı (KORUNACAK).** Yardımcının `SECURITY
 DEFINER` olması şart, kolaylık değil. Bir politika kendi tablosuna düz bir
   alt sorguyla geri sorarsa (`EXISTS (SELECT 1 FROM profiles p WHERE ...)`
@@ -312,25 +338,36 @@ Path sözleşmesi: `<user_id>/<uuid>.<ext>`. Storage RLS: yükleme yalnızca ken
 prefix'ine; okuma kendi prefix'i + koç için tüm prefix'ler (tek koçlu model).
 Maks. dosya boyutu: foto 10 MB, video 100 MB; MIME whitelist.
 
-**Mevcut durum ve Faz 1 çıkış kriteri (I-4'ün fiili karşılığı).** Repoda şu an
-`avatars` ve `form-checks-media` bucket'ları **public** (`public = true`,
-`getPublicUrl` ile servis ediliyor) ve `form_checks.front_pose_url` /
-`back_pose_url` **tam public URL** saklıyor — danışan vücut fotoğrafları
-URL'yi bilen herkese açık. I-4 bugün ihlal ediliyor. Faz 1, aşağıdakiler
-karşılanmadan "bitti" sayılamaz:
+**Mevcut durum ve Faz 1 çıkış kriteri (I-4'ün fiili karşılığı) — TAMAMLANDI
+(2026-08-17, Faz 1a).** Repoda önceden `avatars` ve `form-checks-media`
+bucket'ları **public** (`public = true`, `getPublicUrl` ile servis ediliyordu)
+ve `form_checks.front_pose_url` / `back_pose_url` **tam public URL**
+saklıyordu — danışan vücut fotoğrafları URL'yi bilen herkese açıktı. I-4 bu
+haliyle ihlal ediliyordu.
+`supabase/migrations/20260817100000_private_storage.sql` aşağıdaki üç maddeyi
+birlikte uyguladı:
 
-1. **Hiçbir bucket public kalmayacak.** Tüm okuma signed URL ile (TTL ≤ 1
-   saat); `getPublicUrl` çağrısı kod tabanında kalmayacak.
-2. **URL kolonları tam URL değil, bucket içi YOL saklayacak** —
+1. ~~**Hiçbir bucket public kalmayacak.** Tüm okuma signed URL ile (TTL ≤ 1
+   saat); `getPublicUrl` çağrısı kod tabanında kalmayacak.~~ **TAMAMLANDI:**
+   iki bucket da `public = false`; okuma `src/lib/storage.ts` →
+   `createSignedUrl`/`createSignedUrls` ile, `SIGNED_URL_TTL_SECONDS = 3600`.
+2. ~~**URL kolonları tam URL değil, bucket içi YOL saklayacak** —
    `form_checks.front_pose_url` / `back_pose_url` ve `profiles.avatar_url`
    dahil. Signed URL istemcide okuma anında üretilir
    (`src/hooks/useFormChecks.ts`, `src/hooks/useProfile.ts`,
-   `src/components/AdminUserManagement.tsx` güncellenir).
-3. **Mevcut satırlar için veri dönüşümü yazılacak** (tam URL → yol); bkz.
-   §3.5. Barındırılan projede de aynı dönüşüm planlanır.
+   `src/components/AdminUserManagement.tsx` güncellenir).~~ **TAMAMLANDI:**
+   kolonlar `front_pose_path` / `back_pose_path` / `avatar_path` olarak
+   yeniden adlandırıldı; ilgili hook'lar ve `CoachUserManagement.tsx`
+   (eskiden `AdminUserManagement.tsx`) imzalı adres kullanacak şekilde
+   güncellendi.
+3. ~~**Mevcut satırlar için veri dönüşümü yazılacak** (tam URL → yol); bkz.
+   §3.5.~~ **TAMAMLANDI:** aynı migration içinde regex ile dönüştürüldü
+   (storage dışı mutlak URL'ler — ör. `placehold.co` — bilinçli olarak
+   dönüştürülmedi, UI bunlar için placeholder'a düşer). Barındırılan projede
+   aynı dönüşüm henüz planlanmadı — bkz. `docs/PROGRESS.md` §6a "ÖNEMLİ NOT".
 
-Bu üç madde `docs/PROGRESS.md` §6a'da devir borcu olarak kayıtlıdır; iki liste
-birbirinden ayrışmamalıdır.
+Bu üç madde `docs/PROGRESS.md` §6a'da devir borcu olarak kayıtlıydı, artık
+tamamlandı olarak işaretli; iki liste birbirinden ayrışmamalıdır.
 
 ### 3.4 API sözleşmesi (contract-first)
 
@@ -375,7 +412,13 @@ class ApiError extends Error {
   kullanılır.
 - Ortak zod şemaları bugün `src/lib/validation/schemas.ts` içinde; Faz 4.5'te
   `packages/types/schemas/` altına taşınır. FastAPI tarafındaki Pydantic
-  modelleriyle alan adları birebir aynı (snake_case, wire format).
+  modelleriyle alan adları birebir aynı (snake_case, wire format). **Tek
+  bilinçli istisna (2026-08-17, Faz 1a):** `RecommendationInput`/
+  `recommendationSchema` içindeki `student_id` alanı `client_id`'ye
+  **çevrilmedi**, çünkü `ai_backend/app/schemas/recommendations.py` hâlâ
+  `student_id` bekliyor ve bu uç (`useRecommendations`) hiçbir bileşen
+  tarafından çağrılmıyor; hizalama gerçek bir tüketici eklendiğinde ayrı bir
+  işte yapılacak (bkz. `docs/PROGRESS.md` §3 "Faz 1a — AI tel protokolü").
 
 ### 3.5 Veri migrasyonu (bu bir yeşil alan projesi DEĞİL)
 

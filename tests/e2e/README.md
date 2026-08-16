@@ -13,9 +13,9 @@ Bu klasördeki testler gerçek bir Supabase örneğine ve seed verisine ihtiyaç
    npx supabase db reset
    ```
    Bu komut `supabase/seed.sql` dosyasını çalıştırır ve şu demo hesapları oluşturur (parola hepsi için `Passw0rd!23`):
-   - `coach@example.com` (koç / admin)
-   - `client1@example.com` (danışan / student)
-   - `client2@example.com` (danışan / student)
+   - `coach@example.com` (koç / coach)
+   - `client1@example.com` (danışan / client)
+   - `client2@example.com` (danışan / client)
 3. `.env.local` dosyasının doldurulmuş olduğundan emin olun (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` vb.). Uygulama sunucusunun **yerel** Supabase yığınına (`NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321` ve o yığının anon key'i) bağlı olması gerekir — uzak/staging bir projeye bağlıysa seed kullanıcıları bulunamaz ve girişler başarısız olur.
 4. Yerel Supabase'de e-posta/parola girişinin (`auth.email`) etkin olduğunu doğrulayın:
    ```

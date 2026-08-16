@@ -14,15 +14,15 @@ function planToJson(plan: WorkoutPlan): Json {
   return plan as unknown as Json
 }
 
-export function usePendingApprovals(studentId?: string) {
+export function usePendingApprovals(clientId?: string) {
   return useQuery({
-    queryKey: queryKeys.programApprovals(studentId),
-    enabled: Boolean(studentId),
+    queryKey: queryKeys.programApprovals(clientId),
+    enabled: Boolean(clientId),
     queryFn: async (): Promise<ProgramApproval[]> => {
       const { data, error } = await supabase
         .from('program_approvals')
         .select('*')
-        .eq('student_id', studentId ?? '')
+        .eq('client_id', clientId ?? '')
         .eq('status', 'pending')
         .order('created_at', { ascending: false })
       if (error) throw new Error(error.message)
@@ -32,7 +32,7 @@ export function usePendingApprovals(studentId?: string) {
 }
 
 export interface SubmitProgramForApprovalInput {
-  studentId: string
+  clientId: string
   plan: WorkoutPlan
   /** Bildirimin gideceği koç id'si. Verilmezse bildirim öğrencinin kendisine düşer. */
   coachId?: string
@@ -43,27 +43,27 @@ export function useSubmitProgramForApproval() {
 
   return useMutation({
     mutationFn: async ({
-      studentId,
+      clientId,
       plan,
       coachId,
     }: SubmitProgramForApprovalInput): Promise<ProgramApproval> => {
       const { data, error } = await supabase
         .from('program_approvals')
-        .insert({ student_id: studentId, workout_data: planToJson(plan), status: 'pending' })
+        .insert({ client_id: clientId, workout_data: planToJson(plan), status: 'pending' })
         .select()
         .single()
       if (error) throw new Error(error.message)
 
       const { error: notifyError } = await supabase.from('notifications').insert({
-        student_id: coachId ?? studentId,
+        client_id: coachId ?? clientId,
         message: '🔔 Yeni bir antrenman programı onayınıza sunuldu.',
       })
       if (notifyError) throw new Error(notifyError.message)
 
       return data
     },
-    onSuccess: (_approval, { studentId }) => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.programApprovals(studentId) })
+    onSuccess: (_approval, { clientId }) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.programApprovals(clientId) })
       void queryClient.invalidateQueries({ queryKey: queryKeyRoots.notifications })
       toast.success('Program taslağı koçuna gönderildi.')
     },
@@ -75,7 +75,7 @@ export function useSubmitProgramForApproval() {
 
 export interface ApproveProgramInput {
   approvalId: string
-  studentId: string
+  clientId: string
   plan: WorkoutPlan
   /** Onaylayan koçun id'si (`reviewed_by`). */
   reviewerId?: string
@@ -87,14 +87,14 @@ export function useApproveProgram() {
   return useMutation({
     mutationFn: async ({
       approvalId,
-      studentId,
+      clientId,
       plan,
       reviewerId,
     }: ApproveProgramInput): Promise<void> => {
       const { error: profileError } = await supabase
         .from('profiles')
         .update({ workout_plan: JSON.stringify(plan) })
-        .eq('id', studentId)
+        .eq('id', clientId)
       if (profileError) throw new Error(profileError.message)
 
       const { error: approvalError } = await supabase
@@ -108,14 +108,14 @@ export function useApproveProgram() {
       if (approvalError) throw new Error(approvalError.message)
 
       const { error: notifyError } = await supabase.from('notifications').insert({
-        student_id: studentId,
+        client_id: clientId,
         message: '✅ Koçun yeni antrenman programını onayladı. Artık kullanabilirsin.',
       })
       if (notifyError) throw new Error(notifyError.message)
     },
-    onSuccess: (_result, { studentId }) => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.programApprovals(studentId) })
-      void queryClient.invalidateQueries({ queryKey: queryKeys.profile(studentId) })
+    onSuccess: (_result, { clientId }) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.programApprovals(clientId) })
+      void queryClient.invalidateQueries({ queryKey: queryKeys.profile(clientId) })
       void queryClient.invalidateQueries({ queryKey: queryKeyRoots.notifications })
       toast.success('Program onaylandı ve öğrencinin profiline işlendi.')
     },

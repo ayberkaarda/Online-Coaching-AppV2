@@ -9,15 +9,15 @@ import { queryKeys } from '@/lib/query/keys'
 import { supabase } from '@/lib/supabase/client'
 import type { TablesInsert, WorkoutLog } from '@/types'
 
-export function useWorkoutLogs(studentId?: string) {
+export function useWorkoutLogs(clientId?: string) {
   return useQuery({
-    queryKey: queryKeys.workoutLogs(studentId),
-    enabled: Boolean(studentId),
+    queryKey: queryKeys.workoutLogs(clientId),
+    enabled: Boolean(clientId),
     queryFn: async (): Promise<WorkoutLog[]> => {
       const { data, error } = await supabase
         .from('workout_logs')
         .select('*')
-        .eq('student_id', studentId ?? '')
+        .eq('client_id', clientId ?? '')
         .order('created_at', { ascending: false })
       if (error) throw new Error(error.message)
       return data
@@ -26,7 +26,7 @@ export function useWorkoutLogs(studentId?: string) {
 }
 
 export interface CreateWorkoutLogInput {
-  studentId: string
+  clientId: string
   exercise_name: string
   weight_kg?: number | null
   reps?: number | null
@@ -38,7 +38,7 @@ export function useCreateWorkoutLog() {
 
   return useMutation({
     mutationFn: async ({
-      studentId,
+      clientId,
       exercise_name,
       weight_kg,
       reps,
@@ -47,7 +47,7 @@ export function useCreateWorkoutLog() {
       const { data, error } = await supabase
         .from('workout_logs')
         .insert({
-          student_id: studentId,
+          client_id: clientId,
           exercise_name,
           weight_kg: weight_kg ?? null,
           reps: reps ?? null,
@@ -58,8 +58,8 @@ export function useCreateWorkoutLog() {
       if (error) throw new Error(error.message)
       return data
     },
-    onSuccess: (_log, { studentId }) => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.workoutLogs(studentId) })
+    onSuccess: (_log, { clientId }) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workoutLogs(clientId) })
       toast.success('Set kaydedildi.')
     },
     onError: (error: Error) => {
@@ -69,7 +69,7 @@ export function useCreateWorkoutLog() {
 }
 
 export interface CreateWorkoutLogsInput {
-  studentId: string
+  clientId: string
   /** Canlı antrenman modunda tamamlanan setler. */
   sets: {
     exercise_name: string
@@ -84,11 +84,11 @@ export function useCreateWorkoutLogs() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async ({ studentId, sets }: CreateWorkoutLogsInput): Promise<number> => {
+    mutationFn: async ({ clientId, sets }: CreateWorkoutLogsInput): Promise<number> => {
       if (sets.length === 0) return 0
 
       const rows: TablesInsert<'workout_logs'>[] = sets.map((set) => ({
-        student_id: studentId,
+        client_id: clientId,
         exercise_name: set.exercise_name,
         weight_kg: set.weight_kg ?? null,
         reps: set.reps ?? null,
@@ -99,8 +99,8 @@ export function useCreateWorkoutLogs() {
       if (error) throw new Error(error.message)
       return rows.length
     },
-    onSuccess: (count, { studentId }) => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.workoutLogs(studentId) })
+    onSuccess: (count, { clientId }) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workoutLogs(clientId) })
       if (count > 0) toast.success('Antrenmanın başarıyla kaydedildi.')
     },
     onError: (error: Error) => {

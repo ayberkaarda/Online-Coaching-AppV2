@@ -4,7 +4,7 @@ import {
   DAY_NAMES,
   EMPTY_NUTRITION_PLAN,
   EMPTY_WORKOUT_PLAN,
-  isAdmin,
+  isCoach,
   isDayName,
   parseMacros,
   parseNutritionPlan,
@@ -125,18 +125,18 @@ describe('isDayName', () => {
   })
 })
 
-describe('isAdmin', () => {
-  it('"admin" rolünde true döner', () => {
-    expect(isAdmin('admin')).toBe(true)
+describe('isCoach', () => {
+  it('"coach" rolünde true döner', () => {
+    expect(isCoach('coach')).toBe(true)
   })
 
-  it('"student" rolünde false döner', () => {
-    expect(isAdmin('student')).toBe(false)
+  it('"client" rolünde false döner', () => {
+    expect(isCoach('client')).toBe(false)
   })
 
   it('null/undefined için false döner', () => {
-    expect(isAdmin(null)).toBe(false)
-    expect(isAdmin(undefined)).toBe(false)
+    expect(isCoach(null)).toBe(false)
+    expect(isCoach(undefined)).toBe(false)
   })
 })
 
