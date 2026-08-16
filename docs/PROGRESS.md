@@ -18,20 +18,21 @@ adımları — backend araç zinciri, veritabanı migration'ları, RLS izolasyon
 (üçüncü oturum) E2E testleri ilk kez koşturuldu; dört gerçek sorun ortaya çıkardı, hepsi
 düzeltildi ve paket artık 28/28 yeşil (bkz. §3 "E2E doğrulaması ve ortaya çıkardığı hatalar").
 
-| Kontrol                   | Komut                       | Durum                                                               | Tarih      |
-| -------------------------- | ---------------------------- | --------------------------------------------------------------------- | ---------- |
-| Lint                       | `npm run lint`                | Temiz — 0 hata, 12 bilinçli uyarı                                     | 2026-08-16 |
-| Tip kontrolü                | `npm run type-check`          | Temiz                                                                  | 2026-08-16 |
-| Biçim                       | `npm run format:check`        | Temiz                                                                  | 2026-08-16 |
-| Birim/bileşen testleri      | `npm run test`                | 180/180                                                                | 2026-08-16 |
-| Production build            | `npm run build`               | Başarılı                                                               | 2026-08-16 |
-| Backend lint                | `uv run ruff check .`         | Temiz                                                                  | 2026-08-16 |
-| Backend tip (strict)        | `uv run mypy app`             | Temiz, 28 dosya                                                        | 2026-08-16 |
-| Backend testleri            | `uv run pytest`               | 63 test, kapsam %92 (eşik %70)                                         | 2026-08-16 |
-| Backend Docker imajı        | `docker build` + container    | Derlendi, `/health` doğrulandı                                        | 2026-08-16 |
-| Veritabanı migration'ları   | `npx supabase db reset`       | Uygulandı — 9 tablo, 37 politika, 8 storage politikası, 6 fonksiyon    | 2026-08-16 |
-| RLS izolasyonu              | Manuel SQL testi              | Doğrulandı (bkz. §1.1)                                                 | 2026-08-16 |
-| E2E testleri                | `npm run test:e2e`            | 28/28 geçti (14 senaryo × 2 profil: chromium + Mobile Chrome)          | 2026-08-16 |
+| Kontrol                   | Komut                      | Durum                                                               | Tarih      |
+| ------------------------- | -------------------------- | ------------------------------------------------------------------- | ---------- |
+| Lint                      | `npm run lint`             | Temiz — 0 hata, 12 bilinçli uyarı                                   | 2026-08-16 |
+| Tip kontrolü              | `npm run type-check`       | Temiz                                                               | 2026-08-16 |
+| Biçim                     | `npm run format:check`     | Temiz                                                               | 2026-08-16 |
+| Birim/bileşen testleri    | `npm run test`             | 192/192 (17 dosya)                                                  | 2026-08-16 |
+| Production build          | `npm run build`            | Başarılı                                                            | 2026-08-16 |
+| Backend lint              | `uv run ruff check .`      | Temiz                                                               | 2026-08-16 |
+| Backend tip (strict)      | `uv run mypy app`          | Temiz, 28 dosya                                                     | 2026-08-16 |
+| Backend testleri          | `uv run pytest`            | 63 test, kapsam %92 (eşik %70)                                      | 2026-08-16 |
+| Backend Docker imajı      | `docker build` + container | Derlendi, `/health` doğrulandı                                      | 2026-08-16 |
+| Veritabanı migration'ları | `npx supabase db reset`    | Uygulandı — 9 tablo, 37 politika, 8 storage politikası, 6 fonksiyon | 2026-08-16 |
+| RLS izolasyonu            | Manuel SQL testi           | Doğrulandı (bkz. §1.1)                                              | 2026-08-16 |
+| E2E testleri              | `npm run test:e2e`         | 16 senaryo × 2 profil (chromium + Mobile Chrome)                    | 2026-08-16 |
+| RLS politika testleri     | `npm run test:rls`         | 19 senaryo, hepsi geçti                                             | 2026-08-16 |
 
 Kalan 12 lint uyarısı bilinçlidir: 8 adet `@next/next/no-img-element` (Supabase public
 URL'leri ve `ui-avatars.com` için `next/image` bilerek tercih edilmedi — harici/dinamik
@@ -211,22 +212,66 @@ E2E ilk kez koşturuldu ve **dört gerçek sorun** ortaya çıkardı:
    5 elemana eşleşiyordu, çünkü seed verisinde aynı makro değeri birden çok kayıtta geçiyor).
    Doğrulama en yeni rapor kartına kapsandı.
 
+### Kritik kırık düzeltmeleri (dördüncü oturum)
+
+`docs/DISCOVERY.md` envanterinin ortaya çıkardığı üç kırık ve düzeltmeleri:
+
+1. **Danışan mesajlaşmayı hiç kullanamıyordu.** `profiles_select` politikası
+   `id = auth.uid() OR is_admin()` olduğu için danışan koçun profil satırını göremiyordu →
+   `useAdminId()` null → `MessagesTab`'da sohbet partneri boş. Düzeltme:
+   `supabase/migrations/20260816100000_fix_rls_visibility.sql` — politikaya `role = 'admin'`
+   koşulu eklendi (satırın kendi kolonu, alt sorgu değil; özyineleme yok).
+2. **Koç, onaya sunulan programdan haberdar olmuyordu.** `notifications_insert` WITH CHECK'i
+   danışanın koça bildirim yazmasını reddediyordu. Düzeltme: aynı migration —
+   `SECURITY DEFINER` `public.is_coach_profile(uuid)` yardımcısı eklendi ve politikaya
+   `OR public.is_coach_profile(student_id)` kondu.
+3. **`/api/ai/*` proxy uçlarında oturum kontrolü yoktu** (planın §5.3 ihlali). Giriş yapmamış
+   herkes AI backend'ini kullanabiliyordu. Düzeltme: `src/lib/api/ai.ts` istemci tarafında
+   `Authorization: Bearer <token>` gönderiyor, `src/lib/api/proxy.ts` sunucu tarafında
+   `getUser()` ile doğruluyor; kimliksiz istek upstream'e **hiç ulaşmıyor**.
+
+Ayrıca kaydedilenler:
+
+- **Bilinçli takas:** koçun `profiles` satırı artık tüm giriş yapmış kullanıcılara açık
+  (e-posta dahil). Tek koçlu modelde kabul edildi; koça özel hassas bir kolon eklenirse
+  kolon-sınırlı view'a geçilmeli. Migration başlığında ve `supabase/README.md`'de kayıtlı.
+- **`INSERT ... RETURNING` tuzağı:** `RETURNING` ek olarak SELECT görünürlüğü ister; danışan
+  koça yazdığı bildirimi geri okuyamaz. Çağıran kod (`useProgramApprovals.ts`) düz `.insert()`
+  yaptığı için sorun yok — `.select()` eklenirse kırılır. İki ajan bağımsız olarak keşfetti.
+
+### Regresyon korumaları
+
+Bu kırıkların testlerden kaçmış olması asıl sorundu. Eklenen korumalar:
+
+- `supabase/tests/rls.test.sql` — 19 senaryo, `BEGIN/ROLLBACK` ile veri değiştirmez,
+  başarısızlıkta `raise exception` + sıfırdan farklı çıkış kodu. **Testin gerçekten
+  kırılabildiği kanıtlandı** (kasten bozulan beklenti `EXIT_CODE=3` verdi). `npm run test:rls`.
+- `tests/e2e/messaging.spec.ts` — 2 senaryo, iki tarayıcı bağlamıyla danışan→koç→realtime
+  yanıt zinciri. Bu akış daha önce hiç test edilmiyordu.
+- `tests/unit/proxy-auth.test.ts` — 12 test; en kritik iddia: kimliksiz istekte `fetch`
+  **hiç çağrılmıyor**.
+- CI: RLS testleri `e2e` job'una eklendi (`supabase db reset` sonrası, build öncesi), container
+  adı için koruma adımı ile.
+
 ---
 
 ## 4. Alınan kararlar (karar kaydı)
 
-| Tarih      | Karar                                                     | Gerekçe                                                                                                            | Durum                                  |
-| ---------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | -------------------------------------- |
-| 2026-08-16 | Rol enum değerleri `admin`/`student` korundu              | Mevcut veri bozulmasın; ürün dilinde admin=koç, student=danışan                                                    | Faz 1'de `coach`/`client`'a taşınacak  |
-| 2026-08-16 | **Tek koçlu model benimsendi**                            | Kullanıcı kararı; `profiles.coach_id` ve çok-koç RLS katmanı gereksiz karmaşıklık                                  | Plan v1.1'e işlenecek                  |
-| 2026-08-16 | AI çağrıları Next.js route handler proxy'sinden geçer     | API key istemciye sızmasın; CORS ve rate limit tek noktada                                                         | Uygulandı                              |
-| 2026-08-16 | PWA korundu, build `--webpack` ile yapılıyor              | `next-pwa` webpack eklentisi; Turbopack'e geçiş PWA'yı feda etmek demek                                            | Uygulandı                              |
-| 2026-08-16 | `Result<T>` yerine typed `ApiError` fırlatma sürdürülecek | TanStack Query'nin hata makinesi queryFn'in fırlatmasına dayanır; `Result` sınırın ardında yine `throw`'a çevrilir | Plan v1.1'de §3.4 düzeltilecek         |
-| 2026-08-16 | Monorepo (pnpm+Turborepo) ve Expo mobil ertelendi         | En yıkıcı adım, kullanıcı değeri üretmiyor; monorepo'nun tek gerekçesi mobil ve mobil Faz 5'e kadar zorunlu değil  | Plan v1.1'de Faz 4 sonrasına taşınacak |
-| 2026-08-16 | **Tek koçlu model**                                        | Kullanıcı kararı; `profiles.coach_id` ve çok-koç RLS katmanı gereksiz karmaşıklık                                  | Plan v1.1'e işlenecek                  |
-| 2026-08-16 | **Storage mahremiyet düzeltmesi Faz 1'e ertelendi**        | Uygulama yayında değil. `form_checks.front_pose_url` tam public URL saklıyor; private bucket'a geçmek kolonun yol saklamasını + mevcut satırların dönüştürülmesini gerektiriyor. Planın Faz 1'i `form_checks` tablosunu zaten baştan yazıyor — aynı iş iki kez yapılmayacak | **Faz 1 çıkış kriteri** (bkz. Bölüm 6a) |
-| 2026-08-16 | Prettier `semi: false`                                     | Kod tabanının fiili stili; tersi yüzlerce dosyaya gereksiz noktalı virgül eklerdi                                  | Uygulandı                              |
-| 2026-08-16 | **CSP, yapılandırılan Supabase adresinden türetiliyor**    | Sabit `*.supabase.co` deseni yerel yığını (`127.0.0.1:54321`) kapsamıyordu ve yerel geliştirmeyi imkânsız kılıyordu | Uygulandı                              |
+| Tarih      | Karar                                                     | Gerekçe                                                                                                                                                                                                                                                                     | Durum                                   |
+| ---------- | --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
+| 2026-08-16 | Rol enum değerleri `admin`/`student` korundu              | Mevcut veri bozulmasın; ürün dilinde admin=koç, student=danışan                                                                                                                                                                                                             | Faz 1'de `coach`/`client`'a taşınacak   |
+| 2026-08-16 | **Tek koçlu model benimsendi**                            | Kullanıcı kararı; `profiles.coach_id` ve çok-koç RLS katmanı gereksiz karmaşıklık                                                                                                                                                                                           | Plan v1.1'e işlenecek                   |
+| 2026-08-16 | AI çağrıları Next.js route handler proxy'sinden geçer     | API key istemciye sızmasın; CORS ve rate limit tek noktada                                                                                                                                                                                                                  | Uygulandı                               |
+| 2026-08-16 | PWA korundu, build `--webpack` ile yapılıyor              | `next-pwa` webpack eklentisi; Turbopack'e geçiş PWA'yı feda etmek demek                                                                                                                                                                                                     | Uygulandı                               |
+| 2026-08-16 | `Result<T>` yerine typed `ApiError` fırlatma sürdürülecek | TanStack Query'nin hata makinesi queryFn'in fırlatmasına dayanır; `Result` sınırın ardında yine `throw`'a çevrilir                                                                                                                                                          | Plan v1.1'de §3.4 düzeltilecek          |
+| 2026-08-16 | Monorepo (pnpm+Turborepo) ve Expo mobil ertelendi         | En yıkıcı adım, kullanıcı değeri üretmiyor; monorepo'nun tek gerekçesi mobil ve mobil Faz 5'e kadar zorunlu değil                                                                                                                                                           | Plan v1.1'de Faz 4 sonrasına taşınacak  |
+| 2026-08-16 | **Tek koçlu model**                                       | Kullanıcı kararı; `profiles.coach_id` ve çok-koç RLS katmanı gereksiz karmaşıklık                                                                                                                                                                                           | Plan v1.1'e işlenecek                   |
+| 2026-08-16 | **Storage mahremiyet düzeltmesi Faz 1'e ertelendi**       | Uygulama yayında değil. `form_checks.front_pose_url` tam public URL saklıyor; private bucket'a geçmek kolonun yol saklamasını + mevcut satırların dönüştürülmesini gerektiriyor. Planın Faz 1'i `form_checks` tablosunu zaten baştan yazıyor — aynı iş iki kez yapılmayacak | **Faz 1 çıkış kriteri** (bkz. Bölüm 6a) |
+| 2026-08-16 | Prettier `semi: false`                                    | Kod tabanının fiili stili; tersi yüzlerce dosyaya gereksiz noktalı virgül eklerdi                                                                                                                                                                                           | Uygulandı                               |
+| 2026-08-16 | **CSP, yapılandırılan Supabase adresinden türetiliyor**   | Sabit `*.supabase.co` deseni yerel yığını (`127.0.0.1:54321`) kapsamıyordu ve yerel geliştirmeyi imkânsız kılıyordu                                                                                                                                                         | Uygulandı                               |
+| 2026-08-16 | Koç profili tüm authenticated kullanıcılara görünür       | Mesajlaşmanın çalışması için zorunlu; tek koçlu modelde kabul edilebilir takas                                                                                                                                                                                              | Uygulandı                               |
+| 2026-08-16 | AI proxy'leri Bearer token ile korunuyor                  | Plan §5.3; kimliksiz erişim kapatıldı                                                                                                                                                                                                                                       | Uygulandı                               |
+| 2026-08-16 | RLS testleri SQL script olarak yazıldı (pgTAP değil)      | Ek bağımlılık gerektirmiyor, `psql` ile CI'da doğrudan koşuyor                                                                                                                                                                                                              | Uygulandı                               |
 
 ---
 
@@ -235,12 +280,21 @@ E2E ilk kez koşturuldu ve **dört gerçek sorun** ortaya çıkardı:
 **ÇÖZÜLEN (önceki blokaj):**
 
 - `npx supabase start` çalışmıyordu (`failed to connect to the docker API at
-  npipe:////./pipe/docker_engine`, Docker Desktop kapalıydı). **ÇÖZÜLDÜ (2026-08-16):**
+npipe:////./pipe/docker_engine`, Docker Desktop kapalıydı). **ÇÖZÜLDÜ (2026-08-16):**
   Docker Desktop çalışıyor, yığın ayakta; migration doğrulaması ve RLS testi bu oturumda
   tamamlandı.
 - E2E testleri (`npm run test:e2e`) hiç çalıştırılmamıştı. **ÇÖZÜLDÜ (2026-08-16, üçüncü
   oturum):** ilk kez koşturuldu, dört gerçek sorun bulundu ve düzeltildi (bkz. Bölüm 3 "E2E
   doğrulaması ve ortaya çıkardığı hatalar"); paket artık 28/28 yeşil.
+- Danışan mesajlaşmayı hiç kullanamıyordu (`useAdminId()` null döndürüyordu). **ÇÖZÜLDÜ
+  (2026-08-16, dördüncü oturum):** `profiles_select` politikasına `role = 'admin'` koşulu
+  eklendi (bkz. Bölüm 3 "Kritik kırık düzeltmeleri").
+- Koç, onaya sunulan programdan haberdar olmuyordu (`notifications_insert` WITH CHECK
+  reddediyordu). **ÇÖZÜLDÜ (2026-08-16, dördüncü oturum):** `public.is_coach_profile(uuid)`
+  yardımcısı eklendi, politika güncellendi.
+- `/api/ai/*` proxy uçlarında oturum kontrolü yoktu (planın §5.3 ihlali). **ÇÖZÜLDÜ
+  (2026-08-16, dördüncü oturum):** Bearer token ile sunucu tarafı doğrulama eklendi; kimliksiz
+  istek upstream'e hiç ulaşmıyor.
 
 **BLOKE:**
 
@@ -264,17 +318,18 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=<npx supabase status ile alınan yerel anon key>
 
 **BEKLEYEN RİSKLER** (detay: `UPGRADE_NOTES.md` §7):
 
-| Risk                                                                                                                                                                     | Not                                                                                                                                                                                                           |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Risk                                                                                                                                                                     | Not                                                                                                                                                                                                                                                          |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `supabase/migrations/20260816090300_storage.sql` doğrudan `storage.objects` üzerine `CREATE POLICY` yazıyor                                                              | **Yerelde sorun yok** — 8 storage politikası `db reset` ile sorunsuz uygulandı (2026-08-16). Ancak barındırılan (hosted) projede `db push` sırasında rolün tablo sahibi olmaması nedeniyle `must be owner of table objects` hatasıyla hâlâ karşılaşılabilir. |
-| Storage bucket'ları (`avatars`, `form-checks-media`) **public** (`public = true`, `getPublicUrl` ile servis ediliyor)                                                    | Danışan vücut fotoğrafları URL'yi bilen herkese açık. Private bucket + signed URL'e geçilmeli. Faz 1'e ertelendi (bkz. Bölüm 4 karar kaydı ve Bölüm 6a).                                                     |
-| `next.config.mjs` PWA `runtimeCaching`'i `/rest/v1/(workout_logs\|profiles)` yanıtlarını **7 gün** (`maxAgeSeconds: 60*60*24*7`) cihazda tutuyor, logout'ta temizlik yok | Beslenme/antrenman planları ve e-posta içeren veri paylaşılan cihazda mahremiyet sorunu.                                                                                                                      |
-| `ai_backend/uv.lock` üretilmedi (dosya yok, doğrulandı)                                                                                                                  | Dockerfile `uv sync --frozen \|\| uv sync` fallback'i kullanıyor, derlemeler tekrarlanabilir değil.                                                                                                           |
-| `src/types/database.ts` elle yazıldı                                                                                                                                     | `npm run db:types` ile üretilenle diff'lenmeli.                                                                                                                                                               |
-| `npm audit`: 18 zafiyet (3 orta, 13 yüksek, 2 kritik)                                                                                                                    | Büyük ölçüde `next-pwa` v5'in eski bağımlılık ağacından. `npm audit fix --force` ÇALIŞTIRILMAMALI (Next 16'yı düşürebilir).                                                                                   |
-| `src/middleware.ts` — Next 16 bu dosya adlandırmasını deprecate etti, `proxy` istiyor                                                                                    | Şu an yalnızca uyarı.                                                                                                                                                                                         |
-| CI'daki `e2e` job'u hiç koşmadı                                                                                                                                          | Yerelde `npm run test:e2e` artık 28/28 geçiyor (2026-08-16, üçüncü oturum) ama CI'da hâlâ hiç koşmadı — bkz. aşağıdaki yeni risk satırı.                                                                     |
-| CI'daki `e2e` job'u yerel Supabase yığını + seed gerektiriyor                                                                                                            | GitHub Actions üzerinde `supabase start` adımı ve yerel `NEXT_PUBLIC_SUPABASE_URL`/`NEXT_PUBLIC_SUPABASE_ANON_KEY` ortam değişkenleri eklenmeden bu job geçemez. Şu an `.github/workflows/ci.yml`'de bu adım yok. |
+| Storage bucket'ları (`avatars`, `form-checks-media`) **public** (`public = true`, `getPublicUrl` ile servis ediliyor)                                                    | Danışan vücut fotoğrafları URL'yi bilen herkese açık. Private bucket + signed URL'e geçilmeli. Faz 1'e ertelendi (bkz. Bölüm 4 karar kaydı ve Bölüm 6a).                                                                                                     |
+| `next.config.mjs` PWA `runtimeCaching`'i `/rest/v1/(workout_logs\|profiles)` yanıtlarını **7 gün** (`maxAgeSeconds: 60*60*24*7`) cihazda tutuyor, logout'ta temizlik yok | Beslenme/antrenman planları ve e-posta içeren veri paylaşılan cihazda mahremiyet sorunu.                                                                                                                                                                     |
+| `ai_backend/uv.lock` üretilmedi (dosya yok, doğrulandı)                                                                                                                  | **ÇÖZÜLDÜ:** `ai_backend/uv.lock` artık mevcut ve commit'li.                                                                                                                                                                                                 |
+| `src/types/database.ts` elle yazıldı                                                                                                                                     | `npm run db:types` ile üretilenle diff'lenmeli.                                                                                                                                                                                                              |
+| `npm audit`: 18 zafiyet (3 orta, 13 yüksek, 2 kritik)                                                                                                                    | Büyük ölçüde `next-pwa` v5'in eski bağımlılık ağacından. `npm audit fix --force` ÇALIŞTIRILMAMALI (Next 16'yı düşürebilir).                                                                                                                                  |
+| `src/middleware.ts` — Next 16 bu dosya adlandırmasını deprecate etti, `proxy` istiyor                                                                                    | Şu an yalnızca uyarı.                                                                                                                                                                                                                                        |
+| CI'daki `e2e` job'u artık yerel Supabase yığınını kurup RLS testlerini koşuyor                                                                                           | `.github/workflows/ci.yml` `e2e` job'u güncellendi: `supabase start` adımı, yerel `NEXT_PUBLIC_SUPABASE_URL`/`NEXT_PUBLIC_SUPABASE_ANON_KEY`, ardından `npm run test:rls`. "CI'da e2e geçemez" riski **ÇÖZÜLDÜ**.                                            |
+| `data/` altındaki CSV'ler (8,7 MB `exercises.csv` dahil) hiçbir zaman veritabanına import edilmedi                                                                       | `exercises` ve `food_database` tablolarında yalnızca 10'ar demo satır var. Egzersiz kütüphanesi ve besin arama gerçek veriyle çalışmıyor. Faz 1'e taşındı.                                                                                                   |
+| `src/app/actions.ts`'teki 4 server action hiçbir yerden çağrılmıyor (ölü kod)                                                                                            | Planın AC-2.4 grep kuralını da ihlal ediyorlar (`.from()` doğrudan çağrısı). Faz 1'de karara bağlanmalı: silinsin mi, kullanılsın mı.                                                                                                                        |
 
 ---
 
@@ -370,9 +425,10 @@ sütuna taşınması.
 
 ## 9. Oturum günlüğü
 
-| Tarih      | Oturum özeti                                                                                                                                                                  | Sonuç                                                                                                     |
-| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| 2026-08-16 | v1.0 production-ready yükseltmesi (TS migrasyonu, FastAPI servisleştirme, Supabase RLS, test/CI/Docker altyapısı, dokümantasyon) + lint/test/build zincirinin yeşile alınması | lint 0 hata, 180/180 test, build başarılı. DB/E2E doğrulaması Docker eksikliği nedeniyle bekliyor.        |
-| 2026-08-16 | `docs/PROGRESS.md` oluşturuldu (oturumlar arası süreklilik için); `supabase/config.toml`'daki `[inbucket]` → `[local_smtp]` deprecation uyarısı düzeltildi                    | `PROGRESS.md` ilk sürümü yazıldı; `config.toml` düzeltmesi tek bölüm adı değişikliği, anahtarlar korundu. |
-| 2026-08-16 (ikinci oturum) | Sağlamlaştırma turu: DB/RLS doğrulaması, tip üretimi, ai_backend ilk çalıştırma, PWA mahremiyet düzeltmesi, Prettier hizalama, gitignore artıkları | Tüm kapılar yeşil (lint/type/format/test/build + ruff/mypy/pytest/docker). Storage düzeltmesi Faz 1'e ertelendi. E2E koşuluyor. |
-| 2026-08-16 (üçüncü oturum) | E2E doğrulaması: Playwright ilk kez koşturuldu; Türkçe İ locator tuzağı, kapalı e-posta sağlayıcısı, CSP'nin yerel Supabase'i bloklaması ve iki kararsız/hatalı test düzeltildi | 28/28 E2E geçti (chromium + Mobile Chrome). Sağlamlaştırma turu kapandı. |
+| Tarih                        | Oturum özeti                                                                                                                                                                    | Sonuç                                                                                                                           |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-08-16                   | v1.0 production-ready yükseltmesi (TS migrasyonu, FastAPI servisleştirme, Supabase RLS, test/CI/Docker altyapısı, dokümantasyon) + lint/test/build zincirinin yeşile alınması   | lint 0 hata, 180/180 test, build başarılı. DB/E2E doğrulaması Docker eksikliği nedeniyle bekliyor.                              |
+| 2026-08-16                   | `docs/PROGRESS.md` oluşturuldu (oturumlar arası süreklilik için); `supabase/config.toml`'daki `[inbucket]` → `[local_smtp]` deprecation uyarısı düzeltildi                      | `PROGRESS.md` ilk sürümü yazıldı; `config.toml` düzeltmesi tek bölüm adı değişikliği, anahtarlar korundu.                       |
+| 2026-08-16 (ikinci oturum)   | Sağlamlaştırma turu: DB/RLS doğrulaması, tip üretimi, ai_backend ilk çalıştırma, PWA mahremiyet düzeltmesi, Prettier hizalama, gitignore artıkları                              | Tüm kapılar yeşil (lint/type/format/test/build + ruff/mypy/pytest/docker). Storage düzeltmesi Faz 1'e ertelendi. E2E koşuluyor. |
+| 2026-08-16 (üçüncü oturum)   | E2E doğrulaması: Playwright ilk kez koşturuldu; Türkçe İ locator tuzağı, kapalı e-posta sağlayıcısı, CSP'nin yerel Supabase'i bloklaması ve iki kararsız/hatalı test düzeltildi | 28/28 E2E geçti (chromium + Mobile Chrome). Sağlamlaştırma turu kapandı.                                                        |
+| 2026-08-16 (dördüncü oturum) | Keşif envanteri (`docs/DISCOVERY.md`), plan v1.1 revizyonu, üç kritik kırığın düzeltilmesi ve regresyon korumalarının eklenmesi                                                 | 192 birim + 16×2 E2E + 19 RLS senaryosu geçiyor. Faz 1'e hazır.                                                                 |

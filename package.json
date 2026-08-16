@@ -22,6 +22,7 @@
     "db:types": "supabase gen types typescript --local --schema public > src/types/database.ts",
     "db:migrate": "supabase db push",
     "clean:foods": "node scripts/clean-foods.mjs",
+    "test:rls": "docker exec -i supabase_db_my-coaching-app psql -U postgres -d postgres -v ON_ERROR_STOP=1 -f - < supabase/tests/rls.test.sql",
     "ci": "npm run lint && npm run type-check && npm run test && npm run build"
   },
   "dependencies": {

@@ -54,6 +54,7 @@ Türkçe metin içeren locator'larda **case-insensitive regex (`/i` bayrağı) k
 - Bu, `tests/e2e/fixtures.ts`'teki `login()` fonksiyonunda gerçek bir hataya yol açmıştı: `page.getByLabel(/şifre/i)` giriş sayfasındaki `ŞİFRE` etiketiyle hiçbir zaman eşleşmiyordu ve bu tek satır **12 testin tamamını** `beforeEach`/`login()` üzerinden bozuyordu.
 
 **Kural:** İ veya ı içeren herhangi bir metni eşlerken:
+
 - Erişilebilir etiket/rol için **birebir metin** kullanın: `page.getByLabel('ŞİFRE')`, `page.getByRole('button', { name: 'GİRİŞ YAP' })` — bu en dayanıklı yöntemdir.
 - Regex kullanmanız gerekiyorsa `i` bayrağını KOYMAYIN ve kaynaktaki harfleri birebir (aynı Unicode kod noktasıyla) kopyalayın, ör. `/çıkış yap/` (`i` bayrağı yok, `ı` kaynaktan birebir kopyalanmış).
 - İ/ı içermeyen metinlerde (`Duyurular`, `Beslenme`, `Antrenman`, `Sohbet`, `Form Check`, `Günlük Veriler` — bunların hiçbiri İ/ı içermez, `ü` gibi standart aksanlı harfler güvenlidir) `/i` bayraklı regex kullanmaya devam edebilirsiniz.

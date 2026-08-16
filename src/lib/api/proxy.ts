@@ -8,6 +8,7 @@ import type { z } from 'zod'
 
 import { getServerEnv } from '@/env'
 import { createRequestLogger } from '@/lib/logger'
+import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { formatZodError } from '@/lib/validation/schemas'
 
 const UPSTREAM_TIMEOUT_MS = 30_000
@@ -47,7 +48,41 @@ export async function handleAiProxy<TOut>(
   upstreamPath: string
 ): Promise<NextResponse> {
   const requestId = crypto.randomUUID()
-  const log = createRequestLogger(requestId)
+  let log = createRequestLogger(requestId)
+
+  // 0) Oturum doğrulama — plan §5.3: "auth zorunlu, kullanıcı kimliği server'da JWT'den
+  // alınır (client'tan user_id kabul etme)". `Authorization: Bearer <token>` başlığı
+  // Supabase'e karşı doğrulanır; kullanıcı kimliği yalnızca loglama için tutulur ve
+  // upstream'e (FastAPI) gövdede GÖNDERİLMEZ.
+  // NOT: Rate limit anahtarı hâlâ IP tabanlıdır (bkz. src/proxy.ts) — burada değişmedi.
+  const authHeader = request.headers.get('authorization')
+  const bearerMatch = authHeader?.match(/^Bearer\s+(.+)$/i)
+  const accessToken = bearerMatch?.[1]?.trim()
+
+  if (!accessToken) {
+    log.warn({ upstreamPath }, 'AI proxy: Authorization başlığı eksik/biçimsiz')
+    return errorResponse(
+      401,
+      'NOT_AUTHENTICATED',
+      'Oturumunuz sona ermiş. Lütfen tekrar giriş yapın.',
+      requestId
+    )
+  }
+
+  const authClient = createServerSupabaseClient(accessToken)
+  const { data: userData, error: userError } = await authClient.auth.getUser(accessToken)
+
+  if (userError || !userData.user) {
+    log.warn({ upstreamPath, err: userError }, 'AI proxy: geçersiz veya süresi dolmuş oturum')
+    return errorResponse(
+      401,
+      'NOT_AUTHENTICATED',
+      'Oturumunuz sona ermiş. Lütfen tekrar giriş yapın.',
+      requestId
+    )
+  }
+
+  log = log.child({ userId: userData.user.id })
 
   // 1) Gövdeyi oku
   let rawBody: unknown

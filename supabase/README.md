@@ -10,7 +10,8 @@ supabase/
 │   ├── 20260816090000_initial_schema.sql         # enum'lar, tablolar, indeksler
 │   ├── 20260816090100_functions_and_triggers.sql # is_admin, handle_new_user, increment_streak
 │   ├── 20260816090200_rls_policies.sql           # RLS + GRANT/REVOKE
-│   └── 20260816090300_storage.sql                # bucket'lar + storage.objects politikaları
+│   ├── 20260816090300_storage.sql                # bucket'lar + storage.objects politikaları
+│   └── 20260816100000_fix_rls_visibility.sql     # koç profili görünürlüğü + danışan→koç bildirimi
 ├── seed.sql                    # SADECE YEREL demo verisi
 └── README.md
 ```
@@ -89,8 +90,8 @@ Kısaltmalar: **S** = satır sahibi (`student_id`/`id` = `auth.uid()`), **K** = 
 
 | Tablo | SELECT | INSERT | UPDATE | DELETE |
 |---|---|---|---|---|
-| `profiles` | S veya K | Sadece K (normalde trigger yapar) | S (**rol sütunu değiştirilemez**) veya K | Sadece K |
-| `notifications` | S veya K | K **veya** kendi adına (`student_id = auth.uid()`) | S veya K (`is_read`) | Sadece K |
+| `profiles` | S veya K **veya satırın rolü `admin`** (koç profili herkese görünür) | Sadece K (normalde trigger yapar) | S (**rol sütunu değiştirilemez**) veya K | Sadece K |
+| `notifications` | S veya K | K **veya** kendi adına (`student_id = auth.uid()`) **veya alıcı koçsa** (`is_coach_profile(student_id)`) | S veya K (`is_read`) | Sadece K |
 | `form_checks` | S veya K | Sadece kendi adına | S veya K | S veya K |
 | `daily_logs` | S veya K | Sadece kendi adına | S veya K | S veya K |
 | `workout_logs` | S veya K | Sadece kendi adına | S veya K | S veya K |
@@ -98,6 +99,26 @@ Kısaltmalar: **S** = satır sahibi (`student_id`/`id` = `auth.uid()`), **K** = 
 | `messages` | gönderen **veya** alıcı veya K | `sender_id = auth.uid()` | **Sadece alıcı** (`is_read`) | gönderen veya K |
 | `exercises` | Tüm `authenticated` | Sadece K | Sadece K | Sadece K |
 | `food_database` | Tüm `authenticated` | Sadece K | Sadece K | Sadece K |
+
+### Koç görünürlüğü (`20260816100000_fix_rls_visibility.sql`)
+
+İki politika bu migration'da genişletildi:
+
+* **`profiles_select`** artık `id = auth.uid() OR is_admin() OR role = 'admin'` .
+  Kimliği doğrulanmış herkes **koç profillerini** görebilir — `useAdminId()` bu sayede
+  koçun id'sini bulabiliyor ve mesajlaşma çalışıyor. Danışanlar **birbirini görmez**.
+  `role` ifadesi satırın kendi kolonudur (alt sorgu değil), bu yüzden özyineleme oluşmaz.
+  > **Görünürlük etkisi (bilinçli karar):** Koçun profil satırının tamamı — e-posta, ad,
+  > avatar ve `profiles`'taki diğer kolonlar — tüm danışanlara açılır. Kabul edilebilir
+  > görülmüştür (koç zaten danışanın muhatabıdır). `profiles`'a ileride koça ait hassas
+  > bir kolon eklenirse bu politika kolon bazlı bir görünüme daraltılmalıdır.
+
+* **`notifications_insert`** artık `is_admin() OR student_id = auth.uid() OR is_coach_profile(student_id)`.
+  Danışan, alıcısı **koç** olan bildirim oluşturabilir (program onaya sunulduğunda).
+  Danışandan danışana bildirim hâlâ reddedilir (spam koruması).
+  > `notifications_select` **değiştirilmedi**: danışan koça yazdığı bildirimi geri okuyamaz.
+  > Bu yüzden bu insert'e `.select()` / `RETURNING` zincirlenmemelidir — aksi hâlde satır
+  > yazılsa bile sorgu `new row violates row-level security policy` ile döner.
 
 ### Yetki yükseltme koruması
 
@@ -125,6 +146,7 @@ satırını güncelleyebilir ama **rolünü `admin`'e çeviremez**. Yalnızca ko
 |---|---|---|
 | `public.is_admin` | `(uid uuid default auth.uid()) -> boolean` | `SECURITY DEFINER`, `STABLE` |
 | `public.profile_role` | `(uid uuid default auth.uid()) -> user_role` | `SECURITY DEFINER`, `STABLE` |
+| `public.is_coach_profile` | `(target uuid) -> boolean` | `SECURITY DEFINER`, `STABLE`. Yalnız `notifications_insert` içinde kullanılır; `profiles` politikalarında **çağrılmamalıdır** (özyineleme) |
 | `public.increment_streak` | `(user_id uuid) -> integer` | **İmza değiştirilemez** — kod `rpc('increment_streak', { user_id })` çağırıyor |
 
 `increment_streak` mantığı: `last_checkin_at` bugünse seri değişmez, dünse +1,
@@ -218,6 +240,18 @@ supabase db reset      # migration'lar + seed
    Ayrıca `createUser` çağrısına `user_metadata: { full_name, role: 'student' }`
    eklenirse trigger doğru adı ilk seferde yazar.
 
-4. **`anon` rolü kilitli.** Giriş yapmamış istemci `public` şemadaki hiçbir tabloyu
+4. **[Düzeltildi] Danışan koçun profilini göremiyordu** (`docs/DISCOVERY.md` §15.2 #1).
+   `profiles_select` yalnızca `id = auth.uid() OR is_admin()` idi; `useAdminId()`
+   (`src/hooks/useMessages.ts`) `null` dönüyor, `MessagesTab`'da `chatPartnerId` boş
+   kalıyor ve danışan koçla hiç mesajlaşamıyordu.
+   `20260816100000_fix_rls_visibility.sql` politikaya `OR role = 'admin'` koşulunu ekledi.
+
+5. **[Düzeltildi] Danışan koça bildirim oluşturamıyordu** (`docs/DISCOVERY.md` §15.2 #2).
+   `notifications_insert` `WITH CHECK` alıcının `auth.uid()` olmasını şart koşuyordu, bu
+   yüzden `useSubmitProgramForApproval` koça "onay bekliyor" bildirimi yazamıyordu.
+   `20260816100000_fix_rls_visibility.sql` `public.is_coach_profile(student_id)` koşulunu
+   ekledi; danışandan danışana bildirim hâlâ reddedilir.
+
+6. **`anon` rolü kilitli.** Giriş yapmamış istemci `public` şemadaki hiçbir tabloyu
    okuyamaz. Server-side render'da veri çekmek gerekirse `getSupabaseAdmin()`
    (service_role) veya kullanıcı oturumunu taşıyan bir server client kullanılmalıdır.

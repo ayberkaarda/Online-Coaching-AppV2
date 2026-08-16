@@ -135,6 +135,32 @@ jobs:
         # yığın ayağa kaldırıldı; reset edilecek gerçek/kalıcı bir veri yok.
         run: supabase db reset
 
+      - name: Verify Supabase DB container is up
+        # `npm run test:rls` (package.json) hedef container adını
+        # `supabase_db_my-coaching-app` olarak SABİT kullanıyor; bu ad
+        # `supabase/config.toml`'daki `project_id = "my-coaching-app"`
+        # değerinden türüyor. `supabase start` bu adı örtük olarak üretir,
+        # dolayısıyla normalde CI'da da aynı olmalı — ama bu bağ kırılgan
+        # (CLI davranışı değişebilir, config.toml elle değiştirilebilir).
+        # Container yoksa bir sonraki adımdaki `docker exec` hatası
+        # ("No such container") kafa karıştırıcı olur; burada erkenden,
+        # net bir mesajla düşüyoruz.
+        run: |
+          if ! docker ps --format '{{.Names}}' | grep -q '^supabase_db_my-coaching-app$'; then
+            echo "::error::supabase_db_my-coaching-app container'i bulunamadi. 'supabase start' beklenen adla bir DB container'i olusturmamis olabilir (bkz. supabase/config.toml project_id). 'docker ps' ciktisi:"
+            docker ps --format '{{.Names}}'
+            exit 1
+          fi
+
+      - name: Run RLS policy tests
+        # supabase/tests/rls.test.sql: her senaryo BEGIN/ROLLBACK icinde
+        # calisir (veri degistirmez) ve basarisizlikta \set ON_ERROR_STOP
+        # sayesinde psql sifirdan farkli exit code doner. Bilerek "db
+        # reset" SONRASI (seed verisi hazir olmali) ve "build" ONCESI
+        # calistiriliyor: RLS kirilmissa job build/E2E'ye hic girmeden,
+        # erken ve net bir mesajla dussun.
+        run: npm run test:rls
+
       - name: Capture local Supabase connection info
         # Yerel anon key, Supabase CLI'nin tüm kurulumlarında sabit ve
         # herkese açık bilinen bir demo JWT'sidir (gizli bir sır değildir).

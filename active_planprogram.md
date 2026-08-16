@@ -28,7 +28,7 @@
 - **R3** — Tek koçlu modele geçildi: §3.1'den `profiles.coach_id` ve bağlı
   CHECK kaldırıldı, §3.2 RLS matrisi iki aktöre indi, "koç başka koçun
   öğrencisini göremez" katmanı kaldırıldı, `EXISTS (... coach_id =
-  auth.uid())` pattern'i mevcut ve doğrulanmış `public.is_admin()`
+auth.uid())` pattern'i mevcut ve doğrulanmış `public.is_admin()`
   `SECURITY DEFINER` yardımcısıyla değiştirildi (özyineleme uyarısı gerekçesiyle
   korundu), RLS test senaryoları güncellendi — kullanıcı kararı
   (`docs/PROGRESS.md` §4).
@@ -51,7 +51,7 @@
   ihlal ediliyor.
 - **R8** — §1.3 teknoloji tablosu güncellendi: Next.js 15 → **16 + React 19**,
   monorepo satırına "Faz 4.5" notu, build motoru satırı (`next build
-  --webpack`, `next-pwa` kısıtı), grafik satırına `chart.js` ikinci kütüphane
+--webpack`, `next-pwa` kısıtı), grafik satırına `chart.js` ikinci kütüphane
   notu — tablo repodan geri kalmıştı. Grafik tekleştirme Faz 4'e iş kalemi +
   AC-4.3 olarak eklendi.
 - **R9** — §1.2 topoloji diyagramı mevcut duruma çekildi (`src/` · Next.js 16,
@@ -164,19 +164,19 @@ ile yürür; `apps/web` yolu Faz 4.5'ten sonra geçerlidir.
 
 ### 1.3 Teknoloji kararları (sabitlenmiş)
 
-| Alan             | Karar                                                  | Not                                                                                                                                    |
-| ---------------- | ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Alan             | Karar                                                  | Not                                                                                                                                     |
+| ---------------- | ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
 | Monorepo         | pnpm workspaces + Turborepo                            | **Faz 4.5'te devreye girer (§7)**; o zamana kadar tek repo + npm                                                                        |
 | Web              | Next.js 16 (App Router) + React 19 + TypeScript strict | mevcut durum (`next@16.2.10`, `react@19.2.4`)                                                                                           |
 | Build motoru     | webpack — `next build --webpack`                       | `next-pwa` bir webpack eklentisi; Turbopack'e geçiş PWA'yı bırakmayı gerektirir. `@ducanh2912/next-pwa` de webpack tabanlı, çözüm değil |
-| Mobil            | Expo SDK (managed) + Expo Router + TypeScript          | Faz 4.5; EAS build hedefli                                                                                                             |
+| Mobil            | Expo SDK (managed) + Expo Router + TypeScript          | Faz 4.5; EAS build hedefli                                                                                                              |
 | Veri erişimi     | TanStack Query + merkezi veri katmanı                  | bugün `src/hooks` + `src/lib/api`; Faz 4.5'te `@repo/api-client`. Sözleşme ve cache key: §3.4                                           |
 | Form             | react-hook-form + zod                                  | ortak şemalar bugün `src/lib/validation/schemas.ts`; Faz 4.5'te `packages/types/schemas`                                                |
 | Grafik           | web: recharts · mobil: victory-native                  | web'de ayrıca `chart.js` + `react-chartjs-2` kullanılıyor (StatsTab) — **Faz 4'te tek kütüphaneye indirilecek**                         |
-| AI backend       | FastAPI + Pydantic v2 + uv                             | ruff + mypy strict                                                                                                                     |
+| AI backend       | FastAPI + Pydantic v2 + uv                             | ruff + mypy strict                                                                                                                      |
 | Vision sağlayıcı | Anthropic Messages API (görsel girişli)                | `VISION_PROVIDER` env ile soyutlanır, adapter pattern                                                                                   |
-| Push             | Expo Push + `device_push_tokens`                       | web push kapsam dışı (v2)                                                                                                              |
-| Zamanlama        | Supabase Edge Functions + pg_cron                      | §10                                                                                                                                    |
+| Push             | Expo Push + `device_push_tokens`                       | web push kapsam dışı (v2)                                                                                                               |
+| Zamanlama        | Supabase Edge Functions + pg_cron                      | §10                                                                                                                                     |
 
 ---
 
@@ -268,12 +268,12 @@ dışındadır ve o gün geldiğinde ADR ile açılır.
 Tek koçlu model: iki aktör vardır. Koç **tüm** danışanları görür; "koç başka
 koçun danışanını göremez" katmanı yoktur.
 
-| Aktör        | Kendi verisi | Danışan verisi                                                                                 | Not                                                        |
-| ------------ | ------------ | ---------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
-| client       | R/W          | —                                                                                              | Kendi satırı dışındaki her şey DENY                        |
-| coach        | R/W          | **R** (tüm danışanlar) + **W** (yalnız: plan tabloları, coach_feedback, coach_notes, sistem mesajları) | Danışanın kendi log'una yazamaz                            |
-| anon         | —            | —                                                                                              | Tüm tablolarda REVOKE; hiçbir satır okuyamaz               |
-| service_role | bypass       | bypass                                                                                         | Yalnızca Edge Function'lar ve `ai_backend` (I-2)           |
+| Aktör        | Kendi verisi | Danışan verisi                                                                                         | Not                                              |
+| ------------ | ------------ | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------ |
+| client       | R/W          | —                                                                                                      | Kendi satırı dışındaki her şey DENY              |
+| coach        | R/W          | **R** (tüm danışanlar) + **W** (yalnız: plan tabloları, coach_feedback, coach_notes, sistem mesajları) | Danışanın kendi log'una yazamaz                  |
+| anon         | —            | —                                                                                                      | Tüm tablolarda REVOKE; hiçbir satır okuyamaz     |
+| service_role | bypass       | bypass                                                                                                 | Yalnızca Edge Function'lar ve `ai_backend` (I-2) |
 
 - Koç yetkisi bir ilişki kolonundan değil **rolden** doğrulanır. Politikalarda
   mevcut ve doğrulanmış `public.is_admin()` yardımcısı kullanılır
@@ -282,7 +282,7 @@ koçun danışanını göremez" katmanı yoktur.
   Faz 1'deki yeniden adlandırmadan sonra fonksiyonun gövdesi `role = 'coach'`
   olur; adı ve imzası korunur.
 - **Politika özyinelemesi uyarısı (KORUNACAK).** Yardımcının `SECURITY
-  DEFINER` olması şart, kolaylık değil. Bir politika kendi tablosuna düz bir
+DEFINER` olması şart, kolaylık değil. Bir politika kendi tablosuna düz bir
   alt sorguyla geri sorarsa (`EXISTS (SELECT 1 FROM profiles p WHERE ...)`
   bir `profiles` politikasının içinde), alt sorgu da RLS'e tabi olur ve aynı
   politikayı yeniden tetikler; Postgres bunu
@@ -382,13 +382,13 @@ class ApiError extends Error {
 Faz 1 şemayı yeniden yazar, ama repoda çalışan bir şema ve içinde veri var.
 Her yapısal migration'ın yanında bir **veri migrasyonu** yazılır:
 
-| Kaynak (mevcut)                                                    | Hedef (Faz 1)                              | Not                                                                                                                                                                                                       |
-| ------------------------------------------------------------------ | ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `profiles.workout_plan` — JSON **string**, `Record<gün, string>`   | `workout_plans` + `workout_plan_exercises` | Gün içeriği serbest metin; satırlara ayrıştırılır, ilk sürüm `version = 1, is_active = true`. Ayrıştırılamayan metin kaybolmaz, ham hâliyle bir `notes` alanında saklanır.                                 |
-| `profiles.nutrition_plan` — JSON **string**, `Record<gün, {items,total}>` | `nutrition_plans` + `nutrition_plan_meals` | `items` "Ad:gram" listesi, `total` gün kalorisi. Parse edilemeyen gün düşürülmez, ham metin korunur.                                                                                                       |
-| `messages` (`sender_id` / `receiver_id`, `is_read bool`)           | `conversations` + `messages.conversation_id` | **`conversations` tablosu şu an YOK.** Her (koç, danışan) çifti için tek konuşma üretilir. `is_read` → `read_at`: bilgi uydurma; okunma zamanı bilinmediği için karar ADR'de verilir (NULL bırak vs. `created_at` ile doldur). |
-| `form_checks`                                                      | yeni `form_checks` (+ `status` enum)       | **`status` kolonu şu an YOK.** Dönüşüm: `coach_feedback` doluysa `reviewed`, boşsa `pending`. URL kolonları tam URL → bucket içi yol (§3.3).                                                              |
-| `daily_logs`, `workout_logs`, `program_approvals`, `notifications` | karşılıkları                               | Kolon eşlemesi birebir değilse eşleme tablosu migration dosyasının başına yorum olarak yazılır.                                                                                                            |
+| Kaynak (mevcut)                                                           | Hedef (Faz 1)                                | Not                                                                                                                                                                                                                            |
+| ------------------------------------------------------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `profiles.workout_plan` — JSON **string**, `Record<gün, string>`          | `workout_plans` + `workout_plan_exercises`   | Gün içeriği serbest metin; satırlara ayrıştırılır, ilk sürüm `version = 1, is_active = true`. Ayrıştırılamayan metin kaybolmaz, ham hâliyle bir `notes` alanında saklanır.                                                     |
+| `profiles.nutrition_plan` — JSON **string**, `Record<gün, {items,total}>` | `nutrition_plans` + `nutrition_plan_meals`   | `items` "Ad:gram" listesi, `total` gün kalorisi. Parse edilemeyen gün düşürülmez, ham metin korunur.                                                                                                                           |
+| `messages` (`sender_id` / `receiver_id`, `is_read bool`)                  | `conversations` + `messages.conversation_id` | **`conversations` tablosu şu an YOK.** Her (koç, danışan) çifti için tek konuşma üretilir. `is_read` → `read_at`: bilgi uydurma; okunma zamanı bilinmediği için karar ADR'de verilir (NULL bırak vs. `created_at` ile doldur). |
+| `form_checks`                                                             | yeni `form_checks` (+ `status` enum)         | **`status` kolonu şu an YOK.** Dönüşüm: `coach_feedback` doluysa `reviewed`, boşsa `pending`. URL kolonları tam URL → bucket içi yol (§3.3).                                                                                   |
+| `daily_logs`, `workout_logs`, `program_approvals`, `notifications`        | karşılıkları                                 | Kolon eşlemesi birebir değilse eşleme tablosu migration dosyasının başına yorum olarak yazılır.                                                                                                                                |
 
 Kurallar:
 
