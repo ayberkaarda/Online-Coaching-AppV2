@@ -15,6 +15,7 @@ import { toast } from 'sonner'
 
 import { EmptyState, QueryState, SkeletonCard } from '@/components/ui'
 import { useFormChecks, useSubmitFormCheck } from '@/hooks'
+import { ALLOWED_IMAGE_MIME, validateImageFile } from '@/lib/upload-validation'
 import { formatDateTR, formatDateTimeTR } from '@/lib/utils'
 import { formCheckSchema, type FormCheckInput } from '@/lib/validation/schemas'
 import type { UserRole } from '@/types'
@@ -69,10 +70,26 @@ export default function FormCheckTab({
   const beforeImageId = beforeOverride ?? defaultBeforeId
   const afterImageId = afterOverride ?? defaultAfterId
 
+  // A-20/A-07: dosya seçildiği anda (submit beklenmeden) boyut/tip/magic-byte doğrulanır.
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>): void => {
     const file = event.target.files?.[0] ?? null
-    setPoseFile(file)
-    if (file) setFileError(null)
+    if (!file) {
+      setPoseFile(null)
+      return
+    }
+
+    void validateImageFile(file).then((result) => {
+      if (!result.ok) {
+        toast.error(result.message)
+        setFileError(result.message)
+        setPoseFile(null)
+        // key artınca input yeniden mount olur; reddedilen seçim temizlenir.
+        setFileInputKey((k) => k + 1)
+        return
+      }
+      setPoseFile(file)
+      setFileError(null)
+    })
   }
 
   const onSubmit = handleSubmit(async (values) => {
@@ -171,7 +188,7 @@ export default function FormCheckTab({
                 id="formcheck-pose"
                 key={fileInputKey}
                 type="file"
-                accept="image/*"
+                accept={ALLOWED_IMAGE_MIME.join(',')}
                 onChange={handleFileChange}
                 aria-invalid={fileError ? 'true' : 'false'}
                 aria-describedby={fileError ? 'formcheck-pose-error' : undefined}

@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation'
 import type { ChangeEvent, JSX } from 'react'
 import { useEffect } from 'react'
 import { useForm } from 'react-hook-form'
+import { toast } from 'sonner'
 
 import {
   useNutritionPlan,
@@ -17,6 +18,7 @@ import {
   useWorkoutPlan,
 } from '@/hooks'
 import { QueryState, SkeletonCard, SkeletonText } from '@/components/ui'
+import { ALLOWED_IMAGE_MIME, validateImageFile } from '@/lib/upload-validation'
 import { passwordChangeSchema, type PasswordChangeInput } from '@/lib/validation/schemas'
 import {
   DAY_NAMES,
@@ -121,11 +123,21 @@ export default function ProfilePage(): JSX.Element {
     }
   }, [isSessionLoading, session, router])
 
+  // A-20/A-07: dosya seçildiği anda (submit beklenmeden) boyut/tip/magic-byte doğrulanır.
   function handleAvatarUpload(event: ChangeEvent<HTMLInputElement>): void {
     const file = event.target.files?.[0]
+    const input = event.target
     if (!file || !userId) return
-    uploadAvatar.mutate({ userId, file })
-    event.target.value = ''
+
+    void validateImageFile(file).then((result) => {
+      if (!result.ok) {
+        toast.error(result.message)
+        input.value = ''
+        return
+      }
+      uploadAvatar.mutate({ userId, file })
+      input.value = ''
+    })
   }
 
   const onSubmitPassword = handleSubmit((values) => {
@@ -177,7 +189,7 @@ export default function ProfilePage(): JSX.Element {
           </div>
           <input
             type="file"
-            accept="image/*"
+            accept={ALLOWED_IMAGE_MIME.join(',')}
             aria-label="Profil fotoğrafı yükle"
             aria-busy={uploadAvatar.isPending}
             onChange={handleAvatarUpload}

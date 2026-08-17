@@ -16,6 +16,7 @@ import {
   createSignedUrls,
 } from '@/lib/storage'
 import { supabase } from '@/lib/supabase/client'
+import { assertValidImageFile } from '@/lib/upload-validation'
 import type { Profile } from '@/types'
 
 /** Profil satırı + avatar için üretilmiş imzalı adres. */
@@ -87,12 +88,13 @@ export function useUploadAvatar() {
 
   return useMutation({
     mutationFn: async ({ userId, file }: UploadAvatarInput): Promise<string> => {
-      const extension = file.name.split('.').pop()?.toLowerCase() || 'jpg'
+      // Uzantı dosya adından DEĞİL, magic-byte ile tespit edilen gerçek içerikten türetilir (A-21).
+      const { mime, extension } = await assertValidImageFile(file)
       const fileName = `${userId}-${crypto.randomUUID()}.${extension}`
 
       const { error: uploadError } = await supabase.storage
         .from(AVATAR_BUCKET)
-        .upload(fileName, file, { cacheControl: '3600', upsert: false })
+        .upload(fileName, file, { cacheControl: '3600', upsert: false, contentType: mime })
       if (uploadError) throw new Error(uploadError.message)
 
       const { error: updateError } = await supabase

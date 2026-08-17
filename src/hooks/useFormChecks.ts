@@ -15,6 +15,7 @@ import { logger } from '@/lib/logger'
 import { queryKeyRoots, queryKeys } from '@/lib/query/keys'
 import { FORM_CHECK_BUCKET, SIGNED_URL_STALE_TIME_MS, createSignedUrls } from '@/lib/storage'
 import { supabase } from '@/lib/supabase/client'
+import { assertValidImageFile } from '@/lib/upload-validation'
 import type { FormCheck } from '@/types'
 
 /**
@@ -72,10 +73,13 @@ export interface SubmitFormCheckInput {
 
 /** Pozu yükler ve bucket İÇİNDEKİ YOLU döner (tam URL değil — kolonlar yol saklar). */
 async function uploadPose(clientId: string, file: File): Promise<string> {
-  const extension = file.name.split('.').pop()?.toLowerCase() || 'jpg'
+  // Uzantı dosya adından DEĞİL, magic-byte ile tespit edilen gerçek içerikten türetilir (A-21).
+  const { mime, extension } = await assertValidImageFile(file)
   const path = `poses/${clientId}-${crypto.randomUUID()}.${extension}`
 
-  const { error } = await supabase.storage.from(FORM_CHECK_BUCKET).upload(path, file)
+  const { error } = await supabase.storage
+    .from(FORM_CHECK_BUCKET)
+    .upload(path, file, { contentType: mime })
   if (error) throw new Error(error.message)
 
   return path
