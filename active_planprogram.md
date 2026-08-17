@@ -811,7 +811,24 @@ düşürdüğünde yeni değer baseline olur.
 
 ---
 
-## 4. Faz 2 — Koç-Öğrenci Çekirdek Akışı
+## 4. Faz 2 — Koç-Öğrenci Çekirdek Akışı (TAMAMLANDI)
+
+**Durum — TAMAMLANDI (2026-08-17).** Yedi dilim (2a–2j) sıralı/paralel yürütüldü; sıralama
+kritikti, 2a tüm ekranlara dokunduğu için atomik ve yalnız çalıştı. **AC-2.1–AC-2.4
+karşılandı**: uçtan uca akış Playwright'ta doğrulandı, mesaj gecikmesi ölçüldü **419 ms**
+(bütçe 2 sn), form check medyası curl ile yeniden kanıtlandı (kimliksiz `400`, imzalı
+adres `200`), `supabase.from(` grep'i yalnızca `src/hooks/**` içinde geçiyor. **AC-1.6.7
+(Faz 1.6'dan devredilen `LoopRing`/`prefers-reduced-motion` kısıtı) `LoopRing` bileşeniyle
+(ADR-0017) bu fazda kapandı** — reduced-motion açık/kapalı iki durumda üretilen
+`stroke-dashoffset` birebir aynı çıktı verdi. §4.1 madde 2'deki "geçmiş loglar eski
+versiyona bağlı kalır" garantisi copy-on-write plan yayınlama ile karşılandı: eski
+`save_workout_plan()` her kayıtta plan satırlarını silip yeniden yazdığı için danışanın
+geçmiş antrenman loglarının plan bağı kopuyordu, bu turda düzeltildi. Doğrulama zinciri tam
+yeşil: birim **502/502** (42 dosya), RLS **104/104**, plan transform 26/26,
+type-check/lint/format temiz, build başarılı, `db reset` 21 migration + seed, CI ratchet
+6/6 sayaç yeşil, E2E **50/50** (iki ardışık koşu + `CI=1`/workers=1/retries=2
+yapılandırmasıyla). Tam detay, dilim bazlı bulgular ve kaydedilen borçlar:
+`docs/PROGRESS.md` §3 "Faz 2 — Koç-Danışan Çekirdek Akışı".
 
 ### 4.1 Antrenman
 
