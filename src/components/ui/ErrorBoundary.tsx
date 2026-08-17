@@ -66,7 +66,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
         <button
           type="button"
           onClick={this.reset}
-          className="rounded-xl bg-brand-purple px-5 py-2.5 text-sm font-bold text-white transition-transform active:scale-95"
+          className="rounded-xl bg-accent px-5 py-2.5 text-sm font-bold text-white transition-transform active:scale-95"
         >
           Tekrar Dene
         </button>

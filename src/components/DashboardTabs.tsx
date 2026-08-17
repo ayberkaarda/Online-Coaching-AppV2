@@ -180,7 +180,7 @@ export function DashboardTabs({
           <div className="mb-8 overflow-hidden rounded-3xl border border-gray-200 bg-white p-5 shadow-sm transition-all dark:border-zinc-800 dark:bg-[#16161d]">
             <div className="mb-6 flex flex-col items-start justify-between gap-4 border-b border-gray-100 pb-4 dark:border-zinc-800 md:flex-row md:items-center">
               <div>
-                <h3 className="text-sm font-black uppercase tracking-widest text-brand-purple">
+                <h3 className="text-sm font-black uppercase tracking-widest text-accent">
                   Öğrenci Yönetimi
                 </h3>
               </div>
@@ -203,14 +203,14 @@ export function DashboardTabs({
                     setSearchTerm(e.target.value)
                     setCurrentPage(0)
                   }}
-                  className="w-full rounded-xl border border-gray-200 bg-gray-50 py-2.5 pl-9 pr-3 text-sm transition-all focus:border-brand-purple focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 py-2.5 pl-9 pr-3 text-sm transition-all focus:border-accent focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
                 />
               </div>
               <div className="flex w-full items-center justify-between gap-4 md:w-auto">
                 <button
                   type="button"
                   onClick={selectAll}
-                  className="whitespace-nowrap rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-bold text-gray-600 transition-all hover:bg-brand-purple hover:text-white dark:bg-zinc-800 dark:text-gray-300"
+                  className="whitespace-nowrap rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-bold text-gray-600 transition-all hover:bg-accent hover:text-white dark:bg-zinc-800 dark:text-gray-300"
                 >
                   {selectedClientIds.length === filteredClients.length && filteredClients.length > 0
                     ? 'SEÇİMİ TEMİZLE'
@@ -222,7 +222,7 @@ export function DashboardTabs({
                     onClick={prevBtn}
                     disabled={currentPage === 0}
                     aria-label="Önceki sayfa"
-                    className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-100 transition-all hover:bg-brand-purple hover:text-white disabled:opacity-30 dark:bg-zinc-800"
+                    className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-100 transition-all hover:bg-accent hover:text-white disabled:opacity-30 dark:bg-zinc-800"
                   >
                     <span aria-hidden="true">{'<'}</span>
                   </button>
@@ -231,7 +231,7 @@ export function DashboardTabs({
                     onClick={nextBtn}
                     disabled={currentPage >= totalPages - 1 || totalPages === 0}
                     aria-label="Sonraki sayfa"
-                    className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-100 transition-all hover:bg-brand-purple hover:text-white disabled:opacity-30 dark:bg-zinc-800"
+                    className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-100 transition-all hover:bg-accent hover:text-white disabled:opacity-30 dark:bg-zinc-800"
                   >
                     <span aria-hidden="true">{'>'}</span>
                   </button>
@@ -282,7 +282,7 @@ export function DashboardTabs({
                                   loading="lazy"
                                   className={`h-14 w-14 rounded-full object-cover shadow-sm transition-all duration-300 ${
                                     isSelected
-                                      ? 'scale-110 ring-4 ring-brand-purple'
+                                      ? 'scale-110 ring-4 ring-accent'
                                       : 'opacity-60 grayscale hover:grayscale-0 group-hover:scale-105 group-hover:opacity-100'
                                   }`}
                                 />
@@ -294,7 +294,7 @@ export function DashboardTabs({
                               </div>
                               <span
                                 className={`w-full truncate text-center text-[10px] font-bold ${
-                                  isSelected ? 'text-brand-purple' : 'text-gray-500'
+                                  isSelected ? 'text-accent' : 'text-gray-500'
                                 }`}
                               >
                                 {firstName}
@@ -333,7 +333,7 @@ export function DashboardTabs({
             onClick={() => setActiveTab(tab)}
             className={`relative flex items-center gap-2 whitespace-nowrap pb-2 transition-all ${
               activeTab === tab
-                ? 'font-bold text-brand-purple'
+                ? 'font-bold text-accent'
                 : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
             }`}
           >
@@ -380,7 +380,9 @@ export function DashboardTabs({
             {activeTab === tab && (
               <span
                 aria-hidden="true"
-                className="absolute bottom-[-9px] left-0 h-[2px] w-full bg-brand-purple shadow-[0_0_8px_rgba(139,92,246,0.8)]"
+                // Kutu gölgesi CSS değişkenine bağlanır: `rgb(var(--color-accent) / N)`
+                // globals.css'teki aynı desendir, ham marka moru bırakmaz.
+                className="absolute bottom-[-9px] left-0 h-[2px] w-full bg-accent shadow-[0_0_8px_rgb(var(--color-accent)_/_0.8)]"
               />
             )}
           </button>

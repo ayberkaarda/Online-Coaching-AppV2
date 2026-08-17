@@ -29,7 +29,7 @@ export default function AnnouncementsTab({
       </div>
 
       {userRole === 'coach' && selectedClientIds.length > 1 ? (
-        <p className="py-10 text-center text-sm font-bold text-brand-purple">
+        <p className="py-10 text-center text-sm font-bold text-accent">
           Sadece 1 öğrenci seçili bırakın.
         </p>
       ) : announcements.length === 0 ? (
@@ -39,14 +39,11 @@ export default function AnnouncementsTab({
           {announcements.map((ann) => (
             <article
               key={ann.id}
-              className="relative overflow-hidden rounded-2xl border border-brand-purple/20 bg-gradient-to-br from-brand-purple/5 to-transparent p-5"
+              className="relative overflow-hidden rounded-2xl border border-accent/20 bg-gradient-to-br from-accent/5 to-transparent p-5"
             >
-              <div
-                className="absolute left-0 top-0 h-full w-1 bg-brand-purple"
-                aria-hidden="true"
-              />
+              <div className="absolute left-0 top-0 h-full w-1 bg-accent" aria-hidden="true" />
               <div className="mb-3 flex items-center justify-between">
-                <span className="flex items-center gap-2 text-sm font-black text-brand-purple">
+                <span className="flex items-center gap-2 text-sm font-black text-accent">
                   <span
                     className="h-2 w-2 animate-pulse rounded-full bg-red-500"
                     aria-hidden="true"

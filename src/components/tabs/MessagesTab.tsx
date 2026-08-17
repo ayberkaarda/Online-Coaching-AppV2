@@ -62,7 +62,7 @@ export default function MessagesTab({
 
   if (userRole === 'coach' && selectedClientIds.length !== 1) {
     return (
-      <p className="py-10 text-center text-sm font-bold text-brand-purple">
+      <p className="py-10 text-center text-sm font-bold text-accent">
         Sohbet etmek için sadece 1 öğrenci seçili bırakın.
       </p>
     )
@@ -126,7 +126,7 @@ export default function MessagesTab({
                     <div
                       className={`max-w-[70%] rounded-2xl p-3 text-sm ${
                         isMe
-                          ? 'rounded-br-none bg-brand-purple text-white'
+                          ? 'rounded-br-none bg-accent text-white'
                           : 'rounded-bl-none border border-gray-200 bg-white text-gray-800 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200'
                       }`}
                     >
@@ -134,7 +134,7 @@ export default function MessagesTab({
                       <p className="whitespace-pre-wrap">{msg.message}</p>
                       <span
                         className={`mt-1 block text-right text-[9px] ${
-                          isMe ? 'text-brand-purple-200 opacity-70' : 'text-gray-400'
+                          isMe ? 'text-accent-200 opacity-70' : 'text-gray-400'
                         }`}
                       >
                         {new Date(msg.created_at).toLocaleTimeString('tr-TR', {
@@ -166,12 +166,12 @@ export default function MessagesTab({
           value={newMessage}
           onChange={(e) => setNewMessage(e.target.value)}
           placeholder="Mesajınızı yazın..."
-          className="flex-1 rounded-xl border border-gray-200 bg-gray-50 p-3 text-sm focus:border-brand-purple focus:outline-none dark:border-zinc-800 dark:bg-zinc-900"
+          className="flex-1 rounded-xl border border-gray-200 bg-gray-50 p-3 text-sm focus:border-accent focus:outline-none dark:border-zinc-800 dark:bg-zinc-900"
         />
         <button
           type="submit"
           disabled={!newMessage.trim()}
-          className="rounded-xl bg-brand-purple px-6 py-3 font-bold text-white shadow-md transition-transform active:scale-95 disabled:opacity-50"
+          className="rounded-xl bg-accent px-6 py-3 font-bold text-white shadow-md transition-transform active:scale-95 disabled:opacity-50"
         >
           Gönder
         </button>

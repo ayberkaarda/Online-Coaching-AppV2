@@ -44,7 +44,7 @@ export function ThemeToggle(): JSX.Element | null {
       ) : (
         <span
           aria-hidden="true"
-          className="text-2xl drop-shadow-md transition-colors duration-300 group-hover:text-brand-purple"
+          className="text-2xl drop-shadow-md transition-colors duration-300 group-hover:text-accent"
         >
           🌙
         </span>

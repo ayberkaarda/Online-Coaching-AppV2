@@ -371,7 +371,7 @@ export default function WorkoutTab({
         >
           Bitir
         </button>
-        <h3 className="mb-2 text-xl font-black text-brand-purple">
+        <h3 className="mb-2 text-xl font-black text-accent">
           <span aria-hidden="true">🏋️</span> CANLI GYM MODU
         </h3>
         <p className="mb-6 text-sm font-bold uppercase text-gray-500">
@@ -387,7 +387,7 @@ export default function WorkoutTab({
                   role="timer"
                   aria-live="polite"
                   aria-label={`Dinlenme süresi ${formatTime(restTime)}`}
-                  className="font-mono text-6xl font-black text-brand-purple"
+                  className="font-mono text-6xl font-black text-accent"
                 >
                   {formatTime(restTime)}
                 </div>
@@ -401,7 +401,7 @@ export default function WorkoutTab({
               </div>
             ) : (
               <>
-                <p className="mb-4 inline-block rounded-full bg-brand-purple/10 px-3 py-1 text-sm font-bold text-brand-purple">
+                <p className="mb-4 inline-block rounded-full bg-accent/10 px-3 py-1 text-sm font-bold text-accent">
                   Hareket {currentExIdx + 1} / {liveExercises.length}
                 </p>
 
@@ -449,9 +449,7 @@ export default function WorkoutTab({
                 </h2>
                 <p className="mb-6 text-lg font-bold text-gray-500">
                   Set {currentSet} / {currentExercise.sets}{' '}
-                  <span className="text-brand-purple opacity-50">
-                    ({currentExercise.reps} Tekrar)
-                  </span>
+                  <span className="text-accent opacity-50">({currentExercise.reps} Tekrar)</span>
                 </p>
 
                 <p className="sr-only" aria-live="polite">
@@ -472,7 +470,7 @@ export default function WorkoutTab({
                       type="number"
                       value={liveWeight}
                       onChange={(e) => setLiveWeight(e.target.value)}
-                      className="w-full rounded-2xl border-2 p-4 text-center text-xl font-black outline-none focus:border-brand-purple dark:bg-black"
+                      className="w-full rounded-2xl border-2 p-4 text-center text-xl font-black outline-none focus:border-accent dark:bg-black"
                     />
                   </div>
                   <div className="flex-1">
@@ -488,14 +486,14 @@ export default function WorkoutTab({
                       value={liveReps}
                       onChange={(e) => setLiveReps(e.target.value)}
                       placeholder={currentExercise.reps.toString()}
-                      className="w-full rounded-2xl border-2 p-4 text-center text-xl font-black outline-none focus:border-brand-purple dark:bg-black"
+                      className="w-full rounded-2xl border-2 p-4 text-center text-xl font-black outline-none focus:border-accent dark:bg-black"
                     />
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={handleCompleteSet}
-                  className="w-full rounded-2xl bg-brand-purple py-4 text-lg font-black text-white shadow-lg active:scale-95"
+                  className="w-full rounded-2xl bg-accent py-4 text-lg font-black text-white shadow-lg active:scale-95"
                 >
                   {currentSet === currentExercise.sets ? 'Son Seti Tamamla' : 'Seti Tamamla'}
                 </button>
@@ -554,7 +552,7 @@ export default function WorkoutTab({
             <button
               type="button"
               onClick={startLiveWorkout}
-              className="animate-pulse rounded-lg bg-brand-purple px-4 py-2 text-xs font-black text-white shadow-lg"
+              className="animate-pulse rounded-lg bg-accent px-4 py-2 text-xs font-black text-white shadow-lg"
             >
               <span aria-hidden="true">🏋️</span> BUGÜNÜ BAŞLAT
             </button>
@@ -562,7 +560,7 @@ export default function WorkoutTab({
           <button
             type="button"
             onClick={onDownloadImage}
-            className="rounded-lg bg-brand-purple/10 px-3 py-1.5 text-xs font-bold text-brand-purple"
+            className="rounded-lg bg-accent/10 px-3 py-1.5 text-xs font-bold text-accent"
           >
             <span aria-hidden="true">🖼️</span> Görsel
           </button>
@@ -572,7 +570,7 @@ export default function WorkoutTab({
       {/* isWaitingMyApproval yalnızca userRole === 'client' iken true olabilir (bkz. tanım),
           bu yüzden ek bir 'coach' kontrolü gereksizdir — koç için bu blok zaten görünür. */}
       {!isWaitingMyApproval && (
-        <div className="mb-6 flex flex-col items-start gap-4 rounded-2xl border border-blue-500/20 bg-gradient-to-br from-blue-500/10 to-brand-purple/5 p-5 shadow-sm md:flex-row">
+        <div className="mb-6 flex flex-col items-start gap-4 rounded-2xl border border-blue-500/20 bg-gradient-to-br from-blue-500/10 to-accent/5 p-5 shadow-sm md:flex-row">
           <div className="pt-2 text-4xl" aria-hidden="true">
             🤖
           </div>
@@ -676,8 +674,8 @@ export default function WorkoutTab({
                         }
                         className={`min-h-[120px] w-full rounded-lg border bg-transparent p-2 outline-none transition-all ${
                           dragOverDay === day
-                            ? 'border-brand-purple bg-brand-purple/5 ring-2 ring-brand-purple/50'
-                            : 'border-transparent hover:border-gray-200 focus:border-brand-purple'
+                            ? 'border-accent bg-accent/5 ring-2 ring-accent/50'
+                            : 'border-transparent hover:border-gray-200 focus:border-accent'
                         }`}
                       />
                     </td>
@@ -707,7 +705,7 @@ export default function WorkoutTab({
               placeholder="Hareket Ara (Örn: Incline...)"
               value={recommenderFilter}
               onChange={(e) => setRecommenderFilter(e.target.value)}
-              className="mb-4 w-full rounded-xl border bg-white p-2.5 text-xs outline-none focus:border-brand-purple dark:border-zinc-700 dark:bg-black"
+              className="mb-4 w-full rounded-xl border bg-white p-2.5 text-xs outline-none focus:border-accent dark:border-zinc-700 dark:bg-black"
             />
 
             <label htmlFor="exercise-target-day" className="sr-only">
@@ -717,7 +715,7 @@ export default function WorkoutTab({
               id="exercise-target-day"
               value={keyboardTargetDay}
               onChange={(e) => setKeyboardTargetDay(e.target.value as DayName)}
-              className="mb-4 w-full rounded-xl border bg-white p-2.5 text-xs outline-none focus:border-brand-purple dark:border-zinc-700 dark:bg-black"
+              className="mb-4 w-full rounded-xl border bg-white p-2.5 text-xs outline-none focus:border-accent dark:border-zinc-700 dark:bg-black"
             >
               {DAYS.map((d) => (
                 <option key={d} value={d}>
@@ -745,7 +743,7 @@ export default function WorkoutTab({
                     draggable
                     onDragStart={(e) => handleDragStart(e, ex.name)}
                     onDragEnd={handleDragEnd}
-                    className={`group cursor-grab rounded-xl border border-gray-100 bg-white p-3 shadow-sm transition-all hover:border-brand-purple hover:bg-brand-purple/5 active:cursor-grabbing dark:border-zinc-800 dark:bg-[#16161d] ${
+                    className={`group cursor-grab rounded-xl border border-gray-100 bg-white p-3 shadow-sm transition-all hover:border-accent hover:bg-accent/5 active:cursor-grabbing dark:border-zinc-800 dark:bg-[#16161d] ${
                       draggingName === ex.name ? 'scale-95 opacity-50' : ''
                     }`}
                   >
@@ -755,7 +753,7 @@ export default function WorkoutTab({
                           {ex.name}
                         </p>
                         <div className="mt-1 flex gap-2 opacity-70">
-                          <span className="rounded bg-brand-purple/10 px-2 text-[9px] text-brand-purple">
+                          <span className="rounded bg-accent/10 px-2 text-[9px] text-accent">
                             {ex.target ?? ex.body_part}
                           </span>
                           <span className="rounded bg-blue-500/10 px-2 text-[9px] text-blue-500">
@@ -767,7 +765,7 @@ export default function WorkoutTab({
                         type="button"
                         onClick={() => appendExercise(keyboardTargetDay, ex.name)}
                         aria-label={`${ex.name} hareketini ${keyboardTargetDay} gününe ekle`}
-                        className="shrink-0 rounded-lg bg-brand-purple/10 px-2 py-1 text-[10px] font-bold text-brand-purple transition-all hover:bg-brand-purple hover:text-white"
+                        className="shrink-0 rounded-lg bg-accent/10 px-2 py-1 text-[10px] font-bold text-accent transition-all hover:bg-accent hover:text-white"
                       >
                         Ekle
                       </button>

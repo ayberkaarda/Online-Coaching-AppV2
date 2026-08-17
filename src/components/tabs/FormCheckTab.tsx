@@ -134,9 +134,7 @@ export default function FormCheckTab({
             onClick={() => setCompareMode(!compareMode)}
             aria-pressed={compareMode}
             className={`rounded-lg px-4 py-2 text-xs font-bold transition-all ${
-              compareMode
-                ? 'bg-red-500 text-white'
-                : 'bg-brand-purple/10 text-brand-purple hover:bg-brand-purple/20'
+              compareMode ? 'bg-red-500 text-white' : 'bg-accent/10 text-accent hover:bg-accent/20'
             }`}
           >
             {compareMode ? 'Kıyaslamayı Kapat' : 'Öncesi / Sonrası Yap'}
@@ -165,7 +163,7 @@ export default function FormCheckTab({
                 {...register('weight')}
                 aria-invalid={errors.weight ? 'true' : 'false'}
                 aria-describedby={errors.weight ? 'formcheck-weight-error' : undefined}
-                className="w-full rounded-xl border border-gray-200 bg-gray-50 p-3 text-sm focus:border-brand-purple focus:outline-none dark:border-zinc-800 dark:bg-zinc-950"
+                className="w-full rounded-xl border border-gray-200 bg-gray-50 p-3 text-sm focus:border-accent focus:outline-none dark:border-zinc-800 dark:bg-zinc-950"
               />
               {errors.weight ? (
                 <p
@@ -192,7 +190,7 @@ export default function FormCheckTab({
                 onChange={handleFileChange}
                 aria-invalid={fileError ? 'true' : 'false'}
                 aria-describedby={fileError ? 'formcheck-pose-error' : undefined}
-                className="w-full cursor-pointer text-xs text-gray-500 transition-all file:mr-4 file:rounded-xl file:border-0 file:bg-brand-purple/10 file:px-4 file:py-2.5 file:font-bold file:text-brand-purple hover:file:bg-brand-purple/20"
+                className="w-full cursor-pointer text-xs text-gray-500 transition-all file:mr-4 file:rounded-xl file:border-0 file:bg-accent/10 file:px-4 file:py-2.5 file:font-bold file:text-accent hover:file:bg-accent/20"
               />
               {fileError ? (
                 <p
@@ -209,7 +207,7 @@ export default function FormCheckTab({
             type="submit"
             disabled={isUploading}
             aria-busy={isUploading}
-            className="w-full rounded-xl bg-brand-purple py-3 text-sm font-bold text-white disabled:opacity-50"
+            className="w-full rounded-xl bg-accent py-3 text-sm font-bold text-white disabled:opacity-50"
           >
             {isUploading ? 'Yükleniyor...' : 'Formu Antrenörüme Gönder'}
           </button>
@@ -217,7 +215,7 @@ export default function FormCheckTab({
       )}
 
       {userRole === 'coach' && selectedClientIds.length > 1 ? (
-        <p className="py-10 text-center text-sm font-bold text-brand-purple">
+        <p className="py-10 text-center text-sm font-bold text-accent">
           Sadece 1 öğrenci seçili bırakın.
         </p>
       ) : (
@@ -265,7 +263,7 @@ export default function FormCheckTab({
                 </div>
               </div>
               <div className="flex-1 space-y-3">
-                <span className="block border-b pb-2 text-center text-sm font-black uppercase text-brand-purple">
+                <span className="block border-b pb-2 text-center text-sm font-black uppercase text-accent">
                   Sonrası
                 </span>
                 <label htmlFor="formcheck-after" className="sr-only">
@@ -283,7 +281,7 @@ export default function FormCheckTab({
                     </option>
                   ))}
                 </select>
-                <div className="relative aspect-[3/4] w-full overflow-hidden rounded-2xl border-4 border-brand-purple shadow-lg">
+                <div className="relative aspect-[3/4] w-full overflow-hidden rounded-2xl border-4 border-accent shadow-lg">
                   {afterCheck?.frontPoseSignedUrl ? (
                     <img
                       src={afterCheck.frontPoseSignedUrl}
@@ -320,9 +318,7 @@ export default function FormCheckTab({
                     </div>
                   )}
                   <div className="text-sm">
-                    <p className="text-lg font-black text-brand-purple">
-                      {check.current_weight} kg
-                    </p>
+                    <p className="text-lg font-black text-accent">{check.current_weight} kg</p>
                     <p className="mt-1 text-xs text-gray-500">
                       {formatDateTimeTR(check.created_at)}
                     </p>

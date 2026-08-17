@@ -38,7 +38,7 @@ export default function LoginPage(): JSX.Element {
     <div className="flex min-h-screen items-center justify-center bg-slate-50 p-4 dark:bg-[#0f0f12]">
       <div className="w-full max-w-md rounded-3xl border border-gray-100 bg-white p-8 shadow-2xl dark:border-zinc-800 dark:bg-[#16161d]">
         <div className="mb-8 text-center">
-          <h1 className="mb-2 bg-gradient-to-r from-brand-purple to-purple-500 bg-clip-text text-3xl font-black text-transparent">
+          <h1 className="mb-2 bg-gradient-to-r from-accent to-purple-500 bg-clip-text text-3xl font-black text-transparent">
             Coaching Hub
           </h1>
           <p className="text-sm font-medium uppercase tracking-widest text-gray-500">
@@ -69,7 +69,7 @@ export default function LoginPage(): JSX.Element {
               autoComplete="email"
               aria-invalid={errors.email ? 'true' : 'false'}
               aria-describedby={errors.email ? 'login-email-error' : undefined}
-              className="w-full rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm transition-colors focus:border-brand-purple focus:outline-none dark:border-zinc-800 dark:bg-zinc-950"
+              className="w-full rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm transition-colors focus:border-accent focus:outline-none dark:border-zinc-800 dark:bg-zinc-950"
               placeholder="ornek@email.com"
               {...register('email')}
             />
@@ -97,7 +97,7 @@ export default function LoginPage(): JSX.Element {
               autoComplete="current-password"
               aria-invalid={errors.password ? 'true' : 'false'}
               aria-describedby={errors.password ? 'login-password-error' : undefined}
-              className="w-full rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm transition-colors focus:border-brand-purple focus:outline-none dark:border-zinc-800 dark:bg-zinc-950"
+              className="w-full rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm transition-colors focus:border-accent focus:outline-none dark:border-zinc-800 dark:bg-zinc-950"
               placeholder="••••••••"
               {...register('password')}
             />
@@ -115,7 +115,7 @@ export default function LoginPage(): JSX.Element {
           <button
             type="submit"
             disabled={isPending}
-            className="w-full rounded-xl bg-gradient-to-r from-brand-purple to-purple-600 py-4 text-sm font-black text-white shadow-lg shadow-purple-500/30 transition-all hover:from-purple-600 hover:to-brand-purple disabled:opacity-50"
+            className="w-full rounded-xl bg-gradient-to-r from-accent to-purple-600 py-4 text-sm font-black text-white shadow-lg shadow-purple-500/30 transition-all hover:from-purple-600 hover:to-accent disabled:opacity-50"
           >
             {isPending ? 'GİRİŞ YAPILIYOR...' : 'GİRİŞ YAP'}
           </button>

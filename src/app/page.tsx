@@ -81,7 +81,7 @@ export default function DashboardPage(): JSX.Element {
         aria-live="polite"
         className="flex min-h-screen items-center justify-center bg-slate-50 dark:bg-[#0f0f12]"
       >
-        <div className="animate-pulse text-xl font-black tracking-widest text-brand-purple">
+        <div className="animate-pulse text-xl font-black tracking-widest text-accent">
           SİSTEM YÜKLENİYOR...
         </div>
       </div>
@@ -133,7 +133,7 @@ export default function DashboardPage(): JSX.Element {
                         key={notif.id}
                         className="border-b p-4 transition-colors hover:bg-gray-50 dark:border-zinc-800 dark:hover:bg-zinc-900"
                       >
-                        <h4 className="mb-1 text-sm font-bold text-brand-purple">{notif.title}</h4>
+                        <h4 className="mb-1 text-sm font-bold text-accent">{notif.title}</h4>
                         <p className="mb-3 text-xs text-gray-600 dark:text-gray-300">
                           {notif.message}
                         </p>
@@ -157,7 +157,7 @@ export default function DashboardPage(): JSX.Element {
           <button
             onClick={() => router.push('/users')}
             aria-label="Kullanıcı Yönetimi"
-            className="flex items-center gap-2 rounded-lg p-2 text-sm font-bold text-brand-purple transition-all hover:bg-brand-purple/10"
+            className="flex items-center gap-2 rounded-lg p-2 text-sm font-bold text-accent transition-all hover:bg-accent/10"
           >
             <span aria-hidden="true">👥</span>{' '}
             <span className="hidden sm:inline">Kullanıcı Yönetimi</span>
@@ -166,7 +166,7 @@ export default function DashboardPage(): JSX.Element {
           <button
             onClick={() => router.push('/profile')}
             aria-label="Profilim"
-            className="flex items-center gap-2 rounded-lg p-2 text-sm font-bold text-brand-purple transition-all hover:bg-brand-purple/10"
+            className="flex items-center gap-2 rounded-lg p-2 text-sm font-bold text-accent transition-all hover:bg-accent/10"
           >
             <span aria-hidden="true">⚙️</span> <span className="hidden sm:inline">Profilim</span>
           </button>
@@ -184,7 +184,7 @@ export default function DashboardPage(): JSX.Element {
       <ThemeToggle />
 
       <header className="mb-12 mt-12 space-y-2 text-center md:mt-0">
-        <h1 className="bg-gradient-to-r from-brand-purple to-purple-400 bg-clip-text text-3xl font-black tracking-tight text-transparent md:text-5xl">
+        <h1 className="bg-gradient-to-r from-accent to-purple-400 bg-clip-text text-3xl font-black tracking-tight text-transparent md:text-5xl">
           Closed-Loop Coaching Hub
         </h1>
         <p className="text-sm font-medium uppercase tracking-widest text-gray-500 dark:text-gray-400 md:text-base">

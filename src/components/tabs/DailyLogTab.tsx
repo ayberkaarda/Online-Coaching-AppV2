@@ -92,7 +92,7 @@ export default function DailyLogTab({
                 {...register('water_lt')}
                 aria-invalid={errors.water_lt ? 'true' : 'false'}
                 aria-describedby={errors.water_lt ? 'daily-water-error' : undefined}
-                className="w-full rounded-xl border p-3 outline-none focus:border-brand-purple"
+                className="w-full rounded-xl border p-3 outline-none focus:border-accent"
               />
               {errors.water_lt ? (
                 <p
@@ -114,7 +114,7 @@ export default function DailyLogTab({
                 {...register('sodium_mg')}
                 aria-invalid={errors.sodium_mg ? 'true' : 'false'}
                 aria-describedby={errors.sodium_mg ? 'daily-sodium-error' : undefined}
-                className="w-full rounded-xl border p-3 outline-none focus:border-brand-purple"
+                className="w-full rounded-xl border p-3 outline-none focus:border-accent"
               />
               {errors.sodium_mg ? (
                 <p
@@ -204,7 +204,7 @@ export default function DailyLogTab({
             type="submit"
             disabled={isSaving}
             aria-busy={isSaving}
-            className="w-full rounded-xl bg-brand-purple py-3 font-bold text-white shadow-lg disabled:opacity-50"
+            className="w-full rounded-xl bg-accent py-3 font-bold text-white shadow-lg disabled:opacity-50"
           >
             Antrenörüme Gönder
           </button>
@@ -212,7 +212,7 @@ export default function DailyLogTab({
       )}
 
       {userRole === 'coach' && selectedClientIds.length > 1 ? (
-        <p className="py-10 text-center text-sm font-bold text-brand-purple">
+        <p className="py-10 text-center text-sm font-bold text-accent">
           Sadece 1 öğrenci seçili bırakın.
         </p>
       ) : (
@@ -251,7 +251,7 @@ export default function DailyLogTab({
                 return (
                   <div
                     key={log.id}
-                    className="rounded-3xl border bg-gray-50 p-5 text-sm shadow-sm hover:border-brand-purple/30 dark:bg-zinc-950"
+                    className="rounded-3xl border bg-gray-50 p-5 text-sm shadow-sm hover:border-accent/30 dark:bg-zinc-950"
                   >
                     <div className="mb-4 flex items-center justify-between">
                       <span className="font-bold">{formatDateTR(log.log_date)}</span>

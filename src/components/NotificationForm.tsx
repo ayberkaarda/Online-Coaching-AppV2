@@ -68,7 +68,7 @@ export function NotificationForm({ clients }: NotificationFormProps): JSX.Elemen
             {...register('target')}
             aria-invalid={errors.target ? 'true' : 'false'}
             aria-describedby={errors.target ? 'notification-target-error' : undefined}
-            className="w-full rounded-xl border border-gray-200 bg-gray-50 p-3.5 text-sm font-medium focus:border-brand-purple focus:outline-none dark:border-zinc-800 dark:bg-zinc-950"
+            className="w-full rounded-xl border border-gray-200 bg-gray-50 p-3.5 text-sm font-medium focus:border-accent focus:outline-none dark:border-zinc-800 dark:bg-zinc-950"
           >
             <option value="all">🌐 Tüm Öğrenciler</option>
             {clientOptions.map((c) => (
@@ -102,7 +102,7 @@ export function NotificationForm({ clients }: NotificationFormProps): JSX.Elemen
             aria-invalid={errors.title ? 'true' : 'false'}
             aria-describedby={errors.title ? 'notification-title-error' : undefined}
             placeholder="Örn: Yeni Antrenman Bloklarına Geçiş"
-            className="w-full rounded-xl border border-gray-200 bg-gray-50 p-3.5 text-sm focus:border-brand-purple focus:outline-none dark:border-zinc-800 dark:bg-zinc-950"
+            className="w-full rounded-xl border border-gray-200 bg-gray-50 p-3.5 text-sm focus:border-accent focus:outline-none dark:border-zinc-800 dark:bg-zinc-950"
           />
           {errors.title ? (
             <p
@@ -128,7 +128,7 @@ export function NotificationForm({ clients }: NotificationFormProps): JSX.Elemen
             aria-invalid={errors.message ? 'true' : 'false'}
             aria-describedby={errors.message ? 'notification-message-error' : undefined}
             placeholder="Kardiyo süreleri 10 dakika artırıldı..."
-            className="h-32 w-full resize-none rounded-xl border border-gray-200 bg-gray-50 p-3.5 text-sm focus:border-brand-purple focus:outline-none dark:border-zinc-800 dark:bg-zinc-950"
+            className="h-32 w-full resize-none rounded-xl border border-gray-200 bg-gray-50 p-3.5 text-sm focus:border-accent focus:outline-none dark:border-zinc-800 dark:bg-zinc-950"
           />
           {errors.message ? (
             <p
@@ -145,7 +145,7 @@ export function NotificationForm({ clients }: NotificationFormProps): JSX.Elemen
           type="submit"
           disabled={isSending}
           aria-busy={isSending}
-          className="w-full rounded-xl bg-gradient-to-r from-brand-purple to-purple-600 py-4 text-sm font-black text-white shadow-lg shadow-purple-500/30 transition-all hover:from-purple-600 hover:to-brand-purple disabled:opacity-50"
+          className="w-full rounded-xl bg-gradient-to-r from-accent to-purple-600 py-4 text-sm font-black text-white shadow-lg shadow-purple-500/30 transition-all hover:from-purple-600 hover:to-accent disabled:opacity-50"
         >
           {isSending ? 'Gönderiliyor...' : 'Gönder'}
         </button>

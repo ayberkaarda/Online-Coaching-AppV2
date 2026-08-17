@@ -3,6 +3,8 @@
 - **Durum:** Kabul edildi (uygulama Faz 1.6'da)
 - **Tarih:** 2026-08-17
 - **Karar verenler:** Proje sahibi + Claude Code
+- **Revizyonlar:** 2026-08-17 — Kehribar `#B45D00` → `#A65600`; Faz 1.6 uygulamasında
+  yapılan kontrast ölçümü ilk değerin AA eşiğini geçmediğini gösterdi (bkz. "Palet").
 
 ## Bağlam
 
@@ -46,12 +48,22 @@ ikincil metin) bunlardan türetilen token'lardır, yeni serbest renk eklenmez.
 | Demir           | `#14161B`                                | koyu tema zemini                  |
 | Menevis         | `#5B48D9` (koyu temada durağı `#A79BFF`) | birincil / aksiyon / odak halkası |
 | Kapanış         | `#0F7A4C`                                | başarı                            |
-| Kehribar        | `#B45D00`                                | uyarı / bekleyen                  |
+| Kehribar        | `#A65600`                                | uyarı / bekleyen                  |
 | Plaka Kırmızısı | `#C22F2F`                                | hata                              |
 
-Mor **atılmıyor, kaydırılıyor**: `#5B48D9` Tebeşir üstünde yaklaşık **6:1**, koyu temada
-`#A79BFF` Demir üstünde yaklaşık **6.5:1** verir. Aynı ton ailesinde kalındığı için marka
+Mor **atılmıyor, kaydırılıyor**: `#5B48D9` Tebeşir üstünde **5.65:1**, koyu temada
+`#A79BFF` Demir üstünde **7.56:1** verir. Aynı ton ailesinde kalındığı için marka
 sürekliliği korunur, ama kontrast borcu kapanır. 14 gradyanın tamamı sistemden çıkar.
+
+Aynı kural Kehribar'a da uygulandı: ilk seçilen `#B45D00` Tebeşir üstünde yalnızca
+**4.23:1** (kart zemininde 4.46:1) verdiği için AA'nın 4.5:1 eşiğini geçmiyordu — yani
+morun kaydırılmasına yol açan hata modunun aynısını taşıyordu. Uyarı rengi kod tabanında
+ezici çoğunlukla küçük punto **metin** olarak kullanıldığı için 3:1'lik UI bileşeni eşiğine
+sığınmak geçerli değildir. Ton 31° ve tam doygunluk korunarak yalnızca parlaklık düşürüldü:
+`#B45D00` → **`#A65600`** (Tebeşir üstünde 4.82:1, kart zemininde 5.08:1, beyaz üstünde
+5.31:1) — böylece Kapanış'ın 4.88'i ve Plaka Kırmızısı'nın 5.09'uyla aynı emniyet bandına
+oturur. Sistem hâlâ **altı adlandırılmış hex** üzerine kuruludur; biri kontrast ölçümü
+sonucu revize edilmiştir (2026-08-17).
 
 ### Tema
 

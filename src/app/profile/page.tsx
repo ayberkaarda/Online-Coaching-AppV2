@@ -162,7 +162,7 @@ export default function ProfilePage(): JSX.Element {
     <main id="main-content" className="container mx-auto max-w-4xl px-4 py-12">
       <button
         onClick={() => router.push('/')}
-        className="mb-6 flex items-center gap-2 font-bold text-brand-purple transition-opacity hover:opacity-80"
+        className="mb-6 flex items-center gap-2 font-bold text-accent transition-opacity hover:opacity-80"
       >
         ← Ana Sayfaya Dön
       </button>
@@ -170,7 +170,7 @@ export default function ProfilePage(): JSX.Element {
       <div className="mb-8 flex flex-col items-center gap-8 rounded-3xl border border-gray-100 bg-white p-8 shadow-xl dark:border-zinc-800 dark:bg-[#16161d] md:flex-row md:items-start">
         {/* Avatar Bölümü */}
         <div className="group relative cursor-pointer">
-          <div className="flex h-32 w-32 items-center justify-center overflow-hidden rounded-full border-4 border-brand-purple/20 bg-gray-100 transition-all group-hover:border-brand-purple dark:bg-zinc-900">
+          <div className="flex h-32 w-32 items-center justify-center overflow-hidden rounded-full border-4 border-accent/20 bg-gray-100 transition-all group-hover:border-accent dark:bg-zinc-900">
             {/* Avatar private bucket'tadır: adres imzalıdır ve süreye bağlıdır.
                 İmza üretilemezse (dosya yok/erişim yok) kırık görsel yerine 👤 gösterilir. */}
             {profile.avatarSignedUrl ? (
@@ -231,7 +231,7 @@ export default function ProfilePage(): JSX.Element {
                 autoComplete="new-password"
                 aria-invalid={errors.password ? 'true' : 'false'}
                 aria-describedby={errors.password ? 'new-password-error' : undefined}
-                className="w-full rounded-xl border bg-gray-50 p-3 text-sm focus:border-brand-purple focus:outline-none dark:border-zinc-800 dark:bg-zinc-950"
+                className="w-full rounded-xl border bg-gray-50 p-3 text-sm focus:border-accent focus:outline-none dark:border-zinc-800 dark:bg-zinc-950"
                 {...register('password')}
               />
               {errors.password && (
@@ -258,7 +258,7 @@ export default function ProfilePage(): JSX.Element {
       {/* Program Görüntüleme Alanı */}
       <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
         <div className="rounded-3xl border border-gray-100 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-[#16161d]">
-          <h3 className="mb-4 border-b pb-3 text-lg font-black text-brand-purple dark:border-zinc-800">
+          <h3 className="mb-4 border-b pb-3 text-lg font-black text-accent dark:border-zinc-800">
             🥗 Beslenme Programım
           </h3>
           <QueryState

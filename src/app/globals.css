@@ -2,6 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
+/* --color-* değişkenleri tek kaynaktan (src/design/tokens.ts) üretilir; bağlama
+   tailwind.config.ts içindeki addBase plugin'iyle yapılır. Değerler ham RGB
+   kanallarıdır ("91 72 217"), bu yüzden burada rgb(...) ile sarmalanırlar. */
+
 /* Özel Scrollbar (Kaydırma Çubuğu) Tasarımı */
 ::-webkit-scrollbar {
   width: 6px;
@@ -15,20 +19,21 @@
   border-radius: 10px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #8b5cf6;
+  background: rgb(var(--color-accent));
 }
 
-/* Glassmorphism (Buzlu Cam) Efekti */
+/* Glassmorphism (Buzlu Cam) Efekti — zemin token'dan beslenir, tema ile birlikte döner. */
 .glass-panel {
-  background: rgba(255, 255, 255, 0.7);
+  background: rgb(var(--color-surface-raised) / 0.7);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  border: 1px solid rgb(var(--color-border) / 0.6);
 }
 
 .dark .glass-panel {
-  background: rgba(22, 22, 29, 0.7);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  /* Demir yüzey kademesi (#24262A) — viewport.themeColor ile senkron (AC-1.6.8). */
+  background: rgb(var(--color-surface) / 0.7);
+  border: 1px solid rgb(var(--color-border) / 0.6);
 }
 /* Sadece yatay sekmelerdeki scrollbar'ı gizleyen özel sınıf */
 .hide-scrollbar {
@@ -42,7 +47,7 @@
 /* İnce, marka renginde scrollbar (kodda kullanılıyor ama tanımsızdı) */
 .custom-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: #8b5cf6 transparent;
+  scrollbar-color: rgb(var(--color-accent)) transparent;
 }
 .custom-scrollbar::-webkit-scrollbar {
   width: 6px;
@@ -52,14 +57,25 @@
   background: transparent;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #8b5cf6;
+  background: rgb(var(--color-accent));
   border-radius: 10px;
 }
 
+/* Veri fontu (IBM Plex Mono) her zaman tabular figürlerle kullanılır (ADR-0015):
+   sayaç her saniye genişlik değiştirirse titrer, kg kolonları hizalanmaz. Tailwind'in
+   `tabular-nums` yardımcısını her çağrı yerinde hatırlamak yerine burada `.font-mono`
+   üzerinden garanti ediyoruz — unutulabilir bir opt-in yerine varsayılan davranış.
+   `tabular-nums` / `proportional-nums` yardımcıları hâlâ kullanılabilir durumda. */
+.font-mono {
+  font-variant-numeric: tabular-nums;
+}
+
 /* Erişilebilirlik güvenlik ağı: kodda bolca `focus:outline-none` kullanılıyor,
-   bu global kural klavye kullanıcıları için odak görünürlüğünü garanti eder. */
+   bu global kural klavye kullanıcıları için odak görünürlüğünü garanti eder.
+   Renk `focus-ring` token'ından gelir; açık temada Menevis zemin üstünde 5.65:1,
+   koyu temada #A79BFF Demir üstünde 7.56:1 — hiçbir temada görünmez olmuyor (AC-1.6.3). */
 :focus-visible {
-  outline: 2px solid #8b5cf6;
+  outline: 2px solid rgb(var(--color-focus-ring));
   outline-offset: 2px;
   border-radius: 4px;
 }
@@ -77,9 +93,10 @@
 }
 
 /* Kontrast notu (WCAG AA):
-   `.text-gray-400` açık zeminde (beyaz kart üstünde) normal metin boyutunda AA kontrastını
-   (4.5:1) zor geçiyor ya da geçmiyor; `.text-gray-500` sınırda. Bu sınıflar özellikle küçük
-   punto (text-xs) ile birlikte kullanıldığında risklidir. Burada override edilmedi çünkü
-   tasarım dilinin bir parçası; ileride bu sınıfların kritik/okunması gereken metinlerde
-   (hata mesajları, form etiketleri gibi) `.text-gray-600` veya daha koyusuyla değiştirilmesi
-   önerilir. */
+   Eski `text-gray-400` / `text-gray-500` borcu Faz 1.6 ile YAPISAL olarak kapandı:
+   ikincil metnin tek adresi artık `text-fg-muted` token'ı ve bu token her iki temada da
+   ölçülmüş durumda — açık temada 5.39:1 (zemin) / 5.94:1 (beyaz kart), koyu temada
+   7.43:1 (zemin) / 5.20:1 (en açık yüzey). Eşikler `tests/unit/design-tokens.test.ts`
+   içinde makineye bağlıdır; token değiştirmek testi kırar, sessizce bozamaz.
+   Kod tabanında hâlâ duran ham `text-gray-*` kullanımları Katman B'de (Faz 2, ADR-0018)
+   ekranlar yeniden yazılırken sökülür; bu fazın kapsamı sistemin kendisidir. */

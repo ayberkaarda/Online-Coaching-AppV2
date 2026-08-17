@@ -25,6 +25,7 @@ import {
 } from 'recharts'
 
 import { EmptyState, SkeletonCard, SkeletonChart } from '@/components/ui'
+import { tokens } from '@/design/tokens'
 import { useDailyLogs, useFormChecks, useLastCheckins, useSendNotification } from '@/hooks'
 import type { ProfileWithAvatar } from '@/hooks/useProfile'
 import { daysSince, formatDateTR } from '@/lib/utils'
@@ -203,7 +204,7 @@ export function CoachUserManagement({ clients }: CoachUserManagementProps): JSX.
                 setNowMs(Date.now())
                 openDrawer(client, event.currentTarget)
               }}
-              className="group relative w-full cursor-pointer rounded-2xl border border-gray-100 bg-white p-5 text-left shadow-sm transition-all hover:border-brand-purple dark:border-zinc-800 dark:bg-[#16161d] dark:hover:border-brand-purple"
+              className="group relative w-full cursor-pointer rounded-2xl border border-gray-100 bg-white p-5 text-left shadow-sm transition-all hover:border-accent dark:border-zinc-800 dark:bg-[#16161d] dark:hover:border-accent"
             >
               {/* Durum yalnızca renkle anlatılmasın diye metin karşılığı sr-only olarak eklenir. */}
               <span
@@ -215,7 +216,7 @@ export function CoachUserManagement({ clients }: CoachUserManagementProps): JSX.
               <span className="sr-only">{late ? 'Form gecikti' : 'Form güncel'}</span>
 
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border border-brand-purple/20 bg-brand-purple/10 text-lg font-black text-brand-purple">
+                <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border border-accent/20 bg-accent/10 text-lg font-black text-accent">
                   {/* Private bucket: imzalı adres yoksa baş harf gösterilir (kırık görsel yok). */}
                   {client.avatarSignedUrl ? (
                     <img
@@ -229,7 +230,7 @@ export function CoachUserManagement({ clients }: CoachUserManagementProps): JSX.
                   )}
                 </div>
                 <div>
-                  <h4 className="font-bold text-gray-800 transition-colors group-hover:text-brand-purple dark:text-zinc-200">
+                  <h4 className="font-bold text-gray-800 transition-colors group-hover:text-accent dark:text-zinc-200">
                     {client.full_name}
                   </h4>
                   <p className="text-xs text-gray-500">{client.email}</p>
@@ -266,7 +267,7 @@ export function CoachUserManagement({ clients }: CoachUserManagementProps): JSX.
                 <div>
                   <h2
                     id="client-drawer-title"
-                    className="bg-gradient-to-r from-brand-purple to-purple-500 bg-clip-text text-2xl font-black text-transparent"
+                    className="bg-gradient-to-r from-accent to-purple-500 bg-clip-text text-2xl font-black text-transparent"
                   >
                     {selectedClient.full_name}
                   </h2>
@@ -313,7 +314,7 @@ export function CoachUserManagement({ clients }: CoachUserManagementProps): JSX.
                           aria-pressed={weightChartPeriod === 'week'}
                           className={`rounded-md px-3 py-1 text-xs font-bold ${
                             weightChartPeriod === 'week'
-                              ? 'bg-white text-brand-purple dark:bg-zinc-700'
+                              ? 'bg-white text-accent dark:bg-zinc-700'
                               : 'text-gray-500'
                           }`}
                         >
@@ -328,7 +329,7 @@ export function CoachUserManagement({ clients }: CoachUserManagementProps): JSX.
                           aria-pressed={weightChartPeriod === 'month'}
                           className={`rounded-md px-3 py-1 text-xs font-bold ${
                             weightChartPeriod === 'month'
-                              ? 'bg-white text-brand-purple dark:bg-zinc-700'
+                              ? 'bg-white text-accent dark:bg-zinc-700'
                               : 'text-gray-500'
                           }`}
                         >
@@ -343,7 +344,7 @@ export function CoachUserManagement({ clients }: CoachUserManagementProps): JSX.
                           aria-pressed={weightChartPeriod === 'all'}
                           className={`rounded-md px-3 py-1 text-xs font-bold ${
                             weightChartPeriod === 'all'
-                              ? 'bg-white text-brand-purple dark:bg-zinc-700'
+                              ? 'bg-white text-accent dark:bg-zinc-700'
                               : 'text-gray-500'
                           }`}
                         >
@@ -390,9 +391,12 @@ export function CoachUserManagement({ clients }: CoachUserManagementProps): JSX.
                               <Line
                                 type="monotone"
                                 dataKey="kilo"
-                                stroke="#8b5cf6"
+                                // Recharts JS renk değeri bekliyor; statik tokens.light.accent
+                                // kullanılıyor (tema duyarlı grafik renkleri Faz 4 grafik
+                                // tekleştirme işine ait, bkz. AC-4.3).
+                                stroke={tokens.light.accent}
                                 strokeWidth={3}
-                                dot={{ r: 4, fill: '#8b5cf6' }}
+                                dot={{ r: 4, fill: tokens.light.accent }}
                                 activeDot={{ r: 6 }}
                               />
                             </LineChart>
@@ -451,7 +455,7 @@ export function CoachUserManagement({ clients }: CoachUserManagementProps): JSX.
                               <Bar
                                 dataKey="Protein"
                                 stackId="a"
-                                fill="#8b5cf6"
+                                fill={tokens.light.accent}
                                 radius={[0, 0, 4, 4]}
                               />
                               <Bar dataKey="Karb" stackId="a" fill="#3b82f6" />
@@ -485,7 +489,7 @@ export function CoachUserManagement({ clients }: CoachUserManagementProps): JSX.
                             id="coach-before-pose"
                             value={beforePoseId}
                             onChange={(e) => setBeforePoseOverride(e.target.value)}
-                            className="w-full rounded-xl border bg-gray-50 p-3 text-sm font-bold focus:border-brand-purple focus:outline-none dark:border-zinc-800 dark:bg-zinc-950"
+                            className="w-full rounded-xl border bg-gray-50 p-3 text-sm font-bold focus:border-accent focus:outline-none dark:border-zinc-800 dark:bg-zinc-950"
                           >
                             {poses.map((pose) => (
                               <option key={`before-${pose.id}`} value={pose.id}>
@@ -526,7 +530,7 @@ export function CoachUserManagement({ clients }: CoachUserManagementProps): JSX.
                             id="coach-after-pose"
                             value={afterPoseId}
                             onChange={(e) => setAfterPoseOverride(e.target.value)}
-                            className="w-full rounded-xl border border-brand-purple bg-brand-purple/5 p-3 text-sm font-bold text-brand-purple focus:outline-none dark:bg-brand-purple/10"
+                            className="w-full rounded-xl border border-accent bg-accent/5 p-3 text-sm font-bold text-accent focus:outline-none dark:bg-accent/10"
                           >
                             {poses.map((pose) => (
                               <option key={`after-${pose.id}`} value={pose.id}>
@@ -535,15 +539,15 @@ export function CoachUserManagement({ clients }: CoachUserManagementProps): JSX.
                             ))}
                           </select>
                           {afterPose?.frontPoseSignedUrl ? (
-                            <div className="relative aspect-[3/4] w-full overflow-hidden rounded-2xl border-2 border-brand-purple">
+                            <div className="relative aspect-[3/4] w-full overflow-hidden rounded-2xl border-2 border-accent">
                               <img
                                 src={afterPose.frontPoseSignedUrl}
                                 alt={`Sonrası: ${formatDateTR(afterPose.created_at)}, ${afterPose.current_weight} kg`}
                                 loading="lazy"
                                 className="h-full w-full object-cover"
                               />
-                              <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-brand-purple/90 to-transparent p-4">
-                                <span className="rounded bg-white px-2 py-1 text-xs font-bold uppercase tracking-wider text-brand-purple">
+                              <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-accent/90 to-transparent p-4">
+                                <span className="rounded bg-white px-2 py-1 text-xs font-bold uppercase tracking-wider text-accent">
                                   After
                                 </span>
                                 <p className="mt-1 font-bold text-white">
@@ -569,7 +573,7 @@ export function CoachUserManagement({ clients }: CoachUserManagementProps): JSX.
                               afterPose.current_weight > beforePose.current_weight
                                 ? 'text-emerald-500'
                                 : afterPose.current_weight < beforePose.current_weight
-                                  ? 'text-brand-purple'
+                                  ? 'text-accent'
                                   : 'text-gray-500'
                             }`}
                           >
@@ -586,15 +590,14 @@ export function CoachUserManagement({ clients }: CoachUserManagementProps): JSX.
                         `nutrition_plans` tablolarında tutuluyor ve buradaki ham metin
                         editörü ölü yazma yapıyordu (koç kaydediyor, danışan göremiyordu).
                         Tam editör "Beslenme" sekmesinde. */}
-                    <div className="space-y-2 rounded-xl border border-brand-purple/30 bg-brand-purple/5 p-4">
-                      <h4 className="text-xs font-bold uppercase tracking-wider text-brand-purple">
+                    <div className="space-y-2 rounded-xl border border-accent/30 bg-accent/5 p-4">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-accent">
                         Beslenme Programı
                       </h4>
                       <p className="text-sm font-medium leading-relaxed text-gray-600 dark:text-gray-400">
                         Beslenme programı buradan düzenlenmez. Gün bazlı tablo, besin kütüphanesi ve
                         otomatik kalori hesabı için üstteki{' '}
-                        <span className="font-bold text-brand-purple">Beslenme</span> sekmesini
-                        kullanın.
+                        <span className="font-bold text-accent">Beslenme</span> sekmesini kullanın.
                       </p>
                     </div>
                     {/* Antrenman editörü bilinçli olarak KALDIRILDI: plan artık

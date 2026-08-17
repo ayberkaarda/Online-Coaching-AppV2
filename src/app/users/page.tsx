@@ -40,7 +40,7 @@ export default function UsersPage(): JSX.Element {
       <div className="absolute left-4 top-4 flex gap-2">
         <button
           onClick={() => router.push('/')}
-          className="flex items-center gap-2 rounded-lg p-2 text-sm font-bold text-brand-purple transition-all hover:bg-brand-purple/10"
+          className="flex items-center gap-2 rounded-lg p-2 text-sm font-bold text-accent transition-all hover:bg-accent/10"
         >
           <span aria-hidden="true">←</span>{' '}
           <span className="hidden sm:inline">Ana Sayfaya Dön</span>
@@ -50,7 +50,7 @@ export default function UsersPage(): JSX.Element {
       <ThemeToggle />
 
       <header className="mb-12 mt-12 text-center md:mt-0">
-        <h1 className="bg-gradient-to-r from-brand-purple to-purple-400 bg-clip-text text-3xl font-black tracking-tight text-transparent md:text-5xl">
+        <h1 className="bg-gradient-to-r from-accent to-purple-400 bg-clip-text text-3xl font-black tracking-tight text-transparent md:text-5xl">
           Kullanıcı Yönetim Merkezi
         </h1>
         <p className="mt-2 text-sm font-medium uppercase tracking-widest text-gray-500 md:text-base">

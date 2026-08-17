@@ -225,7 +225,7 @@ export default function NutritionTab({
           <button
             type="button"
             onClick={onDownloadImage}
-            className="rounded-lg bg-brand-purple/10 px-3 py-1.5 text-xs font-bold text-brand-purple"
+            className="rounded-lg bg-accent/10 px-3 py-1.5 text-xs font-bold text-accent"
           >
             <span aria-hidden="true">🖼️</span> Görsel İndir
           </button>
@@ -243,9 +243,9 @@ export default function NutritionTab({
       <form
         onSubmit={onGenerate}
         noValidate
-        className="mb-6 rounded-2xl border border-brand-purple/20 bg-gradient-to-br from-brand-purple/5 to-transparent p-5 shadow-inner"
+        className="mb-6 rounded-2xl border border-accent/20 bg-gradient-to-br from-accent/5 to-transparent p-5 shadow-inner"
       >
-        <h4 className="mb-4 flex items-center gap-2 text-sm font-black text-brand-purple">
+        <h4 className="mb-4 flex items-center gap-2 text-sm font-black text-accent">
           <span aria-hidden="true">🧠</span> AI DİYETİSYEN &amp; KALORİ HESAPLAYICI
         </h4>
         <div className="flex flex-col gap-6 md:flex-row">
@@ -260,7 +260,7 @@ export default function NutritionTab({
                 placeholder="Yaş"
                 {...register('age')}
                 aria-invalid={errors.age ? 'true' : 'false'}
-                className="w-full rounded-xl border bg-white p-3 text-xs outline-none focus:border-brand-purple dark:bg-zinc-900"
+                className="w-full rounded-xl border bg-white p-3 text-xs outline-none focus:border-accent dark:bg-zinc-900"
               />
               {errors.age ? (
                 <p role="alert" className="mt-1 text-[10px] font-bold text-red-500">
@@ -278,7 +278,7 @@ export default function NutritionTab({
                 placeholder="Boy (cm)"
                 {...register('height_cm')}
                 aria-invalid={errors.height_cm ? 'true' : 'false'}
-                className="w-full rounded-xl border bg-white p-3 text-xs outline-none focus:border-brand-purple dark:bg-zinc-900"
+                className="w-full rounded-xl border bg-white p-3 text-xs outline-none focus:border-accent dark:bg-zinc-900"
               />
               {errors.height_cm ? (
                 <p role="alert" className="mt-1 text-[10px] font-bold text-red-500">
@@ -296,7 +296,7 @@ export default function NutritionTab({
                 placeholder="Kilo (kg)"
                 {...register('weight_kg')}
                 aria-invalid={errors.weight_kg ? 'true' : 'false'}
-                className="w-full rounded-xl border bg-white p-3 text-xs outline-none focus:border-brand-purple dark:bg-zinc-900"
+                className="w-full rounded-xl border bg-white p-3 text-xs outline-none focus:border-accent dark:bg-zinc-900"
               />
               {errors.weight_kg ? (
                 <p role="alert" className="mt-1 text-[10px] font-bold text-red-500">
@@ -311,7 +311,7 @@ export default function NutritionTab({
               <select
                 id="ai-diet-gender"
                 {...register('gender')}
-                className="w-full rounded-xl border bg-white p-3 text-xs outline-none focus:border-brand-purple dark:bg-zinc-900"
+                className="w-full rounded-xl border bg-white p-3 text-xs outline-none focus:border-accent dark:bg-zinc-900"
               >
                 <option value="male">Erkek</option>
                 <option value="female">Kadın</option>
@@ -324,7 +324,7 @@ export default function NutritionTab({
               <select
                 id="ai-diet-steps"
                 {...register('steps')}
-                className="w-full rounded-xl border bg-white p-3 text-xs outline-none focus:border-brand-purple dark:bg-zinc-900"
+                className="w-full rounded-xl border bg-white p-3 text-xs outline-none focus:border-accent dark:bg-zinc-900"
               >
                 <option value={4000}>&lt; 5.000 Adım (Masa Başı)</option>
                 <option value={6500}>5.000 - 8.000 Adım</option>
@@ -357,7 +357,7 @@ export default function NutritionTab({
               id="ai-diet-prompt"
               {...register('user_prompt')}
               placeholder="Örn: Yulaf ve tavuk yemem alternatif öner. Yağı zeytinyağı + kuruyemiş olarak ayarla..."
-              className="min-h-[90px] w-full rounded-xl border bg-white p-3 text-xs outline-none focus:border-brand-purple dark:bg-zinc-900"
+              className="min-h-[90px] w-full rounded-xl border bg-white p-3 text-xs outline-none focus:border-accent dark:bg-zinc-900"
             />
             <div className="flex items-center gap-3">
               {targetCalories > 0 && (
@@ -367,7 +367,7 @@ export default function NutritionTab({
                   className="flex flex-1 items-center justify-center rounded-xl border bg-white p-3 dark:bg-zinc-900"
                 >
                   <p className="mr-2 text-[10px] font-bold text-gray-500">HEDEF:</p>
-                  <p className="text-xl font-black text-brand-purple">
+                  <p className="text-xl font-black text-accent">
                     {targetCalories} <span className="text-xs">kcal</span>
                   </p>
                 </div>
@@ -376,7 +376,8 @@ export default function NutritionTab({
                 type="submit"
                 disabled={isGenerating}
                 aria-busy={isGenerating}
-                className="flex-1 rounded-xl bg-brand-purple p-3 text-sm font-bold text-white shadow-md transition-all hover:bg-brand-purpleHover disabled:opacity-50"
+                // Eski hover moru (#7c3aed) ayrı bir token değildi; en sadık eşleme accent'in %90 opaklığı (hover koyulaşması).
+                className="flex-1 rounded-xl bg-accent p-3 text-sm font-bold text-white shadow-md transition-all hover:bg-accent/90 disabled:opacity-50"
               >
                 {isGenerating ? 'Hesaplanıyor...' : 'Oluştur ✨'}
               </button>
@@ -428,7 +429,7 @@ export default function NutritionTab({
               setActiveIndex(-1)
             }}
             onKeyDown={handleSearchKeyDown}
-            className="w-full rounded-xl border bg-white p-2.5 text-sm outline-none focus:border-brand-purple dark:border-zinc-700 dark:bg-black"
+            className="w-full rounded-xl border bg-white p-2.5 text-sm outline-none focus:border-accent dark:border-zinc-700 dark:bg-black"
           />
           {isListOpen && (
             <div
@@ -447,7 +448,7 @@ export default function NutritionTab({
                   onClick={() => pickFood(food)}
                   onMouseEnter={() => setActiveIndex(index)}
                   className={`w-full cursor-pointer border-b p-3 text-left text-sm last:border-0 dark:border-zinc-800 ${
-                    index === activeIndex ? 'bg-brand-purple/10' : 'hover:bg-brand-purple/10'
+                    index === activeIndex ? 'bg-accent/10' : 'hover:bg-accent/10'
                   }`}
                 >
                   <span className="font-bold">{food.name}</span>{' '}
@@ -472,14 +473,14 @@ export default function NutritionTab({
             type="number"
             value={quickAddGrams}
             onChange={(e) => setQuickAddGrams(e.target.value)}
-            className="w-full rounded-xl border bg-white p-2.5 text-sm outline-none focus:border-brand-purple dark:border-zinc-700 dark:bg-black"
+            className="w-full rounded-xl border bg-white p-2.5 text-sm outline-none focus:border-accent dark:border-zinc-700 dark:bg-black"
           />
         </div>
 
         <button
           type="button"
           onClick={handleQuickAdd}
-          className="w-full whitespace-nowrap rounded-xl bg-brand-purple px-6 py-2.5 font-bold text-white shadow-md transition-transform active:scale-95 md:w-auto"
+          className="w-full whitespace-nowrap rounded-xl bg-accent px-6 py-2.5 font-bold text-white shadow-md transition-transform active:scale-95 md:w-auto"
         >
           Hızlı Ekle <span aria-hidden="true">⚡</span>
         </button>
@@ -532,10 +533,10 @@ export default function NutritionTab({
                       value={nutritionData[day].items}
                       onChange={(e) => handleManualNutritionChange(day, e.target.value)}
                       placeholder="Manuel de yazabilirsiniz..."
-                      className="w-full rounded-lg border border-transparent bg-transparent p-2 outline-none transition-all hover:border-gray-200 focus:border-brand-purple dark:hover:border-zinc-700"
+                      className="w-full rounded-lg border border-transparent bg-transparent p-2 outline-none transition-all hover:border-gray-200 focus:border-accent dark:hover:border-zinc-700"
                     />
                   </td>
-                  <td className="p-3 font-black text-brand-purple">
+                  <td className="p-3 font-black text-accent">
                     {nutritionData[day].total}{' '}
                     <span className="text-xs font-bold opacity-50">kcal</span>
                   </td>

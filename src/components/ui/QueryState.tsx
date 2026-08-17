@@ -50,7 +50,7 @@ export function QueryState({
           <button
             type="button"
             onClick={onRetry}
-            className="rounded-xl bg-brand-purple px-5 py-2 text-xs font-bold text-white transition-transform active:scale-95"
+            className="rounded-xl bg-accent px-5 py-2 text-xs font-bold text-white transition-transform active:scale-95"
           >
             Tekrar Dene
           </button>
