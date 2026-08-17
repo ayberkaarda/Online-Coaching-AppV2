@@ -20,9 +20,10 @@ supabase/
 │   ├── 20260817150000_form_check_review.sql      # form_checks inceleme durumu + sütun koruması
 │   ├── 20260817160000_program_approval_guard.sql # onay kapısı: CHECK + trigger + DELETE daraltma (AC-01/AC-07)
 │   ├── 20260817160100_signup_role_hardening.sql  # handle_new_user rolü sabit 'client' (AC-02)
-│   └── 20260817160200_column_guards.sql          # messages/notifications/profiles sütun korumaları (AC-04/05/08/09/10)
+│   ├── 20260817160200_column_guards.sql          # messages/notifications/profiles sütun korumaları (AC-04/05/08/09/10)
+│   └── 20260817170000_force_rls_and_grants.sql   # TRUNCATE/REFERENCES/TRIGGER sökümü + FORCE RLS (AC-03/AC-06)
 ├── tests/
-│   ├── rls.test.sql            # 70 RLS senaryosu       (npm run test:rls)
+│   ├── rls.test.sql            # 76 RLS senaryosu       (npm run test:rls)
 │   └── transform.test.sql      # 26 dönüşüm senaryosu   (npm run test:transform)
 ├── seed.sql                    # SADECE YEREL demo verisi
 └── README.md
@@ -97,9 +98,12 @@ supabase gen types typescript --local --schema public > src/types/database.ts
 
 ## 4. RLS Özeti
 
-Tüm tablolarda RLS **açıktır**. Politikalar yalnızca `authenticated` rolüne verilmiştir;
+Tüm tablolarda RLS **açıktır** ve **`FORCE ROW LEVEL SECURITY`** ile tablo sahibini de
+kapsar (bkz. 4f). Politikalar yalnızca `authenticated` rolüne verilmiştir;
 `anon` (giriş yapmamış ziyaretçi) rolünden `public` şemadaki tüm tablo/sequence/fonksiyon
-yetkileri **REVOKE** edilmiştir.
+yetkileri **REVOKE** edilmiştir. `authenticated` rolünde tablo düzeyinde yalnızca
+`SELECT/INSERT/UPDATE/DELETE` vardır — `TRUNCATE`, `REFERENCES` ve `TRIGGER` sökülmüştür
+(bkz. 4f; `TRUNCATE` RLS'e tabi olmadığı için bir baypas yoluydu).
 
 Kısaltmalar: **S** = satır sahibi (`client_id`/`id` = `auth.uid()`), **K** = koç (`is_coach()`)
 
@@ -303,7 +307,7 @@ Dönüşüm kuralları: NULL / boş / geçersiz JSON / JSON-nesnesi-olmayan içe
 ### Testler
 
 ```bash
-npm run test:rls         # 70 senaryo (20–27 bu tablolara ait)
+npm run test:rls         # 76 senaryo (20–27 bu tablolara ait)
 npm run test:transform   # 26 senaryo (1–10 bu tablolara ait: dönüşüm + round-trip + idempotency)
 ```
 
@@ -389,7 +393,7 @@ oluşturulur (varsa o kullanılır), planın **tüm** öğün satırları silini
 ### Testler
 
 ```bash
-npm run test:rls         # 70 senaryo (28–35 bu tablolara ait)
+npm run test:rls         # 76 senaryo (28–35 bu tablolara ait)
 npm run test:transform   # 26 senaryo (11–19 bu tablolara ait)
 ```
 
@@ -467,7 +471,7 @@ kapısındadır. `useMarkConversationRead` iki kolonu da tutarlı tutar.
 ### Testler
 
 ```bash
-npm run test:rls         # 70 senaryo (36–42 mesajlaşma konuşma anahtarına ait)
+npm run test:rls         # 76 senaryo (36–42 mesajlaşma konuşma anahtarına ait)
 npm run test:transform   # 26 senaryo (20–22 backfill: temel + idempotency + atlanan satır)
 ```
 
@@ -563,7 +567,7 @@ taşırdı. Kısmi indeksin boyutu **kuyruk uzunluğuyla** orantılıdır, arşi
 ### Testler
 
 ```bash
-npm run test:rls         # 70 senaryo (43–50 form check incelemesine ait)
+npm run test:rls         # 76 senaryo (43–50 form check incelemesine ait)
 npm run test:transform   # 26 senaryo (23–26 backfill + tutarlılık kısıtı)
 ```
 
@@ -674,7 +678,7 @@ almasıdır — her iki durumda da istek reddedilir, yalnızca hata kodu farklı
 ### Testler
 
 ```bash
-npm run test:rls   # 70 senaryo (51–70 Faz 1.5 güvenlik regresyonlarına ait)
+npm run test:rls   # 76 senaryo (51–70 Faz 1.5 güvenlik regresyonlarına ait)
 ```
 
 Kapsanan boşluklar (`findings-access-control.md` §6): G-01, G-02, G-03, G-06 (51–57),
@@ -691,6 +695,103 @@ meşru uygulama akışını kırmadığını kanıtlar.
 
 Üç migration dosyasının da sonunda çalıştırılabilir bir `-- DOWN` bloğu vardır.
 **UYARI:** geri alma ilgili bulguları (AC-01 High ve AC-02 High dahil) yeniden açar.
+
+---
+
+## 4f. Tablo Yetkileri ve FORCE RLS (AC-03 / AC-06)
+
+`20260817170000_force_rls_and_grants.sql`. Şema değiştirmez; yalnızca **yetki (ACL)**
+ve **tablo bayrağı** değiştirir.
+
+### `authenticated` artık TRUNCATE / REFERENCES / TRIGGER yapamaz (AC-03)
+
+RLS yalnızca SELECT/INSERT/UPDATE/DELETE'i filtreler — **`TRUNCATE` RLS'e tabi
+değildir**. Denetimde `authenticated` rolünde bu yetki açıktı ve tek ifadeyle tüm
+veritabanı silinebiliyordu:
+
+```
+-- düzeltmeden ÖNCE, danışan A oturumunda:
+truncate table public.profiles cascade;
+-- NOTICE: truncate cascades to ... (11 tablo) -> GEÇTİ
+```
+
+Düzeltme sonrası aynı ifade `42501 permission denied for table profiles` verir.
+
+> **Asıl düzeltme `revoke` değil, `alter default privileges`.**
+> `20260816090200_rls_policies.sql`'deki GRANT zaten dardı
+> (`select, insert, update, delete`). Üç fazla yetkinin kaynağı Supabase'in
+> platform seviyesindeki varsayılanıdır
+> (`alter default privileges for role postgres in schema public grant all on tables to …`).
+> Bu yüzden yalnızca mevcut tablolardan REVOKE etmek yetmez: **bir sonraki
+> migration'da açılan her yeni tablo yetkiyi kendiliğinden geri kazanırdı.**
+> Migration bu yüzden varsayılan yetkilerin kendisinden de söker. Canlı doğrulama:
+> düzeltme sonrası `create table public.zz (id int)` → ACL
+> `postgres=arwdDxt | service_role=Dxt` (authenticated **yok**).
+
+**Pratik sonuç:** `public` şemasına eklenen her yeni tablo, kendi migration'ında
+`grant select, insert, update, delete on public.<tablo> to authenticated;`
+satırını **açıkça** içermek zorundadır (mevcut kalıp zaten budur). Unutulursa
+uygulama `permission denied for table` ile **gürültülü** kırılır — sessiz bir
+güvenlik açığı oluşmaz.
+
+`service_role` ve `postgres` **kısıtlanmadı** (ikisi de zaten `rolbypassrls = t`).
+
+**Kapatılamayan boşluk:** `pg_default_acl`'de bir de `supabase_admin` kaydı vardır
+(`authenticated=arwdDxt`). Onu değiştirmek `must be member of role "supabase_admin"`
+ile reddedilir. Uygulamanın 13 tablosunun tamamı `postgres` sahipli olduğu için
+pratik etkisi yoktur; ama `public` şemasına `supabase_admin` ile kurulan bir
+**eklenti** tablo yaratırsa o tablo kapsam dışı kalır. Test senaryosu 73 tablo
+listesini `pg_tables`'tan dinamik okuduğu için böyle bir tablo ortaya çıkarsa
+**test kırılır**.
+
+### `FORCE ROW LEVEL SECURITY` tüm tablolarda açık (AC-06)
+
+Normalde tablo **sahibi** RLS'ten muaftır; `FORCE` muafiyeti kaldırır. Bu projede
+13 tablonun da sahibi `postgres`'tir ve `handle_new_user()`, `sync_profile_email()`,
+`increment_streak()`, `is_coach()`, `profile_role()`, `is_coach_profile()` ile tüm
+`*_guard_*` trigger fonksiyonları `SECURITY DEFINER` olarak **`postgres` kimliğiyle**
+çalışır. FORCE bunları RLS'e soksaydı en az iki yol ölürdü:
+
+* `handle_new_user()` → `profiles` INSERT: kayıt anında `auth.uid()` NULL'dır,
+  `profiles_insert_coach` politikası `is_coach()` ister → **her kullanıcı kaydı ve
+  `db reset` seed'i çökerdi**.
+* `is_coach()` → `profiles` SELECT: politikaların içinden çağrıldığı için `false`
+  dönmeye başlar → **koç tüm verisine erişimini sessizce kaybederdi**.
+
+**Kırılmıyor — çünkü `postgres` rolünde `rolbypassrls = t` ve BYPASSRLS, FORCE'u
+ezer.** Bu tahmin değil, ölçüm: FORCE tüm tablolarda açıkken GoTrue'nun gerçek DB
+rolü (`supabase_auth_admin`, `bypassrls = f`) ile `insert into auth.users` çalıştı
+ve profil oluştu; `POST /auth/v1/admin/users` gerçek HTTP çağrısı `200` döndü ve
+`role=client` profil yazıldı; `test:rls` 76/76, `test:transform` 26/26 geçti.
+
+> **Bugünkü etkisi sıfırdır** — bulgunun **Low** olmasının sebebi budur. Değeri,
+> `postgres`'ten BYPASSRLS alındığı veya tablolar BYPASSRLS'siz bir role
+> devredildiği gün doğar. Aynı sebeple **hiçbir tablo kapsam dışı bırakılmadı**.
+> Senaryo 75 bu varsayımı açıkça test eder: sahibin BYPASSRLS'i kalkarsa test
+> "migration yeniden değerlendirilmeli" mesajıyla kırılır.
+
+### Testler
+
+```bash
+npm run test:rls   # 76 senaryo (71–76 bu migration'a ait)
+```
+
+* **71** — `authenticated` TRUNCATE edemez (`profiles cascade`, `messages`, `form_checks`)
+* **72** — `authenticated` `create trigger` / `alter table ... add foreign key` yapamaz
+* **73** — dinamik grant denetimi: her `public` tablosunda `authenticated`/`anon` için
+  TRUNCATE+REFERENCES+TRIGGER yok, S/I/U/D **var** (pozitif kontrol)
+* **74** — dinamik `pg_class` denetimi: her `public` tablosunda
+  `relrowsecurity = relforcerowsecurity = true`
+* **75** — pozitif: FORCE açıkken `handle_new_user()` ve `sync_profile_email()` çalışıyor
+* **76** — pozitif: FORCE açıkken `is_coach()` / `profile_role()` / `is_coach_profile()`
+  doğru cevaplıyor
+
+### Geri alma
+
+Migration dosyasının sonunda çalıştırılabilir bir `-- DOWN` bloğu vardır.
+**UYARI:** geri alma AC-03'ü yeniden açar — `authenticated` rolündeki herhangi bir
+kullanıcı yeniden `truncate table public.profiles cascade` ile tüm veritabanını
+silebilir hâle gelir. `anon` bilerek geri verilmez.
 
 ---
 

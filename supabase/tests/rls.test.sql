@@ -2663,9 +2663,335 @@ end $$;
 rollback;
 
 
+-- #############################################################################
+-- ## FAZ 1.5 — GRUP 5: YETKİ SÖKÜMÜ VE FORCE RLS (71–76)                     ##
+-- ##                                                                         ##
+-- ## Düzeltme: 20260817170000_force_rls_and_grants.sql                       ##
+-- ## Boşluklar: G-17 (AC-03), G-18 (AC-06)                                   ##
+-- #############################################################################
+
+
+-- =============================================================================
+-- YETKI — 71) [G-17 / AC-03] `authenticated` rolü TRUNCATE EDEMEZ
+--
+-- Düzeltmeden ÖNCE bu üç ifade de GEÇİYORDU. En yıkıcısı ilkidir: `profiles`
+-- doğrudan truncate edilemiyordu (0A000, FK), ama `cascade` ile 11 tabloya
+-- yayılıp TÜM veritabanını siliyordu. TRUNCATE **RLS'e tabi değildir** —
+-- satır politikaları hiç çalışmaz.
+-- =============================================================================
+begin;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+do $$
+declare
+  v_tbl    text;
+  v_stmt   text;
+  v_caught boolean;
+  v_state  text;
+begin
+  foreach v_tbl in array array['public.profiles cascade', 'public.messages', 'public.form_checks']
+  loop
+    v_caught := false;
+    v_stmt   := 'truncate table ' || v_tbl;
+    begin
+      execute v_stmt;
+    exception when insufficient_privilege then
+      v_caught := true;
+      get stacked diagnostics v_state = returned_sqlstate;
+    end;
+
+    if not v_caught then
+      raise exception 'BASARISIZ [G-17 TRUNCATE reddedilmeli]: "%" GECTI -- RLS BAYPAS YOLU ACIK!', v_stmt;
+    end if;
+    if v_state is distinct from '42501' then
+      raise exception 'BASARISIZ [G-17 hata kodu / %]: beklenen 42501, gelen %', v_tbl, v_state;
+    end if;
+  end loop;
+  raise notice 'GECTI [G-17 authenticated TRUNCATE edemez: profiles cascade / messages / form_checks (42501)]';
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- YETKI — 72) [G-17b / AC-03] `authenticated` rolü TRIGGER kuramaz, tabloyu
+-- ALTER edemez
+--
+-- TRIGGER yetkisi düzeltmeden ÖNCE gerçekten AÇIKTI: `create trigger ... on
+-- public.messages` hatasız geçiyordu — yani kullanıcı, her INSERT'te kendi
+-- kodunu çalıştıran bir trigger kurabiliyordu.
+--
+-- Not: `alter table ... add foreign key` zaten SAHİPLİK ister (authenticated
+-- hiçbir tabloyu sahiplenmez), yani bu dal REFERENCES yetkisini TEK BAŞINA
+-- ölçmez; REFERENCES'ın gerçekten sökülmüş olduğu senaryo 73'te
+-- `has_table_privilege` ile doğrudan doğrulanır.
+-- =============================================================================
+begin;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+do $$
+declare
+  v_trg_caught boolean := false;
+  v_alt_caught boolean := false;
+  v_state      text;
+begin
+  begin
+    execute 'create trigger zz_evil_trg before insert on public.messages '
+         || 'for each row execute function public.set_updated_at()';
+  exception when insufficient_privilege then
+    v_trg_caught := true;
+    get stacked diagnostics v_state = returned_sqlstate;
+  end;
+
+  if not v_trg_caught then
+    raise exception 'BASARISIZ [G-17b CREATE TRIGGER reddedilmeli]: hata ALINMADI -- TRIGGER yetkisi ACIK!';
+  end if;
+  if v_state is distinct from '42501' then
+    raise exception 'BASARISIZ [G-17b trigger hata kodu]: beklenen 42501, gelen %', v_state;
+  end if;
+
+  begin
+    execute 'alter table public.workout_logs add constraint zz_evil_fk '
+         || 'foreign key (client_id) references public.profiles(id)';
+  exception when insufficient_privilege then
+    v_alt_caught := true;
+  end;
+
+  if not v_alt_caught then
+    raise exception 'BASARISIZ [G-17b ALTER TABLE reddedilmeli]: hata ALINMADI';
+  end if;
+  raise notice 'GECTI [G-17b authenticated CREATE TRIGGER / ALTER TABLE ADD FK yapamaz (42501)]';
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- YETKI — 73) [G-17 / AC-03] Toplu grant denetimi — DİNAMİK
+--
+-- Tablo listesi `pg_tables`'tan okunur: gelecekte eklenen bir tablo bu üç
+-- yetkiyi (Supabase'in `alter default privileges` varsayılanından) geri
+-- kazanırsa bu senaryo KIRILIR. Migration'ın (b) adımı tam olarak bunu
+-- engellemek içindir.
+--
+-- POZİTİF KONTROL de aynı blokta: select/insert/update/delete HÂLÂ durmalı —
+-- aksi hâlde "güvenli ama çalışmayan" bir veritabanı üretmiş olurduk.
+-- =============================================================================
+begin;
+do $$
+declare
+  v_leak  text;
+  v_miss  text;
+  v_tabs  int;
+begin
+  select count(*) into v_tabs from pg_tables where schemaname = 'public';
+  if v_tabs < 13 then
+    raise exception 'BASARISIZ [G-17 kurulum]: public semada beklenenden az tablo var (%)', v_tabs;
+  end if;
+
+  select string_agg(format('%s/%s/%s', g.role_name, t.tablename, p.priv), ', ' order by t.tablename)
+    into v_leak
+    from pg_tables t
+    cross join (values ('authenticated'), ('anon')) as g(role_name)
+    cross join (values ('TRUNCATE'), ('REFERENCES'), ('TRIGGER')) as p(priv)
+   where t.schemaname = 'public'
+     and has_table_privilege(g.role_name, format('public.%I', t.tablename), p.priv);
+
+  if v_leak is not null then
+    raise exception 'BASARISIZ [G-17 D/x/t yetkisi hala acik]: %', v_leak;
+  end if;
+
+  select string_agg(format('%s/%s', t.tablename, p.priv), ', ' order by t.tablename)
+    into v_miss
+    from pg_tables t
+    cross join (values ('SELECT'), ('INSERT'), ('UPDATE'), ('DELETE')) as p(priv)
+   where t.schemaname = 'public'
+     and not has_table_privilege('authenticated', format('public.%I', t.tablename), p.priv);
+
+  if v_miss is not null then
+    raise exception 'BASARISIZ [G-17 POZITIF KONTROL]: authenticated in normal yetkileri KAYIP -> %', v_miss;
+  end if;
+
+  raise notice 'GECTI [G-17 % public tablosunda authenticated/anon icin TRUNCATE+REFERENCES+TRIGGER YOK; S/I/U/D korunuyor]', v_tabs;
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- YETKI — 74) [G-18 / AC-06] Her `public` tablosunda FORCE ROW LEVEL SECURITY
+--
+-- Tablo listesi yine DİNAMİKTİR: ileride eklenen bir tabloda
+-- `alter table ... force row level security` unutulursa bu senaryo kırılır.
+-- RLS'in kendisinin (relrowsecurity) açık olduğu da aynı blokta doğrulanır —
+-- FORCE, RLS kapalıyken hiçbir anlam ifade etmez.
+-- =============================================================================
+begin;
+do $$
+declare
+  v_no_force text;
+  v_no_rls   text;
+  v_count    int;
+begin
+  select string_agg(c.relname, ', ' order by c.relname) into v_no_force
+    from pg_class c
+    join pg_namespace n on n.oid = c.relnamespace
+   where n.nspname = 'public' and c.relkind = 'r' and not c.relforcerowsecurity;
+
+  if v_no_force is not null then
+    raise exception 'BASARISIZ [G-18 FORCE RLS kapali tablolar]: %', v_no_force;
+  end if;
+
+  select string_agg(c.relname, ', ' order by c.relname) into v_no_rls
+    from pg_class c
+    join pg_namespace n on n.oid = c.relnamespace
+   where n.nspname = 'public' and c.relkind = 'r' and not c.relrowsecurity;
+
+  if v_no_rls is not null then
+    raise exception 'BASARISIZ [G-18 RLS kapali tablolar]: %', v_no_rls;
+  end if;
+
+  select count(*) into v_count
+    from pg_class c join pg_namespace n on n.oid = c.relnamespace
+   where n.nspname = 'public' and c.relkind = 'r';
+
+  raise notice 'GECTI [G-18 % public tablosunda relrowsecurity=true VE relforcerowsecurity=true]', v_count;
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- YETKI — 75) POZİTİF KONTROL: FORCE RLS AÇIKKEN yeni kullanıcı kaydı
+-- (`handle_new_user`) HÂLÂ ÇALIŞIR
+--
+-- Bu senaryonun varlık sebebi: `handle_new_user()` `SECURITY DEFINER`'dır ve
+-- tablo sahibi `postgres` olarak `public.profiles`'a INSERT eder. Kayıt anında
+-- `auth.uid()` NULL'dır; `profiles_insert_coach` politikası `is_coach()` ister.
+-- FORCE RLS sahibi de politikalara soksaydı HER KAYIT (ve `db reset` seed'i)
+-- çökerdi. `postgres` rolündeki `rolbypassrls = t` bunu engeller — test
+-- bunu ÖNCE doğrular, sonra akışı canlı çalıştırır.
+--
+-- Gerçek GoTrue yolu (`supabase_auth_admin`, bypassrls = f) ayrıca elle
+-- doğrulanmıştır; oradaki bypass fonksiyonun DEFINER'ı (`postgres`) üzerinden
+-- gelir, çağıran rolden değil.
+-- =============================================================================
+begin;
+
+do $$
+declare
+  v_force  boolean;
+  v_bypass boolean;
+begin
+  select c.relforcerowsecurity into v_force
+    from pg_class c join pg_namespace n on n.oid = c.relnamespace
+   where n.nspname = 'public' and c.relname = 'profiles';
+  if v_force is not true then
+    raise exception 'BASARISIZ [75 kurulum]: profiles tablosunda FORCE RLS kapali -- bu senaryo anlamsiz';
+  end if;
+
+  select rolbypassrls into v_bypass from pg_roles
+   where rolname = (select pg_get_userbyid(relowner) from pg_class where oid = 'public.profiles'::regclass);
+  if v_bypass is not true then
+    raise exception 'BASARISIZ [75 varsayim]: profiles sahibi artik BYPASSRLS degil -- handle_new_user FORCE RLS ile kirilabilir, migration yeniden degerlendirilmeli';
+  end if;
+end $$;
+
+insert into auth.users (
+  instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
+  raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
+  confirmation_token, email_change, email_change_token_new, recovery_token
+)
+values (
+  '00000000-0000-0000-0000-000000000000',
+  '88888888-8888-8888-8888-888888888888',
+  'authenticated', 'authenticated', 'forcetest@example.com', 'x', now(),
+  '{"provider":"email","providers":["email"]}'::jsonb,
+  '{"full_name":"Force Test"}'::jsonb,
+  now(), now(), '', '', '', ''
+);
+
+do $$
+declare
+  v_role  public.user_role;
+  v_name  text;
+  v_email text;
+begin
+  select role, full_name, email into v_role, v_name, v_email
+    from public.profiles where id = '88888888-8888-8888-8888-888888888888';
+
+  if v_role is null then
+    raise exception 'BASARISIZ [75 handle_new_user FORCE RLS ile KIRILDI]: profil olusmadi -- KAYIT AKISI TAMAMEN OLU';
+  end if;
+  if v_role is distinct from 'client'::public.user_role then
+    raise exception 'BASARISIZ [75 rol]: beklenen client, gelen %', v_role;
+  end if;
+  if v_name is distinct from 'Force Test' or v_email is distinct from 'forcetest@example.com' then
+    raise exception 'BASARISIZ [75 alanlar]: full_name=%, email=%', v_name, v_email;
+  end if;
+  raise notice 'GECTI [POZITIF - FORCE RLS acikken handle_new_user yeni kullanici kaydini HALA olusturuyor]';
+end $$;
+
+-- `sync_profile_email()` de aynı sahiplik yolundan geçer: FORCE altında
+-- `public.profiles` UPDATE'i hâlâ yürümeli.
+update auth.users set email = 'forcetest2@example.com'
+ where id = '88888888-8888-8888-8888-888888888888';
+
+do $$
+declare
+  v_email text;
+begin
+  select email into v_email from public.profiles
+   where id = '88888888-8888-8888-8888-888888888888';
+  if v_email is distinct from 'forcetest2@example.com' then
+    raise exception 'BASARISIZ [75 sync_profile_email FORCE RLS ile KIRILDI]: gelen %', v_email;
+  end if;
+  raise notice 'GECTI [POZITIF - FORCE RLS acikken sync_profile_email() profiles.email i HALA esitliyor]';
+end $$;
+
+rollback;
+
+
+-- =============================================================================
+-- YETKI — 76) POZİTİF KONTROL: FORCE RLS AÇIKKEN `SECURITY DEFINER` rol
+-- yardımcıları doğru cevap veriyor
+--
+-- `is_coach()` / `profile_role()` / `is_coach_profile()` `profiles`'ı sahip
+-- kimliğiyle okur ve RLS POLİTİKALARININ İÇİNDEN çağrılır. FORCE bunları
+-- etkileseydi hata değil SESSİZ YANLIŞ CEVAP üretirdi: koç `is_coach() = false`
+-- görüp tüm danışan verisine erişimini kaybederdi.
+-- =============================================================================
+begin;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+do $$
+declare
+  v_is_coach_self  boolean;
+  v_is_coach_coach boolean;
+  v_role           public.user_role;
+  v_is_coach_prof  boolean;
+begin
+  select public.is_coach() into v_is_coach_self;
+  select public.is_coach('11111111-1111-1111-1111-111111111111') into v_is_coach_coach;
+  select public.profile_role('11111111-1111-1111-1111-111111111111') into v_role;
+  select public.is_coach_profile('11111111-1111-1111-1111-111111111111') into v_is_coach_prof;
+
+  if v_is_coach_self is distinct from false then
+    raise exception 'BASARISIZ [76 is_coach() danisan icin false olmali]: gelen %', v_is_coach_self;
+  end if;
+  if v_is_coach_coach is distinct from true then
+    raise exception 'BASARISIZ [76 is_coach(koc) FORCE RLS ile KIRILDI]: beklenen true, gelen % -- kocun tum erisimi olurdu', v_is_coach_coach;
+  end if;
+  if v_role is distinct from 'coach'::public.user_role then
+    raise exception 'BASARISIZ [76 profile_role(koc) FORCE RLS ile KIRILDI]: beklenen coach, gelen %', v_role;
+  end if;
+  if v_is_coach_prof is distinct from true then
+    raise exception 'BASARISIZ [76 is_coach_profile(koc) FORCE RLS ile KIRILDI]: beklenen true, gelen %', v_is_coach_prof;
+  end if;
+  raise notice 'GECTI [POZITIF - FORCE RLS acikken is_coach / profile_role / is_coach_profile dogru cevapliyor]';
+end $$;
+rollback;
+
+
 -- =============================================================================
 -- TOPLAM ÖZET
--- Bu noktaya yalnızca YUKARIDAKİ 70 senaryonun HEPSİ GECTI verdiyse ulaşılır --
+-- Bu noktaya yalnızca YUKARIDAKİ 76 senaryonun HEPSİ GECTI verdiyse ulaşılır --
 -- herhangi biri BASARISIZ olsaydı raise exception + ON_ERROR_STOP psql'i
 -- daha önce sıfırdan farklı çıkış koduyla durdururdu.
 --   * 1–19  : Faz 1a ve öncesi (profiles, notifications, form_checks, daily_logs,
@@ -2679,8 +3005,9 @@ rollback;
 --   * 62–65 : Faz 1.5 — notifications içerik koruması      (AC-05, AC-10 / G-10, G-11)
 --   * 66–69 : Faz 1.5 — profiles sunucu sütunları          (AC-08, AC-09 / G-13, G-14)
 --   * 70    : Faz 1.5 — handle_new_user rol sertleştirmesi (AC-02 / G-16)
+--   * 71–76 : Faz 1.5 Grup 5 — yetki sökümü + FORCE RLS   (AC-03, AC-06 / G-17, G-18)
 -- =============================================================================
 do $$
 begin
-  raise notice 'TUM RLS TESTLERI GECTI (70 senaryo)';
+  raise notice 'TUM RLS TESTLERI GECTI (76 senaryo)';
 end $$;
