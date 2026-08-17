@@ -21,7 +21,7 @@
 // değişkenler her çalıştırmada kabuktan açıkça verilmelidir.
 import fs from 'node:fs'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { createClient } from '@supabase/supabase-js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -87,7 +87,7 @@ function parseArgs(argv) {
 //    - BOM varsa atılır
 // ---------------------------------------------------------------------------
 
-function parseCsv(text) {
+export function parseCsv(text) {
   if (text.charCodeAt(0) === 0xfeff) text = text.slice(1) // BOM
 
   const rows = []
@@ -147,7 +147,7 @@ function parseCsv(text) {
 }
 
 // CSV satırlarını başlık isimlerine göre nesneye çevirir.
-function toRecords(rows) {
+export function toRecords(rows) {
   if (rows.length === 0) return { header: [], records: [] }
   const header = rows[0].map((h) => h.trim().toLowerCase())
   const records = rows.slice(1).map((cells) => {
@@ -262,7 +262,7 @@ function repairCp1251(text) {
 
 const repairSamples = []
 
-function repairEncoding(text) {
+export function repairEncoding(text) {
   if (!text || !NON_ASCII.test(text)) return text
   const fixed = repairLatin1(text) ?? repairCp1251(text)
   if (!fixed) return text
@@ -283,12 +283,12 @@ function readCsvFile(fileName) {
 }
 
 // Boş string'i null'a çevirir (opsiyonel text sütunları için).
-function nullIfEmpty(value) {
+export function nullIfEmpty(value) {
   const trimmed = (value ?? '').trim()
   return trimmed === '' ? null : trimmed
 }
 
-function chunk(items, size) {
+export function chunk(items, size) {
   const out = []
   for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size))
   return out
@@ -302,7 +302,7 @@ function formatDuration(ms) {
 // 5) Kaynak tanımları — CSV -> tablo dönüşümü
 // ---------------------------------------------------------------------------
 
-const SOURCES = {
+export const SOURCES = {
   exercises: {
     table: 'exercises',
     file: 'clean_exercises_v2.csv',
@@ -347,15 +347,9 @@ const SOURCES = {
 // 6) Tek bir kaynağı işle
 // ---------------------------------------------------------------------------
 
-async function importSource(source, { client, dryRun }) {
-  const startedAt = performance.now()
-  const { filePath, text } = readCsvFile(source.file)
-  const { header, records } = toRecords(parseCsv(text))
-
-  if (!header.includes('name')) {
-    throw new Error(`${source.file}: 'name' sütunu bulunamadı. Başlık: ${header.join(', ')}`)
-  }
-
+// Ayrıştırılmış CSV kayıtlarını (map + dosya içi tekilleştirme) tablo satırlarına
+// çevirir. Dosya sistemine/DB'ye dokunmaz — saf, test edilebilir çekirdek.
+export function transformRecords(source, records) {
   const skipReasons = new Map()
   const byName = new Map() // dosya içi tekilleştirme: aynı isimde son kayıt kazanır
   let duplicates = 0
@@ -373,7 +367,19 @@ async function importSource(source, { client, dryRun }) {
     byName.set(result.row.name, result.row)
   }
 
-  const rows = [...byName.values()]
+  return { rows: [...byName.values()], skipReasons, duplicates }
+}
+
+async function importSource(source, { client, dryRun }) {
+  const startedAt = performance.now()
+  const { filePath, text } = readCsvFile(source.file)
+  const { header, records } = toRecords(parseCsv(text))
+
+  if (!header.includes('name')) {
+    throw new Error(`${source.file}: 'name' sütunu bulunamadı. Başlık: ${header.join(', ')}`)
+  }
+
+  const { rows, skipReasons, duplicates } = transformRecords(source, records)
   const batches = chunk(rows, BATCH_SIZE)
   let written = 0
 
@@ -545,9 +551,14 @@ async function main() {
   }
 }
 
-try {
-  await main()
-} catch (error) {
-  console.error(`\nHata: ${error instanceof Error ? error.message : String(error)}`)
-  process.exitCode = 1
+// Yalnızca doğrudan `node scripts/import-catalog.mjs` olarak çalıştırıldığında
+// main()'i tetikler; tests/unit/catalog-import.test.ts gibi bir modül olarak
+// import edildiğinde (saf fonksiyonları test etmek için) CLI çalışmaz.
+if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
+  try {
+    await main()
+  } catch (error) {
+    console.error(`\nHata: ${error instanceof Error ? error.message : String(error)}`)
+    process.exitCode = 1
+  }
 }

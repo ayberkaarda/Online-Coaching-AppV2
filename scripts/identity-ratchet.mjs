@@ -92,7 +92,7 @@ export const BASELINES = {
     // üzerinde ölçülen gerçek değer budur. Farklı bir emoji tanımı (ör. yalnızca
     // U+1F300+ aralığı) farklı bir sayı üretir; ADR-0018 bu yüzden sayıyı mutlak
     // olarak değil "script'in kendi ölçümü" olarak sabitliyor.
-    ceiling: 60,
+    ceiling: 59,
     label:
       "JSX/string emoji kullanımı (Faz 2'nin ilk mekanik işi olan Lucide dönüşümüne kadar — ADR-0016)",
   },

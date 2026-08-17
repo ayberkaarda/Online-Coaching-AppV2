@@ -15,6 +15,38 @@ manuel Supabase Table Editor / `supabase db` import akışları için kullanıl�
 | `daily_food_nutrition_dataset.csv` | Kaggle'dan indirilen ham besin/kalori veri seti | — (ara ürün) | `scripts/clean-foods.mjs` girdisi. |
 | `clean_foods.csv` | `daily_food_nutrition_dataset.csv`'nin `name,calories_per_100g` formatına indirgenmiş hali | `food_database` | `scripts/clean-foods.mjs` çıktısı, Supabase `food_database` tablosuna import edilir. |
 
+### Neden `exercises.csv` değil de `clean_exercises_v2.csv`? (Faz 1.7 doğrulaması)
+
+`exercises` tablosunun şeması (`name, body_part, target, equipment, gif_url, image`)
+6 sütunludur. İkisi de aynı 1324 satırlık veri setini temsil eder ama:
+
+- `exercises.csv` (8.7 MB) — ham kaynak indirme. **95 sütunlu**, altı dilde
+  (`en/it/tr/es/ru/zh`) tekrarlanan `instructions/*` ve `instruction_steps/*/N`
+  serbest metin alanları, ayrı `muscle_group`/`secondary_muscles/N` alanları
+  içerir. Şemadaki `body_part`/`target` isimleriyle birebir eşleşmez (`muscle_group`
+  vs. `target` gibi ayrı kavramlar var) ve hangi dilin/hangi alanın kullanılacağı
+  belirsizdir — doğrudan import şema dışı veri kaybına veya yanlış eşlemeye yol açar.
+- `clean_exercises_v2.csv` (150 KB) — tablo şemasıyla **birebir 6 sütun**
+  (`name, body_part, target, equipment, gif_url, image`), aynı 1324 satır, zaten
+  projekte edilmiş/temizlenmiş. `scripts/import-catalog.mjs` bunu kullanır.
+
+Sonuç: `clean_exercises_v2.csv` kanoniktir; `exercises.csv` yalnızca arşiv/ara
+ürün olarak tutulur, import scripti tarafından okunmaz.
+
+### Faz 1.7 import sonucu (yerel Supabase, 2026-08-17)
+
+`npm run db:import-catalog` yerel `127.0.0.1:54321` yığınına karşı çalıştırıldı:
+
+| Tablo | Okunan (CSV) | Dosya içi tekrarlı | Tekil yazılan | Nihai satır sayısı (10 demo dahil) |
+|---|---|---|---|---|
+| `exercises` | 1324 | 6 | 1318 | 1328 |
+| `food_database` | 639 | 58 | 581 | 591 |
+
+İki kez art arda çalıştırıldı, satır sayısı değişmedi (idempotent upsert,
+`onConflict: 'name'`). Türkçe/aksanlı karakterler (`Tavuk Göğsü`, `sautéed`, `Ragù`)
+ve kodlaması onarılan alanlar (`sled 45в° calf press` → `sled 45° calf press`)
+import sonrası geri okunarak doğrulandı.
+
 ## Supabase'e import
 
 Temizlenmiş CSV'leri Supabase tablolarına aktarmak için `scripts/import-catalog.mjs`
