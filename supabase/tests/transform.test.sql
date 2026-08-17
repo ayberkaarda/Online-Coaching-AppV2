@@ -1198,6 +1198,17 @@ values
 alter table public.messages alter column client_id drop not null;
 alter table public.messages disable trigger messages_apply_conversation_key;
 
+-- FAZ 2b NOTU (20260817190300_message_read_state.sql):
+--   `read_at` KANONİK / `is_read` TÜREV invaryantı, bu senaryonun simüle ettiği
+--   ESKİ ŞEKİLLİ satırı (`is_read = true` iken `read_at IS NULL`) artık
+--   İMKÂNSIZ kılıyor. `backfill_messages_conversation_key()` tam olarak o eski
+--   dünyanın onarım aracıdır, dolayısıyla ESKİ DÜNYADA test edilmelidir:
+--   normalleştirme trigger'ı ve kısıt İŞLEM SÜRESİNCE kaldırılır. Geri
+--   AÇILMAZLAR — backfill'in kendisi de eski-şekilli satırlar üzerinde
+--   çalışmalıdır; `rollback` ikisini de geri getirir (DDL işlemseldir).
+alter table public.messages drop constraint messages_read_state_chk;
+alter table public.messages disable trigger messages_sync_read_state;
+
 update public.messages
    set client_id = null, read_at = null
  where id in ('f0000000-0000-0000-0000-000000000201'::uuid, 'f0000000-0000-0000-0000-000000000202'::uuid);
@@ -1261,6 +1272,11 @@ values
 
 alter table public.messages alter column client_id drop not null;
 alter table public.messages disable trigger messages_apply_conversation_key;
+
+-- FAZ 2b: bkz. senaryo 20'deki not — eski şekilli satır ancak invaryant
+-- geçici olarak kaldırıldığında üretilebilir (`rollback` geri getirir).
+alter table public.messages drop constraint messages_read_state_chk;
+alter table public.messages disable trigger messages_sync_read_state;
 
 update public.messages
    set client_id = null, read_at = null

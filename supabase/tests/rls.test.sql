@@ -3552,8 +3552,721 @@ rollback;
 
 
 -- =============================================================================
+-- FAZ 2b — ŞEMA TAMAMLAMA
+-- (20260817190000 … 20260817190400: workout_logs set kolonları, beslenme
+--  hedefleri + nutrition_logs, mesaj eki, read_at invaryantı, realtime yayını)
+-- =============================================================================
+
+
+-- =============================================================================
+-- WORKOUT LOG — 86) POZİTİF: Danışan kendi setini YENİ KOLONLARLA yazabilir
+-- (set_number + plan_exercise_id + completed_at) ve geri okuyabilir.
+-- Bu senaryo olmadan "kolonlar eklendi" ile "kolonlar KULLANILABİLİR" arasındaki
+-- fark ölçülmezdi (grant/RLS/trigger üçlüsünden biri eksik olsa da şema doğru
+-- görünürdü).
+-- =============================================================================
+begin;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+do $$
+declare
+  v_pe        uuid;
+  v_id        uuid;
+  v_set       integer;
+  v_pe_back   uuid;
+  v_completed timestamptz;
+begin
+  select wpe.id into v_pe
+    from public.workout_plan_exercises wpe
+    join public.workout_plans wp on wp.id = wpe.plan_id
+   where wp.client_id = '22222222-2222-2222-2222-222222222222'::uuid
+   order by wpe.day, wpe.position
+   limit 1;
+
+  if v_pe is null then
+    raise exception 'BASARISIZ [86 kurulum]: Danisan A nin plan satiri gorunmuyor (seed veya RLS bozuk)';
+  end if;
+
+  insert into public.workout_logs
+    (client_id, exercise_name, weight_kg, reps, rpe, set_number, plan_exercise_id, completed_at)
+  values
+    ('22222222-2222-2222-2222-222222222222'::uuid, 'Bench Press', 60.00, 8, 8, 2, v_pe, now())
+  returning id into v_id;
+
+  select set_number, plan_exercise_id, completed_at
+    into v_set, v_pe_back, v_completed
+    from public.workout_logs where id = v_id;
+
+  if v_set is distinct from 2 then
+    raise exception 'BASARISIZ [86 set_number]: beklenen 2, gelen %', v_set;
+  end if;
+  if v_pe_back is distinct from v_pe then
+    raise exception 'BASARISIZ [86 plan_exercise_id]: beklenen %, gelen %', v_pe, v_pe_back;
+  end if;
+  if v_completed is null then
+    raise exception 'BASARISIZ [86 completed_at]: NULL kaldi -- oturum tamamlama damgasi yazilamiyor';
+  end if;
+
+  raise notice 'GECTI [86 POZITIF - Danisan set_number / plan_exercise_id / completed_at yazabiliyor]';
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- WORKOUT LOG — 87) Log satırı BAŞKA BİR DANIŞANIN plan satırına BAĞLANAMAZ
+--
+-- RLS bunu kapatmaz (`workout_logs_insert` yalnızca `client_id = auth.uid()`
+-- bakar). Kontrol `workout_logs_guard_plan_exercise` trigger'ındadır.
+-- Danışan B'nin plan satırının id'si, RLS yüzünden A tarafından GÖRÜLEMEZ; bu
+-- yüzden id, rol değiştirilmeden ÖNCE bir işlem-yerel GUC'a yazılır (saldırgan
+-- id'yi başka bir yoldan öğrenmiş varsayılır — en kötü durum).
+-- Üçüncü dal: KOÇ bile bu bağı kuramaz (bütünlük kuralı, yetki kuralı değil).
+-- =============================================================================
+begin;
+do $$
+begin
+  perform set_config('zz.pe_b', (
+    select wpe.id::text
+      from public.workout_plan_exercises wpe
+      join public.workout_plans wp on wp.id = wpe.plan_id
+     where wp.client_id = '33333333-3333-3333-3333-333333333333'::uuid
+     order by wpe.day, wpe.position
+     limit 1
+  ), true);
+
+  if coalesce(current_setting('zz.pe_b', true), '') = '' then
+    raise exception 'BASARISIZ [87 kurulum]: Danisan B nin plan satiri yok';
+  end if;
+end $$;
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+do $$
+declare
+  v_caught boolean := false;
+  v_state  text;
+begin
+  begin
+    insert into public.workout_logs
+      (client_id, exercise_name, set_number, plan_exercise_id)
+    values
+      ('22222222-2222-2222-2222-222222222222'::uuid, 'Capraz Baglanti', 1,
+       current_setting('zz.pe_b')::uuid);
+  exception when others then
+    v_caught := true;
+    get stacked diagnostics v_state = returned_sqlstate;
+  end;
+
+  if not v_caught then
+    raise exception 'BASARISIZ [87]: Danisan A, B nin plan satirina log BAGLAYABILDI -- capraz danisan veri kirlenmesi ACIK!';
+  end if;
+  if v_state is distinct from '42501' then
+    raise exception 'BASARISIZ [87 hata kodu]: beklenen 42501, gelen %', v_state;
+  end if;
+  raise notice 'GECTI [87a Danisan baska danisanin plan satirina log baglayamaz (42501)]';
+end $$;
+
+-- Koç yolu: yetki değil BÜTÜNLÜK kuralı olduğu için koç da yapamaz.
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+do $$
+declare
+  v_log    uuid;
+  v_caught boolean := false;
+  v_state  text;
+begin
+  select id into v_log from public.workout_logs
+   where client_id = '22222222-2222-2222-2222-222222222222'::uuid limit 1;
+
+  if v_log is null then
+    raise exception 'BASARISIZ [87b kurulum]: Danisan A nin logu yok';
+  end if;
+
+  begin
+    update public.workout_logs
+       set plan_exercise_id = current_setting('zz.pe_b')::uuid
+     where id = v_log;
+  exception when others then
+    v_caught := true;
+    get stacked diagnostics v_state = returned_sqlstate;
+  end;
+
+  if not v_caught then
+    raise exception 'BASARISIZ [87b]: KOC, A nin logunu B nin plan satirina baglayabildi';
+  end if;
+  if v_state is distinct from '42501' then
+    raise exception 'BASARISIZ [87b hata kodu]: beklenen 42501, gelen %', v_state;
+  end if;
+  raise notice 'GECTI [87b Koc da capraz plan bagi kuramaz -- kural yetki degil, butunluk]';
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- WORKOUT LOG — 88) Yeni kolonlar GÖRÜNÜRLÜK sınırını değiştirmez
+-- (A'nın seti B'ye görünmez, koça görünür) + §3.2: KOÇ danışanın loguna
+-- INSERT EDEMEZ.
+-- =============================================================================
+begin;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+insert into public.workout_logs (client_id, exercise_name, set_number, completed_at)
+values ('22222222-2222-2222-2222-222222222222'::uuid, 'zz-88-probe', 3, now());
+
+set local request.jwt.claims = '{"sub":"33333333-3333-3333-3333-333333333333","role":"authenticated"}';
+do $$
+declare v_n int;
+begin
+  select count(*) into v_n from public.workout_logs where exercise_name = 'zz-88-probe';
+  if v_n is distinct from 0 then
+    raise exception 'BASARISIZ [88 sizinti]: Danisan B, A nin setini goruyor (%)', v_n;
+  end if;
+end $$;
+
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+do $$
+declare
+  v_n      int;
+  v_caught boolean := false;
+  v_state  text;
+begin
+  select count(*) into v_n from public.workout_logs where exercise_name = 'zz-88-probe' and set_number = 3;
+  if v_n is distinct from 1 then
+    raise exception 'BASARISIZ [88 koc gormeli]: beklenen 1, gelen %', v_n;
+  end if;
+
+  begin
+    insert into public.workout_logs (client_id, exercise_name, set_number)
+    values ('22222222-2222-2222-2222-222222222222'::uuid, 'zz-88-koc-yazdi', 1);
+  exception when insufficient_privilege then
+    v_caught := true;
+    get stacked diagnostics v_state = returned_sqlstate;
+  end;
+
+  if not v_caught then
+    raise exception 'BASARISIZ [88 koc INSERT]: koc danisanin loguna yazabildi -- §3.2 ihlali';
+  end if;
+
+  raise notice 'GECTI [88 Yeni kolonlar gorunurlugu degistirmiyor; koc danisanin loguna INSERT edemiyor]';
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- MESAJ EKİ — 89) `attachment_path` sözleşmesi ve DOKUNULMAZLIĞI
+--   (a) POZİTİF: danışan kendi konuşmasına ait ek yolu yazabilir
+--   (b) ALICI (koç) gönderilmiş mesajın EKİNİ DEĞİŞTİREMEZ  -> 42501
+--       (AC-04'ün Faz 2b uzantısı: yeni kolon otomatik korunmaz)
+--   (c) BAŞKA konuşmanın klasörünü işaret eden ek                -> 23514
+--   (d) YOL yerine TAM URL (I-4 ihlali)                          -> 23514
+-- =============================================================================
+begin;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+do $$
+declare
+  v_id     uuid;
+  v_path   text;
+  v_caught boolean;
+  v_state  text;
+begin
+  -- (a) POZİTİF
+  insert into public.messages (sender_id, receiver_id, client_id, message, attachment_path)
+  values ('22222222-2222-2222-2222-222222222222'::uuid,
+          '11111111-1111-1111-1111-111111111111'::uuid,
+          '22222222-2222-2222-2222-222222222222'::uuid,
+          'zz-89 ekli mesaj',
+          '22222222-2222-2222-2222-222222222222/22222222-2222-2222-2222-222222222222-aaaaaaaa-1111-2222-3333-444444444444.jpg')
+  returning id, attachment_path into v_id, v_path;
+
+  if v_path is null then
+    raise exception 'BASARISIZ [89a]: gecerli ek yolu yazilamadi';
+  end if;
+  perform set_config('zz.msg_89', v_id::text, true);
+
+  -- (c) BAŞKA konuşmanın klasörü
+  v_caught := false;
+  begin
+    insert into public.messages (sender_id, receiver_id, client_id, message, attachment_path)
+    values ('22222222-2222-2222-2222-222222222222'::uuid,
+            '11111111-1111-1111-1111-111111111111'::uuid,
+            '22222222-2222-2222-2222-222222222222'::uuid,
+            'zz-89 capraz ek',
+            '33333333-3333-3333-3333-333333333333/22222222-2222-2222-2222-222222222222-bbbbbbbb-1111-2222-3333-444444444444.jpg');
+  exception when check_violation then
+    v_caught := true; get stacked diagnostics v_state = returned_sqlstate;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [89c]: mesaj BASKA bir konusmanin ekini isaret edebildi';
+  end if;
+
+  -- (d) tam URL
+  v_caught := false;
+  begin
+    insert into public.messages (sender_id, receiver_id, client_id, message, attachment_path)
+    values ('22222222-2222-2222-2222-222222222222'::uuid,
+            '11111111-1111-1111-1111-111111111111'::uuid,
+            '22222222-2222-2222-2222-222222222222'::uuid,
+            'zz-89 url ek',
+            'http://127.0.0.1:54321/storage/v1/object/public/message-attachments/x.jpg');
+  exception when check_violation then
+    v_caught := true;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [89d]: attachment_path TAM URL kabul etti -- I-4 ihlali sema tarafindan engellenmiyor';
+  end if;
+
+  raise notice 'GECTI [89a/c/d Ek yolu sozlesmesi: gecerli yol OK, capraz konusma RED, tam URL RED]';
+end $$;
+
+-- (b) ALICI (koç) eki değiştiremez
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+do $$
+declare
+  v_caught boolean := false;
+  v_state  text;
+begin
+  begin
+    update public.messages
+       set attachment_path = '22222222-2222-2222-2222-222222222222/11111111-1111-1111-1111-111111111111-cccccccc-1111-2222-3333-444444444444.jpg'
+     where id = current_setting('zz.msg_89')::uuid;
+  exception when insufficient_privilege then
+    v_caught := true; get stacked diagnostics v_state = returned_sqlstate;
+  end;
+
+  if not v_caught then
+    raise exception 'BASARISIZ [89b]: ALICI gonderilmis mesajin EKINI degistirebildi -- AC-04 gerilemesi!';
+  end if;
+  if v_state is distinct from '42501' then
+    raise exception 'BASARISIZ [89b hata kodu]: beklenen 42501, gelen %', v_state;
+  end if;
+  raise notice 'GECTI [89b Alici gonderilmis mesajin ekini DEGISTIREMEZ (42501)]';
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- MESAJ EKİ — 90) `message-attachments` OKUMA: sohbetin İKİ TARAFI görür,
+-- ÜÇÜNCÜ KİŞİ GÖRMEZ; ad ayrıştırıcısı SÖMÜRÜLEMEZ
+--
+-- KURULUM NOTU (senaryo 81/82 ile aynı): `storage.objects` seed'lenmez;
+-- nesneler `postgres` kimliğiyle yaratılıp ROLLBACK ile geri alınır.
+-- =============================================================================
+begin;
+
+insert into storage.objects (bucket_id, name, owner, owner_id) values
+  -- A'nın konuşmasında A'nın yüklediği ek
+  ('message-attachments', '22222222-2222-2222-2222-222222222222/22222222-2222-2222-2222-222222222222-a0000000-0000-0000-0000-00000000000a.jpg',
+    '22222222-2222-2222-2222-222222222222', '22222222-2222-2222-2222-222222222222'),
+  -- A'nın konuşmasında KOÇUN yüklediği ek (karşı taraf da görebilmeli)
+  ('message-attachments', '22222222-2222-2222-2222-222222222222/11111111-1111-1111-1111-111111111111-a0000000-0000-0000-0000-00000000000b.jpg',
+    '11111111-1111-1111-1111-111111111111', '11111111-1111-1111-1111-111111111111'),
+  -- B'nin konuşmasındaki ek (A GÖREMEMELİ)
+  ('message-attachments', '33333333-3333-3333-3333-333333333333/33333333-3333-3333-3333-333333333333-a0000000-0000-0000-0000-00000000000c.jpg',
+    '33333333-3333-3333-3333-333333333333', '33333333-3333-3333-3333-333333333333'),
+  -- Ayrıştırılamayan adlar (fail-closed dalları)
+  ('message-attachments', 'kotu-ad.jpg', null, null),
+  ('message-attachments', '22222222-2222-2222-2222-222222222222/gizli/22222222-2222-2222-2222-222222222222-x.jpg', null, null),
+  ('message-attachments', 'zz-22222222-2222-2222-2222-222222222222/22222222-2222-2222-2222-222222222222-x.jpg', null, null);
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+do $$
+declare v_own int; v_coach_upload int; v_other int; v_junk int;
+begin
+  select count(*) into v_own from storage.objects
+   where bucket_id = 'message-attachments'
+     and name = '22222222-2222-2222-2222-222222222222/22222222-2222-2222-2222-222222222222-a0000000-0000-0000-0000-00000000000a.jpg';
+  select count(*) into v_coach_upload from storage.objects
+   where bucket_id = 'message-attachments'
+     and name = '22222222-2222-2222-2222-222222222222/11111111-1111-1111-1111-111111111111-a0000000-0000-0000-0000-00000000000b.jpg';
+  select count(*) into v_other from storage.objects
+   where bucket_id = 'message-attachments'
+     and name = '33333333-3333-3333-3333-333333333333/33333333-3333-3333-3333-333333333333-a0000000-0000-0000-0000-00000000000c.jpg';
+  select count(*) into v_junk from storage.objects
+   where bucket_id = 'message-attachments'
+     and name in ('kotu-ad.jpg',
+                  '22222222-2222-2222-2222-222222222222/gizli/22222222-2222-2222-2222-222222222222-x.jpg',
+                  'zz-22222222-2222-2222-2222-222222222222/22222222-2222-2222-2222-222222222222-x.jpg');
+
+  if v_own is distinct from 1 then
+    raise exception 'BASARISIZ [90 kendi eki]: beklenen 1, gelen % -- danisan KENDI ekini goremiyor', v_own;
+  end if;
+  if v_coach_upload is distinct from 1 then
+    raise exception 'BASARISIZ [90 karsi tarafin eki]: beklenen 1, gelen % -- sohbetin iki tarafi sarti KIRIK', v_coach_upload;
+  end if;
+  if v_other is distinct from 0 then
+    raise exception 'BASARISIZ [90 SIZINTI]: Danisan A, Danisan B nin sohbet ekini GORUYOR (%)!', v_other;
+  end if;
+  if v_junk is distinct from 0 then
+    raise exception 'BASARISIZ [90 ayristirici]: bozuk adli % nesne gorunuyor -- FAIL-OPEN', v_junk;
+  end if;
+end $$;
+
+-- Koç: aynı bucket'ta HER konuşmayı görür (tek koçlu model).
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+do $$
+declare v_n int;
+begin
+  select count(*) into v_n from storage.objects
+   where bucket_id = 'message-attachments'
+     and name like '%-a0000000-0000-0000-0000-%';
+  if v_n is distinct from 3 then
+    raise exception 'BASARISIZ [90 koc]: beklenen 3 nesne, gelen %', v_n;
+  end if;
+end $$;
+
+-- anon: politikalar yalnızca `authenticated` rolüne verildi -> HİÇBİR nesne.
+set local role anon;
+do $$
+declare v_n int;
+begin
+  select count(*) into v_n from storage.objects where bucket_id = 'message-attachments';
+  if v_n is distinct from 0 then
+    raise exception 'BASARISIZ [90 anon]: giris yapmamis ziyaretci % nesne goruyor', v_n;
+  end if;
+  raise notice 'GECTI [90 Ek okuma: iki taraf EVET, ucuncu kisi HAYIR, bozuk ad HAYIR, anon HAYIR, koc hepsi]';
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- MESAJ EKİ — 91) `message-attachments` YAZMA: klasör ve yükleyen ön eki
+-- SAHTELENEMEZ
+--   (a) POZİTİF: A kendi konuşma klasörüne, kendi uid ön ekiyle yükler
+--   (b) A, B'nin konuşma klasörüne yükleyemez        (delil yerleştirme kapalı)
+--   (c) A, KOÇUN uid'iyle adlandırılmış dosya yükleyemez (kimlik taklidi kapalı)
+--   (d) POZİTİF: koç, A'nın klasörüne KENDİ ön ekiyle yükleyebilir
+-- =============================================================================
+begin;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+do $$
+declare v_caught boolean; v_state text;
+begin
+  -- (a)
+  insert into storage.objects (bucket_id, name)
+  values ('message-attachments', '22222222-2222-2222-2222-222222222222/22222222-2222-2222-2222-222222222222-91000000-0000-0000-0000-000000000001.jpg');
+
+  -- (b)
+  v_caught := false;
+  begin
+    insert into storage.objects (bucket_id, name)
+    values ('message-attachments', '33333333-3333-3333-3333-333333333333/22222222-2222-2222-2222-222222222222-91000000-0000-0000-0000-000000000002.jpg');
+  exception when others then
+    v_caught := true; get stacked diagnostics v_state = returned_sqlstate;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [91b]: Danisan A, B nin sohbet klasorune dosya BIRAKABILDI';
+  end if;
+
+  -- (c)
+  v_caught := false;
+  begin
+    insert into storage.objects (bucket_id, name)
+    values ('message-attachments', '22222222-2222-2222-2222-222222222222/11111111-1111-1111-1111-111111111111-91000000-0000-0000-0000-000000000003.jpg');
+  exception when others then
+    v_caught := true;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [91c]: Danisan A, KOC adina dosya yukleyebildi -- yukleyen on eki sahtelenebilir!';
+  end if;
+end $$;
+
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+do $$
+begin
+  -- (d)
+  insert into storage.objects (bucket_id, name)
+  values ('message-attachments', '22222222-2222-2222-2222-222222222222/11111111-1111-1111-1111-111111111111-91000000-0000-0000-0000-000000000004.jpg');
+  raise notice 'GECTI [91 Ek yazma: kendi klasoru EVET, baskasinin klasoru HAYIR, kimlik taklidi HAYIR, koc her konusmaya EVET]';
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- OKUNDU BİLGİSİ — 92) `read_at` KANONİK / `is_read` TÜREV invaryantı
+--   (a) yalnızca `is_read` yazılınca `read_at` TÜRER
+--   (b) `read_at` NULL'a çekilince `is_read` false OLUR
+--   (c) çelişkili yazma (read_at dolu + is_read=false) NORMALLEŞTİRİLİR (hata YOK)
+--   (d) trigger DEVRE DIŞI bırakılsa bile CHECK tutarsız satırı REDDEDER
+-- =============================================================================
+begin;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+do $$
+declare
+  v_id      uuid;
+  v_read_at timestamptz;
+  v_flag    boolean;
+begin
+  select id into v_id
+    from public.messages
+   where receiver_id = '22222222-2222-2222-2222-222222222222'::uuid
+     and read_at is null
+   limit 1;
+  if v_id is null then
+    raise exception 'BASARISIZ [92 kurulum]: Danisan A ya gelmis OKUNMAMIS mesaj yok (seed degismis)';
+  end if;
+
+  -- (a)
+  update public.messages set is_read = true where id = v_id;
+  select read_at, is_read into v_read_at, v_flag from public.messages where id = v_id;
+  if v_read_at is null or not v_flag then
+    raise exception 'BASARISIZ [92a]: yalnizca is_read yazildi ama read_at TUREMEDI (read_at=%, is_read=%)', v_read_at, v_flag;
+  end if;
+
+  -- (b)
+  update public.messages set read_at = null where id = v_id;
+  select read_at, is_read into v_read_at, v_flag from public.messages where id = v_id;
+  if v_read_at is not null or v_flag then
+    raise exception 'BASARISIZ [92b]: read_at NULL a cekildi ama is_read true kaldi';
+  end if;
+
+  -- (c)
+  update public.messages set read_at = now(), is_read = false where id = v_id;
+  select read_at, is_read into v_read_at, v_flag from public.messages where id = v_id;
+  if v_read_at is null or not v_flag then
+    raise exception 'BASARISIZ [92c]: celiskili yazma normallestirilmedi (read_at=%, is_read=%)', v_read_at, v_flag;
+  end if;
+
+  raise notice 'GECTI [92a/b/c read_at KANONIK, is_read TUREV: her iki yon de normallestiriliyor]';
+end $$;
+rollback;
+
+begin;
+-- (d) KISIT tek başına da tutar: trigger kapatılınca tutarsız satır GİREMEZ.
+alter table public.messages disable trigger messages_sync_read_state;
+do $$
+declare v_caught boolean := false; v_state text;
+begin
+  begin
+    insert into public.messages (sender_id, receiver_id, client_id, message, is_read, read_at)
+    values ('22222222-2222-2222-2222-222222222222'::uuid,
+            '11111111-1111-1111-1111-111111111111'::uuid,
+            '22222222-2222-2222-2222-222222222222'::uuid,
+            'zz-92d tutarsiz satir', true, null);
+  exception when check_violation then
+    v_caught := true; get stacked diagnostics v_state = returned_sqlstate;
+  end;
+
+  if not v_caught then
+    raise exception 'BASARISIZ [92d]: trigger kapaliyken is_read=true / read_at=null satiri GIRDI -- invaryant yalnizca triggera dayaniyor';
+  end if;
+  if v_state is distinct from '23514' then
+    raise exception 'BASARISIZ [92d hata kodu]: beklenen 23514, gelen %', v_state;
+  end if;
+  raise notice 'GECTI [92d Trigger devre disi olsa bile CHECK tutarsiz satiri reddediyor (23514)]';
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- BESLENME LOGU — 93) `nutrition_logs` erişim matrisi
+--   danışan: kendi satırı R/W  |  başka danışanınki: HİÇ
+--   koç    : SALT OKUMA (§3.2 "danışanın kendi log'una yazamaz")
+--   anon   : permission denied
+-- =============================================================================
+begin;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+do $$
+declare v_id uuid; v_caught boolean := false; v_state text;
+begin
+  insert into public.nutrition_logs (client_id, log_date, description, kcal, protein_g, carb_g, fat_g)
+  values ('22222222-2222-2222-2222-222222222222'::uuid, current_date, 'zz-93 yulaf + yumurta', 520, 32, 55, 18)
+  returning id into v_id;
+  perform set_config('zz.nl_93', v_id::text, true);
+
+  -- Başka danışan adına yazma -> RLS
+  begin
+    insert into public.nutrition_logs (client_id, description)
+    values ('33333333-3333-3333-3333-333333333333'::uuid, 'zz-93 baskasinin adina');
+  exception when insufficient_privilege then
+    v_caught := true; get stacked diagnostics v_state = returned_sqlstate;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [93]: Danisan A, B adina beslenme logu yazabildi';
+  end if;
+end $$;
+
+set local request.jwt.claims = '{"sub":"33333333-3333-3333-3333-333333333333","role":"authenticated"}';
+do $$
+declare v_n int;
+begin
+  select count(*) into v_n from public.nutrition_logs where description like 'zz-93%';
+  if v_n is distinct from 0 then
+    raise exception 'BASARISIZ [93 sizinti]: Danisan B, A nin ogun logunu goruyor (%)', v_n;
+  end if;
+end $$;
+
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+do $$
+declare
+  v_n      int;
+  v_rows   int;
+  v_caught boolean := false;
+begin
+  select count(*) into v_n from public.nutrition_logs where description like 'zz-93%';
+  if v_n is distinct from 1 then
+    raise exception 'BASARISIZ [93 koc okuma]: beklenen 1, gelen %', v_n;
+  end if;
+
+  -- Koç YAZAMAZ: INSERT politikası `client_id = auth.uid()`
+  begin
+    insert into public.nutrition_logs (client_id, description)
+    values ('22222222-2222-2222-2222-222222222222'::uuid, 'zz-93 koc yazdi');
+  exception when insufficient_privilege then
+    v_caught := true;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [93 koc INSERT]: koc danisanin ogun loguna yazabildi -- §3.2 ihlali';
+  end if;
+
+  -- Koç UPDATE/DELETE: USING false -> hata YOK, ETKILENEN SATIR 0 olmali
+  update public.nutrition_logs set kcal = 9999 where id = current_setting('zz.nl_93')::uuid;
+  get diagnostics v_rows = row_count;
+  if v_rows is distinct from 0 then
+    raise exception 'BASARISIZ [93 koc UPDATE]: koc % satir guncelledi (beklenen 0)', v_rows;
+  end if;
+
+  delete from public.nutrition_logs where id = current_setting('zz.nl_93')::uuid;
+  get diagnostics v_rows = row_count;
+  if v_rows is distinct from 0 then
+    raise exception 'BASARISIZ [93 koc DELETE]: koc % satir sildi (beklenen 0)', v_rows;
+  end if;
+end $$;
+
+set local role anon;
+do $$
+declare v_caught boolean := false; v_state text; v_n int;
+begin
+  begin
+    select count(*) into v_n from public.nutrition_logs;
+  exception when insufficient_privilege then
+    v_caught := true; get stacked diagnostics v_state = returned_sqlstate;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [93 anon]: giris yapmamis ziyaretci nutrition_logs okuyabildi (% satir)', v_n;
+  end if;
+  raise notice 'GECTI [93 nutrition_logs: danisan R/W kendi, baska danisan HIC, koc SALT OKUMA, anon DENY]';
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- BESLENME HEDEFİ — 94) `nutrition_plans.target_*`
+--   (a) POZİTİF: koç danışanın planına günlük hedef yazar
+--   (b) NEGATİF makro CHECK ile reddedilir (23514)
+--   (c) BAŞKA danışan bu hedefleri değiştiremez (0 satır)
+-- =============================================================================
+begin;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+do $$
+declare
+  v_rows   int;
+  v_kcal   int;
+  v_caught boolean := false;
+  v_state  text;
+begin
+  update public.nutrition_plans
+     set target_kcal = 2400, target_protein_g = 180, target_carb_g = 250, target_fat_g = 70
+   where client_id = '22222222-2222-2222-2222-222222222222'::uuid and is_active;
+  get diagnostics v_rows = row_count;
+  if v_rows is distinct from 1 then
+    raise exception 'BASARISIZ [94a]: koc hedef yazamadi (etkilenen %)', v_rows;
+  end if;
+
+  select target_kcal into v_kcal from public.nutrition_plans
+   where client_id = '22222222-2222-2222-2222-222222222222'::uuid and is_active;
+  if v_kcal is distinct from 2400 then
+    raise exception 'BASARISIZ [94a geri okuma]: beklenen 2400, gelen %', v_kcal;
+  end if;
+
+  begin
+    update public.nutrition_plans set target_protein_g = -1
+     where client_id = '22222222-2222-2222-2222-222222222222'::uuid and is_active;
+  exception when check_violation then
+    v_caught := true; get stacked diagnostics v_state = returned_sqlstate;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [94b]: negatif makro hedefi kabul edildi -- CHECK >= 0 yok';
+  end if;
+end $$;
+
+set local request.jwt.claims = '{"sub":"33333333-3333-3333-3333-333333333333","role":"authenticated"}';
+do $$
+declare v_rows int;
+begin
+  update public.nutrition_plans set target_kcal = 9999
+   where client_id = '22222222-2222-2222-2222-222222222222'::uuid;
+  get diagnostics v_rows = row_count;
+  if v_rows is distinct from 0 then
+    raise exception 'BASARISIZ [94c]: Danisan B, A nin makro hedefini degistirdi (% satir)', v_rows;
+  end if;
+  raise notice 'GECTI [94 Gunluk makro hedefi: koc yazar, negatif deger RED, baska danisan degistiremez]';
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- REALTIME — 95) Yayın sözleşmesi (AC-2.2) ŞEMADA kilitlenir
+--
+-- Bu senaryo bir DAVRANIŞ testi değil, bir SÜRÜKLENME testidir: gerçek
+-- WebSocket ölçümü 20260817190400 başlığındaki tabloda kayıtlıdır (INSERT
+-- 78 ms / UPDATE 80 ms, ilgisiz danışana SIFIR olay, DELETE olayı `d` altinda
+-- RLS ile degerlendirilemedigi icin yayindan cikarildi). Buradaki iş, o
+-- ölçümün dayandığı YAPILANDIRMANIN sessizce değişmemesini garanti etmektir.
+-- =============================================================================
+begin;
+do $$
+declare
+  r        record;
+  v_ident  "char";
+begin
+  select pubinsert, pubupdate, pubdelete, pubtruncate into r
+    from pg_publication where pubname = 'supabase_realtime';
+  if r is null then
+    raise exception 'BASARISIZ [95]: supabase_realtime yayini YOK -- realtime mesajlasma imkansiz';
+  end if;
+
+  if not exists (
+    select 1 from pg_publication_tables
+     where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'messages'
+  ) then
+    raise exception 'BASARISIZ [95]: public.messages yayinda degil -- AC-2.2 karsilanamaz';
+  end if;
+
+  if not r.pubinsert then
+    raise exception 'BASARISIZ [95]: yayin INSERT tasimiyor -- yeni mesaj canli dusmez';
+  end if;
+  if not r.pubupdate then
+    raise exception 'BASARISIZ [95]: yayin UPDATE tasimiyor -- read_at (okundu) canli dusmez';
+  end if;
+  if r.pubdelete or r.pubtruncate then
+    raise exception 'BASARISIZ [95]: yayin DELETE/TRUNCATE tasiyor -- replica identity ''d'' altinda bu olaylarda RLS DEGERLENDIRILEMEZ (olculen sizinti: filtresiz abone baskasinin silinen mesaj id sini alir). delete gerekiyorsa ONCE replica identity full sart.';
+  end if;
+
+  select relreplident into v_ident from pg_class where oid = 'public.messages'::regclass;
+  if v_ident is distinct from 'd' then
+    raise exception 'BASARISIZ [95]: messages replica identity ''%'' -- 20260817190400 in olcumu ''d'' varsayimina dayaniyor, yeniden degerlendirilmeli', v_ident;
+  end if;
+
+  if exists (
+    select 1 from pg_publication_tables
+     where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'nutrition_logs'
+  ) then
+    raise exception 'BASARISIZ [95]: nutrition_logs yayina eklenmis -- plan bunu istemiyor';
+  end if;
+
+  raise notice 'GECTI [95 Realtime yayini: messages ICERIDE, insert+update ACIK, delete/truncate KAPALI, replica identity d]';
+end $$;
+rollback;
+
+
+-- =============================================================================
 -- TOPLAM ÖZET
--- Bu noktaya yalnızca YUKARIDAKİ 85 senaryonun HEPSİ GECTI verdiyse ulaşılır --
+-- Bu noktaya yalnızca YUKARIDAKİ 95 senaryonun HEPSİ GECTI verdiyse ulaşılır --
 -- herhangi biri BASARISIZ olsaydı raise exception + ON_ERROR_STOP psql'i
 -- daha önce sıfırdan farklı çıkış koduyla durdururdu.
 --   * 1–19  : Faz 1a ve öncesi (profiles, notifications, form_checks, daily_logs,
@@ -3575,8 +4288,21 @@ rollback;
 --             danışan -> danışan KAPALI, dosya adı ayrıştırıcısı sömürülemez)
 --   * 83–85 : Faz 1.7 — sequence yetkileri                (setval kapalı, nextval
 --             açık, gelecekteki sequence'ler için varsayılan doğru)
+--   * 86–88 : Faz 2b — workout_logs set kolonları         (set_number /
+--             plan_exercise_id / completed_at; çapraz danışan plan bağı KAPALI;
+--             koç danışanın loguna INSERT edemez)
+--   * 89–91 : Faz 2b — mesaj eki                          (attachment_path
+--             sözleşmesi + dokunulmazlığı; message-attachments bucket'ında
+--             okuma/yazma sınırları, ad ayrıştırıcısı sömürülemez)
+--   * 92    : Faz 2b — read_at KANONİK / is_read TÜREV    (trigger iki yönü de
+--             normalleştirir; trigger kapalıyken CHECK reddeder)
+--   * 93–94 : Faz 2b — nutrition_logs + günlük makro hedefi
+--   * 95    : Faz 2b — realtime yayın sözleşmesi (sürüklenme testi)
+--
+-- NOT: `nutrition_logs` ayrıca senaryo 73 (yetki) ve 74 (RLS+FORCE) tarafından
+-- DİNAMİK olarak kapsanır — o iki senaryo tablo listesini `pg_tables`'tan okur.
 -- =============================================================================
 do $$
 begin
-  raise notice 'TUM RLS TESTLERI GECTI (85 senaryo)';
+  raise notice 'TUM RLS TESTLERI GECTI (95 senaryo)';
 end $$;

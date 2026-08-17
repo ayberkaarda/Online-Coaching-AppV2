@@ -21,9 +21,17 @@ supabase/
 │   ├── 20260817160000_program_approval_guard.sql # onay kapısı: CHECK + trigger + DELETE daraltma (AC-01/AC-07)
 │   ├── 20260817160100_signup_role_hardening.sql  # handle_new_user rolü sabit 'client' (AC-02)
 │   ├── 20260817160200_column_guards.sql          # messages/notifications/profiles sütun korumaları (AC-04/05/08/09/10)
-│   └── 20260817170000_force_rls_and_grants.sql   # TRUNCATE/REFERENCES/TRIGGER sökümü + FORCE RLS (AC-03/AC-06)
+│   ├── 20260817170000_force_rls_and_grants.sql   # TRUNCATE/REFERENCES/TRIGGER sökümü + FORCE RLS (AC-03/AC-06)
+│   ├── 20260817180000_program_submission_rpc.sql # submit_program_for_approval RPC (AC-05 kuplaj borcu)
+│   ├── 20260817180100_avatar_visibility.sql      # koç avatarı danışana açık (ad ayrıştırmasıyla)
+│   ├── 20260817180200_sequence_grants.sql        # sequence setval kapatıldı, nextval korundu
+│   ├── 20260817190000_workout_log_sets.sql       # workout_logs: set_number / plan_exercise_id / completed_at
+│   ├── 20260817190100_nutrition_targets_and_logs.sql # nutrition_plans.target_* + nutrition_logs tablosu
+│   ├── 20260817190200_message_attachments.sql    # messages.attachment_path + message-attachments bucket'ı
+│   ├── 20260817190300_message_read_state.sql     # read_at KANONİK / is_read TÜREV (trigger + CHECK)
+│   └── 20260817190400_realtime_publication.sql   # realtime yayını insert+update (delete/truncate kapalı)
 ├── tests/
-│   ├── rls.test.sql            # 76 RLS senaryosu       (npm run test:rls)
+│   ├── rls.test.sql            # 95 RLS senaryosu       (npm run test:rls)
 │   └── transform.test.sql      # 26 dönüşüm senaryosu   (npm run test:transform)
 ├── seed.sql                    # SADECE YEREL demo verisi
 └── README.md
@@ -115,7 +123,8 @@ Kısaltmalar: **S** = satır sahibi (`client_id`/`id` = `auth.uid()`), **K** = k
 | `daily_logs` | S veya K | Sadece kendi adına | S veya K | S veya K |
 | `workout_logs` | S veya K | Sadece kendi adına | S veya K | S veya K |
 | `program_approvals` | S veya K | Sadece kendi adına — **her zaman `status='pending'`, `reviewed_*` boş** (trigger, bkz. 4e) | **Sadece K** (onay/ret; `reviewed_by`/`reviewed_at` **sunucudan** dolar) | K **veya** S ama **yalnızca `status='pending'` satırında** (bkz. 4e) |
-| `messages` | gönderen **veya** alıcı veya K | `sender_id = auth.uid()` + `client_id` trigger doğrulaması — **`kind='system'` istemciden üretilemez** (bkz. 4e) | **Sadece alıcı** — **ve yalnızca `read_at` / `is_read`** (trigger, bkz. 4e) | gönderen veya K |
+| `messages` | gönderen **veya** alıcı veya K | `sender_id = auth.uid()` + `client_id` trigger doğrulaması — **`kind='system'` istemciden üretilemez** (bkz. 4e); `attachment_path` **satırın kendi konuşmasına** ait olmak zorunda (CHECK, bkz. 4h) | **Sadece alıcı** — **ve yalnızca `read_at` / `is_read`**; `attachment_path` dahil diğer her sütun dokunulmaz (trigger, bkz. 4e/4h) | gönderen veya K |
+| `nutrition_logs` | S veya K | **Sadece kendi adına** | **Sadece S** — koç danışanın öğün loguna YAZAMAZ (§3.2, bkz. 4h) | **Sadece S** |
 | `exercises` | Tüm `authenticated` | Sadece K | Sadece K | Sadece K |
 | `food_database` | Tüm `authenticated` | Sadece K | Sadece K | Sadece K |
 | `workout_plans` | S veya K | K **veya** kendi planı | K veya kendi planı | K veya kendi planı |
@@ -190,6 +199,7 @@ Her iki bucket da **PRIVATE**'tır (`20260817100000_private_storage.sql`).
 |---|---|---|---|
 | `avatars` | **hayır** | sahibi (`<auth.uid()>-...`), **koçun avatarı (herkese)**, veya koç; `anon` **hiç** | dosya adı `<auth.uid()>-...` ile başlamalı, veya koç |
 | `form-checks-media` | **hayır** | sahibi (`poses/<auth.uid()>-...`) veya koç; `anon` **hiç** | yol `poses/<auth.uid()>-...` olmalı, veya koç |
+| `message-attachments` | **hayır** | **sohbetin iki tarafı**: klasör `<auth.uid()>/…` (danışan) veya koç; `anon` **hiç** (bkz. 4h) | klasör kendi konuşman (koç: her konuşma) **ve** dosya adı `<auth.uid()>-…` ile başlamalı; silme: yükleyen veya koç |
 
 > **Neden private?** Public bucket'ta `storage.objects` SELECT politikası okuma yolunu
 > hiç etkilemez: `/storage/v1/object/public/<bucket>/<yol>` adresi kimlik doğrulamasız
@@ -231,6 +241,8 @@ Her iki bucket da **PRIVATE**'tır (`20260817100000_private_storage.sql`).
 | `public.explode_nutrition_day` | `(p_plan_id uuid, p_day text, p_entry jsonb) -> integer` | `SECURITY INVOKER`. **TEK beslenme günü yazıcısı** — hem dönüşüm hem `save_nutrition_plan` bunu kullanır. Ayrıştırma YAPMAZ |
 | `public.save_nutrition_plan` | `(p_client_ids uuid[], p_plan jsonb) -> integer` | `SECURITY INVOKER` (RLS uygulanır). `p_plan` = `{"Pazartesi": {"items": "metin", "total": 1850}, ...}`. Etkilenen danışan sayısını döner |
 | `public.migrate_nutrition_plans_from_profiles` | `() -> table(profiles_converted int, meals_inserted int)` | `SECURITY DEFINER`, yalnız `service_role`. Idempotent veri dönüşümü; `transform.test.sql` bunu çağırır |
+| `public.message_attachment_conversation` | `(p_name text) -> uuid` | `IMMUTABLE`. `message-attachments` nesne adından konuşma anahtarını (client_id) çıkarır; desene uymazsa **NULL** (fail-closed, bkz. §4h) |
+| `public.message_attachment_uploader` | `(p_name text) -> uuid` | `IMMUTABLE`. Aynı addan yükleyenin uid'ini çıkarır; desene uymazsa **NULL** (fail-closed, bkz. §4h) |
 
 `increment_streak` mantığı: `last_checkin_at` bugünse seri değişmez, dünse +1,
 daha eski/`NULL` ise 1'e sıfırlanır; her durumda `last_checkin_at = now()`.
@@ -309,7 +321,7 @@ Dönüşüm kuralları: NULL / boş / geçersiz JSON / JSON-nesnesi-olmayan içe
 ### Testler
 
 ```bash
-npm run test:rls         # 76 senaryo (20–27 bu tablolara ait)
+npm run test:rls         # 95 senaryo (20–27 bu tablolara ait)
 npm run test:transform   # 26 senaryo (1–10 bu tablolara ait: dönüşüm + round-trip + idempotency)
 ```
 
@@ -395,7 +407,7 @@ oluşturulur (varsa o kullanılır), planın **tüm** öğün satırları silini
 ### Testler
 
 ```bash
-npm run test:rls         # 76 senaryo (28–35 bu tablolara ait)
+npm run test:rls         # 95 senaryo (28–35 bu tablolara ait)
 npm run test:transform   # 26 senaryo (11–19 bu tablolara ait)
 ```
 
@@ -473,7 +485,7 @@ kapısındadır. `useMarkConversationRead` iki kolonu da tutarlı tutar.
 ### Testler
 
 ```bash
-npm run test:rls         # 76 senaryo (36–42 mesajlaşma konuşma anahtarına ait)
+npm run test:rls         # 95 senaryo (36–42 mesajlaşma konuşma anahtarına ait)
 npm run test:transform   # 26 senaryo (20–22 backfill: temel + idempotency + atlanan satır)
 ```
 
@@ -569,7 +581,7 @@ taşırdı. Kısmi indeksin boyutu **kuyruk uzunluğuyla** orantılıdır, arşi
 ### Testler
 
 ```bash
-npm run test:rls         # 76 senaryo (43–50 form check incelemesine ait)
+npm run test:rls         # 95 senaryo (43–50 form check incelemesine ait)
 npm run test:transform   # 26 senaryo (23–26 backfill + tutarlılık kısıtı)
 ```
 
@@ -675,7 +687,7 @@ almasıdır — her iki durumda da istek reddedilir, yalnızca hata kodu farklı
 ### Testler
 
 ```bash
-npm run test:rls   # 85 senaryo (51–70 Faz 1.5 güvenlik regresyonlarına ait)
+npm run test:rls   # 95 senaryo (51–70 Faz 1.5 güvenlik regresyonlarına ait)
 ```
 
 Kapsanan boşluklar (`findings-access-control.md` §6): G-01, G-02, G-03, G-06 (51–57),
@@ -772,7 +784,7 @@ ve profil oluştu; `POST /auth/v1/admin/users` gerçek HTTP çağrısı `200` d�
 ### Testler
 
 ```bash
-npm run test:rls   # 85 senaryo (71–76 bu migration'a ait)
+npm run test:rls   # 95 senaryo (71–76 bu migration'a ait)
 ```
 
 * **71** — `authenticated` TRUNCATE edemez (`profiles cascade`, `messages`, `form_checks`)
@@ -884,7 +896,7 @@ işlem içinde gerçek bir `serial` tablo yaratarak ölçer.
 ### Testler
 
 ```bash
-npm run test:rls   # 85 senaryo (77–85 bu üç migration'a ait)
+npm run test:rls   # 95 senaryo (77–85 bu üç migration'a ait)
 ```
 
 * **77** — pozitif: RPC onay satırını + koç bildirimini atomik yazar (`title` NULL)
@@ -906,6 +918,202 @@ eski `.from('notifications').insert(...)` hâline döndürülmesini **gerektirir
 program gönderimi bildirimsiz kalır ve koç habersiz olur. Avatar geri alması güvenlik
 açığı yaratmaz (yalnızca koç avatarını tekrar görünmez kılar); sequence geri alması
 `setval` yüzeyini yeniden açar.
+
+---
+
+## 4h. Faz 2b — Şema Tamamlama (Faz 2'nin ön koşulu)
+
+Beş migration: `20260817190000_workout_log_sets.sql`,
+`20260817190100_nutrition_targets_and_logs.sql`,
+`20260817190200_message_attachments.sql`,
+`20260817190300_message_read_state.sql`,
+`20260817190400_realtime_publication.sql`.
+
+Bu tur **yalnızca şemadır**; alanları okuyan/yazan UI akışı Faz 2'nin işidir.
+Kapsam bilinçli olarak "planın gerektirdiği kadarı"dır — Faz 3/4 tabloları
+(`ai_usage_counters`, `progress_entries`, `recovery_scores` …) **kurulmadı**.
+
+### `workout_logs` set bazlı oldu — ve `completed_at` bir OTURUM damgasıdır
+
+| Kolon | Tip | Anlamı |
+|---|---|---|
+| `set_number` | `integer` | Gün/oturum içindeki set sırası. `NULL` = Faz 2b öncesi satırlar |
+| `plan_exercise_id` | `uuid` → `workout_plan_exercises(id)` `ON DELETE SET NULL` | Setin bağlı olduğu **versiyonlu** plan satırı. `NULL` = plan dışı set / geçmiş log |
+| `completed_at` | `timestamptz` | **Antrenman oturumunun** tamamlanma anı |
+
+Plan §4.1 iki şeyi aynı anda söylüyordu: kolonun adresi `workout_logs.completed_at`
+(satır = **bir set**) ama tetikleyicisi "**tüm setler** girilince" (bu bir **oturum**
+kavramı). Ayrı bir `workout_sessions` tablosu **açılmadı**: bu, `workout_logs`'u bir
+başlık tablosuna çevirip `src/hooks/useWorkoutLogs.ts`'in ve tüketicilerinin
+"satır = set" sözleşmesini kırardı. Seçilen çözüm **denormalize damga**dır — bir
+antrenman bitirildiğinde o oturuma ait **tüm** set satırlarına **aynı** `completed_at`
+yazılır. `completed_at IS NULL` = "set girildi, antrenman henüz bitirilmedi".
+Karar **kayıpsız yükseltilebilir**: oturumlar
+`select distinct client_id, completed_at ... where completed_at is not null` ile
+tam olarak geri üretilir.
+
+* **`exercise_name` DEPRECATED ama DROP EDİLMEDİ** (§3.5): plan dışı setlerin ve tüm
+  geçmiş logların **tek** etiketi odur. FK bu yüzden **NULLABLE**'dır — mevcut
+  satırların hiçbirinde plan bağı kurulacak bilgi yoktu, uydurulmadı.
+* **`ON DELETE SET NULL`, `CASCADE` değil:** `save_workout_plan()` planın tüm egzersiz
+  satırlarını silip yeniden yazar; CASCADE olsaydı koç planı her kaydettiğinde danışanın
+  **geçmiş logları silinirdi**.
+* **`workout_logs_guard_plan_exercise` trigger'ı (SECURITY DEFINER):** log satırı
+  **başka bir danışanın** plan satırına bağlanamaz (42501). RLS bunu kapatmaz —
+  `workout_logs_insert` yalnızca `client_id`'ye bakar. Kural bir **yetki** değil
+  **bütünlük** kuralı olduğu için **koç için de** geçerlidir (senaryo 87b).
+
+### Beslenme: plan seviyesinde hedef, ayrı bir log tablosu
+
+`nutrition_plans` dört yeni kolon aldı: `target_kcal`, `target_protein_g`,
+`target_carb_g`, `target_fat_g` (hepsi `integer`, `NULL` serbest, `CHECK >= 0`).
+Hedef **günlüktür ve plan seviyesindedir** (§4.2 "koç: günlük makro hedefi");
+`nutrition_plan_meals`'a konsaydı aynı hedef 7 kez tekrarlanır ve satırlar
+çeliştiğinde "günlük hedef" tanımsız kalırdı. `target_` ön eki plandan tek
+sapmadır ve **yalnızca addadır**: `nutrition_plan_meals.kcal` zaten var ve o bir
+hedef değil şablon kalorisidir.
+
+`public.nutrition_logs` **yeni** tablodur — "gerçekleşen" makroyu tutan hiçbir yer
+yoktu, dolayısıyla §4.2'nin "hedef vs gerçekleşen" dashboard'u yazılamıyordu.
+
+| Kolon | Not |
+|---|---|
+| `client_id, log_date, description` | `log_date` gruplama anahtarı; **günde tekillik YOK** (bir günde çok öğün) |
+| `kcal, protein_g, carb_g, fat_g` | `integer`, `NULL` = girilmedi (**0 değil**), `CHECK >= 0` |
+| `created_at, updated_at` | `set_updated_at()` trigger'ı |
+
+* **Ad Faz 3 için ileriye uyumlu, alanları DEĞİL.** Faz 3 (§5.3) bu tabloya
+  `status='ai_suggested'` yazacak; tabloyu bugün başka adla açıp sonra yeniden
+  adlandırmak gereksiz bir kırılma turu olurdu. Ama `status` / `photo_path` /
+  `ai_estimate` / `user_override` **bugün kurulmadı**: AI yolu yok, `status` tüm
+  satırlarda tek değeri taşırdı. Faz 3'te `add column status ... default 'confirmed'`
+  **backfill gerektirmez** — bugünkü satırların semantiği zaten `confirmed`'dır.
+* **RLS'te ADR-0014 sapması YOK.** `workout_logs`/`daily_logs` UPDATE/DELETE'i koça da
+  açar; bu, **mevcut** davranışı kırmama kararının mirasıdır. `nutrition_logs` yeni bir
+  yüzeydir, kıracak bir akış yoktur, bu yüzden plan §3.2 birebir uygulandı: **koç salt
+  okur**, yazamaz. Koçun beslenme yazma yüzeyi `nutrition_plans` /
+  `nutrition_plan_meals` (şablon) tablolarıdır.
+* Tablo `FORCE ROW LEVEL SECURITY`'yi **kendisi alır**: `20260817170000` §2 bir `DO`
+  döngüsüydü ve yalnızca o an var olan tabloları gezdi.
+
+### Mesaj eki: `message-attachments` bucket'ı
+
+`messages.attachment_path` **yol saklar, URL değil** (I-4). Yol sözleşmesi:
+
+```
+message-attachments/<conversation_client_id>/<uploader_uid>-<uuid>.<ext>
+                     ^^^ konuşma anahtarı      ^^^ yükleyen
+```
+
+Mevcut iki bucket da uymuyordu: `avatars` okuma politikası "koçun dosyası **herkese**
+açık" der — koçun gönderdiği her foto **tüm danışanlara** açılırdı. `form-checks-media`
+ise sahibi + koç ile sınırlıdır; danışan **koçun gönderdiği** eki göremezdi.
+
+Sızdırmama **beş kilide** dayanır: (1) SELECT klasörü `auth.uid()` ile kıyaslar
+(`anon` için politika yok, hiç okuyamaz); (2) INSERT klasörü sahtelenemez kılar —
+danışan başkasının klasörüne dosya **bırakamaz**; (3) ayrıştırıcı **katı ve
+fail-closed**tır (kanonik 36 karakterlik UUID, tek seviye klasör; desen tutmazsa
+`NULL` → politika **false**); (4) bucket **private**, okuma yalnızca signed URL
+(TTL 3600 sn); (5) `messages_attachment_path_chk` **veritabanında** yolun ilk
+segmentinin satırın `client_id`'sine eşit olmasını şart koşar — bir mesaj **başka bir
+konuşmanın** ekini işaret **edemez**.
+
+> **`messages_guard_columns()` GENİŞLETİLDİ.** O fonksiyon sütun listesini **açıkça
+> sayar**; yeni bir kolon otomatik kapsanmaz. Genişletilmeseydi alıcı, gelen mesajın
+> **ekini** değiştirebilirdi ve tabloda `edited_at` olmadığı için karşı taraf bunu fark
+> edemezdi — AC-04'ün kapattığı deliğin birebir aynısı. Regresyon: senaryo 89b.
+
+### `read_at` KANONİK, `is_read` TÜREV
+
+`docs/PROGRESS.md` §6b'deki ikilik karara bağlandı. `read_at` kanoniktir çünkü daha
+fazla bilgi taşır: ondan `is_read` **kayıpsız** türer (`read_at is not null`), tersi
+**türetilemez** (bir bayrak zaman üretemez). Garanti **iki katmanlıdır**:
+
+* **`messages_sync_read_state` trigger'ı — NORMALLEŞTİRİR.** Hangi alan yazılırsa
+  yazılsın diğerini türetir (yalnız `is_read=true` yazan eski istemci yolunda `read_at`
+  `now()`a terfi eder; `read_at` yazıldığında bayrak **ezilir**). **Koşulsuzdur** —
+  `is_end_user_write()` guard'ı yoktur, çünkü bu bir yetki değil **veri modeli**
+  kuralıdır; seed ve `service_role` da tutarsız satır yazamamalıdır.
+* **`messages_read_state_chk` kısıtı — KANITLAR.** Trigger devre dışı bırakılsa bile
+  tutarsız satır tabloya **giremez** (senaryo 92d).
+
+Tek başına CHECK yetmezdi (eski istemciyi 23514 ile **kırardı**), tek başına trigger da
+yetmezdi (sessizce kapatılabilir). **Ad sırası önemlidir:**
+`messages_apply_conversation_key` < `messages_guard_columns` < `messages_sync_read_state`
+— normalleştirme **en son** koşar, yani sütun koruması hâlâ **istemcinin gönderdiği**
+değerleri denetler.
+
+`is_read` **DROP EDİLMEDİ** (§3.5) — `src/hooks/useMessages.ts` ve
+`src/types/database.ts` hâlâ okuyor. **Yeni kod bu kolona yazmamalı.**
+
+> **`transform.test.sql` senaryo 20/21 buna göre güncellendi:** simüle ettikleri eski
+> şekilli satır (`is_read = true` iken `read_at IS NULL`) artık imkânsız olduğu için,
+> normalleştirme trigger'ı ve kısıt **işlem süresince** kaldırılır (`rollback` geri
+> getirir). `backfill_messages_conversation_key()` eski dünyanın aracıdır ve eski
+> dünyada test edilmelidir.
+
+### Realtime: ölçüldü, yayın daraltıldı, `replica identity` DEĞİŞMEDİ
+
+Yerel yığında gerçek WebSocket bağlantılarıyla üç aktör (koç, danışan A, danışan B)
+abone edilip `messages` üzerinde INSERT/UPDATE/DELETE tetiklendi.
+
+| Olay | Abone (filtre) | Ulaştı mı | Gecikme |
+|---|---|---|---|
+| INSERT | A (`client_id=eq.A`) | **evet** | 78 ms |
+| INSERT | koç (`client_id=eq.A`) | **evet** | 440 ms |
+| INSERT | **B** (`client_id=eq.A`) | hayır | — (RLS) |
+| UPDATE (`read_at`) | A / koç | **evet** | 80 / 934 ms |
+| UPDATE | **B** | hayır | — (RLS) |
+| DELETE | A (`client_id=eq.A`) | **hayır** | filtre eşleşemez |
+| DELETE | **B (filtresiz abone)** | **EVET (sızıntı)** | 92 ms |
+
+* **`replica identity = 'd'` INSERT ve UPDATE için YETERLİDİR** — WAL kaydı yeni
+  tuple'ı **tam** taşır (ölçüm: 10/10 kolon), Realtime hem `filter`ı hem RLS
+  görünürlüğünü onun üzerinde değerlendirir. `full`'a geçmek yalnızca `payload.old`u
+  doldururdu; `src/hooks/useMessages.ts` onu **hiç okumuyor**. AC-2.2'nin 2 sn bütçesi
+  78–934 ms ile zaten karşılanıyor. **Değişiklik yapılmadı.**
+* **DELETE `d` altında güvenli DEĞİLDİR:** eski kayıt yalnızca birincil anahtarı taşır,
+  yani (a) konuşmanın kendi abonesi olayı **alamaz** (filtre eşleşemez), (b) **filtresiz**
+  abone olan ilgisiz bir danışan olayı **alır** — RLS değerlendirilecek sütun bulamaz.
+  İçerik sızmaz (`{id}`), ama **başka bir konuşmada bir mesajın silindiği bilgisi ve
+  zamanı** sızar.
+* **Çözüm: yayın daraltıldı** —
+  `alter publication supabase_realtime set (publish = 'insert, update')`.
+  `full`'a geçmek, planın Faz 2'de istemediği bir yetenek için her UPDATE'in WAL
+  maliyetini kalıcı olarak artırırdı. Daraltma hiçbir tüketiciyi kaybettirmez: kod
+  tabanında **tek** `postgres_changes` aboneliği vardır (`useMessages`, `messages`,
+  `event: 'INSERT'`) ve DELETE zaten kimseye ulaşmıyordu.
+* **İleride realtime silme gerekirse** `publish`'i genişletmek **tek başına yetmez** —
+  o tabloda `replica identity full` **ön koşuldur**. Bu bir tercih değil, WAL'ın
+  fiziksel kısıtıdır.
+* **`nutrition_logs` yayına EKLENMEDİ:** §4.2 dashboard'u bir **sorgu**dur, canlı akış
+  değil; tek yazıcısı danışanın kendisidir.
+
+### Testler
+
+```bash
+npm run test:rls         # 95 senaryo (86–95 bu beş migration'a ait)
+npm run test:transform   # 26 senaryo (20/21 Faz 2b invaryantına göre güncellendi)
+```
+
+* **86–88** — `workout_logs` yeni kolonları: pozitif yazma; çapraz danışan plan bağı
+  **kapalı** (koç dahil); görünürlük değişmedi; koç danışanın loguna INSERT edemez
+* **89–91** — mesaj eki: yol sözleşmesi (geçerli / çapraz konuşma / tam URL), alıcı eki
+  **değiştiremez**, bucket okuma-yazma sınırları, ad ayrıştırıcısı sömürülemez
+* **92** — `read_at`/`is_read` invaryantı: her iki yön normalleştirilir; trigger
+  kapalıyken CHECK reddeder
+* **93–94** — `nutrition_logs` erişim matrisi (koç **salt okur**) + günlük makro hedefi
+* **95** — realtime yayın sözleşmesi (sürüklenme testi)
+
+`nutrition_logs` ayrıca **dinamik** senaryo 73 (yetki) ve 74 (RLS + FORCE) tarafından
+otomatik kapsanır.
+
+### Geri alma
+
+Beş migration dosyasının da sonunda çalıştırılabilir bir `-- DOWN` bloğu vardır.
+**UYARI:** `nutrition_logs` ve `workout_logs`'un yeni kolonları geri alınırsa o veriyi
+tutan **başka bir yer yoktur** (DOWN blokları önce yedek almayı gösterir);
+`20260817190400`'ün geri alınması ölçülen DELETE sızıntısını yeniden açar.
 
 ---
 

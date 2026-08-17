@@ -227,6 +227,7 @@ export function useSendMessage() {
         read_at: null,
         kind: 'user',
         created_at: new Date().toISOString(),
+        attachment_path: null,
       }
 
       queryClient.setQueryData<Message[]>(key, [...(previous ?? []), optimistic])

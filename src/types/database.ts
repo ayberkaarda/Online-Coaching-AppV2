@@ -154,6 +154,7 @@ export type Database = {
       }
       messages: {
         Row: {
+          attachment_path: string | null
           client_id: string
           created_at: string
           id: string
@@ -165,6 +166,7 @@ export type Database = {
           sender_id: string
         }
         Insert: {
+          attachment_path?: string | null
           client_id: string
           created_at?: string
           id?: string
@@ -176,6 +178,7 @@ export type Database = {
           sender_id: string
         }
         Update: {
+          attachment_path?: string | null
           client_id?: string
           created_at?: string
           id?: string
@@ -245,6 +248,53 @@ export type Database = {
           },
         ]
       }
+      nutrition_logs: {
+        Row: {
+          carb_g: number | null
+          client_id: string
+          created_at: string
+          description: string
+          fat_g: number | null
+          id: string
+          kcal: number | null
+          log_date: string
+          protein_g: number | null
+          updated_at: string
+        }
+        Insert: {
+          carb_g?: number | null
+          client_id: string
+          created_at?: string
+          description: string
+          fat_g?: number | null
+          id?: string
+          kcal?: number | null
+          log_date?: string
+          protein_g?: number | null
+          updated_at?: string
+        }
+        Update: {
+          carb_g?: number | null
+          client_id?: string
+          created_at?: string
+          description?: string
+          fat_g?: number | null
+          id?: string
+          kcal?: number | null
+          log_date?: string
+          protein_g?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nutrition_logs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       nutrition_plan_meals: {
         Row: {
           day: string
@@ -287,6 +337,10 @@ export type Database = {
           id: string
           is_active: boolean
           notes: string | null
+          target_carb_g: number | null
+          target_fat_g: number | null
+          target_kcal: number | null
+          target_protein_g: number | null
           updated_at: string
           version: number
         }
@@ -296,6 +350,10 @@ export type Database = {
           id?: string
           is_active?: boolean
           notes?: string | null
+          target_carb_g?: number | null
+          target_fat_g?: number | null
+          target_kcal?: number | null
+          target_protein_g?: number | null
           updated_at?: string
           version?: number
         }
@@ -305,6 +363,10 @@ export type Database = {
           id?: string
           is_active?: boolean
           notes?: string | null
+          target_carb_g?: number | null
+          target_fat_g?: number | null
+          target_kcal?: number | null
+          target_protein_g?: number | null
           updated_at?: string
           version?: number
         }
@@ -408,29 +470,38 @@ export type Database = {
       workout_logs: {
         Row: {
           client_id: string
+          completed_at: string | null
           created_at: string
           exercise_name: string
           id: string
+          plan_exercise_id: string | null
           reps: number | null
           rpe: number | null
+          set_number: number | null
           weight_kg: number | null
         }
         Insert: {
           client_id: string
+          completed_at?: string | null
           created_at?: string
           exercise_name: string
           id?: string
+          plan_exercise_id?: string | null
           reps?: number | null
           rpe?: number | null
+          set_number?: number | null
           weight_kg?: number | null
         }
         Update: {
           client_id?: string
+          completed_at?: string | null
           created_at?: string
           exercise_name?: string
           id?: string
+          plan_exercise_id?: string | null
           reps?: number | null
           rpe?: number | null
+          set_number?: number | null
           weight_kg?: number | null
         }
         Relationships: [
@@ -439,6 +510,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workout_logs_plan_exercise_id_fkey"
+            columns: ["plan_exercise_id"]
+            isOneToOne: false
+            referencedRelation: "workout_plan_exercises"
             referencedColumns: ["id"]
           },
         ]
@@ -572,6 +650,11 @@ export type Database = {
       is_coach: { Args: { uid?: string }; Returns: boolean }
       is_coach_profile: { Args: { target: string }; Returns: boolean }
       is_end_user_write: { Args: never; Returns: boolean }
+      message_attachment_conversation: {
+        Args: { p_name: string }
+        Returns: string
+      }
+      message_attachment_uploader: { Args: { p_name: string }; Returns: string }
       migrate_nutrition_plans_from_profiles: {
         Args: never
         Returns: {
