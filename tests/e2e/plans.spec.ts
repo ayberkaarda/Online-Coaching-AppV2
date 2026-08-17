@@ -38,16 +38,19 @@ const CLIENT1_FULL_NAME = 'Ahmet Yılmaz'
 const CLIENT2_FULL_NAME = 'Elif Demir'
 
 /**
- * Koç panelinde bir öğrenciyi arayıp seçer.
+ * Koç panelinde bir danışanı arayıp seçer.
  *
- * `.last()` gerekli: current_streak === 0 olan öğrenciler "Acil İlgilenilmesi
+ * `.last()` gerekli: current_streak === 0 olan danışanlar "Acil İlgilenilmesi
  * Gerekenler" panelinde de aynı aria-label ile göründüğü için strict-mode
- * ihlali oluşabilir; asıl "Öğrenci Yönetimi" listesindeki buton DOM'da sonda
+ * ihlali oluşabilir; asıl "Danışan Yönetimi" listesindeki buton DOM'da sonda
  * yer alır (DashboardTabs.tsx). Aynı kalıp messaging.spec.ts'te de kullanılıyor.
+ *
+ * "Danışan Ara" etiketi noktasız ı (U+0131) içerir; kaynaktaki sr-only label
+ * metni birebir kopyalandı, `/i` bayraklı regex KULLANILMADI.
  */
 async function selectClient(page: Page, fullName: string): Promise<void> {
   const firstName = fullName.split(' ')[0] as string
-  await page.getByLabel('Öğrenci Ara').fill(firstName)
+  await page.getByLabel('Danışan Ara').fill(firstName)
   await page
     .getByRole('button', { name: `${fullName} seç` })
     .last()
@@ -100,7 +103,7 @@ test.describe('Plan Akışları (karakterizasyon)', () => {
     const uniquePlan = `E2E Antrenman ${randomSuffix()}`
     const day = 'Pazartesi'
 
-    // --- 1) Koç: öğrenciyi seç, Antrenman sekmesinde planı yaz, kaydet ---
+    // --- 1) Koç: danışanı seç, Antrenman sekmesinde planı yaz, kaydet ---
     await login(page, TEST_USERS.coach)
     await selectClient(page, CLIENT1_FULL_NAME)
     await page.getByRole('tab', { name: /Antrenman/ }).click()
@@ -112,7 +115,7 @@ test.describe('Plan Akışları (karakterizasyon)', () => {
     // WorkoutTab.tsx: koç rolünde kaydet butonunun metni birebir budur.
     await page.getByRole('button', { name: 'Antrenman Tablosunu Güncelle' }).click()
 
-    // usePlans.ts -> useSaveWorkoutPlan onSuccess toast'ı (tek öğrenci hali).
+    // usePlans.ts -> useSaveWorkoutPlan onSuccess toast'ı (tek danışan hali).
     // `i` bayrağı YOK: "programı" ı (U+0131) içeriyor.
     await expect(page.getByText(/Antrenman programı kaydedildi\./)).toBeVisible()
 
@@ -165,8 +168,10 @@ test.describe('Plan Akışları (karakterizasyon)', () => {
       await login(clientPage, TEST_USERS.client)
       await clientPage.goto('/profile')
 
-      // Kart başlığı kaynakta "🏋️ Antrenman Programım" (emoji erişilebilir adın
-      // parçası olabilir) — substring regex, `i` bayrağı YOK ("Programım" ı içerir).
+      // Kart başlığı kaynakta (src/app/profile/page.tsx) artık
+      // `<Dumbbell aria-hidden /> Antrenman Programım` — ikon aria-hidden
+      // olduğu için erişilebilir ad yalnızca metindir. Substring regex,
+      // `i` bayrağı YOK ("Programım" ı içerir).
       await expect(clientPage.getByRole('heading', { name: /Antrenman Programım/ })).toBeVisible()
 
       // Boş durum metni GÖRÜNMEMELİ: kart canlı plandan besleniyorsa dolu gelir.
@@ -210,7 +215,7 @@ test.describe('Plan Akışları (karakterizasyon)', () => {
 
     await page.getByRole('button', { name: 'Beslenme Tablosunu Kaydet' }).click()
 
-    // usePlans.ts -> useSaveNutritionPlan onSuccess toast'ı (tek öğrenci hali).
+    // usePlans.ts -> useSaveNutritionPlan onSuccess toast'ı (tek danışan hali).
     await expect(page.getByText(/Beslenme programı kaydedildi\./)).toBeVisible()
 
     // --- Kalıcılık: sayfa yenilendikten sonra da aynı içerik gelmeli ---
@@ -248,8 +253,10 @@ test.describe('Plan Akışları (karakterizasyon)', () => {
     // --- 2) Aynı danışan kendi profil sayfasında aynı içeriği görmeli ---
     await page.goto('/profile')
 
-    // Kart başlığı kaynakta "🥗 Beslenme Programım" (emoji erişilebilir adın
-    // parçası olabilir) — substring regex, `i` bayrağı YOK ("Programım" ı içerir).
+    // Kart başlığı kaynakta (src/app/profile/page.tsx) artık
+    // `<Salad aria-hidden /> Beslenme Programım` — ikon aria-hidden olduğu için
+    // erişilebilir ad yalnızca metindir. Substring regex, `i` bayrağı YOK
+    // ("Programım" ı içerir).
     await expect(page.getByRole('heading', { name: /Beslenme Programım/ })).toBeVisible()
 
     // Boş durum metni GÖRÜNMEMELİ: kart canlı plandan besleniyorsa dolu gelir.
@@ -279,9 +286,9 @@ test.describe('Plan Akışları (karakterizasyon)', () => {
     await selectClient(coachPage, CLIENT2_FULL_NAME)
     await coachPage.getByRole('tab', { name: /Antrenman/ }).click()
 
-    // WorkoutTab.tsx: onay butonundaki "✅" span'i aria-hidden, ama emoji'nin
-    // erişilebilir ada girip girmediğine bel bağlamamak için substring regex
-    // kullanılır (`i` bayrağı YOK: "İşle" noktalı büyük İ içeriyor).
+    // WorkoutTab.tsx: onay butonundaki ikon (`<Check aria-hidden />`) erişilebilir
+    // ada girmez; yine de metnin başına/sonuna ekleme yapılabildiği için
+    // substring regex kullanılır (`i` bayrağı YOK: "İşle" noktalı büyük İ içeriyor).
     const approveButton = coachPage.getByRole('button', { name: /Onayla ve Profiline İşle/ })
 
     // --- 0) Ön koşul: bekleyen onayları temizle ---
@@ -307,9 +314,11 @@ test.describe('Plan Akışları (karakterizasyon)', () => {
       await expect(clientField).toBeEnabled()
       await clientField.fill(uniquePlan)
 
-      // WorkoutTab.tsx (danışan hali): buton metni "📨 Bu Programı Koça Onaya
-      // Gönder" — emoji aria-hidden DEĞİL, düz metin olarak adın parçası.
-      // Bu yüzden birebir string yerine substring regex (`i` bayrağı yok).
+      // WorkoutTab.tsx (danışan hali): buton içeriği artık
+      // `<Send aria-hidden /> Bu Programı Koça Onaya Gönder`. Faz 2a öncesinde
+      // baştaki "📨" emoji'si aria-hidden DEĞİLDİ ve erişilebilir adın parçasıydı;
+      // ikona geçişle ad yalnızca metne indi. Substring regex her iki halde de
+      // eşleşir (`i` bayrağı yok: "Programı" ı içeriyor).
       const submitButton = clientPage.getByRole('button', {
         name: /Bu Programı Koça Onaya Gönder/,
       })
@@ -320,7 +329,7 @@ test.describe('Plan Akışları (karakterizasyon)', () => {
       await expect(clientPage.getByText(/Program taslağı koçuna gönderildi\./)).toBeVisible()
 
       // --- 2) Danışan tarafı bekleme durumuna geçmeli ---
-      // Aynı buton metni "⏳ Koçun Onayı Bekleniyor..." olur ve disabled edilir
+      // Aynı buton `<Clock aria-hidden /> Koçun Onayı Bekleniyor...` olur ve disabled edilir
       // (WorkoutTab.tsx `isWaitingMyApproval`). Textarea da devre dışı kalır.
       const waitingButton = clientPage.getByRole('button', {
         name: /Koçun Onayı Bekleniyor/,
@@ -331,8 +340,8 @@ test.describe('Plan Akışları (karakterizasyon)', () => {
 
       // --- 3) Koç: sayfayı tazeleyip onay kutusunu görmeli ve onaylamalı ---
       // Reload gerekli: koç sayfası zaten açıkken usePendingApprovals sorgusu
-      // kendiliğinden tazelenmeyebilir; reload state'i (öğrenci seçimi dahil)
-      // sıfırladığı için öğrenci yeniden seçilir.
+      // kendiliğinden tazelenmeyebilir; reload state'i (danışan seçimi dahil)
+      // sıfırladığı için danışan yeniden seçilir.
       await coachPage.reload()
       await selectClient(coachPage, CLIENT2_FULL_NAME)
       await coachPage.getByRole('tab', { name: /Antrenman/ }).click()
@@ -343,7 +352,7 @@ test.describe('Plan Akışları (karakterizasyon)', () => {
 
       // useProgramApprovals.ts -> useApproveProgram onSuccess toast'ı.
       await expect(
-        coachPage.getByText(/Program onaylandı ve öğrencinin profiline işlendi\./)
+        coachPage.getByText(/Program onaylandı ve danışanın profiline işlendi\./)
       ).toBeVisible()
       // Onay kutusu kaybolmalı (bekleyen kayıt kalmadı).
       await expect(approveButton).toHaveCount(0)

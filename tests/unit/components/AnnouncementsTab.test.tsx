@@ -67,7 +67,7 @@ describe('AnnouncementsTab', () => {
     expect(container.querySelector('h5')).not.toBeInTheDocument()
   })
 
-  it('coach rolünde birden fazla öğrenci seçiliyken uyarı görünür ve liste render edilmez', () => {
+  it('coach rolünde birden fazla danışan seçiliyken uyarı görünür ve liste render edilmez', () => {
     const announcements = [makeNotification({ id: 'n-1', message: 'Görünmemeli' })]
 
     render(
@@ -78,11 +78,11 @@ describe('AnnouncementsTab', () => {
       />
     )
 
-    expect(screen.getByText('Sadece 1 öğrenci seçili bırakın.')).toBeInTheDocument()
+    expect(screen.getByText('Sadece 1 danışan seçili bırakın.')).toBeInTheDocument()
     expect(screen.queryByText('Görünmemeli')).not.toBeInTheDocument()
   })
 
-  it('coach rolünde tek öğrenci seçiliyken liste normal render edilir', () => {
+  it('coach rolünde tek danışan seçiliyken liste normal render edilir', () => {
     const announcements = [makeNotification({ id: 'n-1', message: 'Görünmeli' })]
 
     render(

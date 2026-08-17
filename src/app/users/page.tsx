@@ -38,8 +38,12 @@ export default function UsersPage(): JSX.Element {
   return (
     <main id="main-content" className="container relative mx-auto max-w-6xl px-4 py-12 sm:px-6">
       <div className="absolute left-4 top-4 flex gap-2">
+        {/* Metin `sm` altında gizlendiği için buton mobilde YALNIZ-İKON olur;
+            erişilebilir adı `aria-label` sabitler (ADR-0016 erişilebilirlik
+            kuralı — dashboard'daki eşdeğer butonlarla aynı kalıp). */}
         <button
           onClick={() => router.push('/')}
+          aria-label="Ana Sayfaya Dön"
           className="flex items-center gap-2 rounded-lg p-2 text-sm font-bold text-accent transition-all hover:bg-accent/10"
         >
           <span aria-hidden="true">←</span>{' '}
@@ -54,7 +58,7 @@ export default function UsersPage(): JSX.Element {
           Kullanıcı Yönetim Merkezi
         </h1>
         <p className="mt-2 text-sm font-medium uppercase tracking-widest text-gray-500 md:text-base">
-          Öğrenci Analiz ve Program Editörü
+          Danışan Analiz ve Program Editörü
         </p>
       </header>
 

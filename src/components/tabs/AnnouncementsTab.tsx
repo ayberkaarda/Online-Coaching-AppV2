@@ -3,6 +3,7 @@
 // Son 30 günün duyurularını listeler. Veri DashboardTabs'tan prop olarak gelir
 // (orada `useNotifications(targetId, { sinceDays: 30 })` ile çekilir).
 
+import { Bell } from 'lucide-react'
 import type { JSX } from 'react'
 
 import { EmptyState } from '@/components/ui'
@@ -30,10 +31,13 @@ export default function AnnouncementsTab({
 
       {userRole === 'coach' && selectedClientIds.length > 1 ? (
         <p className="py-10 text-center text-sm font-bold text-accent">
-          Sadece 1 öğrenci seçili bırakın.
+          Sadece 1 danışan seçili bırakın.
         </p>
       ) : announcements.length === 0 ? (
-        <EmptyState icon="🔔" title="Duyuru bulunmuyor." />
+        <EmptyState
+          icon={<Bell aria-hidden="true" className="h-8 w-8" />}
+          title="Duyuru bulunmuyor."
+        />
       ) : (
         <div className="space-y-4">
           {announcements.map((ann) => (

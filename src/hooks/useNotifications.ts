@@ -64,7 +64,7 @@ export function useMarkNotificationRead() {
 }
 
 export interface SendNotificationInput {
-  /** Tek alıcı için tek elemanlı dizi, toplu duyuru için tüm öğrenci id'leri. */
+  /** Tek alıcı için tek elemanlı dizi, toplu duyuru için tüm danışan id'leri. */
   clientIds: string[]
   title?: string | null
   message: string

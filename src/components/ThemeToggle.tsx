@@ -3,6 +3,7 @@
 // Sağ alt köşede sabit duran açık/koyu tema anahtarı.
 // Hidrasyon uyuşmazlığını önlemek için mount olana kadar hiçbir şey render etmez.
 
+import { Moon, Sun } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { useSyncExternalStore } from 'react'
 import type { JSX } from 'react'
@@ -35,19 +36,15 @@ export function ThemeToggle(): JSX.Element | null {
       aria-label={isDark ? 'Açık temaya geç' : 'Koyu temaya geç'}
     >
       {isDark ? (
-        <span
+        <Sun
           aria-hidden="true"
-          className="text-2xl drop-shadow-md transition-colors duration-300 group-hover:text-yellow-400"
-        >
-          ☀️
-        </span>
+          className="h-6 w-6 drop-shadow-md transition-colors duration-300 group-hover:text-yellow-400"
+        />
       ) : (
-        <span
+        <Moon
           aria-hidden="true"
-          className="text-2xl drop-shadow-md transition-colors duration-300 group-hover:text-accent"
-        >
-          🌙
-        </span>
+          className="h-6 w-6 drop-shadow-md transition-colors duration-300 group-hover:text-accent"
+        />
       )}
     </button>
   )

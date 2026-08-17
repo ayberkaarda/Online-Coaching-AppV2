@@ -3,6 +3,22 @@
 // Haftalık antrenman planı: AI üretimi, sürükle-bırak egzersiz kütüphanesi,
 // koç onay akışı ve canlı ("gym modu") antrenman takibi.
 
+import {
+  BookOpen,
+  Bot,
+  Check,
+  Clock,
+  Download,
+  Dumbbell,
+  Eye,
+  Lightbulb,
+  Play,
+  Send,
+  Sparkles,
+  TriangleAlert,
+  Trophy,
+  VideoOff,
+} from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import type { DragEvent, JSX } from 'react'
 import { toast } from 'sonner'
@@ -131,7 +147,7 @@ export default function WorkoutTab({
   // lint hatası ortadan kalkar. Anahtar yalnızca targetId değil, "targetId + planın
   // yüklenmiş olması" — planQuery.data asenkron geldiği için targetId değişir değişmez
   // henüz undefined olabilir; veri gelince taslağı yükleyebilmek için isFetched de anahtara girer.
-  // Aynı öğrenci için anahtar sabit kaldığı sürece (ör. arka planda refetch) kullanıcının
+  // Aynı danışan için anahtar sabit kaldığı sürece (ör. arka planda refetch) kullanıcının
   // düzenlemeleri ezilmez.
   const planKey = targetId ? `${targetId}:${planQuery.isFetched ? '1' : '0'}` : 'none'
   const [loadedPlanKey, setLoadedPlanKey] = useState(planKey)
@@ -154,7 +170,7 @@ export default function WorkoutTab({
       return
     }
 
-    // TODO: yaş / hedef / kilo öğrencinin profilinden okunmalı (şimdilik sabit).
+    // TODO: yaş / hedef / kilo danışanın profilinden okunmalı (şimdilik sabit).
     const result = await generateWorkout.mutateAsync({
       split_type: smartSplit as SplitType,
       user_prompt: aiPrompt,
@@ -202,7 +218,7 @@ export default function WorkoutTab({
     const clientIds =
       userRole === 'coach' ? selectedClientIds : currentUserId ? [currentUserId] : []
     if (clientIds.length === 0) {
-      toast.error('Öğrenci seçin!')
+      toast.error('Danışan seçin!')
       return
     }
     savePlan.mutate({ clientIds, plan: workoutData })
@@ -332,7 +348,11 @@ export default function WorkoutTab({
       setRestTime(120)
       setLiveWeight('')
     } else {
-      toast.success('🎉 İNANILMAZ! Bugünün tüm hareketlerini tamamladın!')
+      // Kutlama anı: ADR-0016 gereği emoji ile kodlanmaz. Kalıcı karşılığı
+      // ADR-0017'nin imza öğesi (`LoopRing` — halka kapanır ve Kapanış yeşiline
+      // döner) olacak; o bileşen ilk göründüğü ekranla (gym modu dinlenme
+      // sayacı, AC-1.6.7) birlikte yazılacağı için şimdilik düz metin.
+      toast.success('İNANILMAZ! Bugünün tüm hareketlerini tamamladın!')
       setCurrentExIdx((prev) => prev + 1)
       setRestTime(0)
     }
@@ -368,8 +388,9 @@ export default function WorkoutTab({
         >
           Bitir
         </button>
-        <h3 className="mb-2 text-xl font-black text-accent">
-          <span aria-hidden="true">🏋️</span> CANLI GYM MODU
+        <h3 className="mb-2 flex items-center gap-2 text-xl font-black text-accent">
+          <Dumbbell aria-hidden="true" className="h-5 w-5 shrink-0" />
+          CANLI GYM MODU
         </h3>
         <p className="mb-6 text-sm font-bold uppercase text-gray-500">
           {getTodayName()} Antrenmanı
@@ -420,8 +441,9 @@ export default function WorkoutTab({
                       />
                       {!isGifPlaying && (
                         <div className="absolute inset-0 flex items-center justify-center">
-                          <div className="rounded-full bg-black/60 px-4 py-2 text-xs font-bold text-white backdrop-blur-sm transition-transform group-hover:scale-110">
-                            <span aria-hidden="true">▶️</span> Oynatmak için Üzerine Gel
+                          <div className="flex items-center gap-1.5 rounded-full bg-black/60 px-4 py-2 text-xs font-bold text-white backdrop-blur-sm transition-transform group-hover:scale-110">
+                            <Play aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
+                            Oynatmak için Üzerine Gel
                           </div>
                         </div>
                       )}
@@ -433,9 +455,7 @@ export default function WorkoutTab({
                     </>
                   ) : (
                     <div className="flex flex-col items-center gap-2 text-gray-400">
-                      <span className="text-3xl" aria-hidden="true">
-                        🎥
-                      </span>
+                      <VideoOff aria-hidden="true" className="h-8 w-8" />
                       <span className="text-[10px] font-bold">Görsel Bulunamadı</span>
                     </div>
                   )}
@@ -498,10 +518,12 @@ export default function WorkoutTab({
             )}
           </div>
         ) : (
+          // Kutlama sahnesi: kalıcı görsel karşılığı ADR-0017 imza öğesi
+          // (`LoopRing` — halka kapanır, Kapanış yeşiline döner) olacak.
+          // O bileşen bu ekranla (gym modu dinlenme sayacı) birlikte, AC-1.6.7
+          // kapsamında yazılacağı için şimdilik nötr bir Lucide ikonu duruyor.
           <div className="py-10 text-center">
-            <div className="mb-4 text-6xl" aria-hidden="true">
-              🏆
-            </div>
+            <Trophy aria-hidden="true" className="mx-auto mb-4 h-16 w-16 text-emerald-500" />
             <h2 className="mb-2 text-2xl font-black text-emerald-500">MÜKEMMEL İŞ!</h2>
           </div>
         )}
@@ -514,27 +536,28 @@ export default function WorkoutTab({
       {userRole === 'coach' && firstApproval ? (
         <div className="rounded-2xl border border-orange-200 bg-orange-50 p-5 shadow-sm dark:bg-orange-900/20">
           <h4 className="mb-2 flex items-center gap-2 font-black text-orange-600">
-            <span aria-hidden="true">⚠️</span> ONAY BEKLEYEN PROGRAM VAR
+            <TriangleAlert aria-hidden="true" className="h-4 w-4 shrink-0" /> ONAY BEKLEYEN PROGRAM
+            VAR
           </h4>
           <p className="mb-4 text-sm text-gray-700 dark:text-gray-300">
-            Öğrenci yapay zeka ile tasarladığı bu programı onayına sundu. İncele ve onayla.
+            Danışan yapay zeka ile tasarladığı bu programı onayına sundu. İncele ve onayla.
           </p>
           <div className="flex gap-3">
             <button
               type="button"
               onClick={() => setWorkoutData(jsonToWorkoutPlan(firstApproval.workout_data))}
-              className="rounded-lg border border-orange-200 bg-white px-4 py-2 text-xs font-bold text-orange-600 shadow-sm dark:bg-black"
+              className="flex items-center gap-1.5 rounded-lg border border-orange-200 bg-white px-4 py-2 text-xs font-bold text-orange-600 shadow-sm dark:bg-black"
             >
-              <span aria-hidden="true">👀</span> Taslağı Görüntüle
+              <Eye aria-hidden="true" className="h-3.5 w-3.5 shrink-0" /> Taslağı Görüntüle
             </button>
             <button
               type="button"
               onClick={handleApprove}
               disabled={approveProgram.isPending}
               aria-busy={approveProgram.isPending}
-              className="rounded-lg bg-orange-500 px-4 py-2 text-xs font-black text-white shadow-md hover:bg-orange-600 disabled:opacity-50"
+              className="flex items-center gap-1.5 rounded-lg bg-orange-500 px-4 py-2 text-xs font-black text-white shadow-md hover:bg-orange-600 disabled:opacity-50"
             >
-              <span aria-hidden="true">✅</span> Onayla ve Profiline İşle
+              <Check aria-hidden="true" className="h-3.5 w-3.5 shrink-0" /> Onayla ve Profiline İşle
             </button>
           </div>
         </div>
@@ -549,17 +572,17 @@ export default function WorkoutTab({
             <button
               type="button"
               onClick={startLiveWorkout}
-              className="animate-pulse rounded-lg bg-accent px-4 py-2 text-xs font-black text-white shadow-lg"
+              className="flex animate-pulse items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-xs font-black text-white shadow-lg"
             >
-              <span aria-hidden="true">🏋️</span> BUGÜNÜ BAŞLAT
+              <Dumbbell aria-hidden="true" className="h-3.5 w-3.5 shrink-0" /> BUGÜNÜ BAŞLAT
             </button>
           )}
           <button
             type="button"
             onClick={onDownloadImage}
-            className="rounded-lg bg-accent/10 px-3 py-1.5 text-xs font-bold text-accent"
+            className="flex items-center gap-1.5 rounded-lg bg-accent/10 px-3 py-1.5 text-xs font-bold text-accent"
           >
-            <span aria-hidden="true">🖼️</span> Görsel
+            <Download aria-hidden="true" className="h-3.5 w-3.5 shrink-0" /> Görsel
           </button>
         </div>
       </div>
@@ -568,9 +591,7 @@ export default function WorkoutTab({
           bu yüzden ek bir 'coach' kontrolü gereksizdir — koç için bu blok zaten görünür. */}
       {!isWaitingMyApproval && (
         <div className="mb-6 flex flex-col items-start gap-4 rounded-2xl border border-blue-500/20 bg-gradient-to-br from-blue-500/10 to-accent/5 p-5 shadow-sm md:flex-row">
-          <div className="pt-2 text-4xl" aria-hidden="true">
-            🤖
-          </div>
+          <Bot aria-hidden="true" className="mt-2 h-10 w-10 shrink-0 text-blue-600" />
           <div className="w-full flex-1 space-y-3">
             <div>
               <label htmlFor="ai-split" className="mb-1 block text-xs font-black text-blue-600">
@@ -609,9 +630,16 @@ export default function WorkoutTab({
             onClick={() => void generateSmartWorkout()}
             disabled={generateWorkout.isPending}
             aria-busy={generateWorkout.isPending}
-            className="h-full w-full rounded-xl bg-blue-600 px-8 py-4 text-sm font-black text-white disabled:opacity-50 md:w-auto"
+            className="flex h-full w-full items-center justify-center gap-1.5 rounded-xl bg-blue-600 px-8 py-4 text-sm font-black text-white disabled:opacity-50 md:w-auto"
           >
-            {generateWorkout.isPending ? 'Analiz Ediliyor...' : 'Oluştur ✨'}
+            {generateWorkout.isPending ? (
+              'Analiz Ediliyor...'
+            ) : (
+              <>
+                Oluştur
+                <Sparkles aria-hidden="true" className="h-4 w-4 shrink-0" />
+              </>
+            )}
           </button>
         </div>
       )}
@@ -686,11 +714,14 @@ export default function WorkoutTab({
         {userRole === 'coach' && (
           <div className="sticky top-4 h-fit w-full rounded-2xl border bg-gray-50 p-5 dark:bg-zinc-900 lg:w-1/3">
             <h4 className="mb-2 flex items-center gap-2 text-sm font-black">
-              <span aria-hidden="true">📚</span> Egzersiz Kütüphanesi
+              <BookOpen aria-hidden="true" className="h-4 w-4 shrink-0" /> Egzersiz Kütüphanesi
             </h4>
-            <p className="mb-4 text-[10px] font-medium italic text-gray-500">
-              <span aria-hidden="true">💡</span> Hareketi tutup soldaki günlerin içine sürükleyin
-              veya &quot;Ekle&quot; butonunu kullanın.
+            <p className="mb-4 flex items-start gap-1.5 text-[10px] font-medium italic text-gray-500">
+              <Lightbulb aria-hidden="true" className="mt-0.5 h-3 w-3 shrink-0" />
+              <span>
+                Hareketi tutup soldaki günlerin içine sürükleyin veya &quot;Ekle&quot; butonunu
+                kullanın.
+              </span>
             </p>
 
             <label htmlFor="exercise-filter" className="sr-only">
@@ -791,15 +822,23 @@ export default function WorkoutTab({
           onClick={sendToCoachForApproval}
           disabled={isWaitingMyApproval || submitForApproval.isPending}
           aria-busy={submitForApproval.isPending}
-          className={`w-full rounded-xl py-4 font-black shadow-md transition-all ${
+          className={`flex w-full items-center justify-center gap-2 rounded-xl py-4 font-black shadow-md transition-all ${
             isWaitingMyApproval
               ? 'cursor-not-allowed bg-gray-400 text-white'
               : 'bg-orange-500 text-white hover:bg-orange-600'
           }`}
         >
-          {isWaitingMyApproval
-            ? '⏳ Koçun Onayı Bekleniyor...'
-            : '📨 Bu Programı Koça Onaya Gönder'}
+          {isWaitingMyApproval ? (
+            <>
+              <Clock aria-hidden="true" className="h-4 w-4 shrink-0" />
+              Koçun Onayı Bekleniyor...
+            </>
+          ) : (
+            <>
+              <Send aria-hidden="true" className="h-4 w-4 shrink-0" />
+              Bu Programı Koça Onaya Gönder
+            </>
+          )}
         </button>
       )}
     </div>

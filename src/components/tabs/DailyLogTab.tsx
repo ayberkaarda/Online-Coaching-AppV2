@@ -1,9 +1,10 @@
 'use client'
 
-// Günlük su / sodyum / makro raporu: öğrenci formu + geçmiş kayıtların makro dağılımı.
+// Günlük su / sodyum / makro raporu: danışan formu + geçmiş kayıtların makro dağılımı.
 // Kayıt `useCreateDailyLog` ile UPSERT edilir (aynı gün tekrar gönderilirse güncellenir).
 
 import { zodResolver } from '@hookform/resolvers/zod'
+import { Droplet, FileSpreadsheet } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import type { JSX } from 'react'
 import { toast } from 'sonner'
@@ -213,7 +214,7 @@ export default function DailyLogTab({
 
       {userRole === 'coach' && selectedClientIds.length > 1 ? (
         <p className="py-10 text-center text-sm font-bold text-accent">
-          Sadece 1 öğrenci seçili bırakın.
+          Sadece 1 danışan seçili bırakın.
         </p>
       ) : (
         <>
@@ -225,9 +226,9 @@ export default function DailyLogTab({
               <button
                 type="button"
                 onClick={handleDownload}
-                className="rounded-lg bg-blue-500/10 px-3 py-1.5 text-xs font-bold text-blue-600"
+                className="flex items-center gap-1.5 rounded-lg bg-blue-500/10 px-3 py-1.5 text-xs font-bold text-blue-600"
               >
-                <span aria-hidden="true">📊</span> Excel İndir
+                <FileSpreadsheet aria-hidden="true" className="h-3.5 w-3.5 shrink-0" /> Excel İndir
               </button>
             )}
           </div>
@@ -255,9 +256,12 @@ export default function DailyLogTab({
                   >
                     <div className="mb-4 flex items-center justify-between">
                       <span className="font-bold">{formatDateTR(log.log_date)}</span>
-                      <span className="rounded-lg bg-emerald-500/10 px-3 py-1 font-black text-emerald-500">
-                        <span aria-hidden="true">💧</span> {log.water_lt}L |{' '}
-                        <span aria-hidden="true">🧂</span> {log.sodium_mg}mg
+                      {/* Sodyum için lucide setinde bir "tuzluk" ikonu yok; emoji
+                          yerine düz metin etiket kullanılır (ADR-0016: ikon
+                          bulunmuyorsa metne indirilir). */}
+                      <span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500/10 px-3 py-1 font-black text-emerald-500">
+                        <Droplet aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
+                        {log.water_lt}L | Sodyum {log.sodium_mg}mg
                       </span>
                     </div>
                     <div className="space-y-2">

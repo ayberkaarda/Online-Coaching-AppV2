@@ -119,7 +119,7 @@ export default function StatsTab({
 
       {userRole === 'coach' && selectedClientIds.length > 1 ? (
         <p className="py-10 text-center text-sm font-bold text-accent">
-          Grafikleri görüntülemek için sadece 1 öğrenci seçili bırakın.
+          Grafikleri görüntülemek için sadece 1 danışan seçili bırakın.
         </p>
       ) : (
         <QueryState

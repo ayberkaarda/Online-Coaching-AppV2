@@ -64,10 +64,14 @@ test.describe('Mesajlaşma Akışı', () => {
 
       // supabase/seed.sql: client1@example.com -> "Ahmet Yılmaz". Arama ile
       // filtreleyip seç; ".last()" kullanılır çünkü current_streak === 0 olan
-      // öğrenciler ayrıca "Acil İlgilenilmesi Gerekenler" hızlı erişim
+      // danışanlar ayrıca "Acil İlgilenilmesi Gerekenler" hızlı erişim
       // panelinde de aynı aria-label ile tekrar görünebilir (DashboardTabs.tsx)
-      // — asıl "Öğrenci Yönetimi" listesindeki buton DOM'da her zaman sonda yer alır.
-      await coachPage.getByLabel('Öğrenci Ara').fill('Ahmet')
+      // — asıl "Danışan Yönetimi" listesindeki buton DOM'da her zaman sonda yer alır.
+      //
+      // TÜRKÇE İ/ı TUZAĞI: "Danışan Ara" noktasız ı içeriyor; etiket metni
+      // kaynaktan (DashboardTabs.tsx sr-only label) birebir kopyalandı,
+      // `/i` bayraklı regex kullanılmadı.
+      await coachPage.getByLabel('Danışan Ara').fill('Ahmet')
       await coachPage.getByRole('button', { name: 'Ahmet Yılmaz seç' }).last().click()
 
       await coachPage.getByRole('tab', { name: /sohbet/i }).click()
@@ -107,22 +111,22 @@ test.describe('Mesajlaşma Akışı', () => {
     }
   })
 
-  test('koç öğrenci seçmeden sohbet arayüzünü kullanamıyor', async ({ page }) => {
+  test('koç danışan seçmeden sohbet arayüzünü kullanamıyor', async ({ page }) => {
     await login(page, TEST_USERS.coach)
     await page.getByRole('tab', { name: /sohbet/i }).click()
 
     // NOT (kaynağa uydurmak zorunda kalınan beklenti): MessagesTab.tsx kendi
     // içinde `userRole === 'coach' && selectedClientIds.length !== 1` durumunda
-    // "Sohbet etmek için sadece 1 öğrenci seçili bırakın." metnini basıyor
+    // "Sohbet etmek için sadece 1 danışan seçili bırakın." metnini basıyor
     // (bkz. src/components/tabs/MessagesTab.tsx, satır ~63-69). Ancak HİÇ
-    // öğrenci seçilmediğinde (length === 0) DashboardTabs.tsx bu bileşeni hiç
+    // danışan seçilmediğinde (length === 0) DashboardTabs.tsx bu bileşeni hiç
     // render etmeden kendi geçiş ekranını gösteriyor (satır ~400-406) ve
-    // MessagesTab'a hiç ulaşılmıyor. Yani "sadece 1 öğrenci seçili bırakın"
-    // metni sadece 2+ öğrenci seçiliyken görünür; 0 öğrenci seçiliyken
+    // MessagesTab'a hiç ulaşılmıyor. Yani "sadece 1 danışan seçili bırakın"
+    // metni sadece 2+ danışan seçiliyken görünür; 0 danışan seçiliyken
     // gerçekte görünen metin DashboardTabs kaynaklıdır. Bu test gerçek DOM
     // davranışını doğrular.
     await expect(
-      page.getByText('Lütfen yukarıdaki panelden en az bir öğrenci seçin.')
+      page.getByText('Lütfen yukarıdaki panelden en az bir danışan seçin.')
     ).toBeVisible()
 
     // Sohbet arayüzü (mesaj giriş alanı) hiç render edilmemiş olmalı.

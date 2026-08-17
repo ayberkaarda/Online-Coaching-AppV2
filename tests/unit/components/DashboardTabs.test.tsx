@@ -144,13 +144,13 @@ describe('DashboardTabs', () => {
     expect(messagesTab).toHaveFocus()
   })
 
-  it('userRole="coach" ve hiç öğrenci seçili değilken uyarı mesajı görünür', () => {
+  it('userRole="coach" ve hiç danışan seçili değilken uyarı mesajı görünür', () => {
     setupDefaultHooks()
 
     render(<DashboardTabs currentUserId="coach-1" userRole="coach" clients={[]} />)
 
     expect(
-      screen.getByText('Lütfen yukarıdaki panelden en az bir öğrenci seçin.')
+      screen.getByText('Lütfen yukarıdaki panelden en az bir danışan seçin.')
     ).toBeInTheDocument()
     expect(screen.queryByText('FORM_CHECK_TAB')).not.toBeInTheDocument()
   })

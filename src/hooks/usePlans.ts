@@ -213,7 +213,7 @@ export function useSaveWorkoutPlan() {
 
   return useMutation({
     mutationFn: async ({ clientIds, plan }: SaveWorkoutPlanInput): Promise<number> => {
-      if (clientIds.length === 0) throw new Error('En az bir öğrenci seçmelisiniz.')
+      if (clientIds.length === 0) throw new Error('En az bir danışan seçmelisiniz.')
 
       // Tek RPC = tek transaction: bir danışanda RLS/CHECK hatası olursa TÜM
       // kaydetme geri alınır (kısmi yazma yok).
@@ -231,7 +231,7 @@ export function useSaveWorkoutPlan() {
       }
       toast.success(
         count > 1
-          ? `Antrenman programı ${count} öğrenciye kaydedildi.`
+          ? `Antrenman programı ${count} danışana kaydedildi.`
           : 'Antrenman programı kaydedildi.'
       )
     },
@@ -251,7 +251,7 @@ export function useSaveNutritionPlan() {
 
   return useMutation({
     mutationFn: async ({ clientIds, plan }: SaveNutritionPlanInput): Promise<number> => {
-      if (clientIds.length === 0) throw new Error('En az bir öğrenci seçmelisiniz.')
+      if (clientIds.length === 0) throw new Error('En az bir danışan seçmelisiniz.')
 
       // Tek RPC = tek transaction: bir danışanda RLS/CHECK hatası olursa TÜM
       // kaydetme geri alınır (kısmi yazma yok).
@@ -269,7 +269,7 @@ export function useSaveNutritionPlan() {
       }
       toast.success(
         count > 1
-          ? `Beslenme programı ${count} öğrenciye kaydedildi.`
+          ? `Beslenme programı ${count} danışana kaydedildi.`
           : 'Beslenme programı kaydedildi.'
       )
     },

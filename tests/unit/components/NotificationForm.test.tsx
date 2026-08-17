@@ -52,7 +52,7 @@ function mockSendNotification(
 }
 
 // notificationSchema, target alanı için "all" veya geçerli bir UUID bekliyor;
-// bu yüzden sahte öğrenci id'leri gerçekçi UUID v4 formatında olmalı.
+// bu yüzden sahte danışan id'leri gerçekçi UUID v4 formatında olmalı.
 const CLIENT_1_ID = '11111111-1111-4111-8111-111111111111'
 const CLIENT_2_ID = '22222222-2222-4222-8222-222222222222'
 
@@ -78,7 +78,7 @@ describe('NotificationForm', () => {
     expect(mutation.mutateAsync).not.toHaveBeenCalled()
   })
 
-  it('geçerli form + target="all" ile mutation coach olmayan tüm öğrencilerin id\'leriyle çağrılır', async () => {
+  it('geçerli form + target="all" ile mutation coach olmayan tüm danışanların id\'leriyle çağrılır', async () => {
     const mutation = mockSendNotification()
     vi.mocked(useSendNotification).mockReturnValue(mutation)
     const user = userEvent.setup()
@@ -97,7 +97,7 @@ describe('NotificationForm', () => {
     })
   })
 
-  it('tek öğrenci seçilince mutation clientIds: [seçilenId] ile çağrılır', async () => {
+  it('tek danışan seçilince mutation clientIds: [seçilenId] ile çağrılır', async () => {
     const mutation = mockSendNotification()
     vi.mocked(useSendNotification).mockReturnValue(mutation)
     const user = userEvent.setup()

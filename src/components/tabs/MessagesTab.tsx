@@ -63,7 +63,7 @@ export default function MessagesTab({
   if (userRole === 'coach' && selectedClientIds.length !== 1) {
     return (
       <p className="py-10 text-center text-sm font-bold text-accent">
-        Sohbet etmek için sadece 1 öğrenci seçili bırakın.
+        Sohbet etmek için sadece 1 danışan seçili bırakın.
       </p>
     )
   }
@@ -73,7 +73,7 @@ export default function MessagesTab({
       {/* Sohbet Başlığı */}
       <div className="flex items-center justify-between border-b border-gray-200 bg-white p-4 dark:border-zinc-800 dark:bg-[#16161d]">
         <h4 className="text-sm font-bold text-gray-800 dark:text-zinc-200">
-          {userRole === 'coach' ? 'Öğrenci ile Sohbet' : 'Koç ile Sohbet'}
+          {userRole === 'coach' ? 'Danışan ile Sohbet' : 'Koç ile Sohbet'}
         </h4>
 
         <div className="flex items-center gap-1.5" role="status" aria-live="polite">

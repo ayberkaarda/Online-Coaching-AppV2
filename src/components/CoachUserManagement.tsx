@@ -1,6 +1,6 @@
 'use client'
 
-// Koç paneli öğrenci portföyü: kart listesi + detay çekmecesi.
+// Koç paneli danışan portföyü: kart listesi + detay çekmecesi.
 //
 // Faz 1b sonrası çekmece tamamen ANALİTİK bir görünümdür (kilo trendi, makro
 // grafiği, before/after kıyaslama, form hatırlatması). Buradaki ham metin
@@ -9,6 +9,7 @@
 // bu editörler cutover sonrası DEPRECATED profil kolonlarına yazan "ölü yazma"
 // hâline gelmişti (koç kaydediyor, danışan hiç görmüyordu).
 
+import { Bell, ImageOff } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { JSX } from 'react'
 import {
@@ -138,7 +139,7 @@ export function CoachUserManagement({ clients }: CoachUserManagementProps): JSX.
     // Başarı/hata toast'ı hook içinde gösterilir.
     sendNotification.mutate({
       clientIds: [selectedClient.id],
-      title: '⚠️ Check-in Zamanı!',
+      title: 'Check-in Zamanı!',
       message:
         'Koçunuz güncel formunuzu bekliyor. Lütfen kilonuzu ve form fotoğraflarınızı sisteme yükleyin.',
     })
@@ -188,7 +189,7 @@ export function CoachUserManagement({ clients }: CoachUserManagementProps): JSX.
 
   return (
     <div>
-      <h3 className="mb-6 text-xl font-black text-gray-800 dark:text-zinc-200">Öğrenci Portföyü</h3>
+      <h3 className="mb-6 text-xl font-black text-gray-800 dark:text-zinc-200">Danışan Portföyü</h3>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
         {clientCards.map((client) => {
@@ -277,14 +278,15 @@ export function CoachUserManagement({ clients }: CoachUserManagementProps): JSX.
                     disabled={sendNotification.isPending}
                     className="mt-2 flex items-center gap-1 rounded-lg bg-red-500 px-3 py-1.5 text-xs font-bold text-white shadow-sm transition-all hover:bg-red-600 disabled:opacity-50"
                   >
-                    <span aria-hidden="true">🔔</span> Form Hatırlatması Gönder
+                    <Bell aria-hidden="true" className="h-3.5 w-3.5 shrink-0" /> Form Hatırlatması
+                    Gönder
                   </button>
                 </div>
                 <button
                   type="button"
                   ref={closeButtonRef}
                   onClick={closeDrawer}
-                  aria-label="Öğrenci detayını kapat"
+                  aria-label="Danışan detayını kapat"
                   className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-200 font-bold text-gray-600 transition-all hover:bg-red-500 hover:text-white dark:bg-zinc-800 dark:text-gray-400"
                 >
                   <span aria-hidden="true">✕</span>
@@ -517,7 +519,7 @@ export function CoachUserManagement({ clients }: CoachUserManagementProps): JSX.
                           ) : (
                             // İmzalı adres üretilemedi (dosya yok/erişim yok) — kırık görsel yerine boş durum.
                             <EmptyState
-                              icon="🖼️"
+                              icon={<ImageOff aria-hidden="true" className="h-8 w-8" />}
                               title="Bu kayıt için fotoğraf görüntülenemiyor."
                             />
                           )}
@@ -557,7 +559,7 @@ export function CoachUserManagement({ clients }: CoachUserManagementProps): JSX.
                             </div>
                           ) : (
                             <EmptyState
-                              icon="🖼️"
+                              icon={<ImageOff aria-hidden="true" className="h-8 w-8" />}
                               title="Bu kayıt için fotoğraf görüntülenemiyor."
                             />
                           )}

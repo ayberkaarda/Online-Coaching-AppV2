@@ -2,6 +2,7 @@
 
 // Route segment hata sınırı. GÜVENLİK: ham hata mesajı yalnızca development'ta gösterilir.
 
+import { TriangleAlert } from 'lucide-react'
 import { useEffect } from 'react'
 import type { JSX } from 'react'
 
@@ -28,8 +29,15 @@ export default function Error({
       className="flex min-h-screen flex-col items-center justify-center bg-red-50 p-8 text-red-900 dark:bg-red-950/20 dark:text-red-200"
     >
       <div className="w-full max-w-2xl rounded-3xl border border-red-200 bg-white p-8 shadow-2xl dark:border-red-900 dark:bg-zinc-900">
-        <h2 className="mb-4 text-3xl font-black text-red-600 dark:text-red-500">
-          {isDev ? '🚨 Kritik Çökme Tespit Edildi!' : 'Bir şeyler ters gitti'}
+        <h2 className="mb-4 flex items-center gap-3 text-3xl font-black text-red-600 dark:text-red-500">
+          {isDev ? (
+            <>
+              <TriangleAlert aria-hidden="true" className="h-7 w-7 shrink-0" />
+              Kritik Çökme Tespit Edildi!
+            </>
+          ) : (
+            'Bir şeyler ters gitti'
+          )}
         </h2>
 
         {isDev ? (

@@ -3,6 +3,7 @@
 // Profil sayfası: avatar yükleme, şifre değiştirme, beslenme/antrenman programı görüntüleme.
 
 import { zodResolver } from '@hookform/resolvers/zod'
+import { Dumbbell, Salad, User } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import type { ChangeEvent, JSX } from 'react'
 import { useEffect } from 'react'
@@ -172,7 +173,8 @@ export default function ProfilePage(): JSX.Element {
         <div className="group relative cursor-pointer">
           <div className="flex h-32 w-32 items-center justify-center overflow-hidden rounded-full border-4 border-accent/20 bg-gray-100 transition-all group-hover:border-accent dark:bg-zinc-900">
             {/* Avatar private bucket'tadır: adres imzalıdır ve süreye bağlıdır.
-                İmza üretilemezse (dosya yok/erişim yok) kırık görsel yerine 👤 gösterilir. */}
+                İmza üretilemezse (dosya yok/erişim yok) kırık görsel yerine
+                nötr bir kullanıcı ikonu gösterilir. */}
             {profile.avatarSignedUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
@@ -182,9 +184,7 @@ export default function ProfilePage(): JSX.Element {
                 className="h-full w-full object-cover"
               />
             ) : (
-              <span className="text-4xl" aria-hidden="true">
-                👤
-              </span>
+              <User aria-hidden="true" className="h-12 w-12 text-gray-400" />
             )}
           </div>
           <input
@@ -258,8 +258,9 @@ export default function ProfilePage(): JSX.Element {
       {/* Program Görüntüleme Alanı */}
       <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
         <div className="rounded-3xl border border-gray-100 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-[#16161d]">
-          <h3 className="mb-4 border-b pb-3 text-lg font-black text-accent dark:border-zinc-800">
-            🥗 Beslenme Programım
+          <h3 className="mb-4 flex items-center gap-2 border-b pb-3 text-lg font-black text-accent dark:border-zinc-800">
+            <Salad aria-hidden="true" className="h-5 w-5 shrink-0" />
+            Beslenme Programım
           </h3>
           <QueryState
             isLoading={nutritionPlanQuery.isLoading}
@@ -273,8 +274,9 @@ export default function ProfilePage(): JSX.Element {
         </div>
 
         <div className="rounded-3xl border border-gray-100 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-[#16161d]">
-          <h3 className="mb-4 border-b pb-3 text-lg font-black text-emerald-500 dark:border-zinc-800">
-            🏋️ Antrenman Programım
+          <h3 className="mb-4 flex items-center gap-2 border-b pb-3 text-lg font-black text-emerald-500 dark:border-zinc-800">
+            <Dumbbell aria-hidden="true" className="h-5 w-5 shrink-0" />
+            Antrenman Programım
           </h3>
           <QueryState
             isLoading={workoutPlanQuery.isLoading}

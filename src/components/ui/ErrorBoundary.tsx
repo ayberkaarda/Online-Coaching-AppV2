@@ -3,6 +3,7 @@
 // React hata sınırı. Beklenmeyen render hatalarında uygulamanın tamamen çökmesini engeller.
 // GÜVENLİK: hata detayı yalnızca geliştirme ortamında gösterilir.
 
+import { TriangleAlert } from 'lucide-react'
 import { Component, type ErrorInfo, type ReactNode } from 'react'
 
 import { logger } from '@/lib/logger'
@@ -49,9 +50,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
         role="alert"
         className="space-y-3 rounded-2xl border border-red-200 bg-red-50 p-6 text-center dark:border-red-900/40 dark:bg-red-950/20"
       >
-        <p className="text-2xl" aria-hidden="true">
-          ⚠️
-        </p>
+        <TriangleAlert aria-hidden="true" className="mx-auto h-7 w-7 text-red-500" />
         <h2 className="text-base font-black text-red-600 dark:text-red-400">
           Bir şeyler ters gitti
         </h2>

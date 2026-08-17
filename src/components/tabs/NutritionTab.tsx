@@ -5,6 +5,7 @@
 // tablolarında saklanır; `useNutritionPlan` üzerinden okunur/yazılır.
 
 import { zodResolver } from '@hookform/resolvers/zod'
+import { Brain, Download, FileSpreadsheet, Sparkles, Zap } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import type { JSX, KeyboardEvent } from 'react'
 import { useForm } from 'react-hook-form'
@@ -60,7 +61,7 @@ export default function NutritionTab({
   // lint hatası ortadan kalkar. Anahtar yalnızca targetId değil, "targetId + planın
   // yüklenmiş olması" — planQuery.data asenkron geldiği için targetId değişir değişmez
   // henüz undefined olabilir; veri gelince taslağı yükleyebilmek için isFetched de anahtara girer.
-  // Aynı öğrenci için anahtar sabit kaldığı sürece (ör. arka planda refetch) kullanıcının
+  // Aynı danışan için anahtar sabit kaldığı sürece (ör. arka planda refetch) kullanıcının
   // düzenlemeleri ezilmez.
   const planKey = targetId ? `${targetId}:${planQuery.isFetched ? '1' : '0'}` : 'none'
   const [loadedPlanKey, setLoadedPlanKey] = useState(planKey)
@@ -200,7 +201,7 @@ export default function NutritionTab({
     const clientIds =
       userRole === 'coach' ? selectedClientIds : currentUserId ? [currentUserId] : []
     if (clientIds.length === 0) {
-      toast.error('Öğrenci seçin!')
+      toast.error('Danışan seçin!')
       return
     }
     // Başarı/hata toast'ı hook içinde gösterilir.
@@ -225,16 +226,16 @@ export default function NutritionTab({
           <button
             type="button"
             onClick={onDownloadImage}
-            className="rounded-lg bg-accent/10 px-3 py-1.5 text-xs font-bold text-accent"
+            className="flex items-center gap-1.5 rounded-lg bg-accent/10 px-3 py-1.5 text-xs font-bold text-accent"
           >
-            <span aria-hidden="true">🖼️</span> Görsel İndir
+            <Download aria-hidden="true" className="h-3.5 w-3.5 shrink-0" /> Görsel İndir
           </button>
           <button
             type="button"
             onClick={handleDownloadCsv}
-            className="rounded-lg bg-emerald-500/10 px-3 py-1.5 text-xs font-bold text-emerald-600"
+            className="flex items-center gap-1.5 rounded-lg bg-emerald-500/10 px-3 py-1.5 text-xs font-bold text-emerald-600"
           >
-            <span aria-hidden="true">📊</span> CSV İndir
+            <FileSpreadsheet aria-hidden="true" className="h-3.5 w-3.5 shrink-0" /> CSV İndir
           </button>
         </div>
       </div>
@@ -246,7 +247,8 @@ export default function NutritionTab({
         className="mb-6 rounded-2xl border border-accent/20 bg-gradient-to-br from-accent/5 to-transparent p-5 shadow-inner"
       >
         <h4 className="mb-4 flex items-center gap-2 text-sm font-black text-accent">
-          <span aria-hidden="true">🧠</span> AI DİYETİSYEN &amp; KALORİ HESAPLAYICI
+          <Brain aria-hidden="true" className="h-4 w-4 shrink-0" /> AI DİYETİSYEN &amp; KALORİ
+          HESAPLAYICI
         </h4>
         <div className="flex flex-col gap-6 md:flex-row">
           <div className="grid flex-1 grid-cols-2 gap-3 md:grid-cols-3">
@@ -377,9 +379,16 @@ export default function NutritionTab({
                 disabled={isGenerating}
                 aria-busy={isGenerating}
                 // Eski hover moru (#7c3aed) ayrı bir token değildi; en sadık eşleme accent'in %90 opaklığı (hover koyulaşması).
-                className="flex-1 rounded-xl bg-accent p-3 text-sm font-bold text-white shadow-md transition-all hover:bg-accent/90 disabled:opacity-50"
+                className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-accent p-3 text-sm font-bold text-white shadow-md transition-all hover:bg-accent/90 disabled:opacity-50"
               >
-                {isGenerating ? 'Hesaplanıyor...' : 'Oluştur ✨'}
+                {isGenerating ? (
+                  'Hesaplanıyor...'
+                ) : (
+                  <>
+                    Oluştur
+                    <Sparkles aria-hidden="true" className="h-4 w-4 shrink-0" />
+                  </>
+                )}
               </button>
             </div>
           </div>
@@ -480,9 +489,10 @@ export default function NutritionTab({
         <button
           type="button"
           onClick={handleQuickAdd}
-          className="w-full whitespace-nowrap rounded-xl bg-accent px-6 py-2.5 font-bold text-white shadow-md transition-transform active:scale-95 md:w-auto"
+          className="flex w-full items-center justify-center gap-1.5 whitespace-nowrap rounded-xl bg-accent px-6 py-2.5 font-bold text-white shadow-md transition-transform active:scale-95 md:w-auto"
         >
-          Hızlı Ekle <span aria-hidden="true">⚡</span>
+          Hızlı Ekle
+          <Zap aria-hidden="true" className="h-4 w-4 shrink-0" />
         </button>
       </div>
 

@@ -88,13 +88,15 @@ export const BASELINES = {
   emoji: {
     kind: 'emoji',
     // Bu sayı script'in KENDİ ölçüm yöntemiyle (bkz. aşağıdaki `countEmoji` /
-    // `stripComments`) sabitlenmiştir — 2026-08-17 itibarıyla src/**/*.{ts,tsx,css}
-    // üzerinde ölçülen gerçek değer budur. Farklı bir emoji tanımı (ör. yalnızca
-    // U+1F300+ aralığı) farklı bir sayı üretir; ADR-0018 bu yüzden sayıyı mutlak
-    // olarak değil "script'in kendi ölçümü" olarak sabitliyor.
-    ceiling: 59,
-    label:
-      "JSX/string emoji kullanımı (Faz 2'nin ilk mekanik işi olan Lucide dönüşümüne kadar — ADR-0016)",
+    // `stripComments`) ölçülür — 2026-08-17'de baseline 59 idi. Faz 2a
+    // (ADR-0016 Lucide dönüşümü) tüm fonksiyonel emoji'leri `lucide-react`
+    // ikonlarına çevirdi; ölçüm 0'a indi ve ADR-0018'in "düşürdüğünde yeni
+    // değer baseline olur" kuralı gereği tavan 0'da KİLİTLENDİ. Bundan
+    // sonra src/**/*.{ts,tsx,css} içine giren HER emoji CI'ı kırar.
+    // Kutlama anları da emoji ile kodlanmaz (ADR-0016 tek istisna kuralı):
+    // karşılığı ADR-0017'nin imza öğesi `LoopRing`'dir.
+    ceiling: 0,
+    label: 'JSX/string emoji kullanımı (ADR-0016 — Lucide dönüşümü sonrası 0’da kilitli)',
   },
 }
 

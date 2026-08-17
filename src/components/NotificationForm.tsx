@@ -1,9 +1,10 @@
 'use client'
 
-// Koçun tek bir öğrenciye ya da tüm öğrencilere duyuru göndermesini sağlayan form.
+// Koçun tek bir danışana ya da tüm danışanlara duyuru göndermesini sağlayan form.
 // Doğrulama zod (notificationSchema) + react-hook-form ile yapılır.
 
 import { zodResolver } from '@hookform/resolvers/zod'
+import { Megaphone } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import type { JSX } from 'react'
 
@@ -47,9 +48,7 @@ export function NotificationForm({ clients }: NotificationFormProps): JSX.Elemen
   return (
     <div className="rounded-3xl border border-gray-100 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-[#16161d] md:p-8">
       <div className="mb-6 flex items-center gap-3">
-        <span className="text-2xl" aria-hidden="true">
-          📢
-        </span>
+        <Megaphone aria-hidden="true" className="h-6 w-6 shrink-0 text-accent" />
         <h3 className="text-lg font-black text-gray-800 dark:text-zinc-200">
           Duyuru &amp; Mesaj Gönder
         </h3>
@@ -70,10 +69,12 @@ export function NotificationForm({ clients }: NotificationFormProps): JSX.Elemen
             aria-describedby={errors.target ? 'notification-target-error' : undefined}
             className="w-full rounded-xl border border-gray-200 bg-gray-50 p-3.5 text-sm font-medium focus:border-accent focus:outline-none dark:border-zinc-800 dark:bg-zinc-950"
           >
-            <option value="all">🌐 Tüm Öğrenciler</option>
+            {/* `<option>` içinde ikon render edilemez (tarayıcı yalnızca düz metin
+                gösterir), bu yüzden burada emoji ikonun yerine düz metin geçer. */}
+            <option value="all">Tüm Danışanlar</option>
             {clientOptions.map((c) => (
               <option key={c.id} value={c.id}>
-                👤 {c.full_name}
+                {c.full_name}
               </option>
             ))}
           </select>

@@ -1,7 +1,8 @@
 'use client'
 
-// Ana panel (Dashboard): oturum + role göre koç/öğrenci görünümü, bildirim zili.
+// Ana panel (Dashboard): oturum + role göre koç/danışan görünümü, bildirim zili.
 
+import { Bell, LogOut, Settings, Users } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
 import type { JSX } from 'react'
@@ -91,7 +92,7 @@ export default function DashboardPage(): JSX.Element {
   return (
     <main id="main-content" className="container relative mx-auto max-w-6xl px-4 py-12 sm:px-6">
       <div className="absolute left-4 top-4 z-50 flex items-center gap-2">
-        {/* ÖĞRENCİ BİLDİRİM ZİLİ */}
+        {/* DANIŞAN BİLDİRİM ZİLİ */}
         {role === 'client' && (
           <div className="relative" ref={notifRef}>
             <button
@@ -100,9 +101,9 @@ export default function DashboardPage(): JSX.Element {
               aria-expanded={showNotifs}
               aria-haspopup="menu"
               aria-controls="notification-panel"
-              className="relative rounded-lg p-2 text-xl transition-all hover:bg-gray-100 dark:hover:bg-zinc-800"
+              className="relative rounded-lg p-2 transition-all hover:bg-gray-100 dark:hover:bg-zinc-800"
             >
-              <span aria-hidden="true">🔔</span>
+              <Bell aria-hidden="true" className="h-5 w-5" />
               {unreadCount > 0 && (
                 <span className="absolute right-1 top-1 flex h-3 w-3">
                   <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75"></span>
@@ -159,7 +160,7 @@ export default function DashboardPage(): JSX.Element {
             aria-label="Kullanıcı Yönetimi"
             className="flex items-center gap-2 rounded-lg p-2 text-sm font-bold text-accent transition-all hover:bg-accent/10"
           >
-            <span aria-hidden="true">👥</span>{' '}
+            <Users aria-hidden="true" className="h-4 w-4" />{' '}
             <span className="hidden sm:inline">Kullanıcı Yönetimi</span>
           </button>
         ) : (
@@ -168,7 +169,8 @@ export default function DashboardPage(): JSX.Element {
             aria-label="Profilim"
             className="flex items-center gap-2 rounded-lg p-2 text-sm font-bold text-accent transition-all hover:bg-accent/10"
           >
-            <span aria-hidden="true">⚙️</span> <span className="hidden sm:inline">Profilim</span>
+            <Settings aria-hidden="true" className="h-4 w-4" />{' '}
+            <span className="hidden sm:inline">Profilim</span>
           </button>
         )}
 
@@ -177,7 +179,8 @@ export default function DashboardPage(): JSX.Element {
           aria-label="Çıkış Yap"
           className="flex items-center gap-2 rounded-lg p-2 text-sm font-bold text-red-500 transition-all hover:bg-red-50 dark:hover:bg-red-500/10"
         >
-          <span aria-hidden="true">🚪</span> <span className="hidden sm:inline">Çıkış Yap</span>
+          <LogOut aria-hidden="true" className="h-4 w-4" />{' '}
+          <span className="hidden sm:inline">Çıkış Yap</span>
         </button>
       </div>
 
@@ -188,7 +191,7 @@ export default function DashboardPage(): JSX.Element {
           Closed-Loop Coaching Hub
         </h1>
         <p className="text-sm font-medium uppercase tracking-widest text-gray-500 dark:text-gray-400 md:text-base">
-          {role === 'coach' ? 'Yönetici Paneli' : 'Öğrenci Paneli'}
+          {role === 'coach' ? 'Koç Paneli' : 'Danışan Paneli'}
         </p>
       </header>
 

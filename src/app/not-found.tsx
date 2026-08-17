@@ -1,5 +1,6 @@
 // 404 sayfası: mevcut tasarım diliyle uyumlu (rounded-3xl kart, accent).
 
+import { Compass } from 'lucide-react'
 import type { JSX } from 'react'
 
 import Link from 'next/link'
@@ -8,9 +9,7 @@ export default function NotFound(): JSX.Element {
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-50 p-4 dark:bg-[#0f0f12]">
       <div className="w-full max-w-md space-y-4 rounded-3xl border border-gray-100 bg-white p-8 text-center shadow-2xl dark:border-zinc-800 dark:bg-[#16161d]">
-        <p className="text-5xl" aria-hidden="true">
-          🧭
-        </p>
+        <Compass aria-hidden="true" className="mx-auto h-12 w-12 text-accent" />
         <h1 className="bg-gradient-to-r from-accent to-purple-500 bg-clip-text text-3xl font-black text-transparent">
           404
         </h1>

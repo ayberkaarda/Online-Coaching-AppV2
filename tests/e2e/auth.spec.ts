@@ -30,12 +30,15 @@ test.describe('Kimlik Doğrulama', () => {
     await expect(page).toHaveURL(/\/login/)
   })
 
-  test('doğru bilgilerle giriş yapınca dashboard açılır ve "Öğrenci Paneli" başlığı görünür', async ({
+  test('doğru bilgilerle giriş yapınca dashboard açılır ve "Danışan Paneli" başlığı görünür', async ({
     page,
   }) => {
     await login(page, TEST_USERS.client)
 
-    await expect(page.getByText('Öğrenci Paneli')).toBeVisible()
+    // TÜRKÇE İ/ı TUZAĞI: "Danışan" noktasız ı (U+0131) içeriyor. `/i` bayraklı
+    // regex KULLANILMAZ; kaynaktaki (src/app/page.tsx) metin birebir kopyalanır
+    // ve `exact: true` ile büyük/küçük harf katlaması tamamen devre dışı bırakılır.
+    await expect(page.getByText('Danışan Paneli', { exact: true })).toBeVisible()
   })
 
   test("çıkış yapınca /login'e döner ve korumalı sayfaya erişilemez", async ({ page }) => {
@@ -57,7 +60,7 @@ test.describe('Kimlik Doğrulama', () => {
     if (response) {
       await expect(page).toHaveURL(/\/login/)
     } else {
-      await expect(page.getByText('Öğrenci Paneli')).not.toBeVisible()
+      await expect(page.getByText('Danışan Paneli', { exact: true })).not.toBeVisible()
     }
   })
 

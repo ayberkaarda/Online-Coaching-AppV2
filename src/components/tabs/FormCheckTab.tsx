@@ -1,6 +1,6 @@
 'use client'
 
-// Haftalık form check: öğrenci kilo + podyum fotoğrafı gönderir,
+// Haftalık form check: danışan kilo + podyum fotoğrafı gönderir,
 // geçmiş kayıtlar listelenir ve öncesi/sonrası kıyaslaması yapılabilir.
 //
 // Fotoğraflar PRIVATE bucket'tadır: `useFormChecks` her satır için süreli imzalı
@@ -8,6 +8,7 @@
 // kırık görsel yerine boş durum / placeholder gösterilir.
 
 import { zodResolver } from '@hookform/resolvers/zod'
+import { ImageOff } from 'lucide-react'
 import { useState } from 'react'
 import type { ChangeEvent, JSX } from 'react'
 import { useForm } from 'react-hook-form'
@@ -48,7 +49,7 @@ export default function FormCheckTab({
   // Dosya input'u ref ile değil, key değiştirilip yeniden mount edilerek sıfırlanır (refs kuralı).
   const [fileInputKey, setFileInputKey] = useState(0)
 
-  // Hedef öğrenci değişince manuel seçimler sıfırlanır (effect yerine render sırası prev-value kalıbı).
+  // Hedef danışan değişince manuel seçimler sıfırlanır (effect yerine render sırası prev-value kalıbı).
   const [prevTargetId, setPrevTargetId] = useState(targetId)
   if (targetId !== prevTargetId) {
     setPrevTargetId(targetId)
@@ -216,7 +217,7 @@ export default function FormCheckTab({
 
       {userRole === 'coach' && selectedClientIds.length > 1 ? (
         <p className="py-10 text-center text-sm font-bold text-accent">
-          Sadece 1 öğrenci seçili bırakın.
+          Sadece 1 danışan seçili bırakın.
         </p>
       ) : (
         <QueryState
@@ -258,7 +259,10 @@ export default function FormCheckTab({
                       className="h-full w-full object-cover"
                     />
                   ) : (
-                    <EmptyState icon="🖼️" title="Bu kayıt için fotoğraf bulunamadı." />
+                    <EmptyState
+                      icon={<ImageOff aria-hidden="true" className="h-8 w-8" />}
+                      title="Bu kayıt için fotoğraf bulunamadı."
+                    />
                   )}
                 </div>
               </div>
@@ -290,7 +294,10 @@ export default function FormCheckTab({
                       className="h-full w-full object-cover"
                     />
                   ) : (
-                    <EmptyState icon="🖼️" title="Bu kayıt için fotoğraf bulunamadı." />
+                    <EmptyState
+                      icon={<ImageOff aria-hidden="true" className="h-8 w-8" />}
+                      title="Bu kayıt için fotoğraf bulunamadı."
+                    />
                   )}
                 </div>
               </div>
@@ -312,9 +319,9 @@ export default function FormCheckTab({
                   ) : (
                     <div
                       aria-hidden="true"
-                      className="flex h-20 w-20 items-center justify-center rounded-xl bg-gray-200 text-2xl dark:bg-zinc-800"
+                      className="flex h-20 w-20 items-center justify-center rounded-xl bg-gray-200 text-gray-400 dark:bg-zinc-800"
                     >
-                      🖼️
+                      <ImageOff className="h-7 w-7" />
                     </div>
                   )}
                   <div className="text-sm">

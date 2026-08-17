@@ -120,7 +120,7 @@ export function useApproveProgram() {
 
       const { error: notifyError } = await supabase.from('notifications').insert({
         client_id: clientId,
-        message: '✅ Koçun yeni antrenman programını onayladı. Artık kullanabilirsin.',
+        message: 'Koçun yeni antrenman programını onayladı. Artık kullanabilirsin.',
       })
       if (notifyError)
         throw wrapSupabaseError(notifyError, { table: 'notifications', op: 'insert' })
@@ -129,7 +129,7 @@ export function useApproveProgram() {
       void queryClient.invalidateQueries({ queryKey: queryKeys.programApprovals(clientId) })
       void queryClient.invalidateQueries({ queryKey: queryKeys.workoutPlan(clientId) })
       void queryClient.invalidateQueries({ queryKey: queryKeyRoots.notifications })
-      toast.success('Program onaylandı ve öğrencinin profiline işlendi.')
+      toast.success('Program onaylandı ve danışanın profiline işlendi.')
     },
     onError: (error: Error) => {
       toast.error(`Program onaylanamadı: ${error.message}`)

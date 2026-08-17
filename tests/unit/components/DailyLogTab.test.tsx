@@ -220,7 +220,7 @@ describe('DailyLogTab', () => {
     expect(screen.getByText('Kayıt bulunamadı.')).toBeInTheDocument()
   })
 
-  it('coach + birden fazla seçili öğrenci iken uyarı metni gösterilir', () => {
+  it('coach + birden fazla seçili danışan iken uyarı metni gösterilir', () => {
     vi.mocked(useDailyLogs).mockReturnValue(mockDailyLogsQuery({ data: [makeLog()] }))
     vi.mocked(useCreateDailyLog).mockReturnValue(mockCreateDailyLogMutation())
 
@@ -233,7 +233,7 @@ describe('DailyLogTab', () => {
       />
     )
 
-    expect(screen.getByText('Sadece 1 öğrenci seçili bırakın.')).toBeInTheDocument()
+    expect(screen.getByText('Sadece 1 danışan seçili bırakın.')).toBeInTheDocument()
     expect(screen.queryByText('Rapor Geçmişi ve Makro Dağılımı')).not.toBeInTheDocument()
   })
 })

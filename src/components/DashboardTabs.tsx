@@ -1,8 +1,21 @@
 'use client'
 
-// Panelin sekme kabuğu: koç için öğrenci seçimi/arama, öğrenci için streak başlığı
+// Panelin sekme kabuğu: koç için danışan seçimi/arama, danışan için streak başlığı
 // ve seçili sekmenin içeriğini render eder.
 
+import {
+  Bell,
+  Camera,
+  ClipboardList,
+  Dumbbell,
+  Flame,
+  MessageCircle,
+  Salad,
+  Search,
+  TrendingUp,
+  TriangleAlert,
+  Users,
+} from 'lucide-react'
 import { useRef, useState } from 'react'
 import type { JSX, KeyboardEvent } from 'react'
 import { toast } from 'sonner'
@@ -134,12 +147,13 @@ export function DashboardTabs({
 
   return (
     <div className="mt-4 w-full">
-      {/* Öğrenci Başlığı (Streak) */}
+      {/* Danışan Başlığı (Streak) */}
       {userRole === 'client' && (
         <div className="mb-6 flex items-center justify-between rounded-2xl border border-orange-500/20 bg-gradient-to-r from-orange-500/10 to-transparent p-4">
           <div>
-            <h3 className="text-sm font-black text-orange-600 dark:text-orange-400">
-              <span aria-hidden="true">🔥</span> GÜNLÜK SERİ (STREAK)
+            <h3 className="flex items-center gap-2 text-sm font-black text-orange-600 dark:text-orange-400">
+              <Flame aria-hidden="true" className="h-4 w-4 shrink-0" />
+              GÜNLÜK SERİ (STREAK)
             </h3>
             <p className="text-xs text-gray-600 dark:text-gray-300">
               Raporları aksatmadan ilerliyorsun, bozma!
@@ -151,7 +165,7 @@ export function DashboardTabs({
         </div>
       )}
 
-      {/* Koç Öğrenci Paneli */}
+      {/* Koç Danışan Paneli */}
       {userRole === 'coach' && (
         <>
           {criticalClients.length > 0 && (
@@ -167,10 +181,11 @@ export function DashboardTabs({
                     key={c.id}
                     onClick={() => toggleClient(c.id)}
                     aria-pressed={selectedClientIds.includes(c.id)}
-                    aria-label={`${c.full_name ?? 'Öğrenci'} seç`}
-                    className="cursor-pointer whitespace-nowrap rounded-xl border border-red-100 bg-white px-3 py-2 text-xs font-bold text-gray-700 shadow-sm transition-transform hover:scale-105 dark:border-red-900/20 dark:bg-[#16161d] dark:text-gray-300"
+                    aria-label={`${c.full_name ?? 'Danışan'} seç`}
+                    className="flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-xl border border-red-100 bg-white px-3 py-2 text-xs font-bold text-gray-700 shadow-sm transition-transform hover:scale-105 dark:border-red-900/20 dark:bg-[#16161d] dark:text-gray-300"
                   >
-                    <span aria-hidden="true">⚠️</span> {(c.full_name ?? '').split(' ')[0] ?? ''}
+                    <TriangleAlert aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
+                    {(c.full_name ?? '').split(' ')[0] ?? ''}
                   </button>
                 ))}
               </div>
@@ -181,23 +196,21 @@ export function DashboardTabs({
             <div className="mb-6 flex flex-col items-start justify-between gap-4 border-b border-gray-100 pb-4 dark:border-zinc-800 md:flex-row md:items-center">
               <div>
                 <h3 className="text-sm font-black uppercase tracking-widest text-accent">
-                  Öğrenci Yönetimi
+                  Danışan Yönetimi
                 </h3>
               </div>
               <div className="relative w-full md:w-64">
-                <span
-                  className="absolute inset-y-0 left-3 flex items-center text-sm text-gray-400"
+                <Search
                   aria-hidden="true"
-                >
-                  🔍
-                </span>
+                  className="absolute inset-y-0 left-3 my-auto h-4 w-4 text-gray-400"
+                />
                 <label htmlFor="client-search" className="sr-only">
-                  Öğrenci Ara
+                  Danışan Ara
                 </label>
                 <input
                   id="client-search"
                   type="text"
-                  placeholder="Öğrenci Ara..."
+                  placeholder="Danışan Ara..."
                   value={searchTerm}
                   onChange={(e) => {
                     setSearchTerm(e.target.value)
@@ -242,7 +255,7 @@ export function DashboardTabs({
             <div className="relative h-24 w-full overflow-hidden">
               {filteredClients.length === 0 ? (
                 <div className="flex h-full items-center justify-center text-xs font-bold text-gray-400">
-                  Aramayla eşleşen öğrenci bulunamadı.
+                  Aramayla eşleşen danışan bulunamadı.
                 </div>
               ) : (
                 <div
@@ -270,7 +283,7 @@ export function DashboardTabs({
                               key={client.id}
                               onClick={() => toggleClient(client.id)}
                               aria-pressed={isSelected}
-                              aria-label={`${fullName || 'Öğrenci'} seç`}
+                              aria-label={`${fullName || 'Danışan'} seç`}
                               className="group relative flex w-16 cursor-pointer flex-col items-center gap-2"
                             >
                               <div className="relative">
@@ -339,7 +352,7 @@ export function DashboardTabs({
           >
             {tab === 'announcements' && (
               <>
-                <span aria-hidden="true">🔔</span> Duyurular{' '}
+                <Bell aria-hidden="true" className="h-4 w-4 shrink-0" /> Duyurular{' '}
                 {announcements.length > 0 && (
                   <span className="animate-bounce rounded-full bg-red-500 px-2 py-0.5 text-[10px] text-white">
                     {announcements.length}
@@ -349,32 +362,32 @@ export function DashboardTabs({
             )}
             {tab === 'stats' && (
               <>
-                <span aria-hidden="true">📈</span> İstatistikler
+                <TrendingUp aria-hidden="true" className="h-4 w-4 shrink-0" /> İstatistikler
               </>
             )}
             {tab === 'formCheck' && (
               <>
-                <span aria-hidden="true">📸</span> Form Check
+                <Camera aria-hidden="true" className="h-4 w-4 shrink-0" /> Form Check
               </>
             )}
             {tab === 'daily' && (
               <>
-                <span aria-hidden="true">📊</span> Günlük Veriler
+                <ClipboardList aria-hidden="true" className="h-4 w-4 shrink-0" /> Günlük Veriler
               </>
             )}
             {tab === 'nutrition' && (
               <>
-                <span aria-hidden="true">🥗</span> Beslenme
+                <Salad aria-hidden="true" className="h-4 w-4 shrink-0" /> Beslenme
               </>
             )}
             {tab === 'workout' && (
               <>
-                <span aria-hidden="true">🏋️</span> Antrenman
+                <Dumbbell aria-hidden="true" className="h-4 w-4 shrink-0" /> Antrenman
               </>
             )}
             {tab === 'messages' && (
               <>
-                <span aria-hidden="true">💬</span> Sohbet
+                <MessageCircle aria-hidden="true" className="h-4 w-4 shrink-0" /> Sohbet
               </>
             )}
             {activeTab === tab && (
@@ -400,10 +413,8 @@ export function DashboardTabs({
       >
         {userRole === 'coach' && selectedClientIds.length === 0 ? (
           <div className="flex h-64 flex-col items-center justify-center text-sm font-bold text-gray-500">
-            <span className="mb-3 text-4xl opacity-50" aria-hidden="true">
-              👥
-            </span>
-            Lütfen yukarıdaki panelden en az bir öğrenci seçin.
+            <Users aria-hidden="true" className="mb-3 h-10 w-10 opacity-50" />
+            Lütfen yukarıdaki panelden en az bir danışan seçin.
           </div>
         ) : (
           <>
