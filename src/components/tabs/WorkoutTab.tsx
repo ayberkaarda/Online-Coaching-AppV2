@@ -10,7 +10,6 @@ import { toast } from 'sonner'
 import { QueryState, SkeletonTable } from '@/components/ui'
 import {
   useApproveProgram,
-  useCoachId,
   useCreateWorkoutLogs,
   useExercises,
   useGenerateWorkout,
@@ -110,7 +109,6 @@ export default function WorkoutTab({
   const exercisesQuery = useExercises()
   const planQuery = useWorkoutPlan(targetId)
   const approvalsQuery = usePendingApprovals(targetId)
-  const { data: coachId } = useCoachId()
 
   const savePlan = useSaveWorkoutPlan()
   const submitForApproval = useSubmitProgramForApproval()
@@ -188,7 +186,6 @@ export default function WorkoutTab({
     submitForApproval.mutate({
       clientId: currentUserId,
       plan: workoutData,
-      ...(coachId ? { coachId } : {}),
     })
   }
 

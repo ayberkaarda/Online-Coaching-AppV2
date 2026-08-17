@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 
 import { queryKeyRoots, queryKeys, type NotificationQueryOptions } from '@/lib/query/keys'
+import { wrapSupabaseError } from '@/lib/query/supabase-error'
 import { supabase } from '@/lib/supabase/client'
 import type { Notification, TablesInsert } from '@/types'
 
@@ -34,7 +35,7 @@ export function useNotifications(userId?: string, opts?: NotificationQueryOption
       }
 
       const { data, error } = await query.order('created_at', { ascending: false })
-      if (error) throw new Error(error.message)
+      if (error) throw wrapSupabaseError(error, { table: 'notifications', op: 'select' })
       return data
     },
   })
@@ -51,7 +52,7 @@ export function useMarkNotificationRead() {
   return useMutation({
     mutationFn: async ({ id }: MarkNotificationReadInput): Promise<void> => {
       const { error } = await supabase.from('notifications').update({ is_read: true }).eq('id', id)
-      if (error) throw new Error(error.message)
+      if (error) throw wrapSupabaseError(error, { table: 'notifications', op: 'update' })
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeyRoots.notifications })
@@ -85,7 +86,7 @@ export function useSendNotification() {
       }))
 
       const { error } = await supabase.from('notifications').insert(rows)
-      if (error) throw new Error(error.message)
+      if (error) throw wrapSupabaseError(error, { table: 'notifications', op: 'insert' })
       return rows.length
     },
     onSuccess: (count) => {

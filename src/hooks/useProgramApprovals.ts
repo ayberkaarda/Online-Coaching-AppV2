@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 
 import { planToRpcPayload } from '@/hooks/usePlans'
 import { queryKeyRoots, queryKeys } from '@/lib/query/keys'
+import { wrapSupabaseError } from '@/lib/query/supabase-error'
 import { supabase } from '@/lib/supabase/client'
 import type { Json, ProgramApproval, WorkoutPlan } from '@/types'
 
@@ -26,7 +27,7 @@ export function usePendingApprovals(clientId?: string) {
         .eq('client_id', clientId ?? '')
         .eq('status', 'pending')
         .order('created_at', { ascending: false })
-      if (error) throw new Error(error.message)
+      if (error) throw wrapSupabaseError(error, { table: 'program_approvals', op: 'select' })
       return data
     },
   })
@@ -35,8 +36,6 @@ export function usePendingApprovals(clientId?: string) {
 export interface SubmitProgramForApprovalInput {
   clientId: string
   plan: WorkoutPlan
-  /** Bildirimin gideceği koç id'si. Verilmezse bildirim öğrencinin kendisine düşer. */
-  coachId?: string
 }
 
 export function useSubmitProgramForApproval() {
@@ -46,29 +45,25 @@ export function useSubmitProgramForApproval() {
     mutationFn: async ({
       clientId,
       plan,
-      coachId,
     }: SubmitProgramForApprovalInput): Promise<ProgramApproval> => {
-      const { data, error } = await supabase
-        .from('program_approvals')
-        .insert({ client_id: clientId, workout_data: planToJson(plan), status: 'pending' })
-        .select()
-        .single()
-      if (error) throw new Error(error.message)
-
-      // !!! BU METNİ TEK BAŞINA DEĞİŞTİRMEYİN !!!
-      // Danışan -> koç bildirim metni artık sunucuda BİREBİR doğrulanıyor:
-      // `notifications_guard_content()` trigger'ı (supabase/migrations/
-      // 20260817160200_column_guards.sql, `c_client_to_coach_messages` dizisi)
-      // yalnızca bu tam metni kabul ediyor. `title` alanı da HİÇ gönderilmemeli
-      // (trigger onun NULL olmasını şart koşuyor). Metin burada değişir de o
-      // migration'daki dizi güncellenmezse program gönderme akışı 42501
-      // (insufficient_privilege) ile KIRILIR. Değiştirmeniz gerekiyorsa ÖNCE
-      // yeni bir migration ile trigger'ı, SONRA bu satırı güncelleyin.
-      const { error: notifyError } = await supabase.from('notifications').insert({
-        client_id: coachId ?? clientId,
-        message: '🔔 Yeni bir antrenman programı onayınıza sunuldu.',
+      // TEK ÇAĞRI, ATOMİK: onay satırı + koça giden bildirim aynı sunucu
+      // fonksiyonunda yazılır. Bildirim metni ARTIK BURADA YOK — tek sahibi
+      // RPC gövdesindeki `c_coach_notification` sabitidir. (Eskiden metin hem
+      // burada hem `notifications_guard_content()` trigger'ında yaşıyordu;
+      // biri diğerinden bağımsız değişirse akış 42501 ile kırılıyordu —
+      // docs/security/AUDIT.md §4b'de kayıtlı borç, bu turda kapatıldı.)
+      //
+      // Onay kapısı (AC-01) ATLANMIYOR: RPC `SECURITY DEFINER` olsa da
+      // `program_approvals_guard_review()` bir TRIGGER'dır ve BYPASSRLS'ten
+      // etkilenmez; bu INSERT'te de ateşlenip status/reviewed_* alanlarını
+      // doğrular. Sahiplik (`p_client_id = auth.uid()`) RPC gövdesinde elle
+      // kontrol edilir.
+      const { data, error } = await supabase.rpc('submit_program_for_approval', {
+        p_client_id: clientId,
+        p_workout_data: planToJson(plan),
       })
-      if (notifyError) throw new Error(notifyError.message)
+      if (error) throw wrapSupabaseError(error, { table: 'submit_program_for_approval', op: 'rpc' })
+      if (!data) throw new Error('Program gönderildi ama onay kaydı okunamadı.')
 
       return data
     },
@@ -105,7 +100,7 @@ export function useApproveProgram() {
         p_client_ids: [clientId],
         p_plan: planToRpcPayload(plan),
       })
-      if (planError) throw new Error(planError.message)
+      if (planError) throw wrapSupabaseError(planError, { table: 'save_workout_plan', op: 'rpc' })
 
       // `reviewed_by` / `reviewed_at` artık burada GÖNDERİLMİYOR: sunucuda
       // `program_approvals_guard_review()` trigger'ı (supabase/migrations/
@@ -120,13 +115,15 @@ export function useApproveProgram() {
           status: 'approved',
         })
         .eq('id', approvalId)
-      if (approvalError) throw new Error(approvalError.message)
+      if (approvalError)
+        throw wrapSupabaseError(approvalError, { table: 'program_approvals', op: 'update' })
 
       const { error: notifyError } = await supabase.from('notifications').insert({
         client_id: clientId,
         message: '✅ Koçun yeni antrenman programını onayladı. Artık kullanabilirsin.',
       })
-      if (notifyError) throw new Error(notifyError.message)
+      if (notifyError)
+        throw wrapSupabaseError(notifyError, { table: 'notifications', op: 'insert' })
     },
     onSuccess: (_result, { clientId }) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.programApprovals(clientId) })

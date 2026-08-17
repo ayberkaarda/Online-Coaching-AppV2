@@ -7,6 +7,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 
 import { queryKeys } from '@/lib/query/keys'
+import { wrapSupabaseError } from '@/lib/query/supabase-error'
 import { supabase } from '@/lib/supabase/client'
 import { parseMacros, type DailyLog, type Macros } from '@/types'
 
@@ -20,7 +21,7 @@ export function useDailyLogs(clientId?: string) {
         .select('*')
         .eq('client_id', clientId ?? '')
         .order('log_date', { ascending: false })
-      if (error) throw new Error(error.message)
+      if (error) throw wrapSupabaseError(error, { table: 'daily_logs', op: 'select' })
 
       return data.map((row) => ({ ...row, macros: parseMacros(row.macros) }))
     },
@@ -65,7 +66,7 @@ export function useCreateDailyLog() {
         )
         .select()
         .single()
-      if (error) throw new Error(error.message)
+      if (error) throw wrapSupabaseError(error, { table: 'daily_logs', op: 'upsert' })
 
       return { ...data, macros: parseMacros(data.macros) }
     },

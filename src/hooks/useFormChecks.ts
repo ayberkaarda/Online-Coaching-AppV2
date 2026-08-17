@@ -13,6 +13,7 @@ import { toast } from 'sonner'
 
 import { logger } from '@/lib/logger'
 import { queryKeyRoots, queryKeys } from '@/lib/query/keys'
+import { wrapSupabaseError } from '@/lib/query/supabase-error'
 import { FORM_CHECK_BUCKET, SIGNED_URL_STALE_TIME_MS, createSignedUrls } from '@/lib/storage'
 import { supabase } from '@/lib/supabase/client'
 import { assertValidImageFile } from '@/lib/upload-validation'
@@ -46,7 +47,7 @@ export function useFormChecks(clientId?: string) {
         .select('*')
         .eq('client_id', clientId ?? '')
         .order('created_at', { ascending: false })
-      if (error) throw new Error(error.message)
+      if (error) throw wrapSupabaseError(error, { table: 'form_checks', op: 'select' })
 
       // Tüm yollar TEK istekte imzalanır (fotoğraf başına ayrı istek yok).
       const signed = await createSignedUrls(
@@ -114,7 +115,7 @@ export function useSubmitFormCheck() {
         })
         .select()
         .single()
-      if (error) throw new Error(error.message)
+      if (error) throw wrapSupabaseError(error, { table: 'form_checks', op: 'insert' })
 
       // Seri (streak) güncellemesi kritik değildir: hata akışı bozmaz, sadece loglanır.
       const { error: rpcError } = await supabase.rpc('increment_streak', { user_id: clientId })
@@ -145,7 +146,7 @@ export function useLastCheckins() {
         .from('form_checks')
         .select('client_id, created_at')
         .order('created_at', { ascending: false })
-      if (error) throw new Error(error.message)
+      if (error) throw wrapSupabaseError(error, { table: 'form_checks', op: 'select' })
 
       const lastByClient: Record<string, string> = {}
       for (const row of data) {

@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 
 import { queryKeys } from '@/lib/query/keys'
+import { wrapSupabaseError } from '@/lib/query/supabase-error'
 import { supabase } from '@/lib/supabase/client'
 import type { TablesInsert, WorkoutLog } from '@/types'
 
@@ -19,7 +20,7 @@ export function useWorkoutLogs(clientId?: string) {
         .select('*')
         .eq('client_id', clientId ?? '')
         .order('created_at', { ascending: false })
-      if (error) throw new Error(error.message)
+      if (error) throw wrapSupabaseError(error, { table: 'workout_logs', op: 'select' })
       return data
     },
   })
@@ -55,7 +56,7 @@ export function useCreateWorkoutLog() {
         })
         .select()
         .single()
-      if (error) throw new Error(error.message)
+      if (error) throw wrapSupabaseError(error, { table: 'workout_logs', op: 'insert' })
       return data
     },
     onSuccess: (_log, { clientId }) => {
@@ -96,7 +97,7 @@ export function useCreateWorkoutLogs() {
       }))
 
       const { error } = await supabase.from('workout_logs').insert(rows)
-      if (error) throw new Error(error.message)
+      if (error) throw wrapSupabaseError(error, { table: 'workout_logs', op: 'insert' })
       return rows.length
     },
     onSuccess: (count, { clientId }) => {

@@ -26,6 +26,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 
 import { queryKeys } from '@/lib/query/keys'
+import { wrapSupabaseError } from '@/lib/query/supabase-error'
 import { supabase } from '@/lib/supabase/client'
 import {
   DAY_NAMES,
@@ -102,7 +103,7 @@ export function useWorkoutPlan(clientId?: string) {
         .eq('client_id', clientId ?? '')
         .eq('is_active', true)
         .maybeSingle()
-      if (error) throw new Error(error.message)
+      if (error) throw wrapSupabaseError(error, { table: 'workout_plans', op: 'select' })
       // Aktif plan yoksa (yeni danışan) boş hafta döner — eski davranışla aynı.
       return rowsToWorkoutPlan(data?.workout_plan_exercises)
     },
@@ -195,7 +196,7 @@ export function useNutritionPlan(clientId?: string) {
         .eq('client_id', clientId ?? '')
         .eq('is_active', true)
         .maybeSingle()
-      if (error) throw new Error(error.message)
+      if (error) throw wrapSupabaseError(error, { table: 'nutrition_plans', op: 'select' })
       // Aktif plan yoksa (yeni danışan) boş hafta döner — eski davranışla aynı.
       return rowsToNutritionPlan(data?.nutrition_plan_meals)
     },
@@ -220,7 +221,7 @@ export function useSaveWorkoutPlan() {
         p_client_ids: clientIds,
         p_plan: planToRpcPayload(plan),
       })
-      if (error) throw new Error(error.message)
+      if (error) throw wrapSupabaseError(error, { table: 'save_workout_plan', op: 'rpc' })
 
       return clientIds.length
     },
@@ -258,7 +259,7 @@ export function useSaveNutritionPlan() {
         p_client_ids: clientIds,
         p_plan: nutritionPlanToRpcPayload(plan),
       })
-      if (error) throw new Error(error.message)
+      if (error) throw wrapSupabaseError(error, { table: 'save_nutrition_plan', op: 'rpc' })
 
       return clientIds.length
     },

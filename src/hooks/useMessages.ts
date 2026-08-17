@@ -8,6 +8,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
 
 import { queryKeyRoots, queryKeys } from '@/lib/query/keys'
+import { wrapSupabaseError } from '@/lib/query/supabase-error'
 import { supabase } from '@/lib/supabase/client'
 import type { Message } from '@/types'
 
@@ -36,7 +37,7 @@ async function fetchCoachId(): Promise<string | null> {
     .order('created_at', { ascending: true })
     .limit(1)
     .maybeSingle()
-  if (error) throw new Error(error.message)
+  if (error) throw wrapSupabaseError(error, { table: 'profiles', op: 'select' })
   return data?.id ?? null
 }
 
@@ -140,7 +141,7 @@ export function useMessages(currentUserId?: string, partnerId?: string) {
             `and(sender_id.eq.${partnerId},receiver_id.eq.${currentUserId})`
         )
         .order('created_at', { ascending: true })
-      if (error) throw new Error(error.message)
+      if (error) throw wrapSupabaseError(error, { table: 'messages', op: 'select' })
       return data
     },
   })
@@ -197,7 +198,7 @@ export function useSendMessage() {
         })
         .select()
         .single()
-      if (error) throw new Error(error.message)
+      if (error) throw wrapSupabaseError(error, { table: 'messages', op: 'insert' })
       return data
     },
     onMutate: async ({ senderId, receiverId, message, clientId }) => {
@@ -276,7 +277,7 @@ export function useMarkConversationRead(clientId?: string) {
         .eq('receiver_id', viewerId)
         .is('read_at', null)
         .select('id')
-      if (error) throw new Error(error.message)
+      if (error) throw wrapSupabaseError(error, { table: 'messages', op: 'update' })
       return data.length
     },
     onSuccess: (updated) => {
@@ -309,7 +310,7 @@ export function useUnreadCount(clientId?: string) {
         .eq('client_id', clientId ?? '')
         .eq('receiver_id', viewerId ?? '')
         .is('read_at', null)
-      if (error) throw new Error(error.message)
+      if (error) throw wrapSupabaseError(error, { table: 'messages', op: 'select' })
       return count ?? 0
     },
   })

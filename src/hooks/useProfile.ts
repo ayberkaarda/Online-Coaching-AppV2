@@ -9,11 +9,13 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 
 import { queryKeyRoots, queryKeys } from '@/lib/query/keys'
+import { wrapSupabaseError } from '@/lib/query/supabase-error'
 import {
   AVATAR_BUCKET,
   SIGNED_URL_STALE_TIME_MS,
   createSignedUrl,
   createSignedUrls,
+  removeStoredObject,
 } from '@/lib/storage'
 import { supabase } from '@/lib/supabase/client'
 import { assertValidImageFile } from '@/lib/upload-validation'
@@ -38,7 +40,7 @@ export function useProfile(userId?: string) {
         .select('*')
         .eq('id', userId ?? '')
         .single()
-      if (error) throw new Error(error.message)
+      if (error) throw wrapSupabaseError(error, { table: 'profiles', op: 'select' })
 
       return { ...data, avatarSignedUrl: await createSignedUrl(AVATAR_BUCKET, data.avatar_path) }
     },
@@ -55,7 +57,7 @@ export function useProfiles() {
         .from('profiles')
         .select('*')
         .order('created_at', { ascending: false })
-      if (error) throw new Error(error.message)
+      if (error) throw wrapSupabaseError(error, { table: 'profiles', op: 'select' })
 
       // Tüm avatarlar TEK istekte imzalanır (profil başına ayrı istek yok).
       const signed = await createSignedUrls(
@@ -81,27 +83,56 @@ export interface UploadAvatarInput {
  * (storage RLS politikaları bu ön eke bakar) ve profildeki YOLU günceller.
  * Tam URL saklanmaz; görüntüleme anında imzalı adres üretilir.
  *
- * @returns Bucket içindeki yol (dosya adı).
+ * YETİM DOSYA TEMİZLİĞİ: eski avatar, yeni yol profile YAZILDIKTAN SONRA silinir
+ * (bkz. `removeStoredObject`). SIRA KRİTİKTİR — asla yükleme/güncelleme öncesinde
+ * veya arasında silinmez: `profiles.avatar_path` güncellemesi başarısız olursa
+ * (adım 2) eski dosya adım 3'e hiç ulaşmaz, aksi hâlde kullanıcı hem eski hem yeni
+ * avatarını kaybeder. Silme başarısız olursa (ağ/izin/dosya zaten yok) mutasyon
+ * yine BAŞARILI sayılır — yükleme zaten tamamlanmıştır; hata kullanıcıya
+ * gösterilmez, yalnızca `removeStoredObject` içinde loglanır.
+ *
+ * @returns Bucket içindeki yeni yol (dosya adı).
  */
 export function useUploadAvatar() {
   const queryClient = useQueryClient()
 
   return useMutation({
     mutationFn: async ({ userId, file }: UploadAvatarInput): Promise<string> => {
+      // Silme adayı: güncellemeden ÖNCEKİ yol. Bu değer yalnızca OKUNUR — hiçbir
+      // silme işlemi burada tetiklenmez (bkz. fonksiyon üstü not, "SIRA KRİTİKTİR").
+      const { data: existing, error: fetchError } = await supabase
+        .from('profiles')
+        .select('avatar_path')
+        .eq('id', userId)
+        .single()
+      if (fetchError) throw wrapSupabaseError(fetchError, { table: 'profiles', op: 'select' })
+      const previousPath = existing.avatar_path
+
       // Uzantı dosya adından DEĞİL, magic-byte ile tespit edilen gerçek içerikten türetilir (A-21).
       const { mime, extension } = await assertValidImageFile(file)
       const fileName = `${userId}-${crypto.randomUUID()}.${extension}`
 
+      // (1) Yeni dosyayı yükle.
       const { error: uploadError } = await supabase.storage
         .from(AVATAR_BUCKET)
         .upload(fileName, file, { cacheControl: '3600', upsert: false, contentType: mime })
       if (uploadError) throw new Error(uploadError.message)
 
+      // (2) Profildeki yolu güncelle. Başarısız olursa aşağıdaki (3) HİÇ çalışmaz —
+      // fırlatılan hata mutationFn'i burada keser.
       const { error: updateError } = await supabase
         .from('profiles')
         .update({ avatar_path: fileName })
         .eq('id', userId)
-      if (updateError) throw new Error(updateError.message)
+      if (updateError) throw wrapSupabaseError(updateError, { table: 'profiles', op: 'update' })
+
+      // (3) ANCAK BUNDAN SONRA eski dosyayı sil. `removeStoredObject` NULL/boş
+      // yolda ve storage dışı mutlak URL'lerde (ör. `placehold.co`) hiç istek
+      // atmaz; kendi dosyasının üstüne yazma gibi bir edge-case'te de (aynı yol)
+      // silme denenmez.
+      if (previousPath && previousPath !== fileName) {
+        await removeStoredObject(AVATAR_BUCKET, previousPath)
+      }
 
       return fileName
     },

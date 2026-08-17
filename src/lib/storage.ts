@@ -39,6 +39,20 @@ function normalizePath(path: string | null | undefined): string | null {
 }
 
 /**
+ * Bir değerin gerçekten bucket-içi bir YOL olup olmadığını doğrular.
+ *
+ * NEDEN: `20260817100000_private_storage.sql` mevcut satırlardaki tam public URL'leri
+ * yola çevirdi ama storage dışı mutlak URL'leri (ör. eski `placehold.co` kayıtları)
+ * bilerek dönüştürmedi (bkz. docs/PROGRESS.md §5 "Yetim storage dosyaları
+ * temizlenmiyor"). Böyle bir değeri `storage.remove()`'a vermek anlamsız/tehlikelidir
+ * (yol gibi görünen bir harici URL asla bucket'ta bulunmaz, ama yine de temizlik
+ * mantığı yalnızca gerçek yollarla çalışmalı).
+ */
+function isStoragePath(path: string): boolean {
+  return !/^https?:\/\//i.test(path)
+}
+
+/**
  * Tek bir yol için imzalı adres üretir.
  * @returns İmzalı adres, ya da yol boşsa / dosya yoksa / yetki yoksa `null`.
  */
@@ -66,6 +80,44 @@ export async function createSignedUrl(
       'İmzalı adres üretimi beklenmedik şekilde başarısız oldu'
     )
     return null
+  }
+}
+
+/**
+ * Bucket içindeki bir nesneyi siler (yetim dosya temizliği — ör. eski avatar).
+ *
+ * SÖZLEŞME: `createSignedUrl` ile aynı — ASLA fırlatmaz. Silme başarısız olursa
+ * (ağ, izin, dosya zaten yok) `false` döner; çağıran taraf bunu kullanıcıya hata
+ * olarak GÖSTERMEMELİ, yalnızca loglamalıdır — silme her zaman başarılı bir yazma
+ * işleminden SONRA denenir, o yüzden başarısızlığı akışı bozmamalıdır.
+ *
+ * `path` null/boş ise veya gerçek bir bucket yolu değilse (storage dışı mutlak
+ * URL — bkz. `isStoragePath`) hiç istek atılmaz, doğrudan `false` döner.
+ *
+ * @returns Silme başarılıysa `true`, aksi hâlde `false`.
+ */
+export async function removeStoredObject(
+  bucket: string,
+  path: string | null | undefined
+): Promise<boolean> {
+  const normalized = normalizePath(path)
+  if (!normalized || !isStoragePath(normalized)) return false
+
+  try {
+    const { error } = await supabase.storage.from(bucket).remove([normalized])
+
+    if (error) {
+      logger.warn({ bucket, path: normalized, err: error.message }, 'Depolanan nesne silinemedi')
+      return false
+    }
+
+    return true
+  } catch (err) {
+    logger.warn(
+      { bucket, path: normalized, err: err instanceof Error ? err.message : String(err) },
+      'Depolanan nesne silimi beklenmedik şekilde başarısız oldu'
+    )
+    return false
   }
 }
 
