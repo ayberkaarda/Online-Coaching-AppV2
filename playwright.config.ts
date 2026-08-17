@@ -1,11 +1,42 @@
 import { defineConfig, devices } from '@playwright/test'
+import os from 'node:os'
+
+/**
+ * Yerel worker tavanı — YALNIZCA SUNUCU YÜKÜ İÇİN.
+ *
+ * NE İÇİN DEĞİL: veri çakışması. O sorun `tests/e2e/resource-lock.ts` ile
+ * kaynak bazında çözülür; worker sayısını kısmak çakışmayı yalnızca
+ * SEYRELTİR, ÇÖZMEZ (ve `workers: 1` geri bildirim süresini katlar).
+ *
+ * NE İÇİN: Playwright varsayılanı mantıksal çekirdeğin YARISIDIR (bu makinede
+ * 12 -> 6). Testlerin çoğu ikinci bir tarayıcı bağlamı da açtığından bu, TEK
+ * bir `next start` süreci ve tek bir yerel Supabase yığınına karşı ~12 eş
+ * zamanlı tarayıcı bağlamı demek. Ölçüldü: 6 worker'da tam paket koşusunda
+ * `workout.spec.ts` bir kez, hiçbir iddiada değil, koç panelini yeniden
+ * yükledikten sonra (`selectClient`) sunucu doygunluğu yüzünden timeout'a
+ * düştü. Tavan, doygunluğu ortadan kaldırır ama gerçek paralelliği korur.
+ *
+ * `PLAYWRIGHT_WORKERS` ile geçersiz kılınabilir (ör. daha güçlü bir makinede).
+ */
+const localWorkers = process.env.PLAYWRIGHT_WORKERS
+  ? Number(process.env.PLAYWRIGHT_WORKERS)
+  : Math.max(2, Math.min(4, Math.ceil(os.cpus().length / 2)))
 
 export default defineConfig({
   testDir: './tests/e2e',
+  // Koşu başında sahipsiz kalmış paylaşılan-kaynak kilitlerini siler
+  // (bkz. tests/e2e/resource-lock.ts).
+  globalSetup: './tests/e2e/global-setup.ts',
+  // İZOLASYON: paket TEK bir veritabanına ve seed'deki iki sabit danışan
+  // hesabına karşı koşuyor, ayrıca her spec AYNI anda iki projede (chromium +
+  // Mobile Chrome) çalışıyor. Testler arası veri çakışması `fullyParallel`
+  // kapatılarak DEĞİL, mutasyona uğrayan kaynakların testler tarafından
+  // ilan edilip kilitlenmesiyle çözülür (tests/e2e/resource-lock.ts).
+  // Böylece bağımsız testler tam paralel koşmaya devam eder.
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  workers: process.env.CI ? 1 : localWorkers,
   reporter: [['html', { open: 'never' }], ['list']],
   use: {
     baseURL: process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:3000',

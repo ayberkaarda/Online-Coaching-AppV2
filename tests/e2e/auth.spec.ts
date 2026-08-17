@@ -2,9 +2,10 @@
 // NOT: test.describe.serial KULLANILMAZ — testler paralel çalışabilir, her biri kendi
 // giriş adımını kurar.
 
-import { expect, test } from '@playwright/test'
-
 import { TEST_USERS, login, logout } from './fixtures'
+// SALT OKUNUR testler: paylaşılan kaynak ilan etmezler, kilit fixture'ı no-op'tur
+// ve tam paralel koşarlar (bkz. tests/e2e/resource-lock.ts).
+import { expect, test } from './resource-lock'
 
 test.describe('Kimlik Doğrulama', () => {
   test("giriş yapmadan / adresine gidince /login'e yönlendirilir", async ({ page }) => {

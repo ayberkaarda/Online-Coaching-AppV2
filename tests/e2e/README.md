@@ -45,6 +45,43 @@ E2E_PASSWORD=BaskaParola123!
 
 Bu testler **canlı bir Supabase örneği** gerektirir. CI ortamında Supabase ayağa kaldırılmadan veya seed verisi yüklenmeden çalıştırılırsa (`supabase db reset` atlanırsa) tüm testler başarısız olur — giriş yapılacak kullanıcılar veritabanında bulunmayacaktır. CI pipeline'ına Supabase servislerini başlatan ve seed uygulayan bir adım eklemeden bu testleri çalıştırmayın.
 
+## İzolasyon: paylaşılan kaynak kilidi (ZORUNLU okuma)
+
+Bu paket **tek bir veritabanına** ve seed'deki **sabit iki danışan hesabına** karşı koşar. Eş zamanlılık iki boyutludur:
+
+1. `fullyParallel: true` — farklı spec dosyaları (ve dosya içi testler) ayrı worker'larda aynı anda koşar.
+2. `projects: [chromium, 'Mobile Chrome']` — **her spec dosyası aynı anda iki kez** koşar, aynı hesaplara yazarak.
+
+Bazı yazma işlemleri "tüm kaydı değiştir" semantiğindedir (`save_workout_plan` RPC'si planın **yedi gününü birden** yeniden yazar), bu yüzden **benzersiz metin üretmek yetmez**: A testinin yazdığını B testi tamamen ezer. Bu gerçekten yaşandı — `plans.spec.ts` `"E2E Antrenman ..."` beklerken `workout.spec.ts`'in `"1. E2E Gym ... - 2x5"` satırını okudu.
+
+**Kural:** paylaşılan bir satıra/kayda **yazan** her test, dokunduğu mantıksal kaynağı ilan eder:
+
+```ts
+import { expect, resource, test } from './resource-lock'
+
+test(
+  'koç planı kaydeder ...',
+  { annotation: resource('workout-plan:client1') },
+  async ({ page }) => {
+    /* ... */
+  }
+)
+
+// Birden fazla kaynak:
+test('...', { annotation: [resource('a:client2'), resource('b:client2')] }, async () => {})
+```
+
+- `tests/e2e/resource-lock.ts` içindeki otomatik fixture, test gövdesi başlamadan bu kaynakları **süreçler ve projeler arası** dışlamalı kilitler, test bitince (geçti/düştü/timeout fark etmez) bırakır.
+- Anahtar sözleşmesi: `<kaynak>:<hesap>` — ör. `nutrition-plan:client2`. **Aynı satıra yazan iki test aynı anahtarı kullanmalıdır.**
+- Kaynak ilan etmeyen (salt okunur) testler kilit almaz ve **tam paralel koşmaya devam eder**.
+- Kilitler `os.tmpdir()` altında atomik `mkdir` ile tutulur; kilitler her zaman **sıralı** alınır, bu yüzden deadlock yapısal olarak imkânsızdır.
+
+**`retries` ile flake bastırmayın.** Yeniden deneme çakışmayı gizler (ve gerçek bir regresyonu da gizleyebilir); doğru araç kaynak kilididir. Yerel `workers` tavanı (`playwright.config.ts`) yalnızca **sunucu doygunluğu** içindir, veri çakışması için değildir.
+
+## Tuzak: `numeric` kolonların JSON gidiş-dönüşü sondaki sıfırı atar
+
+`form_checks.current_weight` gibi `numeric(6,2)` kolonlar PostgREST'ten **JSON sayısı** olarak döner ve JS sondaki sıfırı atar: DB'deki `274.00` arayüze `274` basılır. Testin ürettiği `"274.0"` dizesiyle locator eşleşmesi bu yüzden kırılır. Rastgele ondalıklı değer üretirken **ondalık haneyi 1-9 arasında tutun** (bkz. `form-check.spec.ts`) — iddiayı gevşetmek yerine gidiş-dönüşü kayıpsız yapın.
+
 ## Tuzak: Türkçe İ/ı case-insensitive eşleşme
 
 Türkçe metin içeren locator'larda **case-insensitive regex (`/i` bayrağı) kullanmayın** — `Ş`, `Ğ`, `Ü`, `Ö`, `Ç` gibi standart aksanlı harfler için JS'in case-folding'i doğru çalışır, ama **İ (U+0130, noktalı büyük I)** ve **ı (U+0131, noktasız küçük i)** için ÇALIŞMAZ:

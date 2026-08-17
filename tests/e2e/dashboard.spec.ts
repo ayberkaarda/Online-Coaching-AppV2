@@ -1,8 +1,12 @@
 // Panel sekmeleri, klavye navigasyonu, tema değiştirme ve rol bazlı erişim testleri.
 
-import { expect, test } from '@playwright/test'
-
 import { TEST_USERS, login } from './fixtures'
+// Bu dosyadaki testler SALT OKUNUR (sekme gezinme, tema, rol bazlı yönlendirme):
+// hiçbir paylaşılan kaynağa yazmadıkları için `resource(...)` ilan ETMEZLER ve
+// kilit fixture'ı onlar için no-op'tur — tam paralel koşmaya devam ederler.
+// `test` yine de ortak sarmalayıcıdan alınır ki ileride yazan bir senaryo
+// eklenirse kilit mekanizması hazır olsun (bkz. tests/e2e/resource-lock.ts).
+import { expect, test } from './resource-lock'
 
 // Sekme adları DashboardTabs.tsx'ten birebir alınır. Faz 2a'da sekme başlarındaki
 // emoji `lucide-react` ikonlarıyla değiştirildi; ikonlar `aria-hidden="true"`

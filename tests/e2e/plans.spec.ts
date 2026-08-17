@@ -18,9 +18,10 @@
 // metinlerde `/i` bayraklı regex KULLANILMAZ. Aşağıdaki tüm locator'larda ya
 // birebir string ya da `i` bayrağı olmayan, kaynaktan birebir kopyalanmış regex var.
 
-import { expect, test, type Page } from '@playwright/test'
+import { type Page } from '@playwright/test'
 
 import { TEST_USERS, login, type TestUser } from './fixtures'
+import { expect, resource, test } from './resource-lock'
 
 // Date.now() yerine testin kendi ürettiği rastgele sayı: tekrarlanan/paralel
 // koşularda plan içerikleri çakışmasın (messaging.spec.ts ile aynı kalıp).
@@ -87,142 +88,157 @@ async function waitForPlanLoaded(field: ReturnType<typeof workoutDayField>): Pro
   await expect(field).not.toHaveValue('')
 }
 
+// İZOLASYON NOTU (tüm dosya için):
+// Buradaki senaryolar danışanların antrenman/beslenme planına YAZIYOR ve
+// `save_workout_plan` RPC'si planın TAMAMINI (7 gün) yeniden yazıyor — yani
+// benzersiz metin üretmek YETMEZ, aynı plana yazan iki test birbirinin kaydını
+// tamamen ezer. Eski çözüm (`test.describe.configure({ mode: 'default' })`)
+// YETERSİZDİ, çünkü sadece BU DOSYA içindeki sırayı garanti ediyordu:
+//   (a) `workout.spec.ts` de client1'in antrenman planına yazıyor (ayrı dosya,
+//       ayrı worker -> eş zamanlı),
+//   (b) her spec AYNI anda iki projede (chromium + Mobile Chrome) koşuyor.
+// Ölçülen kanıt: plans.spec "E2E Antrenman ..." beklerken workout.spec'in
+// "1. E2E Gym ... - 2x5" satırını okudu.
+// Yeni çözüm: her test dokunduğu kaynağı `resource(...)` ile ilan eder;
+// tests/e2e/resource-lock.ts kilidi süreçler VE projeler arası uygular.
+// Farklı kaynaklara dokunan senaryolar (beslenme <-> antrenman, client1 <->
+// client2) paralel koşmaya DEVAM eder.
 test.describe('Plan Akışları (karakterizasyon)', () => {
-  // Bu dosyadaki senaryolar AYNI iki danışanın antrenman planına yazıyor ve
-  // `save_workout_plan` RPC'si planın TAMAMINI (7 gün) değiştiriyor. Kök
-  // yapılandırmada `fullyParallel: true` olduğu için testler ayrı worker'larda
-  // eş zamanlı koşarsa birbirlerinin kaydını ezerler (gerçek yarış, flake
-  // kaynağı). `mode: 'default'` bu dosyayı tek worker'da, bildirim sırasıyla
-  // koşturur; 'serial'dan farkı: bir test düşerse sonrakiler ATLANMAZ.
-  test.describe.configure({ mode: 'default' })
+  test(
+    'koç antrenman planını kaydeder, danışan aynı içeriği görür',
+    { annotation: resource('workout-plan:client1') },
+    async ({ page, browser }) => {
+      // Bu senaryo client1'i (Ahmet Yılmaz) kullanır. Gerekçe: onay akışı testi
+      // (aşağıda) client2 üzerinde program_approvals kayıtlarını değiştirir;
+      // farklı danışan seçmek kilit kuyruğunu da kısaltır.
+      const uniquePlan = `E2E Antrenman ${randomSuffix()}`
+      const day = 'Pazartesi'
 
-  test('koç antrenman planını kaydeder, danışan aynı içeriği görür', async ({ page, browser }) => {
-    // Bu senaryo client1'i (Ahmet Yılmaz) kullanır. Gerekçe: onay akışı testi
-    // (aşağıda) client2 üzerinde program_approvals kayıtlarını değiştirir;
-    // farklı danışan seçerek paralel koşumda birbirlerini etkilemeleri önlenir.
-    const uniquePlan = `E2E Antrenman ${randomSuffix()}`
-    const day = 'Pazartesi'
+      // --- 1) Koç: danışanı seç, Antrenman sekmesinde planı yaz, kaydet ---
+      await login(page, TEST_USERS.coach)
+      await selectClient(page, CLIENT1_FULL_NAME)
+      await page.getByRole('tab', { name: /Antrenman/ }).click()
 
-    // --- 1) Koç: danışanı seç, Antrenman sekmesinde planı yaz, kaydet ---
-    await login(page, TEST_USERS.coach)
-    await selectClient(page, CLIENT1_FULL_NAME)
-    await page.getByRole('tab', { name: /Antrenman/ }).click()
+      const coachField = workoutDayField(page, day)
+      await waitForPlanLoaded(coachField)
+      await coachField.fill(uniquePlan)
 
-    const coachField = workoutDayField(page, day)
-    await waitForPlanLoaded(coachField)
-    await coachField.fill(uniquePlan)
+      // WorkoutTab.tsx: koç rolünde kaydet butonunun metni birebir budur.
+      await page.getByRole('button', { name: 'Antrenman Tablosunu Güncelle' }).click()
 
-    // WorkoutTab.tsx: koç rolünde kaydet butonunun metni birebir budur.
-    await page.getByRole('button', { name: 'Antrenman Tablosunu Güncelle' }).click()
+      // usePlans.ts -> useSaveWorkoutPlan onSuccess toast'ı (tek danışan hali).
+      // `i` bayrağı YOK: "programı" ı (U+0131) içeriyor.
+      await expect(page.getByText(/Antrenman programı kaydedildi\./)).toBeVisible()
 
-    // usePlans.ts -> useSaveWorkoutPlan onSuccess toast'ı (tek danışan hali).
-    // `i` bayrağı YOK: "programı" ı (U+0131) içeriyor.
-    await expect(page.getByText(/Antrenman programı kaydedildi\./)).toBeVisible()
+      // --- 2) Danışan ikinci bir tarayıcı bağlamında aynı içeriği görmeli ---
+      const clientContext = await browser.newContext()
+      try {
+        const clientPage = await clientContext.newPage()
+        await login(clientPage, TEST_USERS.client)
+        await clientPage.getByRole('tab', { name: /Antrenman/ }).click()
 
-    // --- 2) Danışan ikinci bir tarayıcı bağlamında aynı içeriği görmeli ---
-    const clientContext = await browser.newContext()
-    try {
-      const clientPage = await clientContext.newPage()
-      await login(clientPage, TEST_USERS.client)
-      await clientPage.getByRole('tab', { name: /Antrenman/ }).click()
-
-      // NOT (bugünkü davranış): seed'de client1 için 'pending' bir program onayı
-      // olduğu sürece danışanın gün textarea'ları DISABLED render edilir
-      // (WorkoutTab.tsx `isWaitingMyApproval`). Değer yine de görünür; bu test
-      // sadece içeriğin danışana ulaştığını kilitler, etkin/pasif olmasını değil.
-      await expect(workoutDayField(clientPage, day)).toHaveValue(uniquePlan)
-    } finally {
-      await clientContext.close()
+        // NOT (bugünkü davranış): seed'de client1 için 'pending' bir program onayı
+        // olduğu sürece danışanın gün textarea'ları DISABLED render edilir
+        // (WorkoutTab.tsx `isWaitingMyApproval`). Değer yine de görünür; bu test
+        // sadece içeriğin danışana ulaştığını kilitler, etkin/pasif olmasını değil.
+        await expect(workoutDayField(clientPage, day)).toHaveValue(uniquePlan)
+      } finally {
+        await clientContext.close()
+      }
     }
-  })
+  )
 
   // REGRESYON KORUMASI (Faz 1b Adım 2): `/profile` sayfasındaki "Antrenman
   // Programım" kartı DEPRECATED `profiles.workout_plan` kolonundan besleniyordu;
   // plan `workout_plans` tablolarına taşındıktan sonra bu kart bayat (veya boş)
   // veri gösteriyordu. Kart artık `useWorkoutPlan()` ile besleniyor. Aşağıdaki
   // senaryo kartın gerçekten canlı plandan okuduğunu kilitler.
-  test('koç antrenman planını kaydeder, danışan profil sayfasında aynı içeriği görür', async ({
-    page,
-    browser,
-  }) => {
-    // 1. senaryo ile aynı danışan (client1) kullanılır ama FARKLI bir gün yazılır;
-    // dosya `mode: 'default'` ile sıralı koştuğu için ezişme olmaz.
-    const uniquePlan = `E2E Profil ${randomSuffix()}`
-    const day = 'Salı'
+  test(
+    'koç antrenman planını kaydeder, danışan profil sayfasında aynı içeriği görür',
+    { annotation: resource('workout-plan:client1') },
+    async ({ page, browser }) => {
+      // 1. senaryo ile aynı danışan (client1) ve aynı KAYNAK kilidi kullanılır;
+      // ikisi bu yüzden asla eş zamanlı koşmaz. Yine de farklı bir gün yazılır.
+      const uniquePlan = `E2E Profil ${randomSuffix()}`
+      const day = 'Salı'
 
-    // --- 1) Koç: planı "Antrenman" sekmesinden kaydeder ---
-    await login(page, TEST_USERS.coach)
-    await selectClient(page, CLIENT1_FULL_NAME)
-    await page.getByRole('tab', { name: /Antrenman/ }).click()
+      // --- 1) Koç: planı "Antrenman" sekmesinden kaydeder ---
+      await login(page, TEST_USERS.coach)
+      await selectClient(page, CLIENT1_FULL_NAME)
+      await page.getByRole('tab', { name: /Antrenman/ }).click()
 
-    const coachField = workoutDayField(page, day)
-    await waitForPlanLoaded(coachField)
-    await coachField.fill(uniquePlan)
-    await page.getByRole('button', { name: 'Antrenman Tablosunu Güncelle' }).click()
-    await expect(page.getByText(/Antrenman programı kaydedildi\./)).toBeVisible()
+      const coachField = workoutDayField(page, day)
+      await waitForPlanLoaded(coachField)
+      await coachField.fill(uniquePlan)
+      await page.getByRole('button', { name: 'Antrenman Tablosunu Güncelle' }).click()
+      await expect(page.getByText(/Antrenman programı kaydedildi\./)).toBeVisible()
 
-    // --- 2) Danışan: kendi profil sayfasında aynı içeriği görmeli ---
-    const clientContext = await browser.newContext()
-    try {
-      const clientPage = await clientContext.newPage()
-      await login(clientPage, TEST_USERS.client)
-      await clientPage.goto('/profile')
+      // --- 2) Danışan: kendi profil sayfasında aynı içeriği görmeli ---
+      const clientContext = await browser.newContext()
+      try {
+        const clientPage = await clientContext.newPage()
+        await login(clientPage, TEST_USERS.client)
+        await clientPage.goto('/profile')
 
-      // Kart başlığı kaynakta (src/app/profile/page.tsx) artık
-      // `<Dumbbell aria-hidden /> Antrenman Programım` — ikon aria-hidden
-      // olduğu için erişilebilir ad yalnızca metindir. Substring regex,
-      // `i` bayrağı YOK ("Programım" ı içerir).
-      await expect(clientPage.getByRole('heading', { name: /Antrenman Programım/ })).toBeVisible()
+        // Kart başlığı kaynakta (src/app/profile/page.tsx) artık
+        // `<Dumbbell aria-hidden /> Antrenman Programım` — ikon aria-hidden
+        // olduğu için erişilebilir ad yalnızca metindir. Substring regex,
+        // `i` bayrağı YOK ("Programım" ı içerir).
+        await expect(clientPage.getByRole('heading', { name: /Antrenman Programım/ })).toBeVisible()
 
-      // Boş durum metni GÖRÜNMEMELİ: kart canlı plandan besleniyorsa dolu gelir.
-      await expect(
-        clientPage.getByText('Koçunuz henüz bir antrenman programı atamadı.')
-      ).toHaveCount(0)
+        // Boş durum metni GÖRÜNMEMELİ: kart canlı plandan besleniyorsa dolu gelir.
+        await expect(
+          clientPage.getByText('Koçunuz henüz bir antrenman programı atamadı.')
+        ).toHaveCount(0)
 
-      // Gün satırı: `<li><span>Salı: </span><span>{içerik}</span></li>`.
-      // `uniquePlan` ASCII olduğu için filtre Türkçe harf tuzağına takılmaz.
-      const dayItem = clientPage.getByRole('listitem').filter({ hasText: uniquePlan })
-      await expect(dayItem).toHaveCount(1)
-      // toContainText: büyük/küçük harf duyarlı, birebir alt dize — İ/ı tuzağı yok.
-      await expect(dayItem).toContainText(day)
-      await expect(dayItem).toContainText(uniquePlan)
-    } finally {
-      await clientContext.close()
+        // Gün satırı: `<li><span>Salı: </span><span>{içerik}</span></li>`.
+        // `uniquePlan` ASCII olduğu için filtre Türkçe harf tuzağına takılmaz.
+        const dayItem = clientPage.getByRole('listitem').filter({ hasText: uniquePlan })
+        await expect(dayItem).toHaveCount(1)
+        // toContainText: büyük/küçük harf duyarlı, birebir alt dize — İ/ı tuzağı yok.
+        await expect(dayItem).toContainText(day)
+        await expect(dayItem).toContainText(uniquePlan)
+      } finally {
+        await clientContext.close()
+      }
     }
-  })
+  )
 
-  test('danışan kendi beslenme planını kaydeder ve yenilemeden sonra da görür', async ({
-    page,
-  }) => {
-    // NOT (bugünkü davranış, bilinçli olarak kilitleniyor): "Beslenme Tablosunu
-    // Kaydet" butonu NutritionTab.tsx'te role'e bakılmaksızın render ediliyor ve
-    // `handleSaveProgram` danışan için clientIds = [currentUserId] kuruyor. Yani
-    // danışan KENDİ beslenme planını koç onayı olmadan kaydedebiliyor
-    // (antrenman tarafındaki onay akışının beslenme karşılığı YOK). Bu testin
-    // görevi mevcut davranışı kilitlemek; doğru/yanlış yorumu yapılmıyor.
-    //
-    // client2 kullanılır: 1. senaryo client1'in workout_plan'ını yazıyor, burada
-    // farklı bir danışanın nutrition_plan'ı yazılıyor — çakışma yok.
-    const uniqueMeal = `E2E Beslenme ${randomSuffix()}`
-    const day = 'Perşembe'
+  test(
+    'danışan kendi beslenme planını kaydeder ve yenilemeden sonra da görür',
+    { annotation: resource('nutrition-plan:client2') },
+    async ({ page }) => {
+      // NOT (bugünkü davranış, bilinçli olarak kilitleniyor): "Beslenme Tablosunu
+      // Kaydet" butonu NutritionTab.tsx'te role'e bakılmaksızın render ediliyor ve
+      // `handleSaveProgram` danışan için clientIds = [currentUserId] kuruyor. Yani
+      // danışan KENDİ beslenme planını koç onayı olmadan kaydedebiliyor
+      // (antrenman tarafındaki onay akışının beslenme karşılığı YOK). Bu testin
+      // görevi mevcut davranışı kilitlemek; doğru/yanlış yorumu yapılmıyor.
+      //
+      // client2 kullanılır: antrenman senaryoları client1'in planına yazıyor,
+      // burada farklı bir danışanın beslenme planı yazılıyor — farklı kilit
+      // anahtarı, dolayısıyla bu senaryo onlarla PARALEL koşabilir.
+      const uniqueMeal = `E2E Beslenme ${randomSuffix()}`
+      const day = 'Perşembe'
 
-    await login(page, SECOND_CLIENT)
-    await page.getByRole('tab', { name: /Beslenme/ }).click()
+      await login(page, SECOND_CLIENT)
+      await page.getByRole('tab', { name: /Beslenme/ }).click()
 
-    const field = nutritionDayField(page, day)
-    await waitForPlanLoaded(field)
-    await field.fill(uniqueMeal)
+      const field = nutritionDayField(page, day)
+      await waitForPlanLoaded(field)
+      await field.fill(uniqueMeal)
 
-    await page.getByRole('button', { name: 'Beslenme Tablosunu Kaydet' }).click()
+      await page.getByRole('button', { name: 'Beslenme Tablosunu Kaydet' }).click()
 
-    // usePlans.ts -> useSaveNutritionPlan onSuccess toast'ı (tek danışan hali).
-    await expect(page.getByText(/Beslenme programı kaydedildi\./)).toBeVisible()
+      // usePlans.ts -> useSaveNutritionPlan onSuccess toast'ı (tek danışan hali).
+      await expect(page.getByText(/Beslenme programı kaydedildi\./)).toBeVisible()
 
-    // --- Kalıcılık: sayfa yenilendikten sonra da aynı içerik gelmeli ---
-    await page.reload()
-    await page.getByRole('tab', { name: /Beslenme/ }).click()
-    await expect(nutritionDayField(page, day)).toHaveValue(uniqueMeal)
-  })
+      // --- Kalıcılık: sayfa yenilendikten sonra da aynı içerik gelmeli ---
+      await page.reload()
+      await page.getByRole('tab', { name: /Beslenme/ }).click()
+      await expect(nutritionDayField(page, day)).toHaveValue(uniqueMeal)
+    }
+  )
 
   // REGRESYON KORUMASI (Faz 1b Adım 3b): `/profile` sayfasındaki "Beslenme
   // Programım" kartı DEPRECATED `profiles.nutrition_plan` kolonundan besleniyordu;
@@ -230,148 +246,156 @@ test.describe('Plan Akışları (karakterizasyon)', () => {
   // veri gösteriyordu. Kart artık `useNutritionPlan()` ile besleniyor. Aşağıdaki
   // senaryo kartın gerçekten canlı plandan okuduğunu kilitler. (Antrenman
   // karşılığı: "koç antrenman planını kaydeder, danışan profil sayfasında...")
-  test('danışan beslenme planını kaydeder, profil sayfasında aynı içeriği görür', async ({
-    page,
-  }) => {
-    // Yukarıdaki beslenme senaryosuyla aynı danışan (client2) kullanılır ama
-    // FARKLI bir gün yazılır; dosya `mode: 'default'` ile sıralı koştuğu için
-    // ezişme olmaz. Kaydetmeyi danışanın kendisi yapar: NutritionTab'te kaydet
-    // butonu role bakılmaksızın render ediliyor (bkz. yukarıdaki NOT).
-    const uniqueMeal = `E2E Beslenme Profil ${randomSuffix()}`
-    const day = 'Cumartesi'
+  test(
+    'danışan beslenme planını kaydeder, profil sayfasında aynı içeriği görür',
+    { annotation: resource('nutrition-plan:client2') },
+    async ({ page }) => {
+      // Yukarıdaki beslenme senaryosuyla aynı danışan (client2) ve aynı KAYNAK
+      // kilidi kullanılır; ikisi bu yüzden asla eş zamanlı koşmaz. Yine de farklı
+      // bir gün yazılır. Kaydetmeyi danışanın kendisi yapar: NutritionTab'te
+      // kaydet butonu role bakılmaksızın render ediliyor (bkz. yukarıdaki NOT).
+      const uniqueMeal = `E2E Beslenme Profil ${randomSuffix()}`
+      const day = 'Cumartesi'
 
-    // --- 1) Danışan: "Beslenme" sekmesinden planı kaydeder ---
-    await login(page, SECOND_CLIENT)
-    await page.getByRole('tab', { name: /Beslenme/ }).click()
+      // --- 1) Danışan: "Beslenme" sekmesinden planı kaydeder ---
+      await login(page, SECOND_CLIENT)
+      await page.getByRole('tab', { name: /Beslenme/ }).click()
 
-    const field = nutritionDayField(page, day)
-    await waitForPlanLoaded(field)
-    await field.fill(uniqueMeal)
-    await page.getByRole('button', { name: 'Beslenme Tablosunu Kaydet' }).click()
-    await expect(page.getByText(/Beslenme programı kaydedildi\./)).toBeVisible()
+      const field = nutritionDayField(page, day)
+      await waitForPlanLoaded(field)
+      await field.fill(uniqueMeal)
+      await page.getByRole('button', { name: 'Beslenme Tablosunu Kaydet' }).click()
+      await expect(page.getByText(/Beslenme programı kaydedildi\./)).toBeVisible()
 
-    // --- 2) Aynı danışan kendi profil sayfasında aynı içeriği görmeli ---
-    await page.goto('/profile')
+      // --- 2) Aynı danışan kendi profil sayfasında aynı içeriği görmeli ---
+      await page.goto('/profile')
 
-    // Kart başlığı kaynakta (src/app/profile/page.tsx) artık
-    // `<Salad aria-hidden /> Beslenme Programım` — ikon aria-hidden olduğu için
-    // erişilebilir ad yalnızca metindir. Substring regex, `i` bayrağı YOK
-    // ("Programım" ı içerir).
-    await expect(page.getByRole('heading', { name: /Beslenme Programım/ })).toBeVisible()
+      // Kart başlığı kaynakta (src/app/profile/page.tsx) artık
+      // `<Salad aria-hidden /> Beslenme Programım` — ikon aria-hidden olduğu için
+      // erişilebilir ad yalnızca metindir. Substring regex, `i` bayrağı YOK
+      // ("Programım" ı içerir).
+      await expect(page.getByRole('heading', { name: /Beslenme Programım/ })).toBeVisible()
 
-    // Boş durum metni GÖRÜNMEMELİ: kart canlı plandan besleniyorsa dolu gelir.
-    await expect(page.getByText('Koçunuz henüz bir beslenme programı atamadı.')).toHaveCount(0)
+      // Boş durum metni GÖRÜNMEMELİ: kart canlı plandan besleniyorsa dolu gelir.
+      await expect(page.getByText('Koçunuz henüz bir beslenme programı atamadı.')).toHaveCount(0)
 
-    // Gün satırı: `<li><span>Cumartesi: </span><span>{içerik} ({kcal} kcal)</span></li>`.
-    // `uniqueMeal` ASCII olduğu için filtre Türkçe harf tuzağına takılmaz.
-    const dayItem = page.getByRole('listitem').filter({ hasText: uniqueMeal })
-    await expect(dayItem).toHaveCount(1)
-    // toContainText: büyük/küçük harf duyarlı, birebir alt dize — İ/ı tuzağı yok.
-    await expect(dayItem).toContainText(day)
-    await expect(dayItem).toContainText(uniqueMeal)
-  })
+      // Gün satırı: `<li><span>Cumartesi: </span><span>{içerik} ({kcal} kcal)</span></li>`.
+      // `uniqueMeal` ASCII olduğu için filtre Türkçe harf tuzağına takılmaz.
+      const dayItem = page.getByRole('listitem').filter({ hasText: uniqueMeal })
+      await expect(dayItem).toHaveCount(1)
+      // toContainText: büyük/küçük harf duyarlı, birebir alt dize — İ/ı tuzağı yok.
+      await expect(dayItem).toContainText(day)
+      await expect(dayItem).toContainText(uniqueMeal)
+    }
+  )
 
-  test('danışan programı onaya gönderir, koç onaylar ve plan danışanın profiline işlenir', async ({
-    page,
-    browser,
-  }) => {
-    // Bu senaryo client2 (Elif Demir) üzerinde çalışır; 1. senaryo client1'i
-    // kullandığı için paralel koşumda onay kuyrukları birbirine karışmaz.
-    const uniquePlan = `E2E Onay ${randomSuffix()}`
-    const day = 'Cuma'
+  test(
+    'danışan programı onaya gönderir, koç onaylar ve plan danışanın profiline işlenir',
+    {
+      // İki kaynak: onay kuyruğu (`program_approvals`) VE onaylandığında
+      // danışanın planına işlenen antrenman planı (`useApproveProgram` planı
+      // yeniden yazar). İkisi de client2 üzerinde.
+      annotation: [resource('program-approvals:client2'), resource('workout-plan:client2')],
+    },
+    async ({ page, browser }) => {
+      // Bu senaryo client2 (Elif Demir) üzerinde çalışır; antrenman senaryoları
+      // client1'i kullandığı için onay kuyrukları birbirine karışmaz.
+      const uniquePlan = `E2E Onay ${randomSuffix()}`
+      const day = 'Cuma'
 
-    // Koç varsayılan `page` bağlamında, danışan ikinci bir bağlamda çalışır.
-    const coachPage = page
-    await login(coachPage, TEST_USERS.coach)
-    await selectClient(coachPage, CLIENT2_FULL_NAME)
-    await coachPage.getByRole('tab', { name: /Antrenman/ }).click()
-
-    // WorkoutTab.tsx: onay butonundaki ikon (`<Check aria-hidden />`) erişilebilir
-    // ada girmez; yine de metnin başına/sonuna ekleme yapılabildiği için
-    // substring regex kullanılır (`i` bayrağı YOK: "İşle" noktalı büyük İ içeriyor).
-    const approveButton = coachPage.getByRole('button', { name: /Onayla ve Profiline İşle/ })
-
-    // --- 0) Ön koşul: bekleyen onayları temizle ---
-    // supabase/seed.sql her danışan için 1 adet 'pending' onay yaratıyor. Bu
-    // kayıt dururken danışanın "onaya gönder" butonu DISABLED olur, yani senaryo
-    // hiç başlayamaz. Testin tekrar tekrar koşabilmesi için kuyruk önce
-    // boşaltılır. `toPass` ile döngü: birden fazla bekleyen kayıt varsa (önceki
-    // yarım kalmış bir koşumdan) hepsi onaylanana kadar tekrarlanır.
-    await expect(async () => {
-      if ((await approveButton.count()) > 0) await approveButton.first().click()
-      await expect(approveButton).toHaveCount(0)
-    }).toPass({ timeout: 30_000 })
-
-    // --- 1) Danışan: benzersiz plan yaz ve koç onayına gönder ---
-    const clientContext = await browser.newContext()
-    try {
-      const clientPage = await clientContext.newPage()
-      await login(clientPage, SECOND_CLIENT)
-      await clientPage.getByRole('tab', { name: /Antrenman/ }).click()
-
-      const clientField = workoutDayField(clientPage, day)
-      await waitForPlanLoaded(clientField)
-      await expect(clientField).toBeEnabled()
-      await clientField.fill(uniquePlan)
-
-      // WorkoutTab.tsx (danışan hali): buton içeriği artık
-      // `<Send aria-hidden /> Bu Programı Koça Onaya Gönder`. Faz 2a öncesinde
-      // baştaki "📨" emoji'si aria-hidden DEĞİLDİ ve erişilebilir adın parçasıydı;
-      // ikona geçişle ad yalnızca metne indi. Substring regex her iki halde de
-      // eşleşir (`i` bayrağı yok: "Programı" ı içeriyor).
-      const submitButton = clientPage.getByRole('button', {
-        name: /Bu Programı Koça Onaya Gönder/,
-      })
-      await expect(submitButton).toBeEnabled()
-      await submitButton.click()
-
-      // useProgramApprovals.ts -> useSubmitProgramForApproval onSuccess toast'ı.
-      await expect(clientPage.getByText(/Program taslağı koçuna gönderildi\./)).toBeVisible()
-
-      // --- 2) Danışan tarafı bekleme durumuna geçmeli ---
-      // Aynı buton `<Clock aria-hidden /> Koçun Onayı Bekleniyor...` olur ve disabled edilir
-      // (WorkoutTab.tsx `isWaitingMyApproval`). Textarea da devre dışı kalır.
-      const waitingButton = clientPage.getByRole('button', {
-        name: /Koçun Onayı Bekleniyor/,
-      })
-      await expect(waitingButton).toBeVisible()
-      await expect(waitingButton).toBeDisabled()
-      await expect(workoutDayField(clientPage, day)).toBeDisabled()
-
-      // --- 3) Koç: sayfayı tazeleyip onay kutusunu görmeli ve onaylamalı ---
-      // Reload gerekli: koç sayfası zaten açıkken usePendingApprovals sorgusu
-      // kendiliğinden tazelenmeyebilir; reload state'i (danışan seçimi dahil)
-      // sıfırladığı için danışan yeniden seçilir.
-      await coachPage.reload()
+      // Koç varsayılan `page` bağlamında, danışan ikinci bir bağlamda çalışır.
+      const coachPage = page
+      await login(coachPage, TEST_USERS.coach)
       await selectClient(coachPage, CLIENT2_FULL_NAME)
       await coachPage.getByRole('tab', { name: /Antrenman/ }).click()
 
-      await expect(coachPage.getByText('ONAY BEKLEYEN PROGRAM VAR')).toBeVisible()
-      await expect(approveButton).toBeVisible()
-      await approveButton.click()
+      // WorkoutTab.tsx: onay butonundaki ikon (`<Check aria-hidden />`) erişilebilir
+      // ada girmez; yine de metnin başına/sonuna ekleme yapılabildiği için
+      // substring regex kullanılır (`i` bayrağı YOK: "İşle" noktalı büyük İ içeriyor).
+      const approveButton = coachPage.getByRole('button', { name: /Onayla ve Profiline İşle/ })
 
-      // useProgramApprovals.ts -> useApproveProgram onSuccess toast'ı.
-      await expect(
-        coachPage.getByText(/Program onaylandı ve danışanın profiline işlendi\./)
-      ).toBeVisible()
-      // Onay kutusu kaybolmalı (bekleyen kayıt kalmadı).
-      await expect(approveButton).toHaveCount(0)
+      // --- 0) Ön koşul: bekleyen onayları temizle ---
+      // supabase/seed.sql her danışan için 1 adet 'pending' onay yaratıyor. Bu
+      // kayıt dururken danışanın "onaya gönder" butonu DISABLED olur, yani senaryo
+      // hiç başlayamaz. Testin tekrar tekrar koşabilmesi için kuyruk önce
+      // boşaltılır. `toPass` ile döngü: birden fazla bekleyen kayıt varsa (önceki
+      // yarım kalmış bir koşumdan) hepsi onaylanana kadar tekrarlanır.
+      await expect(async () => {
+        if ((await approveButton.count()) > 0) await approveButton.first().click()
+        await expect(approveButton).toHaveCount(0)
+      }).toPass({ timeout: 30_000 })
 
-      // --- 4) Danışan: yenileme sonrası onaylanan plan görünür, bekleme kalkar ---
-      await clientPage.reload()
-      await clientPage.getByRole('tab', { name: /Antrenman/ }).click()
+      // --- 1) Danışan: benzersiz plan yaz ve koç onayına gönder ---
+      const clientContext = await browser.newContext()
+      try {
+        const clientPage = await clientContext.newPage()
+        await login(clientPage, SECOND_CLIENT)
+        await clientPage.getByRole('tab', { name: /Antrenman/ }).click()
 
-      const clientFieldAfter = workoutDayField(clientPage, day)
-      await expect(clientFieldAfter).toHaveValue(uniquePlan)
-      await expect(clientFieldAfter).toBeEnabled()
-      await expect(
-        clientPage.getByRole('button', { name: /Bu Programı Koça Onaya Gönder/ })
-      ).toBeEnabled()
-      await expect(clientPage.getByRole('button', { name: /Koçun Onayı Bekleniyor/ })).toHaveCount(
-        0
-      )
-    } finally {
-      await clientContext.close()
+        const clientField = workoutDayField(clientPage, day)
+        await waitForPlanLoaded(clientField)
+        await expect(clientField).toBeEnabled()
+        await clientField.fill(uniquePlan)
+
+        // WorkoutTab.tsx (danışan hali): buton içeriği artık
+        // `<Send aria-hidden /> Bu Programı Koça Onaya Gönder`. Faz 2a öncesinde
+        // baştaki "📨" emoji'si aria-hidden DEĞİLDİ ve erişilebilir adın parçasıydı;
+        // ikona geçişle ad yalnızca metne indi. Substring regex her iki halde de
+        // eşleşir (`i` bayrağı yok: "Programı" ı içeriyor).
+        const submitButton = clientPage.getByRole('button', {
+          name: /Bu Programı Koça Onaya Gönder/,
+        })
+        await expect(submitButton).toBeEnabled()
+        await submitButton.click()
+
+        // useProgramApprovals.ts -> useSubmitProgramForApproval onSuccess toast'ı.
+        await expect(clientPage.getByText(/Program taslağı koçuna gönderildi\./)).toBeVisible()
+
+        // --- 2) Danışan tarafı bekleme durumuna geçmeli ---
+        // Aynı buton `<Clock aria-hidden /> Koçun Onayı Bekleniyor...` olur ve disabled edilir
+        // (WorkoutTab.tsx `isWaitingMyApproval`). Textarea da devre dışı kalır.
+        const waitingButton = clientPage.getByRole('button', {
+          name: /Koçun Onayı Bekleniyor/,
+        })
+        await expect(waitingButton).toBeVisible()
+        await expect(waitingButton).toBeDisabled()
+        await expect(workoutDayField(clientPage, day)).toBeDisabled()
+
+        // --- 3) Koç: sayfayı tazeleyip onay kutusunu görmeli ve onaylamalı ---
+        // Reload gerekli: koç sayfası zaten açıkken usePendingApprovals sorgusu
+        // kendiliğinden tazelenmeyebilir; reload state'i (danışan seçimi dahil)
+        // sıfırladığı için danışan yeniden seçilir.
+        await coachPage.reload()
+        await selectClient(coachPage, CLIENT2_FULL_NAME)
+        await coachPage.getByRole('tab', { name: /Antrenman/ }).click()
+
+        await expect(coachPage.getByText('ONAY BEKLEYEN PROGRAM VAR')).toBeVisible()
+        await expect(approveButton).toBeVisible()
+        await approveButton.click()
+
+        // useProgramApprovals.ts -> useApproveProgram onSuccess toast'ı.
+        await expect(
+          coachPage.getByText(/Program onaylandı ve danışanın profiline işlendi\./)
+        ).toBeVisible()
+        // Onay kutusu kaybolmalı (bekleyen kayıt kalmadı).
+        await expect(approveButton).toHaveCount(0)
+
+        // --- 4) Danışan: yenileme sonrası onaylanan plan görünür, bekleme kalkar ---
+        await clientPage.reload()
+        await clientPage.getByRole('tab', { name: /Antrenman/ }).click()
+
+        const clientFieldAfter = workoutDayField(clientPage, day)
+        await expect(clientFieldAfter).toHaveValue(uniquePlan)
+        await expect(clientFieldAfter).toBeEnabled()
+        await expect(
+          clientPage.getByRole('button', { name: /Bu Programı Koça Onaya Gönder/ })
+        ).toBeEnabled()
+        await expect(
+          clientPage.getByRole('button', { name: /Koçun Onayı Bekleniyor/ })
+        ).toHaveCount(0)
+      } finally {
+        await clientContext.close()
+      }
     }
-  })
+  )
 })
