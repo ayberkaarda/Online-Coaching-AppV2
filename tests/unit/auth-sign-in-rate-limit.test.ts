@@ -39,7 +39,7 @@ vi.mock('@/lib/logger', () => {
 })
 
 import { POST } from '@/app/api/auth/sign-in/route'
-import { resetServerEnvCache } from '@/env'
+import { resetServerEnvCache } from '@/env.server'
 import { LOGIN_FAILURE_LIMIT, normalizeEmail } from '@/lib/api/auth-rate-limit'
 import { resetRateLimit } from '@/lib/rate-limit'
 import { createServerSupabaseClient } from '@/lib/supabase/server'

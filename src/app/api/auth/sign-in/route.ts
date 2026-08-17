@@ -35,6 +35,7 @@ import { z } from 'zod'
 import {
   checkLoginQuota,
   clearLoginFailures,
+  maskEmailForLog,
   normalizeEmail,
   recordLoginFailure,
 } from '@/lib/api/auth-rate-limit'
@@ -124,8 +125,14 @@ export async function POST(request: Request): Promise<NextResponse> {
   // 3) Kota — Supabase'e HİÇ gitmeden reddet (upstream'i de korur)
   const quota = checkLoginQuota(email, clientIp)
   if (!quota.allowed) {
+    // A-10: güvenlik olayı — `event` alanı korelasyon anahtarıdır. E-posta TAM olarak
+    // loglanmaz, yalnızca maskelenmiş biçimi (bkz. `maskEmailForLog`) yazılır.
     log.warn(
-      { event: 'login_rate_limited', email: normalizedEmail, blockedBy: quota.blockedBy },
+      {
+        event: 'auth_login_rate_limited',
+        email: maskEmailForLog(normalizedEmail),
+        blockedBy: quota.blockedBy,
+      },
       'Giriş hız sınırı aşıldı'
     )
 
@@ -149,8 +156,12 @@ export async function POST(request: Request): Promise<NextResponse> {
   // 5) Başarısız: sayaçları artır, JENERİK hata dön
   if (error || !data.session) {
     recordLoginFailure(email, clientIp)
+    // A-10: güvenlik olayı — TAM e-posta değil, maskelenmiş biçimi loglanır (bkz.
+    // `maskEmailForLog`). `err.message` GoTrue'nun ham metnidir; istemciye ASLA gitmez (yalnızca
+    // burada, sunucu logunda kalır) — kullanıcı sayımını önlemek için istemci hep JENERİK hata
+    // görür (bkz. `GENERIC_AUTH_ERROR_MESSAGE`).
     log.warn(
-      { event: 'login_failed', email: normalizedEmail, err: error?.message },
+      { event: 'auth_login_failed', email: maskEmailForLog(normalizedEmail), err: error?.message },
       'Giriş başarısız'
     )
     return errorResponse(401, GENERIC_AUTH_ERROR_CODE, GENERIC_AUTH_ERROR_MESSAGE, requestId)

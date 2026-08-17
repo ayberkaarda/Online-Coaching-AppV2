@@ -8,6 +8,12 @@ const projectRoot = path.dirname(fileURLToPath(import.meta.url))
 // CSP'nin yapılandırılan Supabase örneğine (yerel yığın dahil) izin vermesi için
 // NEXT_PUBLIC_SUPABASE_URL'den origin türetilir. Sabit *.supabase.co deseni
 // `npx supabase start` ile gelen http://127.0.0.1:54321 adresini kapsamaz.
+//
+// A-15 (güvenlik denetimi, findings-app-surface.md): önceden `connect-src`/`img-src` bu somut
+// origin'lere EK OLARAK sabit `https://*.supabase.co` (ve `wss://*.supabase.co`) wildcard'ı da
+// içeriyordu — bu, *.supabase.co altındaki HERHANGİ bir Supabase projesine (kendi projemiz
+// dışında) bağlanmayı serbest bırakıyordu; wildcard gereksizdi çünkü gerçek origin zaten ayrıca
+// ekleniyordu. Wildcard'lar kaldırıldı, yalnızca bu fonksiyonun ürettiği somut origin'ler kalır.
 function supabaseCspOrigins() {
   const raw = process.env.NEXT_PUBLIC_SUPABASE_URL
   if (!raw) return []
@@ -21,6 +27,24 @@ function supabaseCspOrigins() {
 }
 
 const supabaseOrigins = supabaseCspOrigins()
+// `connect-src` hem http(s) hem ws(s) origin'ine ihtiyaç duyar (`supabaseOrigins` ikisini de
+// içerir); `img-src` yalnızca http(s) üzerinden resim çeker, ws origin'i orada anlamsızdır.
+// Önceden `supabaseOrigins[0] ?? ''` kullanılıyordu — "ilk eleman http'tir" varsayımına
+// örtük/kırılgan biçimde dayanıyordu. Burada niyet AÇIKÇA belirtiliyor.
+const supabaseHttpOrigin = supabaseOrigins.find((origin) => origin.startsWith('http')) ?? ''
+
+// GÜVENLİ BAŞARISIZLIK (A-15): production build'de `NEXT_PUBLIC_SUPABASE_URL` ayarlanmamışsa
+// (dolayısıyla `supabaseCspOrigins()` boş dizi dönerse) CSP sessizce Supabase'e bağlanmayı
+// tamamen engelleyen, uygulamayı komple kıran bir hâle düşerdi — hatasız ama kullanılamaz bir
+// build. Sessiz kırılmadansa build'in kendisi anlaşılır bir hatayla patlaması tercih edildi.
+if (process.env.NODE_ENV === 'production' && supabaseOrigins.length === 0) {
+  throw new Error(
+    'CSP yapılandırması başarısız: NEXT_PUBLIC_SUPABASE_URL ayarlanmamış veya geçersiz. ' +
+      "Production build Supabase origin'i olmadan CSP `connect-src`/`img-src` üretemez " +
+      "(bkz. docs/security/findings-app-surface.md A-15). Lütfen NEXT_PUBLIC_SUPABASE_URL'i " +
+      'geçerli bir URL olarak ayarlayın.'
+  )
+}
 
 const isDev = process.env.NODE_ENV === 'development'
 
@@ -34,13 +58,22 @@ const scriptSrc = isDev
   ? "script-src 'self' 'unsafe-inline' 'unsafe-eval';"
   : "script-src 'self' 'unsafe-inline';"
 
+// A-15: `*.supabase.co` wildcard'ları KALDIRILDI — yalnızca yukarıda türetilen somut
+// origin'ler (`supabaseHttpOrigin`, `supabaseOrigins`) izinli. `ui-avatars.com` uygulamanın
+// avatar fallback'i için bilerek KALIYOR. Boş origin'lerin çift boşluk üretmemesi için
+// direktifler `filter(Boolean)` ile temiz birleştirilir.
+const imgSrc = ["'self'", 'data:', 'blob:', 'https://ui-avatars.com', supabaseHttpOrigin].filter(
+  Boolean
+)
+const connectSrc = ["'self'", ...supabaseOrigins].filter(Boolean)
+
 const contentSecurityPolicy = [
   "default-src 'self';",
   scriptSrc,
   "style-src 'self' 'unsafe-inline';",
-  `img-src 'self' data: blob: https://*.supabase.co https://ui-avatars.com ${supabaseOrigins[0] ?? ''};`,
+  `img-src ${imgSrc.join(' ')};`,
   "font-src 'self' data:;",
-  `connect-src 'self' https://*.supabase.co wss://*.supabase.co ${supabaseOrigins.join(' ')};`,
+  `connect-src ${connectSrc.join(' ')};`,
   "frame-ancestors 'none';",
   "base-uri 'self';",
   "form-action 'self';",

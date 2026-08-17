@@ -6,8 +6,9 @@
 
 import { NextResponse, type NextRequest } from 'next/server'
 
-import { getServerEnv } from '@/env'
+import { getServerEnv } from '@/env.server'
 import { resolveTrustedClientIp } from '@/lib/api/client-ip'
+import { logger } from '@/lib/logger'
 import { checkRateLimit } from '@/lib/rate-limit'
 
 export const config = { matcher: ['/api/:path*'] }
@@ -38,6 +39,18 @@ function getClientIp(request: NextRequest): string {
   return resolveTrustedClientIp(request.headers) ?? 'unknown'
 }
 
+/**
+ * A-10 (güvenlik denetimi, findings-app-surface.md §2/§5 Grup 5): hız sınırı kovası anahtarı
+ * IP içerir; loglarda ham IP saklanmasın diye kaba bir kısaltma uygulanır. Tersine çevrilemez
+ * bir hash DEĞİL — amaç yalnızca düz metin log satırından ham IP'yi çıkarmak, yine de olay
+ * korelasyonu için (aynı kova mı?) yeterli bir önek/sonek bırakır. Format IPv4/IPv6/`unknown`
+ * hepsinde çalışsın diye anahtarın kendisi (ip:suffix) üzerinde, ayrıştırmadan çalışır.
+ */
+function maskRateLimitKey(key: string): string {
+  if (key.length <= 6) return `${key.slice(0, 2)}***`
+  return `${key.slice(0, 4)}***${key.slice(-2)}`
+}
+
 export function proxy(request: NextRequest): NextResponse {
   const { pathname } = request.nextUrl
   const env = getServerEnv()
@@ -65,6 +78,14 @@ export function proxy(request: NextRequest): NextResponse {
 
   if (!result.success) {
     const retryAfterSeconds = Math.max(1, Math.ceil((result.resetAt - Date.now()) / 1000))
+
+    // A-10: hız sınırı aşımı görünür bir güvenlik olayı olarak loglanır (korelasyon: `event` +
+    // maskelenmiş kova anahtarı). Önceden bu dosyada hiç `logger` importu yoktu — 429'lar
+    // tamamen sessizdi (brute-force/limit taşması tespit edilemiyordu).
+    logger.warn(
+      { event: 'rate_limit_exceeded', path: pathname, key: maskRateLimitKey(bucketKey) },
+      'Hız sınırı aşıldı'
+    )
 
     return NextResponse.json(
       {

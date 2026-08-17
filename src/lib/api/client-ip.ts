@@ -1,15 +1,24 @@
 // Güvenilen ters proxy zincirinden istemci IP'sini çözer.
 //
 // Bu modül HEM Next.js proxy runtime'ı (`src/proxy.ts`) HEM de `/api/**` route handler'ları
-// tarafından kullanılır; bu yüzden bilerek `import 'server-only'` İÇERMEZ (proxy/middleware
-// runtime'ı o paketi desteklemez). Yalnızca sunucu tarafından çağrılır — `getServerEnv()`
-// zaten tarayıcıda çağrılırsa hata fırlatır.
+// tarafından kullanılır. Kendisi doğrudan `import 'server-only'` İÇERMEZ (yine de bilerek sunucu
+// dışında çağrılmaz — `getServerEnv()` tarayıcıda çağrılırsa zaten hata fırlatır), ama AC-11
+// (güvenlik denetimi, findings-access-control.md) sonrası aşağıdaki `@/env.server` importu
+// ÜZERİNDEN dolaylı olarak `server-only`'yi de içeri çekiyor.
+//
+// DAHA ÖNCEKİ NOT ("proxy/middleware runtime'ı server-only paketini desteklemez") YANLIŞTI —
+// bu repodaki Next.js sürümünde webpack derleyicisi `middleware` katmanını `WEBPACK_LAYERS.
+// GROUP.serverOnly` içinde sınıflandırır (bkz. `node_modules/next/dist/lib/constants.js`) ve
+// `server-only`'yi o katmanda no-op bir modüle alias'lar (bkz.
+// `node_modules/next/dist/build/create-compiler-aliases.js`, `createServerOnlyClientOnlyAliases`);
+// yani `src/proxy.ts` içinde `server-only` fiilen SORUNSUZ ÇALIŞIR. `npm run build` ile
+// doğrulandı (bkz. AC-11 kabul kanıtı).
 //
 // Mantık A-02'den (güvenlik denetimi, findings-app-surface.md §3.2) devralınmıştır; daha önce
 // `src/proxy.ts` içinde yaşıyordu ve A-01 (giriş kaba kuvvet koruması) ile ikinci bir çağıran
 // eklendiği için buraya taşındı. DAVRANIŞ DEĞİŞMEDİ.
 
-import { getServerEnv } from '@/env'
+import { getServerEnv } from '@/env.server'
 
 /**
  * `X-Forwarded-For` standart olarak "client, proxy1, proxy2, ..." biçiminde SOLDAN SAĞA büyür:

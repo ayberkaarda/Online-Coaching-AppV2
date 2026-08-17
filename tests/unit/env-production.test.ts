@@ -1,6 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { getServerEnv, resetServerEnvCache } from '@/env'
+// AC-11 (güvenlik denetimi, findings-access-control.md): sunucu şeması `@/env.server`e taşındı;
+// o modül `import 'server-only'` içerir. vitest ham `server-only` paketini koşulsuz fırlatan
+// haliyle çalıştırır (Next'in build-time aliasing'i burada devrede değil), bu yüzden diğer
+// sunucu-tarafı testlerdeki aynı desenle etkisiz hale getiriyoruz. `vi.mock` hoisting nedeniyle
+// importlardan ÖNCE tanımlanmalı.
+vi.mock('server-only', () => ({}))
+
+import { getServerEnv, resetServerEnvCache } from '@/env.server'
 
 // A-12 (güvenlik denetimi, findings-app-surface.md §3.4, §7 Grup 1): `AI_BACKEND_API_KEY`
 // production'da opsiyonel bırakılırsa, ai_backend tarafındaki A-04 (anahtar yokken guard'ın

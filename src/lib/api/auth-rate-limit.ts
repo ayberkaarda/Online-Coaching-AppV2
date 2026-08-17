@@ -97,6 +97,22 @@ export function loginIpKey(ip: string): string {
   return `login-ip:${ip}`
 }
 
+/**
+ * A-10 (güvenlik denetimi, findings-app-surface.md §2/§5 Grup 5): güvenlik olayı loglarında
+ * (`auth_login_failed`, `auth_login_rate_limited`) TAM e-posta ASLA yazılmaz. Hash yerine kısmi
+ * maskeleme seçildi: aynı hesaba tekrar deneme yapılıp yapılmadığını (aynı önek + aynı alan adı)
+ * bir insan log satırlarına bakarak hâlâ gözle takip edebilsin — tam bir kriptografik hash bu
+ * okunabilirliği tamamen ortadan kaldırırdı. `email` `normalizeEmail` ile ÖNCEDEN normalize
+ * edilmiş olarak verilmelidir (çağıranlar zaten öyle yapıyor).
+ */
+export function maskEmailForLog(email: string): string {
+  const at = email.indexOf('@')
+  if (at <= 0) return '***'
+  const local = email.slice(0, at)
+  const domain = email.slice(at + 1)
+  return `${local.slice(0, 2)}***@${domain}`
+}
+
 // ---------------------------------------------------------------------------
 // Kota kontrolü
 // ---------------------------------------------------------------------------

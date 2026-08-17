@@ -6,13 +6,20 @@ import 'server-only'
 import { NextResponse } from 'next/server'
 import type { z } from 'zod'
 
-import { getServerEnv } from '@/env'
+import { getServerEnv } from '@/env.server'
 import { errorResponse } from '@/lib/api/response'
 import { createRequestLogger } from '@/lib/logger'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { formatZodError } from '@/lib/validation/schemas'
 
 const UPSTREAM_TIMEOUT_MS = 30_000
+
+// A-08 (güvenlik denetimi, findings-app-surface.md §3.8): meşru AI proxy gövdesi (antrenman/
+// beslenme planı girdisi) en fazla birkaç yüz bayt/birkaç KB'lık JSON'dur; 64 KB bunun için
+// cömert bir tavan. Öncesinde sınır yoktu — Next.js'in sessiz 10 MB kesme davranışına kalınmıştı
+// (bellek/CPU tüketim vektörü, bkz. bulgu). `export`: `tests/unit/proxy-body-size.test.ts`
+// sınırı burayla senkron kalsın diye kopyalamak yerine doğrudan bu sabiti içe aktarır.
+export const MAX_BODY_BYTES = 64 * 1024
 
 // `errorResponse` `./response.ts`'e taşındı (A-01: `/api/auth/sign-in` de kullanıyor).
 // Mevcut içe aktarmalar (`import { errorResponse } from '@/lib/api/proxy'`) kırılmasın diye
@@ -66,10 +73,86 @@ export async function handleAiProxy<TOut>(
 
   log = log.child({ userId: userData.user.id })
 
-  // 1) Gövdeyi oku
+  // 0.5) Gövde boyutu — ucuz ÖN kontrol (A-08). `Content-Length` istemci tarafından bildirilir,
+  // dolayısıyla GÜVENİLMEZ (sahte/eksik olabilir, chunked/streaming istekte hiç yoktur); varsa
+  // erken reddetmek akışı hiç başlatmadan tasarruf sağlar. ASIL savunma bu değildir — aşağıdaki
+  // 1. adımda gövde STREAM SIRASINDA sınırlanır; bu ön kontrol tamamen atlanabilir olsa da
+  // (`Content-Length` yok/yalan) arkasındaki akış-bazlı kontrol atlatılamaz.
+  const contentLengthHeader = request.headers.get('content-length')
+  if (contentLengthHeader !== null) {
+    const declaredLength = Number(contentLengthHeader)
+    if (Number.isFinite(declaredLength) && declaredLength > MAX_BODY_BYTES) {
+      log.warn(
+        { upstreamPath, declaredLength },
+        'AI proxy: Content-Length beyanı gövde boyutu sınırını aşıyor'
+      )
+      return errorResponse(
+        413,
+        'PAYLOAD_TOO_LARGE',
+        'İstek gövdesi çok büyük. Lütfen daha küçük bir istek gönderin.',
+        requestId
+      )
+    }
+  }
+
+  // 1) Gövdeyi oku — ASIL savunma (A-08). `request.text()` gövdeyi ÖNCE tamamen belleğe alıp
+  // SONRA bayt sayımı yapardı; bu, `Content-Length` olmayan (chunked/streaming) bir istekte
+  // saldırganın gönderdiği DEV bir gövdeyi biz reddetmeden önce tamamen okumuş/bellekte tutmuş
+  // olmamız anlamına gelirdi — A-08'in tarif ettiği DoS vektörünün ta kendisi. Bunun yerine
+  // gövde `ReadableStream` üzerinden PARÇA PARÇA okunur; biriken bayt sayısı `MAX_BODY_BYTES`'ı
+  // AŞAR AŞMAZ `reader.cancel()` ile akış DERHAL durdurulur ve kalan baytlar hiç okunmadan/
+  // belleğe alınmadan 413 dönülür.
+  let bodyText: string
+  if (request.body === null) {
+    // Gövdesiz istek — `JSON.parse('')` aşağıda `INVALID_JSON`'a düşecek, mevcut davranış korunur.
+    bodyText = ''
+  } else {
+    const reader = request.body.getReader()
+    const chunks: Uint8Array[] = []
+    let receivedBytes = 0
+    let exceededLimit = false
+
+    try {
+      for (;;) {
+        const { done, value } = await reader.read()
+        if (done) break
+        if (!value) continue
+
+        receivedBytes += value.byteLength
+        if (receivedBytes > MAX_BODY_BYTES) {
+          exceededLimit = true
+          // Kalan chunk'lar HİÇ okunmaz/belleğe alınmaz — asıl DoS savunması budur.
+          await reader.cancel()
+          break
+        }
+        chunks.push(value)
+      }
+    } catch {
+      return errorResponse(400, 'INVALID_JSON', 'İstek gövdesi geçerli bir JSON değil.', requestId)
+    }
+
+    if (exceededLimit) {
+      log.warn({ upstreamPath }, 'AI proxy: gövde boyutu sınırı aşıldı (stream erken iptal edildi)')
+      return errorResponse(
+        413,
+        'PAYLOAD_TOO_LARGE',
+        'İstek gövdesi çok büyük. Lütfen daha küçük bir istek gönderin.',
+        requestId
+      )
+    }
+
+    const combined = new Uint8Array(receivedBytes)
+    let offset = 0
+    for (const chunk of chunks) {
+      combined.set(chunk, offset)
+      offset += chunk.byteLength
+    }
+    bodyText = new TextDecoder('utf-8').decode(combined)
+  }
+
   let rawBody: unknown
   try {
-    rawBody = await request.json()
+    rawBody = JSON.parse(bodyText)
   } catch {
     return errorResponse(400, 'INVALID_JSON', 'İstek gövdesi geçerli bir JSON değil.', requestId)
   }
@@ -119,11 +202,15 @@ export async function handleAiProxy<TOut>(
       cache: 'no-store',
     })
   } catch (error) {
+    // A-16 (güvenlik denetimi, findings-app-surface.md §3.11): önceki mesaj "Python AI
+    // sunucusuna ulaşılamadı..." diyerek upstream'in teknolojisini (FastAPI/Python) istemciye
+    // ifşa ediyordu — teknik detay yalnızca aşağıdaki `log.error` ile sunucuda kalır, gövdeye
+    // ASLA girmez.
     log.error({ upstreamPath, err: error }, 'AI backend’e ulaşılamadı')
     return errorResponse(
       503,
       'AI_BACKEND_UNAVAILABLE',
-      'Python AI sunucusuna ulaşılamadı. Sunucunun çalıştığından emin olun.',
+      'Yapay zeka servisine şu anda ulaşılamıyor. Lütfen daha sonra tekrar deneyin.',
       requestId
     )
   } finally {

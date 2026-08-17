@@ -39,7 +39,7 @@ vi.mock('@/lib/logger', () => {
   }
 })
 
-import { getServerEnv } from '@/env'
+import { getServerEnv } from '@/env.server'
 import { handleAiProxy } from '@/lib/api/proxy'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { aiWorkoutSchema } from '@/lib/validation/schemas'
@@ -314,9 +314,14 @@ describe('handleAiProxy — oturum doğrulama', () => {
 
       expect(response.status).toBe(503)
       expect(body.error.code).toBe('AI_BACKEND_UNAVAILABLE')
+      // A-16 (güvenlik denetimi, findings-app-surface.md §3.11): eski mesaj "Python AI
+      // sunucusuna ulaşılamadı..." iç mimariyi (upstream'in Python/FastAPI olduğunu) ifşa
+      // ediyordu. Yeni mesaj jenerik olmalı — hiçbir teknoloji/dil/framework adı geçmemeli.
       expect(body.error.message).toBe(
-        'Python AI sunucusuna ulaşılamadı. Sunucunun çalıştığından emin olun.'
+        'Yapay zeka servisine şu anda ulaşılamıyor. Lütfen daha sonra tekrar deneyin.'
       )
+      expect(body.error.message).not.toContain('Python')
+      expect(body.error.message.toLowerCase()).not.toContain('fastapi')
     })
   })
 })

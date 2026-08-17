@@ -1,6 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { getServerEnv, resetServerEnvCache } from '@/env'
+// AC-11 (güvenlik denetimi, findings-access-control.md): sunucu şeması `@/env`'ten
+// `@/env.server`'a taşındı; o modül `import 'server-only'` içerir. vitest (vite/esbuild) Next'in
+// build-time aliasing'ini uygulamadığından ham `server-only` paketi burada değerlendirilirse
+// koşulsuz fırlatır — bu yüzden diğer sunucu-tarafı testlerde kullanılan aynı desenle etkisiz
+// hale getiriyoruz. `vi.mock` hoisting nedeniyle importlardan ÖNCE tanımlanmalı.
+vi.mock('server-only', () => ({}))
+
+import { getServerEnv, resetServerEnvCache } from '@/env.server'
 
 // NOT: Test ortamı `jsdom`dır (vitest.config.ts), yani `window` global olarak HER ZAMAN
 // tanımlıdır. `getServerEnv()` ilk satırda `typeof window !== 'undefined'` kontrolü yapıp
@@ -112,5 +119,18 @@ describe('clientEnv', () => {
     const { clientEnv } = await import('@/env')
     expect(clientEnv.NEXT_PUBLIC_SUPABASE_URL).toBe('http://localhost:54321')
     expect(clientEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY).toBe('test-anon-key-0123456789abcdef')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// AC-11 kabul testi: `@/env` (istemci grafiği) artık sunucu şemasını İÇERMEZ
+// ---------------------------------------------------------------------------
+
+describe('@/env — sunucu API yüzeyi sızmıyor (AC-11)', () => {
+  it('`@/env` modülü `getServerEnv` EXPORT ETMEZ (sunucu şeması `@/env.server`e taşındı)', async () => {
+    const envModule: Record<string, unknown> = await import('@/env')
+    expect(envModule.getServerEnv).toBeUndefined()
+    expect(envModule.resetServerEnvCache).toBeUndefined()
+    expect(envModule.serverSchema).toBeUndefined()
   })
 })

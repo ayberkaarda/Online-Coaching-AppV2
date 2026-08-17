@@ -1,7 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { NextRequest } from 'next/server'
 
-import { resetServerEnvCache } from '@/env'
+// AC-11 (güvenlik denetimi, findings-access-control.md): `src/proxy.ts` artık `@/env.server`i
+// import ediyor (o modül `import 'server-only'` içerir). vitest ham `server-only` paketini
+// koşulsuz fırlatan haliyle çalıştırır (Next'in build-time aliasing'i burada devrede değil),
+// bu yüzden diğer sunucu-tarafı testlerdeki aynı desenle etkisiz hale getiriyoruz. `vi.mock`
+// hoisting nedeniyle importlardan ÖNCE tanımlanmalı.
+vi.mock('server-only', () => ({}))
+
+import { resetServerEnvCache } from '@/env.server'
 import { resetRateLimit } from '@/lib/rate-limit'
 import { proxy } from '@/proxy'
 
