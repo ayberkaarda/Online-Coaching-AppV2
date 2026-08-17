@@ -58,3 +58,11 @@ if (!URL.revokeObjectURL) {
 
 vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://test.supabase.co')
 vi.stubEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', 'test-anon-key')
+// Yukarıdaki sahte URL `*.supabase.co` desenine UYAR, bu yüzden `src/env.server.ts` içindeki
+// KATMAN 2 fail-closed guard'ı (barındırılan projeye kaza eseri sunucu tarafı erişim) tüm
+// birim testlerinde tetiklenirdi. Guard KASITLI olarak `NODE_ENV`'e koşullanmadığından
+// (bkz. env.server.ts'teki gerekçe) burada "test ortamı muafiyeti" gibi bir kaçış yolu
+// AÇILAMAZ — o kaçış yolu guard'ın kendisini zayıflatırdı. Bunun yerine test paketi guard'ın
+// AÇIK onay bayrağını kullanır. Guard'ın gerçek davranışı (bayrak yokken fırlatması dahil)
+// `tests/unit/env-hosted-guard.test.ts` içinde, bayrak oradan silinerek doğrulanır.
+vi.stubEnv('ALLOW_HOSTED_TARGET', '1')

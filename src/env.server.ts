@@ -55,6 +55,74 @@ const serverSchema = z
 
 export type ServerEnv = z.infer<typeof serverSchema>
 
+/**
+ * KATMAN 2 — BARINDIRILAN (hosted) SUPABASE PROJESİNE KAZA ESERİ SUNUCU TARAFI ERİŞİM.
+ *
+ * KAPATILAN YOL: bu süreçte `SUPABASE_SERVICE_ROLE_KEY` ile atılan her istek RLS'i BAYPAS
+ * eder. Yerelde çalıştığını sanan bir `npm run build && npm run start` (ya da bir bakım
+ * script'i) barındırılan projeye yönlendirilmişse, gerçek production verisini hiçbir satır
+ * seviyesinde politika durdurmadan yazabilir/silebilir. Bu, kaza eseri yazmanın EN PAHALI
+ * yoludur, o yüzden burada FAIL-CLOSED kesilir.
+ *
+ * `NODE_ENV`'E KASITLI OLARAK KOŞULLANMADI. İlk akla gelen `NODE_ENV !== 'production'`
+ * koşulu İŞE YARAMAZ: tehlikeli yol tam olarak `npm run build && npm run start` üzerinden
+ * geçer ve `next start` NODE_ENV=production ile koşar. Guard, korumaya çalıştığı senaryonun
+ * içinde kendini kapatırdı. Bunun regresyon testi: `tests/unit/env-hosted-guard.test.ts`
+ * ("NODE_ENV=production iken de fırlatır").
+ *
+ * NEYİ KAPATMAZ: tarayıcıdan DOĞRUDAN Supabase'e giden yazmaları (ör. `daily-log`). Bu dosya
+ * `server-only`'dir, kodu istemci paketine hiç girmez; proxy yalnızca `/api/*` görür. Uzak
+ * hedefe giden tarayıcı yolu KATMAN 0 (`.env.local` artık yerel yığını gösterir) ve KATMAN 1
+ * (`playwright.config.ts` iddiası) ile kapatılır. Aynı sebeple gerçek production'da tarayıcı
+ * barındırılan projeye MEŞRU şekilde bağlanmaya devam eder — bu guard onu etkilemez.
+ *
+ * NE ZAMAN DEĞERLENDİRİLİR: `NEXT_PUBLIC_*` değişkenleri sunucu paketine de BUILD-TIME'da
+ * gömülür, yani aşağıdaki `process.env.NEXT_PUBLIC_SUPABASE_URL` uygulamanın BUILD ALINDIĞI
+ * hedefi verir (ölçüldü: `next start` sırasında bu değişkeni değiştirmek guard'ın gördüğü
+ * değeri değiştirmez). Bu istenen davranıştır — uygulamanın gerçekten konuşacağı proje
+ * build-time'da belirlenir. `ALLOW_HOSTED_TARGET` ise sıradan bir sunucu değişkeni olduğu için
+ * ÇALIŞMA ZAMANINDA okunur; yeniden build almadan verilebilir. Guard `next build`'i DÜŞÜRMEZ
+ * (build `getServerEnv()` çağırmaz), ilk İSTEKTE düşer.
+ *
+ * DEPLOY SÖZLEŞMESİ: gerçek production ortamında (Vercel/Docker) `ALLOW_HOSTED_TARGET=1`
+ * AYARLANMAK ZORUNDADIR; aksi halde uygulama ilk istekte bilinçli olarak düşer.
+ * Bkz. `.env.example` ve `docs/DEPLOYMENT.md` §5.1.
+ */
+const HOSTED_SUPABASE_HOST = /\.supabase\.(co|com)$/
+
+function assertHostedTargetAllowed(): void {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  if (!url) return
+
+  let host: string
+  try {
+    host = new URL(url).hostname
+  } catch {
+    // Ayrıştırılamayan değer: ham metni sondaki `/` olmadan değerlendir — hatalı biçimli
+    // bir URL guard'ı ATLATMAMALI.
+    host = url.replace(/\/+$/, '')
+  }
+
+  if (!HOSTED_SUPABASE_HOST.test(host)) return
+  if (process.env.ALLOW_HOSTED_TARGET === '1') return
+
+  throw new Error(
+    'Sunucu tarafı ortam BARINDIRILAN (uzak) bir Supabase projesine yönlendirilmiş: ' +
+      `${host}\n` +
+      "Bu süreç SUPABASE_SERVICE_ROLE_KEY ile RLS'i baypas ederek yazabildiği için, kaza eseri " +
+      'gerçek production verisini değiştirme riski vardır ve istek reddedildi.\n' +
+      '\n' +
+      'Ne yapmalı:\n' +
+      '  - Yerel geliştirme/test: `.env.local` dosyanızın yerel yığını (http://127.0.0.1:54321) ' +
+      'gösterdiğinden emin olun (`npx supabase status`).\n' +
+      '  - Barındırılan projeye BİLEREK bağlanıyorsanız: `npm run dev:hosted` (ya da ' +
+      '`npm run start:hosted`) kullanın — bunlar `.env.hosted.local` üzerinden ' +
+      'ALLOW_HOSTED_TARGET=1 sağlar.\n' +
+      '  - Gerçek production dağıtımı (Vercel/Docker): ortam değişkenlerine ' +
+      'ALLOW_HOSTED_TARGET=1 ekleyin (bkz. docs/DEPLOYMENT.md §5).'
+  )
+}
+
 let cachedServerEnv: ServerEnv | null = null
 
 /**
@@ -67,6 +135,11 @@ export function getServerEnv(): ServerEnv {
   }
 
   if (cachedServerEnv) return cachedServerEnv
+
+  // KATMAN 2: şema doğrulamasından ÖNCE. Hedef yanlışsa diğer değişkenlerin geçerli olup
+  // olmaması önemsizdir; ayrıca hata fırlattığı için hiçbir şey önbelleğe alınmaz ve guard
+  // her çağrıda yeniden çalışır (fail-closed).
+  assertHostedTargetAllowed()
 
   const parsed = serverSchema.safeParse({
     SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,

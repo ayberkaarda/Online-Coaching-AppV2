@@ -16,9 +16,14 @@
 //   SUPABASE_URL (veya NEXT_PUBLIC_SUPABASE_URL)
 //   SUPABASE_SERVICE_ROLE_KEY
 //
-// Not: `.env.local` BİLEREK okunmaz. O dosya barındırılan (production) projeye
-// işaret ettiği için, kazayla canlı veritabanına yazmayı önlemek adına
-// değişkenler her çalıştırmada kabuktan açıkça verilmelidir.
+// Not: hiçbir `.env` dosyası BİLEREK okunmaz — hedef her çalıştırmada AÇIKÇA
+// belirtilir. (Eskiden gerekçe "`.env.local` barındırılan projeyi gösteriyor"du;
+// `.env.local` artık YEREL yığını gösterir, ama kural aynı kalıyor: bu script
+// service_role ile yazar, yani hedefi örtük bir dosyadan devralmamalıdır.)
+//
+//   Yerel  : $env:NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY kabuktan
+//   Hosted : npx dotenv -e .env.hosted.local -- node scripts/import-catalog.mjs
+//            (barındırılan hedefe BİLEREK yazar — bkz. src/env.server.ts KATMAN 2)
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'

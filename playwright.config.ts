@@ -1,6 +1,47 @@
 import { defineConfig, devices } from '@playwright/test'
 import os from 'node:os'
 
+// ---------------------------------------------------------------------------
+// KATMAN 1 — UZAK (BARINDIRILAN) SUPABASE'E KARŞI E2E KOŞMAYI ENGELLEYEN İDDİA
+//
+// NEDEN AYRI BİR SATIR: aşağıdaki `webServer.env` bloğu da aynı tuzağı kapatıyor,
+// ama o blok bir gün "env'i sadeleştirelim" diye silinirse koruma SESSİZCE kaybolur
+// ve bir sonraki `npm run test:e2e` barındırılan projeye GERÇEK VERİ YAZAR
+// (`daily-log` senaryosu kayıt oluşturur; bkz. docs/PROGRESS.md §5). Bu iddia
+// config nesnesi kurulmadan ÖNCE, modül değerlendirme anında çalışır: tek tarayıcı
+// açılmadan, `npm run build` bile alınmadan düşer. İki koruma birbirini YEDEKLER —
+// biri kaybolursa diğeri hâlâ ayakta kalır, o yüzden ikisi de burada durur.
+//
+// KASITLI OLARAK `NODE_ENV`'E KOŞULLU DEĞİL: e2e paketi `npm run build && npm run
+// start` üzerinden koşar ve `next start` NODE_ENV=production ile çalışır (bkz.
+// aşağıdaki A-12 notu). `NODE_ENV !== 'production'` gibi bir koşul, korumaya
+// çalıştığı senaryonun tam olarak içinde kendini kapatırdı.
+const effectiveSupabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'http://127.0.0.1:54321'
+const supabaseHost = (() => {
+  try {
+    return new URL(effectiveSupabaseUrl).hostname
+  } catch {
+    // Ayrıştırılamayan değer (şema unutulmuş vb.): ham metni sondaki `/` ve port
+    // olmadan değerlendir — hatalı biçimli bir URL yüzünden korumayı ATLATMA.
+    return effectiveSupabaseUrl.replace(/\/+$/, '')
+  }
+})()
+
+if (/\.supabase\.(co|com)$/.test(supabaseHost) && process.env.E2E_ALLOW_REMOTE_SUPABASE !== '1') {
+  throw new Error(
+    'E2E paketi BARINDIRILAN (uzak) bir Supabase projesine yönlendirilmiş: ' +
+      `${supabaseHost}\n` +
+      'Bu koşu uzak veritabanına GERÇEK VERİ YAZAR (ör. daily-log senaryosu kayıt oluşturur) ' +
+      've yerel seed kullanıcıları orada bulunmadığı için zaten tüm login testleri kırılır.\n' +
+      '\n' +
+      'Ne yapmalı:\n' +
+      '  - Yerele karşı koşmak için: NEXT_PUBLIC_SUPABASE_URL değişkenini ayarlamayın ' +
+      '(varsayılan http://127.0.0.1:54321) ve `.env.local` dosyanızın yerel yığını ' +
+      'gösterdiğinden emin olun.\n' +
+      '  - Uzak hedefi GERÇEKTEN istiyorsanız: E2E_ALLOW_REMOTE_SUPABASE=1 ayarlayın.'
+  )
+}
+
 /**
  * Yerel worker tavanı — YALNIZCA SUNUCU YÜKÜ İÇİN.
  *
@@ -64,10 +105,14 @@ export default defineConfig({
     url: process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:3000',
     reuseExistingServer: !process.env.CI,
     // ORTAM TUZAĞI KAPATILDI — `NEXT_PUBLIC_*` değişkenleri BUILD ZAMANINDA
-    // bundle'a gömülür. Depoda duran `.env.local` BARINDIRILAN (uzak) Supabase
-    // projesini gösteriyor; bu blok olmadan yukarıdaki `npm run build` uygulamayı
-    // uzak projeye bağlar, yerel seed kullanıcıları orada bulunmadığı için TÜM
-    // E2E login'leri kırılır. (Bu tuzak iki kez vakit kaybettirdi.)
+    // bundle'a gömülür. `.env.local` eskiden BARINDIRILAN (uzak) Supabase projesini
+    // gösteriyordu; bu blok olmadan yukarıdaki `npm run build` uygulamayı uzak projeye
+    // bağlıyor, yerel seed kullanıcıları orada bulunmadığı için TÜM E2E login'leri
+    // kırılıyor ve dahası uzak veritabanına gerçek veri yazılıyordu. (Bu tuzak iki kez
+    // vakit kaybettirdi.) `.env.local` artık yerel yığını gösteriyor ve dosyanın
+    // tepesindeki KATMAN 1 iddiası aynı tuzağı ikinci kez kapatıyor; bu blok ÜÇÜNCÜ
+    // yedek olarak KASITLI şekilde yerinde bırakıldı — üçü birden kaybolmadıkça
+    // koşu yanlış hedefe gidemez.
     //
     // Aşağıdaki değerler yerel Supabase yığınının SABİT DEMO ANAHTARLARIDIR
     // (`npx supabase status` her kurulumda aynısını üretir) — gerçek sır DEĞİLDİR,
