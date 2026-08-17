@@ -42,6 +42,14 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Kimlik ratchet (ADR-0018)
+        # Tek yönlü mandal: eski görsel dilin (font-black, gradyan, rounded-3xl,
+        # ham #8b5cf6, emoji) sayaçları kilitli tavanın üstüne çıkarsa burada
+        # kırmızı olur. bkz. docs/adr/0018-kimlik-gecisi-iki-katman-ve-ci-ratchet.md
+        # ve scripts/identity-ratchet.mjs. Ucuz bir grep taraması olduğu için ayrı
+        # bir job değil, mevcut frontend job'una bir adım olarak eklendi.
+        run: npm run ratchet
+
       - name: Type-check
         run: npm run type-check
 
