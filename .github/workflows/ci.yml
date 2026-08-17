@@ -4,6 +4,12 @@ on:
   push:
     branches: [main]
   pull_request:
+  schedule:
+    # Faz 1.5 Grup 6 / T-05: gitleaks'in PR/push adımları yalnızca YENİ commit'leri tarar
+    # (bkz. `security` job'u). Bu haftalık job, o taramaların atladığı her şeyi (ör.
+    # `--no-verify` ile geçmişte main'e girmiş bir commit) yakalamak için TAM git geçmişini
+    # tarar. Pazartesi 03:00 UTC — mesai dışı, diğer CI yüküyle çakışma ihtimali düşük.
+    - cron: '0 3 * * 1'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -256,10 +262,127 @@ jobs:
           context: ./ai_backend
           push: false
 
+  security:
+    name: Security scanning (semgrep / gitleaks / npm audit / pip-audit)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      GITLEAKS_VERSION: '8.30.1'
+    steps:
+      # gitleaks'in PR taraması (base..head) ve haftalık tam geçmiş taraması git log'una
+      # ihtiyaç duyar; bu yüzden fetch-depth burada — SADECE bu job'un checkout adımında —
+      # 0'a çekiliyor. Diğer job'lar (frontend/backend/e2e/docker) varsayılan sığ checkout'u
+      # korur.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: '3.12'
+
+      # --- semgrep (SAST) ---
+      # `semgrep/semgrep` resmi action'ı yerine `uvx semgrep` tercih edildi: (1) `ai_backend`
+      # job'u zaten `uv`/`uvx`'i kurulu bir araç olarak kullanıyor, aynı deseni tekrarlamak
+      # ek bir Docker imajı çekmekten (resmi action'ın temeli) daha hafif ve hızlı; (2) bu,
+      # `docs/security/tooling-baseline.md` §4'te YEREL olarak doğrulanmış komutun BİREBİR
+      # aynısı — CI'daki davranış denetimde ölçülenle tutarlı kalır. `--metrics=off` semgrep'in
+      # anonim kullanım telemetrisini kapatır. `--severity=ERROR` + `--error`: semgrep'in
+      # `--error` bayrağı TEK BAŞINA "herhangi bir bulguda" exit 1 verir (severity'den bağımsız);
+      # bu proje üzerinde yerel doğrulamada bu tek başına yanlış bir kırmızıya yol açtığı
+      # görüldü (`pyproject.toml` için MEDIUM önem dereceli, gerçek bir güvenlik açığı OLMAYAN
+      # bir "dependency cooldown" öneri kuralı). `--severity=ERROR` yalnızca ERROR (yüksek
+      # önem/güven) kuralları rapora dahil eder — kabul kriterindeki "high+ bulguda kırılsın"
+      # şartı budur; MEDIUM/WARNING/INFO seviyesindeki öneriler job'u kırmıyor.
+      - name: semgrep — frontend (TypeScript / React)
+        run: >-
+          uvx semgrep --config p/owasp-top-ten --config p/typescript --config p/react
+          --error --severity=ERROR --metrics=off src/
+
+      - name: semgrep — backend (Python)
+        run: >-
+          uvx semgrep --config p/owasp-top-ten --config p/python
+          --error --severity=ERROR --metrics=off ai_backend/
+
+      # --- gitleaks (secret taraması) ---
+      # Resmi `gitleaks/gitleaks-action` yerine doğrudan release binary'si indiriliyor:
+      # o action private repo'larda lisans anahtarı istiyor ve ek bir üçüncü parti Docker
+      # imajı gerektiriyor. Sürüm, yerel denetimde kullanılan ve doğrulanmış olan 8.30.1'e
+      # sabitlendi (bkz. tooling-baseline.md §1) — tekrarlanabilirlik için.
+      - name: Install gitleaks
+        run: |
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" -o /tmp/gitleaks.tar.gz
+          mkdir -p "$HOME/.local/bin"
+          tar -xzf /tmp/gitleaks.tar.gz -C "$HOME/.local/bin" gitleaks
+          chmod +x "$HOME/.local/bin/gitleaks"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/bin/gitleaks" version
+
+      # PR'da yalnızca BU PR'ın getirdiği yeni commit'ler taranır — tüm geçmişi her PR'da
+      # taramak gereksiz yavaşlık yaratır (bkz. tooling-baseline.md §9 CI önerisi).
+      - name: gitleaks — yeni commit'ler (PR)
+        if: github.event_name == 'pull_request'
+        run: |
+          gitleaks detect --source . --redact \
+            --log-opts="${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}"
+
+      # main'e push'ta da aynı mantıkla yalnızca yeni gelen commit'ler taranır. `before` tüm
+      # sıfırlardan oluşuyorsa (branch'in ilk push'u / olağandışı bir olay) `git log` geçersiz
+      # bir aralıkla patlar; bu durumda güvenli bir tabana düşülüp yalnızca son commit taranır.
+      - name: gitleaks — yeni commit'ler (push)
+        if: github.event_name == 'push'
+        run: |
+          BEFORE="${{ github.event.before }}"
+          if [[ "$BEFORE" =~ ^0+$ ]]; then
+            gitleaks detect --source . --redact --log-opts="-1"
+          else
+            gitleaks detect --source . --redact --log-opts="${BEFORE}..${{ github.event.after }}"
+          fi
+
+      # Haftalık zamanlanmış tarama: PR/push adımlarının taramadığı her şeyi (ör. geçmişte
+      # `--no-verify` ile main'e girmiş bir commit) yakalamak için TAM git geçmişi (bkz. yukarı,
+      # `on.schedule`). `--log-opts` verilmez — gitleaks bunu varsayılan olarak tüm `git log`
+      # geçmişini tarama anlamına getirir.
+      - name: gitleaks — tam geçmiş (haftalık schedule)
+        if: github.event_name == 'schedule'
+        run: gitleaks detect --source . --redact -v
+
+      # --- npm audit (bağımlılık zafiyetleri, yalnızca prod bağımlılıkları) ---
+      # DİKKAT: `next-pwa@5.6.0` şu an `package.json`'da `dependencies` altında duruyor ve
+      # build-time zafiyetler taşıyan terk edilmiş bir ağaca sahip (T-04, tooling-baseline.md
+      # §2). Bu paket bu Faz 1.5 turunda paralel bir ajan tarafından `devDependencies`'e
+      # taşınıyor (Grup 5) — o değişiklik bu PR'a girene/merge olana kadar bu adım KIRMIZI
+      # olabilir. `continue-on-error` BİLEREK eklenmedi: T-04 taşınana kadar bu job'un kırmızı
+      # kalması beklenen ve doğru bir sinyaldir, sessizce yeşile boyanmamalı.
+      - name: npm audit (production bağımlılıkları)
+        run: npm audit --audit-level=high --omit=dev
+
+      # --- pip-audit (ai_backend Python bağımlılıkları) ---
+      # `uvx pip-audit` ÇIPLAK ÇALIŞTIRILMAZ — pip-audit'in KENDİ izole ortamını tarayıp
+      # (fastapi/starlette/uvicorn hiç görünmeden) projeyi hiç kapsamadığı yerel denetimde
+      # doğrulandı (tooling-baseline.md §3). Doğru yöntem: `uv export` ile projenin gerçek
+      # çözümlenmiş bağımlılık grafiğini bir requirements dosyasına yazıp `-r` ile onu taramak.
+      # `--no-emit-project` projenin kendi editable self-reference satırını (`-e .` / `.`)
+      # dışlar — bu satır pip-audit'e bir gereksinim olarak anlamlı gelmez.
+      - name: Export ai_backend bağımlılıkları
+        working-directory: ai_backend
+        run: uv export --format requirements-txt --no-hashes --no-emit-project -o requirements-ci.txt
+
+      - name: pip-audit
+        working-directory: ai_backend
+        run: uvx pip-audit -r requirements-ci.txt --progress-spinner off
+
   required-checks:
     name: Required checks
     if: always()
-    needs: [frontend, backend, e2e, docker]
+    needs: [frontend, backend, e2e, docker, security]
     runs-on: ubuntu-latest
     steps:
       - name: Verify all required jobs passed
@@ -268,9 +391,11 @@ jobs:
           echo "backend: ${{ needs.backend.result }}"
           echo "e2e: ${{ needs.e2e.result }}"
           echo "docker: ${{ needs.docker.result }}"
+          echo "security: ${{ needs.security.result }}"
           if [[ "${{ needs.frontend.result }}" != "success" ]] || \
              [[ "${{ needs.backend.result }}" != "success" ]] || \
              [[ "${{ needs.docker.result }}" != "success" ]] || \
+             [[ "${{ needs.security.result }}" != "success" ]] || \
              { [[ "${{ needs.e2e.result }}" != "success" ]] && [[ "${{ needs.e2e.result }}" != "skipped" ]]; }; then
             echo "One or more required jobs failed."
             exit 1
