@@ -79,20 +79,20 @@ severity içinde kaynak rapor sırasıyla (AC → A → T) ve ID numarasıyla.
 
 ### Medium
 
-| ID    | Severity | Alan             | Başlık                                                   | Kaynak rapor               | Durum                                                                                                                      |
-| ----- | -------- | ---------------- | -------------------------------------------------------- | -------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| AC-03 | Medium   | RLS/Yetki        | `authenticated` rolünde `TRUNCATE` yetkisi (RLS bypass)  | findings-access-control.md | **fixed** — `supabase/migrations/20260817170000_force_rls_and_grants.sql` — **severity yeniden değerlendirildi, bkz. §4c** |
-| AC-04 | Medium   | RLS/Yetki        | Mesaj alıcısı gövde/`kind`/`created_at` değiştirebiliyor | findings-access-control.md | **fixed** — `supabase/migrations/20260817160200_column_guards.sql` (`messages_guard_columns()`)                            |
-| AC-05 | Medium   | RLS/Yetki        | Danışan koçun bildirim akışına keyfi içerik yazabiliyor  | findings-access-control.md | **fixed** — `20260817160200_column_guards.sql` (`notifications_guard_content()`) — bilinen borç: bkz. §4b                  |
-| A-05  | Medium   | Kimlik Doğrulama | Oturum token'ları `localStorage`'da, JS'ten okunabilir   | findings-app-surface.md    | open                                                                                                                       |
-| A-06  | Medium   | Kimlik Doğrulama | Logout access token'ı veri düzleminde iptal etmiyor      | findings-app-surface.md    | **fixed (kısmi — kullanıcı kararı)** — `supabase/config.toml` `jwt_expiry` 3600→900, bkz. §7                               |
-| A-07  | Medium   | Storage          | Dosya yüklemede magic byte doğrulaması yok               | findings-app-surface.md    | **fixed** — `src/lib/upload-validation.ts` (yeni)                                                                          |
-| A-08  | Medium   | Girdi Doğrulama  | İstek gövdesi sınırı yok; 10 MB'da sessiz kesme          | findings-app-surface.md    | **fixed** — `src/lib/api/proxy.ts` (`MAX_BODY_BYTES=64KB`, stream `reader.cancel()`)                                       |
-| A-09  | Medium   | AI Backend       | FastAPI hız sınırı tüm kullanıcılar için tek ortak kova  | findings-app-surface.md    | **fixed** — `ai_backend/app/core/rate_limit.py` + `src/lib/api/proxy.ts` (doğrulanmış `X-User-Id`)                         |
-| A-10  | Medium   | Loglama/Gizlilik | Güvenlik olayları loglanmıyor                            | findings-app-surface.md    | **fixed (kısmi)** — `src/proxy.ts`, `src/app/api/auth/sign-in/route.ts`; RLS reddi çağrı noktası eksik, bkz. §4c           |
-| A-11  | Medium   | Loglama/Gizlilik | Logger redact listesi PII/sağlık verisini kapsamıyor     | findings-app-surface.md    | **fixed** — `src/lib/logger.ts` (5→19 anahtar) + tarayıcı `maskForConsole()`                                               |
-| A-12  | Medium   | Yapılandırma     | `AI_BACKEND_API_KEY` opsiyonel, prod'da fail-fast yok    | findings-app-surface.md    | **fixed** — `src/env.ts` (zod `superRefine`)                                                                               |
-| A-13  | Medium   | AI Backend       | FastAPI `/docs`, `/redoc`, `/openapi.json` prod'da açık  | findings-app-surface.md    | **fixed** — `ai_backend/app/main.py` (prod'da `docs_url`/`redoc_url`/`openapi_url` `None`)                                 |
+| ID    | Severity | Alan             | Başlık                                                   | Kaynak rapor               | Durum                                                                                                                                                                                                                         |
+| ----- | -------- | ---------------- | -------------------------------------------------------- | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AC-03 | Medium   | RLS/Yetki        | `authenticated` rolünde `TRUNCATE` yetkisi (RLS bypass)  | findings-access-control.md | **fixed** — `supabase/migrations/20260817170000_force_rls_and_grants.sql` — **severity yeniden değerlendirildi, bkz. §4c**                                                                                                    |
+| AC-04 | Medium   | RLS/Yetki        | Mesaj alıcısı gövde/`kind`/`created_at` değiştirebiliyor | findings-access-control.md | **fixed** — `supabase/migrations/20260817160200_column_guards.sql` (`messages_guard_columns()`)                                                                                                                               |
+| AC-05 | Medium   | RLS/Yetki        | Danışan koçun bildirim akışına keyfi içerik yazabiliyor  | findings-access-control.md | **fixed** — `20260817160200_column_guards.sql` (`notifications_guard_content()`) — bilinen borç: bkz. §4b                                                                                                                     |
+| A-05  | Medium   | Kimlik Doğrulama | Oturum token'ları `localStorage`'da, JS'ten okunabilir   | findings-app-surface.md    | open                                                                                                                                                                                                                          |
+| A-06  | Medium   | Kimlik Doğrulama | Logout access token'ı veri düzleminde iptal etmiyor      | findings-app-surface.md    | **fixed (kısmi — kullanıcı kararı)** — `supabase/config.toml` `jwt_expiry` 3600→900, bkz. §7                                                                                                                                  |
+| A-07  | Medium   | Storage          | Dosya yüklemede magic byte doğrulaması yok               | findings-app-surface.md    | **fixed** — `src/lib/upload-validation.ts` (yeni)                                                                                                                                                                             |
+| A-08  | Medium   | Girdi Doğrulama  | İstek gövdesi sınırı yok; 10 MB'da sessiz kesme          | findings-app-surface.md    | **fixed** — `src/lib/api/proxy.ts` (`MAX_BODY_BYTES=64KB`, stream `reader.cancel()`)                                                                                                                                          |
+| A-09  | Medium   | AI Backend       | FastAPI hız sınırı tüm kullanıcılar için tek ortak kova  | findings-app-surface.md    | **fixed** — `ai_backend/app/core/rate_limit.py` + `src/lib/api/proxy.ts` (doğrulanmış `X-User-Id`)                                                                                                                            |
+| A-10  | Medium   | Loglama/Gizlilik | Güvenlik olayları loglanmıyor                            | findings-app-surface.md    | **fixed (kısmi)** — `src/proxy.ts`, `src/app/api/auth/sign-in/route.ts`; RLS reddi çağrı noktası eksik, bkz. §4c                                                                                                              |
+| A-11  | Medium   | Loglama/Gizlilik | Logger redact listesi PII/sağlık verisini kapsamıyor     | findings-app-surface.md    | **fixed** — `src/lib/logger.ts` (5→19 anahtar) + tarayıcı `maskForConsole()`                                                                                                                                                  |
+| A-12  | Medium   | Yapılandırma     | `AI_BACKEND_API_KEY` opsiyonel, prod'da fail-fast yok    | findings-app-surface.md    | **fixed** — Grup 1'de `src/env.ts` içinde eklendi (zod `superRefine`); Grup 5/AC-11 sunucu şemasını `src/env.server.ts`'e taşıdı, `superRefine` de onunla birlikte oraya geçti (bkz. §4c) — GÜNCEL konum: `src/env.server.ts` |
+| A-13  | Medium   | AI Backend       | FastAPI `/docs`, `/redoc`, `/openapi.json` prod'da açık  | findings-app-surface.md    | **fixed** — `ai_backend/app/main.py` (prod'da `docs_url`/`redoc_url`/`openapi_url` `None`)                                                                                                                                    |
 
 ### Low
 
@@ -465,7 +465,8 @@ yapılmamalı).
   etkisi yok, senaryo 73 ile izleniyor.
 - A-05/A-14 (httpOnly cookie + nonce CSP) kullanıcı kararıyla ayrı bir tura ertelendi.
 - `playwright.config.ts` içindeki bir yorum hâlâ `src/env.ts` diyor; A-12 kontrolü artık
-  `src/env.server.ts`'te — yorum güncellenmedi.
+  `src/env.server.ts`'te — yorum güncellenmedi. **ÇÖZÜLDÜ (2026-08-17, Faz 1.7 borç
+  temizliği):** yorum `src/env.server.ts`'e ve `superRefine`'a atıf yapacak şekilde düzeltildi.
 
 ---
 
@@ -630,10 +631,12 @@ requirements>` adımları eklensin; high+ bulguda job kırılsın.
   getirilmesi (`unsafe-inline`'ın kaldırılması) tek bir işlem olarak ayrı bir tura ertelendi —
   Grup 5'in geri kalanı (AC-03, AC-06, AC-11, A-10 kısmi, A-11, A-15, A-16, T-04 kısmi) bu turda
   kapandı, bu ikisi kapanmadı. Bkz. §4c.
-- **`playwright.config.ts` yorum tutarsızlığı (yeni, 2026-08-17).** Dosyadaki bir yorum hâlâ
-  A-12 kontrolünü `src/env.ts`'e bağlıyor; AC-11 düzeltmesi (§4c) sunucu şemasını
-  `src/env.server.ts`'e taşıdı, yorum güncellenmedi. Davranışsal bir hata değil, yalnızca yanıltıcı
-  bir yorum — bir sonraki dokunuşta düzeltilmeli.
+- **`playwright.config.ts` yorum tutarsızlığı (yeni, 2026-08-17). GEÇERSİZ (2026-08-17
+  doğrulandı, Faz 1.7 borç temizliği).** Dosyadaki bir yorum hâlâ A-12 kontrolünü `src/env.ts`'e
+  bağlıyordu; AC-11 düzeltmesi (§4c) sunucu şemasını `src/env.server.ts`'e taşımıştı, yorum
+  güncellenmemişti. Davranışsal bir hata değildi, yalnızca yanıltıcı bir yorumdu — `src/env.ts`
+  ve `src/env.server.ts` kaynağından doğrulanıp yorum `src/env.server.ts`/`superRefine`'a atıf
+  yapacak şekilde düzeltildi. Artık açık soru değil.
 - **A-01'in upstream bağımlılığı (yeni, 2026-08-17).** `[auth.rate_limit]` yapılandırması repoda
   kasıtlı olarak bırakıldı ama bugün hiçbir koruma sağlamıyor —
   [supabase/supabase#41947](https://github.com/supabase/supabase/issues/41947) düzeltildiğinde bu

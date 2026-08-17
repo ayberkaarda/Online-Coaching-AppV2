@@ -852,12 +852,15 @@ düşürdüğünde yeni değer baseline olur.
 - AC-2.3: Form check medyası public URL ile ERİŞİLEMEZ (curl testiyle kanıtla).
 - AC-2.4: Bileşenlerde doğrudan veri erişimi yoktur; grep ile doğrula:
   `supabase.from(` çağrısı yalnızca `src/hooks/**` ve `src/lib/supabase/**`
-  içinde geçer. Tek istisna, service-role istemcisiyle çalışan sunucu
-  action'ları (`src/app/actions.ts`) — grep beyaz listesine bu dosya adıyla
-  alınır, başka istisna eklenmez. Faz 4.5'ten sonra kural
-  "`supabase.from(` yalnızca `packages/api-client` içinde" olarak sıkılaşır ve
-  aynı ekranın web/mobil sürümü aynı api-client fonksiyonunu çağırır
-  (AC-4.5.5).
+  içinde geçer, **istisna yok**. **GÜNCELLEME (Faz 1.7):** eski istisna
+  `src/app/actions.ts` (service-role istemcisiyle çalışan sunucu action'ları)
+  bu dosyanın 4 ölü server action ile birlikte silinmesiyle geçersizleşti —
+  dosya artık yok, dolayısıyla grep beyaz listesine ihtiyaç kalmadı (kaynakta
+  doğrulandı: `ls src/app/actions.ts` → yok; bkz. `docs/PROGRESS.md` §3
+  "Faz 1.7"). Kural sadeleşti, gerekçesi ortadan kalkan istisna kaldırıldı.
+  Faz 4.5'ten sonra kural "`supabase.from(` yalnızca `packages/api-client`
+  içinde" olarak sıkılaşır ve aynı ekranın web/mobil sürümü aynı api-client
+  fonksiyonunu çağırır (AC-4.5.5).
 
 ---
 
