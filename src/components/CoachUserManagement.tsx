@@ -1,7 +1,13 @@
 'use client'
 
-// Koç paneli öğrenci portföyü: kart listesi + detay çekmecesi (kilo trendi,
-// makro grafiği, before/after kıyaslama ve program editörleri).
+// Koç paneli öğrenci portföyü: kart listesi + detay çekmecesi.
+//
+// Faz 1b sonrası çekmece tamamen ANALİTİK bir görünümdür (kilo trendi, makro
+// grafiği, before/after kıyaslama, form hatırlatması). Buradaki ham metin
+// program editörleri KALDIRILDI: hem antrenman hem beslenme planı artık kendi
+// normalize tablolarında yaşıyor ve yalnızca ilgili sekmelerden yazılıyor;
+// bu editörler cutover sonrası DEPRECATED profil kolonlarına yazan "ölü yazma"
+// hâline gelmişti (koç kaydediyor, danışan hiç görmüyordu).
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { JSX } from 'react'
@@ -19,13 +25,7 @@ import {
 } from 'recharts'
 
 import { EmptyState, SkeletonCard, SkeletonChart } from '@/components/ui'
-import {
-  useDailyLogs,
-  useFormChecks,
-  useLastCheckins,
-  useSendNotification,
-  useUpdateProfile,
-} from '@/hooks'
+import { useDailyLogs, useFormChecks, useLastCheckins, useSendNotification } from '@/hooks'
 import type { ProfileWithAvatar } from '@/hooks/useProfile'
 import { daysSince, formatDateTR } from '@/lib/utils'
 
@@ -46,15 +46,10 @@ export function CoachUserManagement({ clients }: CoachUserManagementProps): JSX.
   // "Şimdi" render sırasında değil, lazy initializer + event handler'larda hesaplanır (saflık kuralı).
   const [nowMs, setNowMs] = useState<number>(() => Date.now())
 
-  // Yalnızca beslenme taslağı: antrenman editörü bu çekmeceden kaldırıldı
-  // (Faz 1b Adım 2 — plan kaynağı `workout_plans` tabloları, "Antrenman" sekmesi).
-  const [nutritionDraft, setNutritionDraft] = useState('')
-
   // Prop değişince state'i ayarlamanın resmî React kalıbı: effect yerine render sırasında senkronlama.
   const [prevClientId, setPrevClientId] = useState<string | null>(selectedClient?.id ?? null)
   if ((selectedClient?.id ?? null) !== prevClientId) {
     setPrevClientId(selectedClient?.id ?? null)
-    setNutritionDraft(selectedClient?.nutrition_plan ?? '')
     setBeforePoseOverride(null)
     setAfterPoseOverride(null)
   }
@@ -68,7 +63,6 @@ export function CoachUserManagement({ clients }: CoachUserManagementProps): JSX.
   const formChecksQuery = useFormChecks(selectedClient?.id)
   const dailyLogsQuery = useDailyLogs(selectedClient?.id)
   const sendNotification = useSendNotification()
-  const updateProfile = useUpdateProfile()
 
   const poses = useMemo(() => formChecksQuery.data ?? [], [formChecksQuery.data])
 
@@ -588,32 +582,20 @@ export function CoachUserManagement({ clients }: CoachUserManagementProps): JSX.
                   )}
 
                   <div className="grid grid-cols-1 gap-6 border-t pt-6 dark:border-zinc-800">
-                    <div className="space-y-2">
-                      <label
-                        htmlFor="coach-nutrition-editor"
-                        className="text-xs font-bold uppercase tracking-wider text-brand-purple"
-                      >
-                        Beslenme Programı (Admin Editörü)
-                      </label>
-                      <textarea
-                        id="coach-nutrition-editor"
-                        value={nutritionDraft}
-                        onChange={(e) => setNutritionDraft(e.target.value)}
-                        className="h-32 w-full rounded-xl border bg-white p-4 text-sm focus:border-brand-purple focus:outline-none dark:border-zinc-800 dark:bg-zinc-950"
-                      />
-                      <button
-                        type="button"
-                        onClick={() =>
-                          updateProfile.mutate({
-                            id: selectedClient.id,
-                            values: { nutrition_plan: nutritionDraft },
-                          })
-                        }
-                        disabled={updateProfile.isPending}
-                        className="w-full rounded-xl bg-zinc-800 py-3 text-sm font-bold text-white transition-all hover:bg-black disabled:opacity-50 dark:bg-white dark:text-black dark:hover:bg-gray-200"
-                      >
-                        Beslenmeyi Kaydet
-                      </button>
+                    {/* Beslenme editörü bilinçli olarak KALDIRILDI: plan artık
+                        `nutrition_plans` tablolarında tutuluyor ve buradaki ham metin
+                        editörü ölü yazma yapıyordu (koç kaydediyor, danışan göremiyordu).
+                        Tam editör "Beslenme" sekmesinde. */}
+                    <div className="space-y-2 rounded-xl border border-brand-purple/30 bg-brand-purple/5 p-4">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-brand-purple">
+                        Beslenme Programı
+                      </h4>
+                      <p className="text-sm font-medium leading-relaxed text-gray-600 dark:text-gray-400">
+                        Beslenme programı buradan düzenlenmez. Gün bazlı tablo, besin kütüphanesi ve
+                        otomatik kalori hesabı için üstteki{' '}
+                        <span className="font-bold text-brand-purple">Beslenme</span> sekmesini
+                        kullanın.
+                      </p>
                     </div>
                     {/* Antrenman editörü bilinçli olarak KALDIRILDI: plan artık
                         `workout_plans` tablolarında tutuluyor ve buradaki ham metin

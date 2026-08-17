@@ -16,7 +16,7 @@ import {
   createSignedUrls,
 } from '@/lib/storage'
 import { supabase } from '@/lib/supabase/client'
-import type { Profile, TablesUpdate } from '@/types'
+import type { Profile } from '@/types'
 
 /** Profil satırı + avatar için üretilmiş imzalı adres. */
 export interface ProfileWithAvatar extends Profile {
@@ -66,39 +66,6 @@ export function useProfiles() {
         ...row,
         avatarSignedUrl: row.avatar_path ? (signed.get(row.avatar_path) ?? null) : null,
       }))
-    },
-  })
-}
-
-export interface UpdateProfileInput {
-  id: string
-  values: TablesUpdate<'profiles'>
-}
-
-export function useUpdateProfile() {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: async ({ id, values }: UpdateProfileInput): Promise<ProfileWithAvatar> => {
-      const { data, error } = await supabase
-        .from('profiles')
-        .update(values)
-        .eq('id', id)
-        .select()
-        .single()
-      if (error) throw new Error(error.message)
-
-      // Önbelleğe yazılacak kayıt da imzalı adresi taşımalı (setQueryData aşağıda).
-      return { ...data, avatarSignedUrl: await createSignedUrl(AVATAR_BUCKET, data.avatar_path) }
-    },
-    onSuccess: (profile) => {
-      queryClient.setQueryData(queryKeys.profile(profile.id), profile)
-      void queryClient.invalidateQueries({ queryKey: queryKeyRoots.profile })
-      void queryClient.invalidateQueries({ queryKey: queryKeyRoots.profiles })
-      toast.success('Profil güncellendi.')
-    },
-    onError: (error: Error) => {
-      toast.error(`Profil güncellenemedi: ${error.message}`)
     },
   })
 }

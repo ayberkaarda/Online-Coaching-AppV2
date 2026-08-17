@@ -66,3 +66,4 @@ ama karar metni silinmez — tarihsel bağlam korunur.
 | [0011](0011-ai-proxy-bearer-token.md)                               | AI proxy'lerinin Bearer token ile korunması                            | Kabul edildi                        | 2026-08-16 |
 | [0012](0012-pwa-webpack-build.md)                                   | PWA'nın korunması ve build'in `next build --webpack` ile alınması      | Kabul edildi                        | 2026-08-16 |
 | [0013](0013-rollerin-coach-client-olarak-yeniden-adlandirilmasi.md) | Rollerin (`admin`/`student` → `coach`/`client`) yeniden adlandırılması | Kabul edildi                        | 2026-08-17 |
+| [0014](0014-danisanin-kendi-beslenme-planini-kaydedebilmesi.md)     | Danışanın kendi beslenme planını kaydedebilmesi                        | Kabul edildi                        | 2026-08-17 |

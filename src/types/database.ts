@@ -210,6 +210,79 @@ export type Database = {
           },
         ]
       }
+      nutrition_plan_meals: {
+        Row: {
+          day: string
+          description: string
+          id: string
+          kcal: number | null
+          plan_id: string
+          position: number
+        }
+        Insert: {
+          day: string
+          description: string
+          id?: string
+          kcal?: number | null
+          plan_id: string
+          position?: number
+        }
+        Update: {
+          day?: string
+          description?: string
+          id?: string
+          kcal?: number | null
+          plan_id?: string
+          position?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nutrition_plan_meals_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "nutrition_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nutrition_plans: {
+        Row: {
+          client_id: string
+          created_at: string
+          id: string
+          is_active: boolean
+          notes: string | null
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          notes?: string | null
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          notes?: string | null
+          updated_at?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nutrition_plans_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_path: string | null
@@ -425,6 +498,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      explode_nutrition_day: {
+        Args: { p_day: string; p_entry: Json; p_plan_id: string }
+        Returns: number
+      }
       explode_plan_day: {
         Args: { p_day: string; p_plan_id: string; p_text: string }
         Returns: number
@@ -432,6 +509,13 @@ export type Database = {
       increment_streak: { Args: { user_id: string }; Returns: number }
       is_coach: { Args: { uid?: string }; Returns: boolean }
       is_coach_profile: { Args: { target: string }; Returns: boolean }
+      migrate_nutrition_plans_from_profiles: {
+        Args: never
+        Returns: {
+          meals_inserted: number
+          profiles_converted: number
+        }[]
+      }
       migrate_workout_plans_from_profiles: {
         Args: never
         Returns: {
@@ -442,6 +526,10 @@ export type Database = {
       profile_role: {
         Args: { uid?: string }
         Returns: Database["public"]["Enums"]["user_role"]
+      }
+      save_nutrition_plan: {
+        Args: { p_client_ids: string[]; p_plan: Json }
+        Returns: number
       }
       save_workout_plan: {
         Args: { p_client_ids: string[]; p_plan: Json }

@@ -8,19 +8,23 @@ import type { ChangeEvent, JSX } from 'react'
 import { useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 
-import { useProfile, useSession, useUpdatePassword, useUploadAvatar, useWorkoutPlan } from '@/hooks'
+import {
+  useNutritionPlan,
+  useProfile,
+  useSession,
+  useUpdatePassword,
+  useUploadAvatar,
+  useWorkoutPlan,
+} from '@/hooks'
 import { QueryState, SkeletonCard, SkeletonText } from '@/components/ui'
 import { passwordChangeSchema, type PasswordChangeInput } from '@/lib/validation/schemas'
-import { DAY_NAMES, EMPTY_WORKOUT_PLAN, parseNutritionPlan, type WorkoutPlan } from '@/types/domain'
-
-function isParsableJson(raw: string): boolean {
-  try {
-    JSON.parse(raw)
-    return true
-  } catch {
-    return false
-  }
-}
+import {
+  DAY_NAMES,
+  EMPTY_NUTRITION_PLAN,
+  EMPTY_WORKOUT_PLAN,
+  type NutritionPlan,
+  type WorkoutPlan,
+} from '@/types/domain'
 
 /**
  * Antrenman planı görünümü.
@@ -55,8 +59,19 @@ function WorkoutPlanView({ plan }: { plan: WorkoutPlan }): JSX.Element {
   )
 }
 
-function NutritionPlanView({ raw }: { raw: string | null }): JSX.Element {
-  if (!raw) {
+/**
+ * Beslenme planı görünümü.
+ *
+ * Faz 1b Adım 3b sonrası kaynak `nutrition_plans` + `nutrition_plan_meals`
+ * tablolarıdır; `useNutritionPlan()` gün->{items,total} sözlüğü döndürür.
+ * DEPRECATED `profiles.nutrition_plan` kolonu artık OKUNMAZ (bayat veri
+ * gösteriyordu). Kolon JSON string olduğu için burada bir "ayrıştırılamayan ham
+ * metin" hâli vardı; tablolar yapılandırılmış veri döndürdüğü için o dal düştü.
+ */
+function NutritionPlanView({ plan }: { plan: NutritionPlan }): JSX.Element {
+  const hasContent = DAY_NAMES.some((day) => plan[day].items.trim().length > 0)
+
+  if (!hasContent) {
     return (
       <p className="text-sm font-medium leading-relaxed text-gray-700 dark:text-gray-300">
         Koçunuz henüz bir beslenme programı atamadı.
@@ -64,15 +79,6 @@ function NutritionPlanView({ raw }: { raw: string | null }): JSX.Element {
     )
   }
 
-  if (!isParsableJson(raw)) {
-    return (
-      <div className="whitespace-pre-wrap text-sm font-medium leading-relaxed text-gray-700 dark:text-gray-300">
-        {raw}
-      </div>
-    )
-  }
-
-  const plan = parseNutritionPlan(raw)
   return (
     <ul className="space-y-3">
       {DAY_NAMES.map((day) => {
@@ -80,7 +86,7 @@ function NutritionPlanView({ raw }: { raw: string | null }): JSX.Element {
         return (
           <li key={day} className="text-sm">
             <span className="font-bold text-gray-800 dark:text-zinc-200">{day}: </span>
-            <span className="font-medium text-gray-700 dark:text-gray-300">
+            <span className="whitespace-pre-line font-medium text-gray-700 dark:text-gray-300">
               {entry.items.trim() ? `${entry.items} (${entry.total} kcal)` : '—'}
             </span>
           </li>
@@ -97,6 +103,7 @@ export default function ProfilePage(): JSX.Element {
   const userId = session?.user.id
   const { data: profile, isLoading: isProfileLoading } = useProfile(userId)
   const workoutPlanQuery = useWorkoutPlan(userId)
+  const nutritionPlanQuery = useNutritionPlan(userId)
 
   const uploadAvatar = useUploadAvatar()
   const updatePassword = useUpdatePassword()
@@ -242,7 +249,15 @@ export default function ProfilePage(): JSX.Element {
           <h3 className="mb-4 border-b pb-3 text-lg font-black text-brand-purple dark:border-zinc-800">
             🥗 Beslenme Programım
           </h3>
-          <NutritionPlanView raw={profile.nutrition_plan} />
+          <QueryState
+            isLoading={nutritionPlanQuery.isLoading}
+            isError={nutritionPlanQuery.isError}
+            error={nutritionPlanQuery.error}
+            skeleton={<SkeletonText lines={7} />}
+            onRetry={() => void nutritionPlanQuery.refetch()}
+          >
+            <NutritionPlanView plan={nutritionPlanQuery.data ?? EMPTY_NUTRITION_PLAN} />
+          </QueryState>
         </div>
 
         <div className="rounded-3xl border border-gray-100 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-[#16161d]">

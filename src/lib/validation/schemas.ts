@@ -169,14 +169,12 @@ export const quickAddFoodSchema = z.object({
 })
 export type QuickAddFoodInput = z.infer<typeof quickAddFoodSchema>
 
-// NOT (Faz 1b Adım 2): `workout_plan` alanı kaldırıldı. Antrenman planı artık
-// `workout_plans` + `workout_plan_exercises` tablolarında tutuluyor ve yalnızca
-// `save_workout_plan` RPC'si üzerinden yazılıyor; DEPRECATED `profiles.workout_plan`
-// kolonuna yazan yol kalmadı. Beslenme planı hâlâ `profiles.nutrition_plan`.
-export const planUpdateSchema = z.object({
-  nutrition_plan: z.string().optional(),
-})
-export type PlanUpdateInput = z.infer<typeof planUpdateSchema>
+// NOT (Faz 1b Adım 3b): `planUpdateSchema` / `PlanUpdateInput` KALDIRILDI.
+// Şema, DEPRECATED `profiles.workout_plan` / `profiles.nutrition_plan` kolonlarına
+// yazan profil güncellemesini doğruluyordu. Antrenman alanı Adım 2'de düşmüştü;
+// beslenme cutover'ıyla (Adım 3b) geriye tüketicisi kalmadı. Planlar artık
+// `save_workout_plan` / `save_nutrition_plan` RPC'leriyle yazılıyor ve doğrulama
+// SQL tarafındadır (gün anahtarı CHECK'leri + RPC'nin hata yükseltmesi).
 
 // ---------------------------------------------------------------------------
 // AI backend girdileri (proxy route'larında kullanılır)

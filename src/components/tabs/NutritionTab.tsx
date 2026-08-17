@@ -1,7 +1,8 @@
 'use client'
 
 // Haftalık beslenme planı: AI diyetisyen, oto-tamamlamalı hızlı besin ekleme
-// ve gün bazlı otomatik kalori hesabı. Plan `profiles.nutrition_plan` içinde saklanır.
+// ve gün bazlı otomatik kalori hesabı. Plan `nutrition_plans` / `nutrition_plan_meals`
+// tablolarında saklanır; `useNutritionPlan` üzerinden okunur/yazılır.
 
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMemo, useState } from 'react'

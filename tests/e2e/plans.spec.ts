@@ -219,6 +219,51 @@ test.describe('Plan Akışları (karakterizasyon)', () => {
     await expect(nutritionDayField(page, day)).toHaveValue(uniqueMeal)
   })
 
+  // REGRESYON KORUMASI (Faz 1b Adım 3b): `/profile` sayfasındaki "Beslenme
+  // Programım" kartı DEPRECATED `profiles.nutrition_plan` kolonundan besleniyordu;
+  // plan `nutrition_plans` tablolarına taşındıktan sonra bu kart bayat (veya boş)
+  // veri gösteriyordu. Kart artık `useNutritionPlan()` ile besleniyor. Aşağıdaki
+  // senaryo kartın gerçekten canlı plandan okuduğunu kilitler. (Antrenman
+  // karşılığı: "koç antrenman planını kaydeder, danışan profil sayfasında...")
+  test('danışan beslenme planını kaydeder, profil sayfasında aynı içeriği görür', async ({
+    page,
+  }) => {
+    // Yukarıdaki beslenme senaryosuyla aynı danışan (client2) kullanılır ama
+    // FARKLI bir gün yazılır; dosya `mode: 'default'` ile sıralı koştuğu için
+    // ezişme olmaz. Kaydetmeyi danışanın kendisi yapar: NutritionTab'te kaydet
+    // butonu role bakılmaksızın render ediliyor (bkz. yukarıdaki NOT).
+    const uniqueMeal = `E2E Beslenme Profil ${randomSuffix()}`
+    const day = 'Cumartesi'
+
+    // --- 1) Danışan: "Beslenme" sekmesinden planı kaydeder ---
+    await login(page, SECOND_CLIENT)
+    await page.getByRole('tab', { name: /Beslenme/ }).click()
+
+    const field = nutritionDayField(page, day)
+    await waitForPlanLoaded(field)
+    await field.fill(uniqueMeal)
+    await page.getByRole('button', { name: 'Beslenme Tablosunu Kaydet' }).click()
+    await expect(page.getByText(/Beslenme programı kaydedildi\./)).toBeVisible()
+
+    // --- 2) Aynı danışan kendi profil sayfasında aynı içeriği görmeli ---
+    await page.goto('/profile')
+
+    // Kart başlığı kaynakta "🥗 Beslenme Programım" (emoji erişilebilir adın
+    // parçası olabilir) — substring regex, `i` bayrağı YOK ("Programım" ı içerir).
+    await expect(page.getByRole('heading', { name: /Beslenme Programım/ })).toBeVisible()
+
+    // Boş durum metni GÖRÜNMEMELİ: kart canlı plandan besleniyorsa dolu gelir.
+    await expect(page.getByText('Koçunuz henüz bir beslenme programı atamadı.')).toHaveCount(0)
+
+    // Gün satırı: `<li><span>Cumartesi: </span><span>{içerik} ({kcal} kcal)</span></li>`.
+    // `uniqueMeal` ASCII olduğu için filtre Türkçe harf tuzağına takılmaz.
+    const dayItem = page.getByRole('listitem').filter({ hasText: uniqueMeal })
+    await expect(dayItem).toHaveCount(1)
+    // toContainText: büyük/küçük harf duyarlı, birebir alt dize — İ/ı tuzağı yok.
+    await expect(dayItem).toContainText(day)
+    await expect(dayItem).toContainText(uniqueMeal)
+  })
+
   test('danışan programı onaya gönderir, koç onaylar ve plan danışanın profiline işlenir', async ({
     page,
     browser,

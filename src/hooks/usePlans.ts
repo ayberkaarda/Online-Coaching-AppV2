@@ -10,18 +10,27 @@
 //          (`explode_plan_day`), istemcide ikinci bir ayrıştırıcı YOKTUR.
 //   `profiles.workout_plan` kolonu DEPRECATED'tır; buradan ne okunur ne yazılır.
 //
-// BESLENME PLANI: hâlâ `profiles.nutrition_plan` JSON string'idir (Faz 1b kapsamı dışı).
+// BESLENME PLANI (Faz 1b Adım 3b — cutover tamamlandı):
+//   Kaynak `public.nutrition_plans` + `public.nutrition_plan_meals` tablolarıdır.
+//   Okuma: aktif planın satırları gün bazında `NutritionPlan`
+//          (Record<gün, { items, total }>) şekline geri üretilir.
+//   Yazma: `save_nutrition_plan(uuid[], jsonb)` RPC'si — TEK yazıcı SQL'dedir
+//          (`explode_nutrition_day`), istemcide ikinci bir yazıcı YOKTUR.
+//   `profiles.nutrition_plan` kolonu DEPRECATED'tır; buradan ne okunur ne yazılır.
+//
+// SÖZLEŞME: `src/components/tabs/**` bu cutover'da DEĞİŞMEDİ. `useNutritionPlan`
+//   eskisiyle birebir aynı şekli döndürür, `useSaveNutritionPlan` eskisiyle
+//   birebir aynı girdiyi alır ve aynı toast metinlerini üretir.
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 
-import { queryKeyRoots, queryKeys } from '@/lib/query/keys'
+import { queryKeys } from '@/lib/query/keys'
 import { supabase } from '@/lib/supabase/client'
 import {
   DAY_NAMES,
   EMPTY_WORKOUT_PLAN,
   isDayName,
-  parseNutritionPlan,
   type Json,
   type NutritionPlan,
   type WorkoutPlan,
@@ -100,18 +109,95 @@ export function useWorkoutPlan(clientId?: string) {
   })
 }
 
+/** `nutrition_plan_meals` satırının gün içeriğini geri üretmek için gereken alanları. */
+export interface NutritionPlanMealRow {
+  day: string
+  position: number
+  description: string
+  kcal: number | null
+}
+
+/** Her çağrıda TAZE gün nesneleri üretir (paylaşılan sabit mutasyona uğramasın). */
+function emptyNutritionPlan(): NutritionPlan {
+  const plan = {} as NutritionPlan
+  for (const day of DAY_NAMES) plan[day] = { items: '', total: 0 }
+  return plan
+}
+
+/**
+ * Öğün satırlarını `NutritionPlan` (Record<gün, { items, total }>) şekline geri üretir.
+ *
+ * Sözleşme (bkz. 20260817130000_nutrition_plan_tables.sql):
+ *   Faz 1b'de gün başına TEK satır vardır (`position = 0`); o günün değeri
+ *   `{ items: description, total: kcal ?? 0 }` olur. `kcal` NULL ise (kaynak
+ *   `total` sayı değildi/negatifti/kesirliydi) 0'a düşer — eski
+ *   `parseNutritionPlan` davranışıyla aynı.
+ *
+ *   İleride öğün granülerliği gelip bir güne birden çok satır düşerse (şema buna
+ *   şimdiden izin veriyor) satırlar `position` sırasıyla '\n' ile birleştirilir ve
+ *   `kcal` değerleri toplanır. Böylece bu dönüşüm HİÇBİR satırı sessizce
+ *   düşürmez; tek satırlı bugünkü hâlde ise yukarıdaki sözleşmeye birebir indirgenir.
+ *
+ * Eksik günler `{ items: '', total: 0 }` olur; bilinmeyen gün adları (şema CHECK'i
+ * sayesinde normalde oluşamaz) sessizce yok sayılır.
+ *
+ * Saf fonksiyondur — hook'tan bağımsız test edilebilir (tests/unit/plans.test.ts).
+ */
+export function rowsToNutritionPlan(
+  rows: readonly NutritionPlanMealRow[] | null | undefined
+): NutritionPlan {
+  const plan = emptyNutritionPlan()
+  if (!rows || rows.length === 0) return plan
+
+  const buckets = new Map<string, NutritionPlanMealRow[]>()
+  for (const row of rows) {
+    if (!isDayName(row.day)) continue
+    const bucket = buckets.get(row.day)
+    if (bucket) bucket.push(row)
+    else buckets.set(row.day, [row])
+  }
+
+  for (const day of DAY_NAMES) {
+    const bucket = buckets.get(day)
+    if (!bucket) continue
+    const sorted = bucket.slice().sort((a, b) => a.position - b.position)
+    plan[day] = {
+      items: sorted.map((row) => row.description).join('\n'),
+      total: sorted.reduce((sum, row) => sum + (row.kcal ?? 0), 0),
+    }
+  }
+
+  return plan
+}
+
+/**
+ * `save_nutrition_plan` RPC'sinin beklediği jsonb yükünü üretir.
+ * YALNIZCA bilinen 7 gün anahtarı gönderilir: RPC bilinmeyen anahtarda hata
+ * yükseltir (sessiz veri kaybı yerine gürültülü hata — bilinçli tasarım).
+ */
+export function nutritionPlanToRpcPayload(plan: NutritionPlan): Json {
+  const payload: Record<string, { items: string; total: number }> = {}
+  for (const day of DAY_NAMES) {
+    const entry = plan[day]
+    payload[day] = { items: entry?.items ?? '', total: entry?.total ?? 0 }
+  }
+  return payload as unknown as Json
+}
+
 export function useNutritionPlan(clientId?: string) {
   return useQuery({
-    queryKey: [...queryKeys.profile(clientId), 'nutrition-plan'] as const,
+    queryKey: queryKeys.nutritionPlan(clientId),
     enabled: Boolean(clientId),
     queryFn: async (): Promise<NutritionPlan> => {
       const { data, error } = await supabase
-        .from('profiles')
-        .select('nutrition_plan')
-        .eq('id', clientId ?? '')
-        .single()
+        .from('nutrition_plans')
+        .select('id, nutrition_plan_meals(day, position, description, kcal)')
+        .eq('client_id', clientId ?? '')
+        .eq('is_active', true)
+        .maybeSingle()
       if (error) throw new Error(error.message)
-      return parseNutritionPlan(data.nutrition_plan)
+      // Aktif plan yoksa (yeni danışan) boş hafta döner — eski davranışla aynı.
+      return rowsToNutritionPlan(data?.nutrition_plan_meals)
     },
   })
 }
@@ -166,17 +252,20 @@ export function useSaveNutritionPlan() {
     mutationFn: async ({ clientIds, plan }: SaveNutritionPlanInput): Promise<number> => {
       if (clientIds.length === 0) throw new Error('En az bir öğrenci seçmelisiniz.')
 
-      const { error } = await supabase
-        .from('profiles')
-        .update({ nutrition_plan: JSON.stringify(plan) })
-        .in('id', clientIds)
+      // Tek RPC = tek transaction: bir danışanda RLS/CHECK hatası olursa TÜM
+      // kaydetme geri alınır (kısmi yazma yok).
+      const { error } = await supabase.rpc('save_nutrition_plan', {
+        p_client_ids: clientIds,
+        p_plan: nutritionPlanToRpcPayload(plan),
+      })
       if (error) throw new Error(error.message)
 
       return clientIds.length
     },
-    onSuccess: (count) => {
-      void queryClient.invalidateQueries({ queryKey: queryKeyRoots.profile })
-      void queryClient.invalidateQueries({ queryKey: queryKeyRoots.profiles })
+    onSuccess: (count, { clientIds }) => {
+      for (const id of clientIds) {
+        void queryClient.invalidateQueries({ queryKey: queryKeys.nutritionPlan(id) })
+      }
       toast.success(
         count > 1
           ? `Beslenme programı ${count} öğrenciye kaydedildi.`

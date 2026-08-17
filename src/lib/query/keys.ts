@@ -18,6 +18,8 @@ export const queryKeyRoots = {
   programApprovals: ['program-approvals'] as const,
   /** Antrenman planı artık `profiles` altında değil, kendi tablolarında yaşar (Faz 1b). */
   workoutPlan: ['workout-plan'] as const,
+  /** Beslenme planı da kendi tablolarında yaşar (Faz 1b Adım 3b). */
+  nutritionPlan: ['nutrition-plan'] as const,
   messages: ['messages'] as const,
   exercises: ['exercises'] as const,
   foods: ['foods'] as const,
@@ -47,6 +49,14 @@ export const queryKeys = {
    * bağımsız bir köke sahiptir ve `profile` invalidate'i onu SÜPÜRMEZ.
    */
   workoutPlan: (clientId?: string) => ['workout-plan', clientId ?? null] as const,
+
+  /**
+   * Beslenme planı (nutrition_plans + nutrition_plan_meals).
+   * Faz 1b Adım 3b öncesinde plan `profiles.nutrition_plan` kolonundaydı ve
+   * anahtarı `[...profile(id), 'nutrition-plan']` idi; tablolar ayrıldığı için
+   * artık bağımsız bir köke sahiptir ve `profile` invalidate'i onu SÜPÜRMEZ.
+   */
+  nutritionPlan: (clientId?: string) => ['nutrition-plan', clientId ?? null] as const,
 
   /** Sohbet anahtarı yön bağımsızdır: (a,b) ve (b,a) aynı anahtarı üretir. */
   messages: (a?: string, b?: string) => {

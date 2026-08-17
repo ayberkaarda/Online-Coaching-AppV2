@@ -853,16 +853,424 @@ end $$;
 rollback;
 
 
+-- #############################################################################
+-- FAZ 1b / ADIM 3a — BESLENME PLANI TABLOLARI (20260817130000_nutrition_plan_tables.sql)
+--
+-- Bu bölümdeki senaryolar `public.nutrition_plans` ve
+-- `public.nutrition_plan_meals` tablolarının RLS politikalarını ve
+-- `public.save_nutrition_plan()` RPC'sinin (SECURITY INVOKER) yetki sınırını
+-- doğrular. Politikalar antrenman tarafının BİREBİR aynısıdır.
+--
+-- BİLİNÇLİ SAPMA (bkz. docs/adr/0014-danisanin-kendi-beslenme-planini-kaydedebilmesi.md):
+--   Danışan KENDİ beslenme planına yazabilir. Senaryo 30 bu davranışı,
+--   senaryo 31/34/35 ise sınırını (başkasının planına asla) kilitler.
+--
+-- KURULUM DESENİ: senaryolar rol taklidine GEÇMEDEN ÖNCE `postgres` (superuser,
+-- RLS bypass) kimliğiyle kendi verisini kurar; `set local role` bundan SONRA
+-- gelir. Tümü ROLLBACK ile geri alınır.
+--
+-- Sabit plan kimlikleri (yalnızca test içi):
+--   Danışan A beslenme planı : cccccccc-cccc-cccc-cccc-cccccccccccc
+--   Danışan B beslenme planı : dddddddd-dddd-dddd-dddd-dddddddddddd
+-- #############################################################################
+
+
+-- =============================================================================
+-- BESLENME PLANI — 28) Danışan A kendi planını okur, Danışan B'ninkini OKUYAMAZ
+-- =============================================================================
+begin;
+
+delete from public.nutrition_plans
+ where client_id in ('22222222-2222-2222-2222-222222222222', '33333333-3333-3333-3333-333333333333');
+
+insert into public.nutrition_plans (id, client_id, version, is_active) values
+  ('cccccccc-cccc-cccc-cccc-cccccccccccc', '22222222-2222-2222-2222-222222222222', 1, true),
+  ('dddddddd-dddd-dddd-dddd-dddddddddddd', '33333333-3333-3333-3333-333333333333', 1, true);
+
+insert into public.nutrition_plan_meals (plan_id, day, position, description, kcal) values
+  ('cccccccc-cccc-cccc-cccc-cccccccccccc', 'Pazartesi', 0, E'Yulaf Ezmesi 80g\nTavuk Göğsü 200g', 1850),
+  ('dddddddd-dddd-dddd-dddd-dddddddddddd', 'Pazartesi', 0, 'Yulaf:60, Yumurta:2', 2100);
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+
+do $$
+declare
+  v_own_plans   int;
+  v_other_plans int;
+  v_own_meals   int;
+  v_other_meals int;
+begin
+  select count(*) into v_own_plans   from public.nutrition_plans where client_id = '22222222-2222-2222-2222-222222222222';
+  select count(*) into v_other_plans from public.nutrition_plans where client_id = '33333333-3333-3333-3333-333333333333';
+  select count(*) into v_own_meals   from public.nutrition_plan_meals where plan_id = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
+  select count(*) into v_other_meals from public.nutrition_plan_meals where plan_id = 'dddddddd-dddd-dddd-dddd-dddddddddddd';
+
+  if v_own_plans is distinct from 1 then
+    raise exception 'BASARISIZ [Danisan A - kendi beslenme planini okur]: beklenen 1 plan, gelen %', v_own_plans;
+  end if;
+  if v_own_meals is distinct from 1 then
+    raise exception 'BASARISIZ [Danisan A - kendi ogun satirlarini okur]: beklenen 1 satir, gelen %', v_own_meals;
+  end if;
+  if v_other_plans is distinct from 0 then
+    raise exception 'BASARISIZ [Danisan A - Danisan B beslenme planini goremez]: beklenen 0 plan, gelen %', v_other_plans;
+  end if;
+  if v_other_meals is distinct from 0 then
+    raise exception 'BASARISIZ [Danisan A - Danisan B ogun satirlarini goremez]: beklenen 0 satir, gelen %', v_other_meals;
+  end if;
+
+  raise notice 'GECTI [Danisan A - kendi beslenme planini okur, Danisan B''ninkini okuyamaz]';
+end $$;
+
+rollback;
+
+
+-- =============================================================================
+-- BESLENME PLANI — 29) Koç her iki danışanın beslenme planını da okur
+-- =============================================================================
+begin;
+
+delete from public.nutrition_plans
+ where client_id in ('22222222-2222-2222-2222-222222222222', '33333333-3333-3333-3333-333333333333');
+
+insert into public.nutrition_plans (id, client_id, version, is_active) values
+  ('cccccccc-cccc-cccc-cccc-cccccccccccc', '22222222-2222-2222-2222-222222222222', 1, true),
+  ('dddddddd-dddd-dddd-dddd-dddddddddddd', '33333333-3333-3333-3333-333333333333', 1, true);
+
+insert into public.nutrition_plan_meals (plan_id, day, position, description, kcal) values
+  ('cccccccc-cccc-cccc-cccc-cccccccccccc', 'Pazartesi', 0, 'Yulaf 80g', 1850),
+  ('dddddddd-dddd-dddd-dddd-dddddddddddd', 'Pazartesi', 0, 'Yulaf 60g', 2100);
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+
+do $$
+declare
+  v_plans int;
+  v_meals int;
+begin
+  select count(*) into v_plans
+    from public.nutrition_plans
+   where client_id in ('22222222-2222-2222-2222-222222222222', '33333333-3333-3333-3333-333333333333');
+
+  select count(*) into v_meals
+    from public.nutrition_plan_meals
+   where plan_id in ('cccccccc-cccc-cccc-cccc-cccccccccccc', 'dddddddd-dddd-dddd-dddd-dddddddddddd');
+
+  if v_plans is distinct from 2 then
+    raise exception 'BASARISIZ [Koc - her iki beslenme planini okur]: beklenen 2 plan, gelen %', v_plans;
+  end if;
+  if v_meals is distinct from 2 then
+    raise exception 'BASARISIZ [Koc - her iki planin ogun satirlarini okur]: beklenen 2 satir, gelen %', v_meals;
+  end if;
+
+  raise notice 'GECTI [Koc - her iki danisanin beslenme planini okur]';
+end $$;
+
+rollback;
+
+
+-- =============================================================================
+-- BESLENME PLANI — 30) Danışan A KENDİ beslenme planına yazabilir
+-- BİLİNÇLİ SAPMA KORUMASI: plan §3.2 "yalnız koç yazar" der; bugün "Beslenme
+-- Tablosunu Kaydet" butonu NutritionTab.tsx'te role bakılmaksızın render
+-- ediliyor ve danışan kendi planını kaydedebiliyor (tests/e2e/plans.spec.ts bu
+-- davranışı kilitliyor). Bkz. docs/adr/0014-....md
+-- =============================================================================
+begin;
+
+delete from public.nutrition_plans where client_id = '22222222-2222-2222-2222-222222222222';
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+
+do $$
+declare
+  v_plan_id uuid;
+  v_rows    int;
+begin
+  -- Plan başlığı
+  insert into public.nutrition_plans (client_id, version, is_active)
+  values ('22222222-2222-2222-2222-222222222222', 1, true)
+  returning id into v_plan_id;
+
+  if v_plan_id is null then
+    raise exception 'BASARISIZ [Danisan A - kendi beslenme planini olusturur]: insert basarisiz';
+  end if;
+
+  -- Öğün satırı
+  insert into public.nutrition_plan_meals (plan_id, day, position, description, kcal)
+  values (v_plan_id, 'Pazartesi', 0, E'Yulaf Ezmesi 80g\nTavuk Göğsü 200g', 1850);
+  get diagnostics v_rows = row_count;
+  if v_rows is distinct from 1 then
+    raise exception 'BASARISIZ [Danisan A - kendi ogun satirini yazar]: beklenen 1, gelen %', v_rows;
+  end if;
+
+  -- Güncelleme ve silme de kendi planında serbest olmalı
+  update public.nutrition_plan_meals set description = 'Yulaf:80, Tavuk:200', kcal = 1900
+   where plan_id = v_plan_id;
+  get diagnostics v_rows = row_count;
+  if v_rows is distinct from 1 then
+    raise exception 'BASARISIZ [Danisan A - kendi ogun satirini gunceller]: beklenen 1, gelen %', v_rows;
+  end if;
+
+  delete from public.nutrition_plan_meals where plan_id = v_plan_id;
+  get diagnostics v_rows = row_count;
+  if v_rows is distinct from 1 then
+    raise exception 'BASARISIZ [Danisan A - kendi ogun satirini siler]: beklenen 1, gelen %', v_rows;
+  end if;
+
+  raise notice 'GECTI [Danisan A - kendi beslenme planina yazabilir]';
+end $$;
+
+rollback;
+
+
+-- =============================================================================
+-- BESLENME PLANI — 31) Danışan A, Danışan B'nin beslenme planına YAZAMAZ
+-- =============================================================================
+begin;
+
+delete from public.nutrition_plans where client_id = '33333333-3333-3333-3333-333333333333';
+
+insert into public.nutrition_plans (id, client_id, version, is_active) values
+  ('dddddddd-dddd-dddd-dddd-dddddddddddd', '33333333-3333-3333-3333-333333333333', 1, true);
+
+insert into public.nutrition_plan_meals (plan_id, day, position, description, kcal) values
+  ('dddddddd-dddd-dddd-dddd-dddddddddddd', 'Pazartesi', 0, 'Yulaf 60g', 2100);
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+
+do $$
+declare
+  v_caught boolean := false;
+  v_rows   int;
+begin
+  -- a) Başkası adına plan başlığı açamaz
+  begin
+    insert into public.nutrition_plans (client_id, version, is_active)
+    values ('33333333-3333-3333-3333-333333333333', 1, true);
+  exception when insufficient_privilege then
+    v_caught := true;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [Danisan A - Danisan B adina beslenme plani acamaz]: beklenen RLS ihlali, hata alinmadi';
+  end if;
+
+  -- b) Başkasının planına satır ekleyemez
+  v_caught := false;
+  begin
+    insert into public.nutrition_plan_meals (plan_id, day, position, description, kcal)
+    values ('dddddddd-dddd-dddd-dddd-dddddddddddd', 'Salı', 0, 'RLS testi - olmamali', 100);
+  exception when insufficient_privilege then
+    v_caught := true;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [Danisan A - Danisan B planina ogun ekleyemez]: beklenen RLS ihlali, hata alinmadi';
+  end if;
+
+  -- c) Başkasının planındaki satırları GÜNCELLEYEMEZ/SİLEMEZ (satırlar görünmediği
+  --    için 0 satır etkilenir -- sessiz veri bozulması olmaz).
+  update public.nutrition_plan_meals set description = 'HACKED'
+   where plan_id = 'dddddddd-dddd-dddd-dddd-dddddddddddd';
+  get diagnostics v_rows = row_count;
+  if v_rows is distinct from 0 then
+    raise exception 'BASARISIZ [Danisan A - Danisan B ogun satirini guncelleyemez]: beklenen 0 satir, etkilenen %', v_rows;
+  end if;
+
+  delete from public.nutrition_plans where client_id = '33333333-3333-3333-3333-333333333333';
+  get diagnostics v_rows = row_count;
+  if v_rows is distinct from 0 then
+    raise exception 'BASARISIZ [Danisan A - Danisan B beslenme planini silemez]: beklenen 0 satir, etkilenen %', v_rows;
+  end if;
+
+  raise notice 'GECTI [Danisan A - Danisan B''nin beslenme planina yazamaz]';
+end $$;
+
+rollback;
+
+
+-- =============================================================================
+-- BESLENME PLANI — 32) anon rolü beslenme plan tablolarını OKUYAMAZ
+-- =============================================================================
+begin;
+set local role anon;
+do $$
+declare
+  v_count  int;
+  v_caught boolean := false;
+begin
+  begin
+    select count(*) into v_count from public.nutrition_plans;
+  exception when insufficient_privilege then
+    v_caught := true;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [anon - nutrition_plans okuyamaz]: beklenen permission denied, gelen v_count=%', v_count;
+  end if;
+
+  v_caught := false;
+  begin
+    select count(*) into v_count from public.nutrition_plan_meals;
+  exception when insufficient_privilege then
+    v_caught := true;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [anon - nutrition_plan_meals okuyamaz]: beklenen permission denied, gelen v_count=%', v_count;
+  end if;
+
+  raise notice 'GECTI [anon - beslenme plani tablolarini okuyamaz]';
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- BESLENME PLANI — 33) save_nutrition_plan() danışan olarak KENDİ id'si için çalışır
+-- (NutritionTab'daki "Beslenme Tablosunu Kaydet" akışının veritabanı karşılığı)
+-- =============================================================================
+begin;
+
+delete from public.nutrition_plans where client_id = '22222222-2222-2222-2222-222222222222';
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+
+do $$
+declare
+  v_affected int;
+  v_plan_id  uuid;
+  v_rows     int;
+begin
+  v_affected := public.save_nutrition_plan(
+    array['22222222-2222-2222-2222-222222222222']::uuid[],
+    jsonb_build_object(
+      'Pazartesi', jsonb_build_object('items', E'Yulaf Ezmesi 80g\nTavuk Göğsü 200g', 'total', 1850),
+      'Çarşamba',  jsonb_build_object('items', 'Yulaf:80, Tavuk:200',                 'total', 1900)
+    )
+  );
+
+  if v_affected is distinct from 1 then
+    raise exception 'BASARISIZ [save_nutrition_plan - kendi id]: beklenen 1 danisan, gelen %', v_affected;
+  end if;
+
+  select id into v_plan_id from public.nutrition_plans
+   where client_id = '22222222-2222-2222-2222-222222222222' and is_active;
+  if v_plan_id is null then
+    raise exception 'BASARISIZ [save_nutrition_plan - kendi id]: aktif plan olusmadi';
+  end if;
+
+  select count(*) into v_rows from public.nutrition_plan_meals where plan_id = v_plan_id;
+  if v_rows is distinct from 2 then
+    raise exception 'BASARISIZ [save_nutrition_plan - kendi id]: beklenen 2 satir, gelen %', v_rows;
+  end if;
+
+  raise notice 'GECTI [save_nutrition_plan - danisan kendi id''si icin calistirabilir]';
+end $$;
+
+rollback;
+
+
+-- =============================================================================
+-- BESLENME PLANI — 34) save_nutrition_plan() BAŞKASININ id'siyle RLS hatası verir
+-- (fonksiyon SECURITY INVOKER'dır ve hatayı YAKALAMAZ -> tüm çağrı geri alınır)
+-- =============================================================================
+begin;
+
+delete from public.nutrition_plans
+ where client_id in ('22222222-2222-2222-2222-222222222222', '33333333-3333-3333-3333-333333333333');
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+
+do $$
+declare
+  v_caught boolean := false;
+begin
+  begin
+    perform public.save_nutrition_plan(
+      array['33333333-3333-3333-3333-333333333333']::uuid[],
+      jsonb_build_object('Pazartesi', jsonb_build_object('items', 'Yulaf 60g', 'total', 2100))
+    );
+  exception when insufficient_privilege then
+    v_caught := true;
+  end;
+
+  if not v_caught then
+    raise exception 'BASARISIZ [save_nutrition_plan - baskasinin id''si]: beklenen RLS ihlali, hata alinmadi';
+  end if;
+
+  raise notice 'GECTI [save_nutrition_plan - baskasinin id''si icin RLS hatasi verir]';
+end $$;
+
+rollback;
+
+
+-- =============================================================================
+-- BESLENME PLANI — 35) save_nutrition_plan() ATOMİKTİR
+-- Karma liste (kendi id + başkasının id) verildiğinde hata yükselir ve
+-- KENDİ planı da yazılmaz -- yani kısmi yazma olmaz.
+-- =============================================================================
+begin;
+
+delete from public.nutrition_plans
+ where client_id in ('22222222-2222-2222-2222-222222222222', '33333333-3333-3333-3333-333333333333');
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+
+do $$
+declare
+  v_caught boolean := false;
+  v_plans  int;
+  v_meals  int;
+begin
+  begin
+    perform public.save_nutrition_plan(
+      array['22222222-2222-2222-2222-222222222222',
+            '33333333-3333-3333-3333-333333333333']::uuid[],
+      jsonb_build_object('Pazartesi', jsonb_build_object('items', 'Yulaf 80g', 'total', 1850))
+    );
+  exception when insufficient_privilege then
+    v_caught := true;
+  end;
+
+  if not v_caught then
+    raise exception 'BASARISIZ [save_nutrition_plan - atomiklik]: beklenen RLS ihlali, hata alinmadi';
+  end if;
+
+  -- plpgsql BEGIN/EXCEPTION bir subtransaction acar; hata yakalandiginda
+  -- blogun ICINDEKI tum yazmalar (kendi planinin olusturulmasi dahil) geri alinir.
+  select count(*) into v_plans from public.nutrition_plans
+   where client_id = '22222222-2222-2222-2222-222222222222';
+  if v_plans is distinct from 0 then
+    raise exception 'BASARISIZ [save_nutrition_plan - atomiklik]: kismi yazma olustu, % plan satiri kaldi', v_plans;
+  end if;
+
+  select count(*) into v_meals from public.nutrition_plan_meals m
+    join public.nutrition_plans p on p.id = m.plan_id
+   where p.client_id = '22222222-2222-2222-2222-222222222222';
+  if v_meals is distinct from 0 then
+    raise exception 'BASARISIZ [save_nutrition_plan - atomiklik]: kismi yazma olustu, % ogun satiri kaldi', v_meals;
+  end if;
+
+  raise notice 'GECTI [save_nutrition_plan - atomik: kismi yazma yok]';
+end $$;
+
+rollback;
+
+
 -- =============================================================================
 -- TOPLAM ÖZET
--- Bu noktaya yalnızca YUKARIDAKİ 27 senaryonun HEPSİ GECTI verdiyse ulaşılır --
+-- Bu noktaya yalnızca YUKARIDAKİ 35 senaryonun HEPSİ GECTI verdiyse ulaşılır --
 -- herhangi biri BASARISIZ olsaydı raise exception + ON_ERROR_STOP psql'i
 -- daha önce sıfırdan farklı çıkış koduyla durdururdu.
 --   * 1–19  : Faz 1a ve öncesi (profiles, notifications, form_checks, daily_logs,
 --             workout_logs, messages, katalog)
 --   * 20–27 : Faz 1b Adım 1 — workout_plans / workout_plan_exercises / save_workout_plan
+--   * 28–35 : Faz 1b Adım 3a — nutrition_plans / nutrition_plan_meals / save_nutrition_plan
 -- =============================================================================
 do $$
 begin
-  raise notice 'TUM RLS TESTLERI GECTI (27 senaryo)';
+  raise notice 'TUM RLS TESTLERI GECTI (35 senaryo)';
 end $$;

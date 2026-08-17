@@ -32,6 +32,26 @@ export default defineConfig({
     command: process.env.CI ? 'npm run start' : 'npm run build && npm run start',
     url: process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:3000',
     reuseExistingServer: !process.env.CI,
+    // ORTAM TUZAĞI KAPATILDI — `NEXT_PUBLIC_*` değişkenleri BUILD ZAMANINDA
+    // bundle'a gömülür. Depoda duran `.env.local` BARINDIRILAN (uzak) Supabase
+    // projesini gösteriyor; bu blok olmadan yukarıdaki `npm run build` uygulamayı
+    // uzak projeye bağlar, yerel seed kullanıcıları orada bulunmadığı için TÜM
+    // E2E login'leri kırılır. (Bu tuzak iki kez vakit kaybettirdi.)
+    //
+    // Aşağıdaki değerler yerel Supabase yığınının SABİT DEMO ANAHTARLARIDIR
+    // (`npx supabase status` her kurulumda aynısını üretir) — gerçek sır DEĞİLDİR,
+    // depoya yazılmalarında sakınca yoktur.
+    //
+    // Dışarıdan verilen değer HER ZAMAN önceliklidir: CI kendi ortam
+    // değişkenleriyle (.github/workflows/ci.yml) bunları geçersiz kılar,
+    // geliştirici de tek seferlik başka bir hedefe yönlendirebilir.
+    env: {
+      NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'http://127.0.0.1:54321',
+      NEXT_PUBLIC_SUPABASE_ANON_KEY:
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0',
+      NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000',
+    },
     // CI'da yalnızca `next start` çalıştığı için 120 sn fazlasıyla yeterli;
     // yerelde build de dahil olduğundan daha cömert bir süre tanınıyor.
     timeout: process.env.CI ? 120_000 : 300_000,

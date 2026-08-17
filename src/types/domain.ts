@@ -152,41 +152,6 @@ export function parseWorkoutPlan(raw: string | null | undefined): WorkoutPlan {
   return plan
 }
 
-/**
- * `profiles.nutrition_plan` JSON string'ini güvenle parse eder.
- * Bozuk JSON veya eksik günler `{ items: '', total: 0 }` ile tamamlanır.
- */
-export function parseNutritionPlan(raw: string | null | undefined): NutritionPlan {
-  const plan = buildEmptyNutritionPlan()
-  if (!raw) return plan
-
-  let parsed: unknown
-  try {
-    parsed = JSON.parse(raw) as unknown
-  } catch {
-    return plan
-  }
-
-  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-    return plan
-  }
-
-  const record = parsed as Record<string, unknown>
-  for (const day of DAY_NAMES) {
-    const value = record[day]
-    if (typeof value !== 'object' || value === null || Array.isArray(value)) continue
-
-    const entry = value as Record<string, unknown>
-    const items = entry['items']
-    const total = entry['total']
-    plan[day] = {
-      items: typeof items === 'string' ? items : '',
-      total: toFiniteNumber(total),
-    }
-  }
-  return plan
-}
-
 export function isDayName(v: string): v is DayName {
   return (DAY_NAMES as readonly string[]).includes(v)
 }

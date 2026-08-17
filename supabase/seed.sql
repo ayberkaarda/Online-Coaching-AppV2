@@ -226,6 +226,52 @@ end
 $$;
 
 
+-- -----------------------------------------------------------------------------
+-- 2c) BESLENME PLANLARINI NORMALİZE TABLOLARA DA YAZ
+--     (nutrition_plans + nutrition_plan_meals — Faz 1b Adım 3b cutover'ı)
+--
+--     §2b'nin beslenme karşılığı, birebir aynı gerekçelerle:
+--
+--     Uygulama artık planı `profiles.nutrition_plan` kolonundan DEĞİL, bu
+--     tablolardan okuyor (src/hooks/usePlans.ts -> useNutritionPlan). Yukarıdaki
+--     `nutrition_plan` yazımı BİLEREK korunuyor: DEPRECATED kolon, veri dönüşümü
+--     testine (supabase/tests/transform.test.sql) malzeme olmaya devam ediyor.
+--
+--     İKİ KAYNAK AYNI İÇERİĞİ ÜRETİR: aşağıdaki blok planı elle tekrarlamaz,
+--     doğrudan `profiles.nutrition_plan` JSON'unu okuyup TEK yazıcıdan
+--     (`explode_nutrition_day`, `save_nutrition_plan` içinden) geçirir. Böylece
+--     kopyala-yapıştır kayması imkânsızdır.
+--
+--     NOT: migration'lar `supabase db reset` sırasında seed'den ÖNCE koştuğu
+--     için `migrate_nutrition_plans_from_profiles()` orada boş tabloda çalışır
+--     (no-op). Dolum bu yüzden seed'in görevidir.
+--
+--     Idempotent: `save_nutrition_plan` aktif planın satırlarını silip yeniden
+--     yazar; seed tekrar çalıştırıldığında satır çoğalmaz, içerik seed'e döner.
+--     (Seed superuser ile koştuğu için RLS ve fonksiyon ACL'i engel değildir.)
+-- -----------------------------------------------------------------------------
+do $$
+declare
+  v_id   uuid;
+  v_plan jsonb;
+begin
+  for v_id, v_plan in
+    select p.id, p.nutrition_plan::jsonb
+      from public.profiles p
+     where p.id in (
+             '22222222-2222-2222-2222-222222222222',
+             '33333333-3333-3333-3333-333333333333'
+           )
+       and p.nutrition_plan is not null
+       and btrim(p.nutrition_plan) <> ''
+     order by p.id
+  loop
+    perform public.save_nutrition_plan(array[v_id], v_plan);
+  end loop;
+end
+$$;
+
+
 -- =============================================================================
 -- 3) REFERANS KATALOGLARI
 --    Gerçek veri src/app/clean_foods.csv ve src/app/clean_exercises_v2.csv

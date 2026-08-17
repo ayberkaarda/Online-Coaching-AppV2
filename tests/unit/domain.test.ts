@@ -7,7 +7,6 @@ import {
   isCoach,
   isDayName,
   parseMacros,
-  parseNutritionPlan,
   parseWorkoutPlan,
 } from '@/types/domain'
 
@@ -80,37 +79,6 @@ describe('parseWorkoutPlan', () => {
   })
 })
 
-describe('parseNutritionPlan', () => {
-  it('geçerli JSON verildiğinde 7 günün tamamı mevcut olur, eksikler {items:"",total:0} olur', () => {
-    const plan = parseNutritionPlan('{"Pazartesi":{"items":"Yulaf:80","total":450}}')
-    expect(Object.keys(plan)).toHaveLength(7)
-    expect(plan.Pazartesi).toEqual({ items: 'Yulaf:80', total: 450 })
-    expect(plan.Salı).toEqual({ items: '', total: 0 })
-    expect(typeof plan.Pazartesi.total).toBe('number')
-  })
-
-  it('bozuk JSON için tüm günler varsayılan olur', () => {
-    const plan = parseNutritionPlan('{bozuk json')
-    for (const day of DAY_NAMES) expect(plan[day]).toEqual({ items: '', total: 0 })
-  })
-
-  it('null için tüm günler varsayılan olur', () => {
-    const plan = parseNutritionPlan(null)
-    for (const day of DAY_NAMES) expect(plan[day]).toEqual({ items: '', total: 0 })
-  })
-
-  it('total string olarak gelirse sayıya çevrilir', () => {
-    const plan = parseNutritionPlan('{"Pazartesi":{"items":"x","total":"450"}}')
-    expect(plan.Pazartesi.total).toBe(450)
-    expect(typeof plan.Pazartesi.total).toBe('number')
-  })
-
-  it('gün değeri obje değilse (örn. dizi) o gün varsayılanda kalır', () => {
-    const plan = parseNutritionPlan('{"Pazartesi":["x"]}')
-    expect(plan.Pazartesi).toEqual({ items: '', total: 0 })
-  })
-})
-
 describe('isDayName', () => {
   it('geçerli bir Türkçe gün adında true döner', () => {
     expect(isDayName('Pazartesi')).toBe(true)
@@ -159,13 +127,6 @@ describe('EMPTY_WORKOUT_PLAN / EMPTY_NUTRITION_PLAN', () => {
     expect(plan).not.toBe(EMPTY_WORKOUT_PLAN)
     plan.Pazartesi = 'Değiştirildi'
     expect(EMPTY_WORKOUT_PLAN.Pazartesi).toBe('')
-  })
-
-  it('parseNutritionPlan(null) her çağrıda yeni bir nesne döner; mutasyon paylaşılan sabiti bozmaz', () => {
-    const plan = parseNutritionPlan(null)
-    expect(plan).not.toBe(EMPTY_NUTRITION_PLAN)
-    plan.Pazartesi.total = 999
-    expect(EMPTY_NUTRITION_PLAN.Pazartesi.total).toBe(0)
   })
 
   it('NOT: EMPTY_WORKOUT_PLAN Object.freeze ile korunmuyor; doğrudan referansı mutasyona uğratmak paylaşılan sabiti bozar (gizli hata sınıfı)', () => {

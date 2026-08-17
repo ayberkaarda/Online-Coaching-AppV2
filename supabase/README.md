@@ -14,10 +14,11 @@ supabase/
 │   ├── 20260816100000_fix_rls_visibility.sql     # koç profili görünürlüğü + danışan→koç bildirimi
 │   ├── 20260817090000_rename_roles.sql           # rol yeniden adlandırma: admin→coach, student→client
 │   ├── 20260817100000_private_storage.sql        # bucket'lar private + *_url → *_path + imzalı okuma
-│   └── 20260817110000_workout_plan_tables.sql    # normalize antrenman planı tabloları + dönüşüm + RPC
+│   ├── 20260817110000_workout_plan_tables.sql    # normalize antrenman planı tabloları + dönüşüm + RPC
+│   └── 20260817130000_nutrition_plan_tables.sql  # normalize beslenme planı tabloları + dönüşüm + RPC
 ├── tests/
-│   ├── rls.test.sql            # 27 RLS senaryosu       (npm run test:rls)
-│   └── transform.test.sql      # 10 dönüşüm senaryosu   (npm run test:transform)
+│   ├── rls.test.sql            # 35 RLS senaryosu       (npm run test:rls)
+│   └── transform.test.sql      # 19 dönüşüm senaryosu   (npm run test:transform)
 ├── seed.sql                    # SADECE YEREL demo verisi
 └── README.md
 ```
@@ -110,6 +111,8 @@ Kısaltmalar: **S** = satır sahibi (`client_id`/`id` = `auth.uid()`), **K** = k
 | `food_database` | Tüm `authenticated` | Sadece K | Sadece K | Sadece K |
 | `workout_plans` | S veya K | K **veya** kendi planı | K veya kendi planı | K veya kendi planı |
 | `workout_plan_exercises` | plan üzerinden S veya K (`EXISTS`) | plan üzerinden K veya kendi planı | plan üzerinden K veya kendi planı | plan üzerinden K veya kendi planı |
+| `nutrition_plans` | S veya K | K **veya** kendi planı | K veya kendi planı | K veya kendi planı |
+| `nutrition_plan_meals` | plan üzerinden S veya K (`EXISTS`) | plan üzerinden K veya kendi planı | plan üzerinden K veya kendi planı | plan üzerinden K veya kendi planı |
 
 ### Koç görünürlüğü (`20260816100000_fix_rls_visibility.sql`)
 
@@ -145,6 +148,22 @@ Kısaltmalar: **S** = satır sahibi (`client_id`/`id` = `auth.uid()`), **K** = k
   Başka danışanın planına insert/update/delete **reddedilir**
   (`rls.test.sql` senaryo 23, 26, 27).
 * **Geri alma koşulu:** Faz 2'de onay akışı ayrı bir "önerilen plan" yüzeyine taşınırsa
+  politika §3.2'ye daraltılmalıdır.
+
+### Beslenme planı tablolarında bilinçli sapma (`20260817130000_nutrition_plan_tables.sql`)
+
+Aynı sapma beslenme tarafında da geçerlidir — danışan kendi beslenme planına yazabilir.
+Tam gerekçe ve sonuçlar: **`docs/adr/0014-danisanin-kendi-beslenme-planini-kaydedebilmesi.md`**.
+
+* **Gerekçe:** "Beslenme Tablosunu Kaydet" butonu `src/components/tabs/NutritionTab.tsx`'te
+  role bakılmaksızın render ediliyor ve `handleSaveProgram` danışan için
+  `clientIds = [currentUserId]` kuruyor. Antrenmandaki onay akışının (`program_approvals`)
+  beslenme karşılığı **yok**; davranış `tests/e2e/plans.spec.ts` ile kilitli.
+* **Kapsam sınırı:** danışan **yalnızca kendi** planına yazabilir
+  (`rls.test.sql` senaryo 30, 31, 34, 35).
+* **Kabul edilen bedel:** danışan koçun verdiği beslenme planını değiştirebilir ve
+  **koç için denetim izi yoktur** (satırı kimin yazdığı tutulmuyor, yalnızca `updated_at` var).
+* **Gözden geçirme koşulu:** beslenmeye de bir onay akışı gelirse ADR 0014 gözden geçirilip
   politika §3.2'ye daraltılmalıdır.
 
 ### Yetki yükseltme koruması
@@ -198,6 +217,9 @@ Her iki bucket da **PRIVATE**'tır (`20260817100000_private_storage.sql`).
 | `public.explode_plan_day` | `(p_plan_id uuid, p_day text, p_text text) -> integer` | `SECURITY INVOKER`. **TEK plan ayrıştırıcısı** — hem veri dönüşümü hem `save_workout_plan` bunu kullanır |
 | `public.save_workout_plan` | `(p_client_ids uuid[], p_plan jsonb) -> integer` | `SECURITY INVOKER` (RLS uygulanır). `p_plan` = `{"Pazartesi": "metin", ...}`. Etkilenen danışan sayısını döner |
 | `public.migrate_workout_plans_from_profiles` | `() -> table(profiles_converted int, exercises_inserted int)` | `SECURITY DEFINER`, yalnız `service_role`. Idempotent veri dönüşümü; `transform.test.sql` bunu çağırır |
+| `public.explode_nutrition_day` | `(p_plan_id uuid, p_day text, p_entry jsonb) -> integer` | `SECURITY INVOKER`. **TEK beslenme günü yazıcısı** — hem dönüşüm hem `save_nutrition_plan` bunu kullanır. Ayrıştırma YAPMAZ |
+| `public.save_nutrition_plan` | `(p_client_ids uuid[], p_plan jsonb) -> integer` | `SECURITY INVOKER` (RLS uygulanır). `p_plan` = `{"Pazartesi": {"items": "metin", "total": 1850}, ...}`. Etkilenen danışan sayısını döner |
+| `public.migrate_nutrition_plans_from_profiles` | `() -> table(profiles_converted int, meals_inserted int)` | `SECURITY DEFINER`, yalnız `service_role`. Idempotent veri dönüşümü; `transform.test.sql` bunu çağırır |
 
 `increment_streak` mantığı: `last_checkin_at` bugünse seri değişmez, dünse +1,
 daha eski/`NULL` ise 1'e sıfırlanır; her durumda `last_checkin_at = now()`.
@@ -276,8 +298,8 @@ Dönüşüm kuralları: NULL / boş / geçersiz JSON / JSON-nesnesi-olmayan içe
 ### Testler
 
 ```bash
-npm run test:rls         # 27 senaryo (20–27 bu tablolara ait)
-npm run test:transform   # 10 senaryo (dönüşüm + round-trip + idempotency)
+npm run test:rls         # 35 senaryo (20–27 bu tablolara ait)
+npm run test:transform   # 19 senaryo (1–10 bu tablolara ait: dönüşüm + round-trip + idempotency)
 ```
 
 Her iki script de `BEGIN … ROLLBACK` kullanır, kalıcı veri bırakmaz ve başarısızlıkta
@@ -289,6 +311,88 @@ durdurur.
 Migration dosyasının sonunda yorum bloğu hâlinde çalıştırılabilir bir `-- DOWN`
 script'i vardır (fonksiyonlar → politikalar → trigger → tablolar → eski kolon yorumu).
 Veri kaybı yaratmaz: kaynak veri `profiles.workout_plan` kolonunda durmaya devam eder.
+
+---
+
+## 4b. Beslenme Planı Tabloları ve Veri Dönüşümü
+
+`20260817130000_nutrition_plan_tables.sql` (Faz 1b / Adım 3a). `profiles.nutrition_plan`
+JSON string kolonu **silinmedi**; `DEPRECATED` yorumuyla yan yana yaşıyor ve Faz 2
+kapısında DROP edilecek. Kod tarafının bu tablolara geçirilmesi (cutover) **Adım 3b**'dedir.
+
+| Tablo | Kolonlar |
+|---|---|
+| `nutrition_plans` | `id, client_id, version (>0), is_active, notes, created_at, updated_at` |
+| `nutrition_plan_meals` | `id, plan_id, day, position (>=0, varsayılan 0), description, kcal (>=0 veya NULL)` |
+
+* **Aktif plan tekilliği:** `nutrition_plans_one_active_idx` — `unique (client_id) where is_active`.
+* **Gün kısıtı:** `day` yalnızca 7 Türkçe gün adını kabul eder; `(plan_id, day, position)` tekildir.
+* **`updated_at`:** mevcut `public.set_updated_at()` trigger'ı ile tazelenir.
+
+### `description` kanoniktir — yapısal ayrıştırma YOK
+
+Antrenman tarafındaki `raw_line` ile aynı rolü `description` üstlenir, ama burada
+**satır/öğün bazlı ayrıştırma yapılmaz**. Sebep: `items` alanı sahada **iki lehçede**
+yazılmış serbest metindir —
+
+| Lehçe | Örnek | Nerede |
+|---|---|---|
+| A | `Yulaf:80, Tavuk Göğsü:200` | kod tabanının varsaydığı biçim (`sumCalories`) |
+| B | `Yulaf Ezmesi 80g\nTavuk Göğsü 200g` | `supabase/seed.sql`'deki gerçek veri |
+
+Hangi lehçe olduğu güvenilir biçimde bilinemediği (ve `80g`'nin miktar mı kalori mi olduğu
+belirsiz olduğu) için besin seviyesine inmek **uydurma veri** üretirdi. Bu yüzden Faz 1b'de
+gün başına **tek satır** (`position = 0`) saklanır: ham metin + kcal.
+
+> `position` kolonu bugün her zaman `0`'dır. İleride öğün granülerliği (kahvaltı / ara öğün /
+> akşam) geldiğinde **şema değişmeden** gün içinde birden çok satır tutulabilsin diye
+> şimdiden konulmuştur.
+
+### Round-trip sözleşmesi
+
+Bir günün orijinal JSON değeri şu ifadeyle **birebir** geri üretilir:
+
+```sql
+select jsonb_object_agg(day, jsonb_build_object('items', description, 'total', kcal))
+  from public.nutrition_plan_meals
+ where plan_id = :plan;
+```
+
+`transform.test.sql` senaryo 12 bunu **her iki lehçe için** doğrular (baştaki/sondaki boşluk
+dahil; `btrim` uygulanmaz).
+
+Bilinen sınırlar (bilinçli): `total` sayı değilse / negatifse / **tam sayı değilse** `kcal`
+`NULL`'a düşer — satır yine eklenir, `description` kayıpsızdır (senaryo 13). Tam sayı şartı
+kasıtlıdır: `1850.5` gibi bir değeri integer'a yuvarlamak sessiz veri kaybı olurdu.
+Gün nesnesinde `items`/`total` dışında ek anahtar varsa o anahtar saklanmaz.
+
+### Tek yazıcı kuralı
+
+`public.explode_nutrition_day()` **tek** yazıcıdır: hem veri dönüşümü
+(`migrate_nutrition_plans_from_profiles`) hem yazma RPC'si (`save_nutrition_plan`) onu çağırır.
+`transform.test.sql` senaryo 18 iki yolun `EXCEPT ALL` ile **birebir aynı** satırları
+ürettiğini doğrular.
+
+### `save_nutrition_plan()` semantiği (Faz 1b)
+
+`save_workout_plan()` ile birebir aynı desendedir: aktif plan yoksa `version = 1` ile
+oluşturulur (varsa o kullanılır), planın **tüm** öğün satırları silinip yeniden yazılır,
+**yeni versiyon üretilmez**, `SECURITY INVOKER` olduğu için RLS ihlali hatayı yükseltir
+(çağrı atomiktir). Geçersiz gün anahtarı **hata verir** ve doğrulama hiçbir satır yazılmadan
+**önce, toptan** yapılır; dönüşüm yolunda ise bilinmeyen gün atlanır.
+
+### Testler
+
+```bash
+npm run test:rls         # 35 senaryo (28–35 bu tablolara ait)
+npm run test:transform   # 19 senaryo (11–19 bu tablolara ait)
+```
+
+### Geri alma
+
+Migration dosyasının sonunda yorum bloğu hâlinde çalıştırılabilir bir `-- DOWN`
+script'i vardır. Veri kaybı yaratmaz: kaynak veri `profiles.nutrition_plan` kolonunda
+durmaya devam eder.
 
 ---
 
