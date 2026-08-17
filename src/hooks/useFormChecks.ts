@@ -35,6 +35,19 @@ export interface FormCheckWithUrls extends FormCheck {
   backPoseSignedUrl: string | null
 }
 
+/**
+ * Koç kuyruğu (`status = 'pending'`) için ayrı bir sorgu anahtarı.
+ *
+ * NOT (dosya sahipliği kısıtı): anahtarlar normalde YALNIZCA `src/lib/query/keys.ts`
+ * içindeki merkezi fabrikadan üretilir (§3.4). Faz 2'nin dört paralel dilimi
+ * `src/lib/**`'i PAYLAŞIYOR ve bu dilimin sahiplik listesi o dosyaya dokunmayı
+ * yasaklıyor; bu yüzden anahtar burada, `queryKeyRoots.formChecks` ÖN EKİYLE
+ * yerel olarak tanımlanır. Ön ek aynı kaldığı için `invalidateQueries({queryKey:
+ * queryKeyRoots.formChecks})` bu kaydı da temizler. Faz 2 birleşiminde bu anahtar
+ * `queryKeys.pendingFormChecks()` olarak merkezi fabrikaya taşınmalıdır.
+ */
+const PENDING_FORM_CHECKS_KEY = [...queryKeyRoots.formChecks, 'pending'] as const
+
 export function useFormChecks(clientId?: string) {
   return useQuery({
     queryKey: queryKeys.formChecks(clientId),
@@ -133,6 +146,163 @@ export function useSubmitFormCheck() {
     },
     onError: (error: Error) => {
       toast.error(`Form gönderilemedi: ${error.message}`)
+    },
+  })
+}
+
+/**
+ * Koç kuyruğu: TÜM danışanların `status = 'pending'` form check'leri, EN ESKİDEN
+ * yeniye (FIFO — kuyrukta en uzun bekleyen ilk sırada). `form_checks_pending_queue_idx`
+ * kısmi indeksi (bkz. 20260817150000_form_check_review.sql §7) tam olarak bu
+ * sorguyu hedefler.
+ *
+ * `useFormChecks(clientId)`'ten AYRIDIR: o tek bir danışanın TÜM geçmişini
+ * (durum farketmeksizin) döner; bu ise TÜM danışanların yalnızca bekleyenlerini.
+ */
+export function usePendingFormChecks() {
+  return useQuery({
+    queryKey: PENDING_FORM_CHECKS_KEY,
+    staleTime: SIGNED_URL_STALE_TIME_MS,
+    queryFn: async (): Promise<FormCheckWithUrls[]> => {
+      const { data, error } = await supabase
+        .from('form_checks')
+        .select('*')
+        .eq('status', 'pending')
+        .order('created_at', { ascending: true })
+      if (error) throw wrapSupabaseError(error, { table: 'form_checks', op: 'select' })
+
+      // Tüm yollar TEK istekte imzalanır (danışan başına ayrı istek yok — N+1 önlenir).
+      const signed = await createSignedUrls(
+        FORM_CHECK_BUCKET,
+        data.flatMap((row) => [row.front_pose_path, row.back_pose_path])
+      )
+
+      return data.map((row) => ({
+        ...row,
+        frontPoseSignedUrl: row.front_pose_path ? (signed.get(row.front_pose_path) ?? null) : null,
+        backPoseSignedUrl: row.back_pose_path ? (signed.get(row.back_pose_path) ?? null) : null,
+      }))
+    },
+  })
+}
+
+/**
+ * Form check 'reviewed' olduğunda bildirim yayınlar. İKİ kanal denenir; hiçbiri
+ * çağıranı BLOKE ETMEZ (asıl işlem — `status` güncellemesi — zaten tamamlanmıştır,
+ * bkz. `useReviewFormCheck` altındaki "NEDEN BLOKE ETMİYOR" notu).
+ *
+ * 1) SİSTEM MESAJI (`messages`, `kind='system'`) — plan §4.3'ün istediği ASIL kanal.
+ *    Artık `supabase.rpc('post_system_message', ...)` ile yazılır (bkz.
+ *    `supabase/migrations/20260817200000_system_message_rpc.sql`,
+ *    `supabase/README.md` §4h). Mesaj METNİ İSTEMCİDEN GÖNDERİLMEZ: RPC yalnızca
+ *    olay türünü (`'form_check_reviewed'`) ve referansı (`formCheckId`) alır,
+ *    metni `form_checks.coach_feedback`'ten SUNUCUDA üretir (AC-05 dersi — bkz.
+ *    migration başlığı). `42501` artık BEKLENEN bir sonuç DEĞİLDİR (RPC koç için
+ *    açıktır); bir hata alınırsa gerçek bir arızadır ve `logger.error` + görünür
+ *    bir uyarı toast'ı ile yüzeye çıkarılır (aşağıya bakınız).
+ * 2) BİLDİRİM (`notifications`) — bugün fiilen ÇALIŞAN yol; `CoachUserManagement.tsx`
+ *    içindeki `sendCheckinReminder` ile AYNI, halihazırda doğrulanmış deseni kullanır.
+ *    "Push Faz 7'de aktifleşecek, şimdi event yayınla" talimatının somut karşılığı
+ *    budur: Faz 7'nin `device_push_tokens` + Edge Function'ı bu tabloyu okuyup push
+ *    gönderecek şekilde tasarlandı (bkz. active_planprogram.md §10); bugün yalnızca
+ *    satır yazılır, gerçek push dispatch'i bu görevin kapsamı DIŞINDADIR. Bu kanalın
+ *    metni burada, istemcide üretilir — `notifications_guard_content()` koç yolunu
+ *    (`is_coach()`) serbest bırakır (bkz. 20260817180000 §3), yani bu RPC'nin
+ *    kapsamı DIŞINDADIR ve değişmedi.
+ */
+async function publishFormCheckReviewedEvent({
+  formCheckId,
+  clientId,
+  feedback,
+}: {
+  formCheckId: string
+  clientId: string
+  feedback: string
+}): Promise<void> {
+  const trimmed = feedback.trim()
+  const text =
+    trimmed.length > 0
+      ? `Koçunuz form check'inize geri bildirim yazdı: "${trimmed}"`
+      : 'Koçunuz form check’inizi inceledi.'
+
+  const { error: messageError } = await supabase.rpc('post_system_message', {
+    p_client_id: clientId,
+    p_event_type: 'form_check_reviewed',
+    p_ref_id: formCheckId,
+  })
+  if (messageError) {
+    // BEKLENMEYEN: RPC koç için açık, referans (formCheckId) az önce bu akışın
+    // kendisi tarafından 'reviewed' yapıldı. Bir hata alınırsa gerçek bir arızadır
+    // (bkz. useReviewFormCheck üzerindeki "NEDEN BLOKE ETMİYOR" notu — asıl işlem
+    // zaten tamamlandığı için burada FIRLATILMAZ, ama artık SESSİZCE de yutulmaz).
+    logger.error(
+      { err: messageError.message, clientId, formCheckId },
+      'Form check sistem mesajı (post_system_message RPC) yazılamadı'
+    )
+    toast.error('Danışana sistem mesajı gönderilemedi (geri bildirim yine de kaydedildi).')
+  }
+
+  const { error: notificationError } = await supabase.from('notifications').insert({
+    client_id: clientId,
+    title: 'Form Check İncelendi',
+    message: text,
+  })
+  if (notificationError) {
+    logger.warn({ err: notificationError.message, clientId }, 'Form check bildirimi yazılamadı')
+  }
+}
+
+export interface ReviewFormCheckInput {
+  formCheckId: string
+  clientId: string
+  coachFeedback: string
+}
+
+/**
+ * Koç geri bildirimi: `form_checks` -> `status='reviewed'` + `coach_feedback`.
+ * `reviewed_at` / `reviewed_by` İSTEMCİDEN GÖNDERİLMEZ — SUNUCUDA doldurulur
+ * (`form_checks_guard_review` trigger'ı, bkz. 20260817150000_form_check_review.sql §6).
+ *
+ * NEDEN `publishFormCheckReviewedEvent` HATASI BU MUTASYONU BLOKE ETMEZ:
+ * asıl işlem (`status='reviewed'` yazımı) yukarıdaki `update` ile ZATEN
+ * TAMAMLANMIŞTIR ve geri alınmaz (tasarım gereği — form check inceleme kararı
+ * sistem mesajından bağımsız bir gerçektir). Bildirim RPC'si (`post_system_message`)
+ * BAŞARISIZ olursa mutasyonu `throw` ile reddetmek YANLIŞ bir sinyal verirdi:
+ * `onError` "Geri bildirim gönderilemedi" derdi ama geri bildirim ZATEN
+ * kaydedilmişti — koç muhtemelen TEKRAR denerdi (zararsız ama kafa karıştırıcı).
+ * Bunun yerine hata `publishFormCheckReviewedEvent` içinde loglanır VE ayrı,
+ * görünür bir `toast.error` ile bildirilir (artık 42501 BEKLENMEDİĞİ için
+ * sessizce yutulmaz) — koç gerçek durumu (inceleme kaydedildi, bildirim
+ * gitmedi) doğru öğrenir.
+ */
+export function useReviewFormCheck() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({
+      formCheckId,
+      clientId,
+      coachFeedback,
+    }: ReviewFormCheckInput): Promise<FormCheck> => {
+      const { data, error } = await supabase
+        .from('form_checks')
+        .update({ status: 'reviewed', coach_feedback: coachFeedback })
+        .eq('id', formCheckId)
+        .select()
+        .single()
+      if (error) throw wrapSupabaseError(error, { table: 'form_checks', op: 'update' })
+
+      await publishFormCheckReviewedEvent({ formCheckId, clientId, feedback: coachFeedback })
+
+      return data
+    },
+    onSuccess: (_data, { clientId }) => {
+      void queryClient.invalidateQueries({ queryKey: PENDING_FORM_CHECKS_KEY })
+      void queryClient.invalidateQueries({ queryKey: queryKeys.formChecks(clientId) })
+      toast.success('Geri bildirim danışana iletildi.')
+    },
+    onError: (error: Error) => {
+      toast.error(`Geri bildirim gönderilemedi: ${error.message}`)
     },
   })
 }

@@ -28,6 +28,12 @@ export const queryKeyRoots = {
   lastCheckins: ['last-checkins'] as const,
   recommendations: ['recommendations'] as const,
   coachId: ['coach-id'] as const,
+  /** Mesaj eki (`messages.attachment_path`) için imzalı adres — bkz. `useMessages.ts::useMessageAttachmentUrl`. */
+  messageAttachmentUrl: ['message-attachment-url'] as const,
+  /** Günlük makro hedefi (`nutrition_plans.target_*`) — bkz. `useNutritionLogs.ts::useNutritionTargets`. */
+  nutritionTargets: ['nutrition-targets'] as const,
+  /** GERÇEKLEŞEN öğün kaydı (`nutrition_logs`) — bkz. `useNutritionLogs.ts::useNutritionLogs`. */
+  nutritionLogs: ['nutrition-logs'] as const,
 } as const
 
 export const queryKeys = {
@@ -83,4 +89,15 @@ export const queryKeys = {
   lastCheckins: () => ['last-checkins'] as const,
   recommendations: (clientId?: string) => ['recommendations', clientId ?? null] as const,
   coachId: () => ['coach-id'] as const,
+
+  /** Mesaj eki (`messages.attachment_path`) için imzalı adres. Yol yoksa `null` bileşeni sorguyu `enabled: false` yapar. */
+  messageAttachmentUrl: (path?: string | null) => ['message-attachment-url', path ?? null] as const,
+
+  /**
+   * Günlük makro hedefi (`nutrition_plans.target_*`).
+   * `nutritionPlan`'dan (öğün ŞABLONU) AYRIDIR — bkz. useNutritionLogs.ts dosya başı notu.
+   */
+  nutritionTargets: (clientId?: string) => ['nutrition-targets', clientId ?? null] as const,
+  /** GERÇEKLEŞEN öğün kaydı (`nutrition_logs`) — danışanın manuel girdiği öğünler. */
+  nutritionLogs: (clientId?: string) => ['nutrition-logs', clientId ?? null] as const,
 } as const

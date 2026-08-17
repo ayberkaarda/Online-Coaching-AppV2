@@ -8,7 +8,7 @@
 // kırık görsel yerine boş durum / placeholder gösterilir.
 
 import { zodResolver } from '@hookform/resolvers/zod'
-import { ImageOff } from 'lucide-react'
+import { Clock, ImageOff } from 'lucide-react'
 import { useState } from 'react'
 import type { ChangeEvent, JSX } from 'react'
 import { useForm } from 'react-hook-form'
@@ -188,6 +188,9 @@ export default function FormCheckTab({
                 key={fileInputKey}
                 type="file"
                 accept={ALLOWED_IMAGE_MIME.join(',')}
+                // Mobil tarayıcılarda dosya seçiciyi doğrudan arka kameraya açar; masaüstünde
+                // desteklenmeyen bir `capture` niteliği yok sayılır, galeri/dosya seçimi bozulmaz.
+                capture="environment"
                 onChange={handleFileChange}
                 aria-invalid={fileError ? 'true' : 'false'}
                 aria-describedby={fileError ? 'formcheck-pose-error' : undefined}
@@ -232,7 +235,7 @@ export default function FormCheckTab({
           {compareMode ? (
             <div className="flex flex-col gap-6 rounded-2xl border border-gray-200 bg-gray-50 p-6 dark:border-zinc-800 dark:bg-zinc-950 md:flex-row">
               <div className="flex-1 space-y-3">
-                <span className="block border-b pb-2 text-center text-sm font-black uppercase">
+                <span className="block border-b pb-2 text-center text-sm font-bold uppercase tracking-wide">
                   Öncesi
                 </span>
                 <label htmlFor="formcheck-before" className="sr-only">
@@ -267,7 +270,7 @@ export default function FormCheckTab({
                 </div>
               </div>
               <div className="flex-1 space-y-3">
-                <span className="block border-b pb-2 text-center text-sm font-black uppercase text-accent">
+                <span className="block border-b pb-2 text-center text-sm font-bold uppercase tracking-wide text-accent">
                   Sonrası
                 </span>
                 <label htmlFor="formcheck-after" className="sr-only">
@@ -307,6 +310,11 @@ export default function FormCheckTab({
               {formChecks.map((check) => (
                 <div
                   key={check.id}
+                  role="group"
+                  // Erişilebilir/test kancası: CoachUserManagement.tsx'teki bekleyen
+                  // kuyruk kartlarıyla AYNI desen — kart tek, belirsizliksiz bir
+                  // hedeftir (bkz. tests/e2e/form-check.spec.ts).
+                  aria-label={`Form check kaydı, ${check.current_weight} kg`}
                   className="flex items-center gap-4 rounded-2xl border bg-gray-50 p-4 shadow-sm transition-transform hover:scale-[1.02] dark:bg-zinc-950"
                 >
                   {check.frontPoseSignedUrl ? (
@@ -324,11 +332,24 @@ export default function FormCheckTab({
                       <ImageOff className="h-7 w-7" />
                     </div>
                   )}
-                  <div className="text-sm">
-                    <p className="text-lg font-black text-accent">{check.current_weight} kg</p>
-                    <p className="mt-1 text-xs text-gray-500">
+                  <div className="min-w-0 flex-1 text-sm">
+                    <div className="flex items-center gap-2">
+                      <p className="text-xl font-bold text-accent">{check.current_weight} kg</p>
+                      {check.status === 'pending' ? (
+                        <span className="inline-flex items-center gap-1 rounded-control bg-warning/10 px-2 py-0.5 text-xs font-bold text-warning">
+                          <Clock aria-hidden="true" className="h-3 w-3" />
+                          Beklemede
+                        </span>
+                      ) : null}
+                    </div>
+                    <p className="mt-1 text-xs text-fg-muted">
                       {formatDateTimeTR(check.created_at)}
                     </p>
+                    {check.status === 'reviewed' && check.coach_feedback ? (
+                      <p className="mt-2 rounded-control bg-accent/5 p-2 text-xs text-fg">
+                        <span className="font-bold text-accent">Koç:</span> {check.coach_feedback}
+                      </p>
+                    ) : null}
                   </div>
                 </div>
               ))}

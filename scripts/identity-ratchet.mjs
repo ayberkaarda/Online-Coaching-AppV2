@@ -42,21 +42,26 @@ export const BASELINES = {
     kind: 'literal',
     literal: 'font-black',
     caseInsensitive: false,
-    ceiling: 49,
+    // 2026-08-17: Faz 2 Katman B dönüşümüyle 49 -> 25'e düştü; ADR-0018 gereği
+    // yeni tavan ölçülen değere indirildi (bkz. "düşürdüğünde yeni değer
+    // baseline olur, tavan asla yükselmez").
+    ceiling: 25,
     label: "`font-black` sınıfı (900 ağırlık — Faz 1.6 kapsamı dışı, Faz 2 Katman B'de dönüşür)",
   },
   'bg-gradient-to-': {
     kind: 'literal',
     literal: 'bg-gradient-to-',
     caseInsensitive: false,
-    ceiling: 14,
+    // 2026-08-17: Faz 2 Katman B dönüşümüyle 14 -> 12'ye düştü; tavan buna indirildi.
+    ceiling: 12,
     label: "`bg-gradient-to-*` gradyanları (Faz 2 Katman B'de dönüşür)",
   },
   'rounded-3xl': {
     kind: 'literal',
     literal: 'rounded-3xl',
     caseInsensitive: false,
-    ceiling: 17,
+    // 2026-08-17: Faz 2 Katman B dönüşümüyle 17 -> 15'e düştü; tavan buna indirildi.
+    ceiling: 15,
     label: "`rounded-3xl` sınıfı (Faz 2 Katman B'de dönüşür)",
   },
   '8b5cf6': {

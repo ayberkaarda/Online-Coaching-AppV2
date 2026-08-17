@@ -9,7 +9,7 @@
 // bu editörler cutover sonrası DEPRECATED profil kolonlarına yazan "ölü yazma"
 // hâline gelmişti (koç kaydediyor, danışan hiç görmüyordu).
 
-import { Bell, ImageOff } from 'lucide-react'
+import { Bell, Clock, ImageOff } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { JSX } from 'react'
 import {
@@ -24,12 +24,21 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
+import { toast } from 'sonner'
 
 import { EmptyState, SkeletonCard, SkeletonChart } from '@/components/ui'
 import { tokens } from '@/design/tokens'
-import { useDailyLogs, useFormChecks, useLastCheckins, useSendNotification } from '@/hooks'
+import {
+  useDailyLogs,
+  useFormChecks,
+  useLastCheckins,
+  usePendingFormChecks,
+  useReviewFormCheck,
+  useSendNotification,
+  useSession,
+} from '@/hooks'
 import type { ProfileWithAvatar } from '@/hooks/useProfile'
-import { daysSince, formatDateTR } from '@/lib/utils'
+import { daysSince, formatDateTR, formatDateTimeTR } from '@/lib/utils'
 
 export interface CoachUserManagementProps {
   /** `useProfiles()` çıktısı: profil satırı + avatar için imzalı adres. */
@@ -65,8 +74,45 @@ export function CoachUserManagement({ clients }: CoachUserManagementProps): JSX.
   const formChecksQuery = useFormChecks(selectedClient?.id)
   const dailyLogsQuery = useDailyLogs(selectedClient?.id)
   const sendNotification = useSendNotification()
+  const { data: session } = useSession()
+  const coachId = session?.user.id
+  const pendingFormChecksQuery = usePendingFormChecks()
+  const reviewFormCheck = useReviewFormCheck()
+  // Kuyruktaki her kayıt için ayrı, kaydedilmemiş geri bildirim taslağı.
+  const [feedbackDrafts, setFeedbackDrafts] = useState<Record<string, string>>({})
 
   const poses = useMemo(() => formChecksQuery.data ?? [], [formChecksQuery.data])
+  const pendingFormChecks = pendingFormChecksQuery.data ?? []
+
+  const clientNameFor = useCallback(
+    (clientId: string): string => clients.find((c) => c.id === clientId)?.full_name ?? 'Danışan',
+    [clients]
+  )
+
+  const handleReviewFormCheck = (formCheckId: string, clientId: string): void => {
+    if (!coachId) {
+      toast.error('Oturum bulunamadı. Lütfen tekrar giriş yapın.')
+      return
+    }
+    const coachFeedback = (feedbackDrafts[formCheckId] ?? '').trim()
+    if (coachFeedback.length === 0) {
+      toast.error('Lütfen bir geri bildirim yazın.')
+      return
+    }
+    reviewFormCheck.mutate(
+      { formCheckId, clientId, coachFeedback },
+      {
+        onSuccess: () => {
+          setFeedbackDrafts((prev) => {
+            if (!(formCheckId in prev)) return prev
+            const next = { ...prev }
+            delete next[formCheckId]
+            return next
+          })
+        },
+      }
+    )
+  }
 
   // Son 14 günlük makro grafiği (sorgu en yeniden eskiye gelir).
   const macroData = useMemo(() => {
@@ -189,7 +235,120 @@ export function CoachUserManagement({ clients }: CoachUserManagementProps): JSX.
 
   return (
     <div>
-      <h3 className="mb-6 text-xl font-black text-gray-800 dark:text-zinc-200">Danışan Portföyü</h3>
+      {/* --- BEKLEYEN FORM CHECK KUYRUĞU ---
+          Konum kararı: bu bölüm (danışan portföyünün üstünde) ayrı bir sekme/route
+          yerine BURADA yaşıyor çünkü koç zaten bu ekranı "danışan durumu" özeti
+          olarak kullanıyor (bkz. aşağıdaki gecikme göstergeleri); ayrı bir yüzey
+          açmak aynı bilgiyi iki yerde göstermek olurdu. Kuyruk TÜM danışanları
+          kapsar (usePendingFormChecks — client bazlı değil), portföy kartlarının
+          altındaki `isCheckinLate` göstergesiyle aynı "triage" amacına hizmet eder. */}
+      {pendingFormChecks.length > 0 && (
+        <section aria-labelledby="pending-form-checks-heading" className="mb-8">
+          <h3
+            id="pending-form-checks-heading"
+            className="mb-4 flex items-center gap-2 text-xl font-bold text-fg"
+          >
+            Bekleyen Form Checkler
+            <span className="rounded-control bg-warning/10 px-2 py-0.5 text-sm font-bold text-warning">
+              {pendingFormChecks.length}
+            </span>
+          </h3>
+          <div className="space-y-4">
+            {pendingFormChecks.map((item) => (
+              <div
+                key={item.id}
+                role="group"
+                // Erişilebilir/test kancası: her kart, karşılık geldiği kaydı benzersiz
+                // tanımlayan bir grup adına sahip. Bu hem ekran okuyucuda "hangi
+                // danışanın hangi kaydı" sorusunu cevaplar hem de E2E'nin (bkz.
+                // tests/e2e/form-check.spec.ts) `getByRole('group', {name})` ile TAM
+                // OLARAK doğru kartı (metin bazlı `div` taramasıyla yanlışlıkla iç içe
+                // geçmiş bir alt div'i DEĞİL) hedeflemesini sağlar.
+                aria-label={`${clientNameFor(item.client_id)} form check kaydı, ${item.current_weight} kg`}
+                className="rounded-panel border border-border bg-surface p-4 shadow-sm"
+              >
+                <div className="flex flex-col gap-4 md:flex-row">
+                  <div className="flex shrink-0 gap-2">
+                    {item.frontPoseSignedUrl ? (
+                      <img
+                        src={item.frontPoseSignedUrl}
+                        alt={`${clientNameFor(item.client_id)} — ön poz, ${item.current_weight} kg`}
+                        loading="lazy"
+                        className="h-24 w-24 rounded-card object-cover"
+                      />
+                    ) : (
+                      <div
+                        aria-hidden="true"
+                        className="flex h-24 w-24 items-center justify-center rounded-card bg-canvas text-fg-muted"
+                      >
+                        <ImageOff className="h-7 w-7" />
+                      </div>
+                    )}
+                    {item.back_pose_path && (
+                      <>
+                        {item.backPoseSignedUrl ? (
+                          <img
+                            src={item.backPoseSignedUrl}
+                            alt={`${clientNameFor(item.client_id)} — arka poz, ${item.current_weight} kg`}
+                            loading="lazy"
+                            className="h-24 w-24 rounded-card object-cover"
+                          />
+                        ) : (
+                          <div
+                            aria-hidden="true"
+                            className="flex h-24 w-24 items-center justify-center rounded-card bg-canvas text-fg-muted"
+                          >
+                            <ImageOff className="h-7 w-7" />
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                  <div className="flex-1 space-y-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="font-bold text-fg">
+                        {clientNameFor(item.client_id)}{' '}
+                        <span className="font-normal text-fg-muted">
+                          · {item.current_weight} kg
+                        </span>
+                      </p>
+                      <p className="flex items-center gap-1 text-xs text-fg-muted">
+                        <Clock aria-hidden="true" className="h-3 w-3" />
+                        {formatDateTimeTR(item.created_at)}
+                      </p>
+                    </div>
+                    {item.notes ? <p className="text-sm text-fg-muted">{item.notes}</p> : null}
+                    <label htmlFor={`form-check-feedback-${item.id}`} className="sr-only">
+                      {clientNameFor(item.client_id)} için geri bildirim
+                    </label>
+                    <textarea
+                      id={`form-check-feedback-${item.id}`}
+                      value={feedbackDrafts[item.id] ?? ''}
+                      onChange={(event) =>
+                        setFeedbackDrafts((prev) => ({ ...prev, [item.id]: event.target.value }))
+                      }
+                      placeholder="Geri bildiriminizi yazın..."
+                      rows={2}
+                      className="w-full rounded-control border border-border bg-canvas p-2 text-sm text-fg focus:border-accent focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleReviewFormCheck(item.id, item.client_id)}
+                      disabled={reviewFormCheck.isPending || !coachId}
+                      aria-busy={reviewFormCheck.isPending}
+                      className="rounded-control bg-accent px-4 py-2 text-xs font-bold text-accent-fg disabled:opacity-50"
+                    >
+                      İncele ve Gönder
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      <h3 className="mb-6 text-xl font-bold text-fg">Danışan Portföyü</h3>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
         {clientCards.map((client) => {
@@ -217,7 +376,7 @@ export function CoachUserManagement({ clients }: CoachUserManagementProps): JSX.
               <span className="sr-only">{late ? 'Form gecikti' : 'Form güncel'}</span>
 
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border border-accent/20 bg-accent/10 text-lg font-black text-accent">
+                <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border border-accent/20 bg-accent/10 text-lg font-bold text-accent">
                   {/* Private bucket: imzalı adres yoksa baş harf gösterilir (kırık görsel yok). */}
                   {client.avatarSignedUrl ? (
                     <img

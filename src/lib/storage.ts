@@ -15,6 +15,8 @@ import { supabase } from '@/lib/supabase/client'
 
 export const AVATAR_BUCKET = 'avatars'
 export const FORM_CHECK_BUCKET = 'form-checks-media'
+/** Sohbet eki (mesaj başına opsiyonel foto) — bkz. 20260817190200_message_attachments.sql. */
+export const MESSAGE_ATTACHMENT_BUCKET = 'message-attachments'
 
 /**
  * İmzalı adreslerin geçerlilik süresi (saniye).

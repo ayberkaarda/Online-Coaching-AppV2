@@ -9,10 +9,27 @@ import { toast } from 'sonner'
 
 import { queryKeyRoots, queryKeys } from '@/lib/query/keys'
 import { wrapSupabaseError } from '@/lib/query/supabase-error'
+import { MESSAGE_ATTACHMENT_BUCKET, SIGNED_URL_STALE_TIME_MS, createSignedUrl } from '@/lib/storage'
 import { supabase } from '@/lib/supabase/client'
+import { assertValidImageFile } from '@/lib/upload-validation'
 import type { Message } from '@/types'
 
 import { useSession } from './useSession'
+
+/**
+ * Mesaj eki yolunu DB CHECK'ine (`messages_attachment_path_chk`) uyacak şekilde üretir:
+ * `<conversation_client_id>/<uploader_uid>-<uuid>.<ext>`. Kısıt ayrıca ilk segmentin
+ * satırın `client_id`'sine EŞİT olmasını şart koşar — bu yüzden `conversationClientId`
+ * çağıran tarafça `resolveConversationClientId` ile önceden doğrulanmış olmalıdır.
+ * Saf fonksiyondur (tests/unit/message-attachment.test.ts).
+ */
+export function buildMessageAttachmentPath(
+  conversationClientId: string,
+  uploaderId: string,
+  extension: string
+): string {
+  return `${conversationClientId}/${uploaderId}-${crypto.randomUUID()}.${extension}`
+}
 
 interface PresencePayload {
   user_id: string
@@ -120,6 +137,35 @@ export function useMessages(currentUserId?: string, partnerId?: string) {
             )
             return [...withoutOptimistic, row]
           })
+
+          // Yeni mesaj BU kullanıcıya geldiyse okunmamış sayacı bayatla — sohbet
+          // ekranı kapalıyken bile (ör. rozet) taze sayı bir sonraki sorguda gelir.
+          if (row.receiver_id === currentUserId) {
+            void queryClient.invalidateQueries({
+              queryKey: queryKeys.unreadCount(clientId, currentUserId),
+            })
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'messages',
+          filter: `client_id=eq.${clientId}`,
+        },
+        (payload) => {
+          // UPDATE'te (bkz. 20260817190400) yayınlanan tek alan sınıfı `read_at`/`is_read`
+          // normalleştirmesidir (`messages_guard_columns` diğer her şeyi dokunulmaz kılar).
+          // Bu, karşı tarafın "okundu" durumunu canlı yansıtır (gönderen "görüldü" bilgisini
+          // sayfayı yenilemeden görür).
+          const row: unknown = payload.new
+          if (!isMessageRow(row)) return
+
+          queryClient.setQueryData<Message[]>(key, (previous) =>
+            previous?.map((item) => (item.id === row.id ? row : item))
+          )
         }
       )
       .subscribe()
@@ -157,6 +203,13 @@ export interface SendMessageInput {
    * DOĞRULAR; yanlış bir client_id ile yazma denemesi hata verir.)
    */
   clientId?: string
+  /**
+   * Opsiyonel foto eki (§4.4: "metin + opsiyonel foto"). `message` metni YİNE
+   * ZORUNLUDUR — yalnız-foto mesaj yoktur (bkz. 20260817190200_message_attachments.sql
+   * satır 11-12). Yükleme `assertValidImageFile` ile (magic-byte) doğrulanır;
+   * geçersiz dosya `UploadValidationError` fırlatır ve `onError` toast'ında görünür.
+   */
+  file?: File
 }
 
 interface SendMessageContext {
@@ -168,7 +221,7 @@ export function useSendMessage() {
   const queryClient = useQueryClient()
 
   return useMutation<Message, Error, SendMessageInput, SendMessageContext>({
-    mutationFn: async ({ senderId, receiverId, message, clientId }): Promise<Message> => {
+    mutationFn: async ({ senderId, receiverId, message, clientId, file }): Promise<Message> => {
       // `client_id` NOT NULL'dır. Trigger NULL gelirse türetir, ama açıkça
       // göndermek hem tipleri hem niyeti nettir. Önbellekte koç kimliği yoksa
       // (ör. sohbet ekranı hiç açılmadan gönderim) tek seferlik çekilir.
@@ -188,6 +241,26 @@ export function useSendMessage() {
         throw new Error('Sohbetin danışan tarafı belirlenemedi.')
       }
 
+      // Ek varsa ÖNCE storage'a yüklenir (form-check akışıyla aynı sıralama —
+      // bkz. useFormChecks.ts uploadPose): yol DB satırından ÖNCE var olmalı ki
+      // gönderim anında `createSignedUrl` hemen çalışsın. Doğrulama SIRASI
+      // otoritedir: boyut/MIME allowlist önce, sonra magic-byte (A-07/A-20/A-21,
+      // bkz. src/lib/upload-validation.ts). Geçersiz dosya burada fırlar,
+      // hiçbir insert denenmez.
+      let attachmentPath: string | null = null
+      if (file) {
+        // `mime` burada TESPİT EDİLEN (magic-byte) türdür, `file.type`'ın bildirdiği
+        // değer DEĞİL — A-07/A-21 otoritesi (bkz. upload-validation.ts) storage'a
+        // yazılan Content-Type'a da taşınır.
+        const { mime, extension } = await assertValidImageFile(file)
+        const path = buildMessageAttachmentPath(resolved, senderId, extension)
+        const { error: uploadError } = await supabase.storage
+          .from(MESSAGE_ATTACHMENT_BUCKET)
+          .upload(path, file, { contentType: mime })
+        if (uploadError) throw new Error(uploadError.message)
+        attachmentPath = path
+      }
+
       const { data, error } = await supabase
         .from('messages')
         .insert({
@@ -195,6 +268,7 @@ export function useSendMessage() {
           receiver_id: receiverId,
           client_id: resolved,
           message,
+          attachment_path: attachmentPath,
         })
         .select()
         .single()
@@ -270,9 +344,11 @@ export function useMarkConversationRead(clientId?: string) {
       const { data, error } = await supabase
         .from('messages')
         .update({
+          // `read_at` KANONİKTİR (Faz 2b: 20260817190300_message_read_state.sql).
+          // `is_read` artık BURADA yazılmıyor — `messages_sync_read_state` trigger'ı
+          // onu `read_at`ten koşulsuz türetir; elle yazmak yalnızca "yeni kod bu
+          // kolona yazmamalı" kuralını ihlal eden ölü bir tekrar olurdu.
           read_at: new Date().toISOString(),
-          // DEPRECATED kolon, tutarlı kalsın diye birlikte yazılır (Faz 2'de DROP).
-          is_read: true,
         })
         .eq('client_id', clientId)
         .eq('receiver_id', viewerId)
@@ -370,5 +446,21 @@ export function useCoachId() {
     queryKey: queryKeys.coachId(),
     staleTime: COACH_ID_STALE_TIME_MS,
     queryFn: fetchCoachId,
+  })
+}
+
+/**
+ * Bir mesaj ekinin (`attachment_path`) imzalı görüntüleme adresi.
+ *
+ * `message-attachments` PRIVATE'tır (I-4); `getPublicUrl` KULLANILMAZ.
+ * `src/lib/storage.ts::createSignedUrl` ile aynı TTL/staleTime sözleşmesini
+ * paylaşır — adres, süresi dolmadan (TTL/2) önbellekte bayatlar.
+ */
+export function useMessageAttachmentUrl(path: string | null | undefined) {
+  return useQuery({
+    queryKey: queryKeys.messageAttachmentUrl(path),
+    enabled: Boolean(path),
+    staleTime: SIGNED_URL_STALE_TIME_MS,
+    queryFn: () => createSignedUrl(MESSAGE_ATTACHMENT_BUCKET, path),
   })
 }
