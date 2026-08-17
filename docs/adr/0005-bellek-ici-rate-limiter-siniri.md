@@ -2,7 +2,7 @@
 
 - **Durum:** Kabul edildi (bilinen kısıtla)
 - **Tarih:** 2026-08-16
-- **Karar verenler:** Proje sahibi + Claude Code
+- **Karar verenler:** Proje sahibi
 
 ## Bağlam
 

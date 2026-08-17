@@ -697,7 +697,7 @@ katmanına kaydı.
 
 ---
 
-## 3b. Faz 1.6 — Görsel Kimlik Oturumu
+## 3b. Faz 1.6 — Görsel Kimlik Oturumu (TAMAMLANDI — AC-1.6.7 hariç)
 
 Kaynak kararlar: **ADR-0015** (görsel kimlik sistemi: palet, tema, token mimarisi,
 tipografi), **ADR-0016** (fonksiyonel emoji → `lucide-react`), **ADR-0017** (imza öğe:
@@ -714,6 +714,15 @@ Faz 1.5 `supabase/**`, `src/lib/**`, `src/proxy.ts` ve CI güvenlik adımlarınd
 üzerinde çalışır. Bu yüzden **paralel yürütülebilirler**. İkisi de **Faz 2'den önce**
 bitmelidir: Faz 2 ekranları yeniden yazacak, kimlik o zaman hazır olmazsa aynı ekranlar
 iki kez elden geçer.
+
+**Durum — TAMAMLANDI (2026-08-17).** Katman A iki commit'te uygulandı (`599974c` token
+sistemi, `167f65e` ratchet). **AC-1.6.1–AC-1.6.6, AC-1.6.8, AC-1.6.9 karşılandı;
+AC-1.6.7 tasarım gereği Faz 2'ye devredildi** (bkz. §3b.3, ADR-0017 — `LoopRing`
+yazılana kadar karşılanamaz). Doğrulama zinciri yeşil: type-check/lint/format temiz,
+birim **363/363** (31 dosya), E2E **42/42** (21 senaryo × 2 profil), build başarılı,
+`npm run ratchet` **6/6** sayaç yeşil. ADR-0015'in Kehribar hex'i uygulama sırasında
+`#B45D00` → `#A65600` revize edildi (AA kontrastı). Tam detay: `docs/PROGRESS.md` §3
+"Faz 1.6 — Görsel Kimlik Oturumu, Katman A".
 
 ### 3b.1 Amaç ve timebox
 
@@ -758,13 +767,14 @@ iki kez elden geçer.
 değerin üstüne çıkarsa CI kırılır**. Tavan asla yükselmez, her PR düşürebilir ve
 düşürdüğünde yeni değer baseline olur.
 
-| Sayaç               | Kilitlenen tavan (2026-08-17 ölçümü)                 |
-| ------------------- | ---------------------------------------------------- |
-| `font-black`        | 49                                                   |
-| `bg-gradient-to-`   | 14                                                   |
-| `rounded-3xl`       | 17                                                   |
-| ham `#8b5cf6`       | 8 → Katman A sonrası **0**                           |
-| JSX emoji kullanımı | script'in kendi ölçümüyle sabitlenir (~60, 15 dosya) |
+| Sayaç                                    | Kilitlenen tavan (2026-08-17 ölçümü)                                                                                                                              |
+| ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `font-black`                             | 49                                                                                                                                                                |
+| `bg-gradient-to-`                        | 14                                                                                                                                                                |
+| `rounded-3xl`                            | 17                                                                                                                                                                |
+| ham `#8b5cf6`                            | 8 → Katman A sonrası **0** — doğrulandı (`grep` boş)                                                                                                              |
+| eski-marka-moru-ondalik (`139, 92, 246`) | **0** — Katman A'da eklendi; `8b5cf6` grep'inin kaçırdığı iki ondalık kullanım (`StatsTab.tsx`, `DashboardTabs.tsx`) elle bulunup düzeltildikten sonra sıfırlandı |
+| JSX emoji kullanımı                      | script'in kendi ölçümüyle sabitlenir (60, 15 dosya — ADR'nin tahminiyle birebir)                                                                                  |
 
 ### Kabul kriterleri
 

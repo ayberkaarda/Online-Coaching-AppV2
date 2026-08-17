@@ -2,7 +2,7 @@
 
 - **Durum:** Reddedildi
 - **Tarih:** 2026-08-17
-- **Karar verenler:** Proje sahibi + Claude Code
+- **Karar verenler:** Proje sahibi
 
 ## Bağlam
 

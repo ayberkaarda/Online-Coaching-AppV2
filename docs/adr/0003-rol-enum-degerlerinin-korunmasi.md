@@ -2,7 +2,7 @@
 
 - **Durum:** Yerini aldı: 0013
 - **Tarih:** 2026-08-16
-- **Karar verenler:** Proje sahibi + Claude Code
+- **Karar verenler:** Proje sahibi
 
 > **Not:** Bu karar `0013-rollerin-coach-client-olarak-yeniden-adlandirilmasi.md` ile
 > geçersiz kılınmıştır. Aşağıdaki metin tarihsel kayıt olarak korunmuştur.

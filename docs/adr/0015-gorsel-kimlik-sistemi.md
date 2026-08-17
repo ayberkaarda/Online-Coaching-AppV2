@@ -2,7 +2,7 @@
 
 - **Durum:** Kabul edildi (uygulama Faz 1.6'da)
 - **Tarih:** 2026-08-17
-- **Karar verenler:** Proje sahibi + Claude Code
+- **Karar verenler:** Proje sahibi
 - **Revizyonlar:** 2026-08-17 — Kehribar `#B45D00` → `#A65600`; Faz 1.6 uygulamasında
   yapılan kontrast ölçümü ilk değerin AA eşiğini geçmediğini gösterdi (bkz. "Palet").
 

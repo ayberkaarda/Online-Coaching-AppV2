@@ -58,6 +58,13 @@ düzeltildi ve paket artık 28/28 yeşil (bkz. §3 "E2E doğrulaması ve ortaya 
 | Backend lint/tip/test (Faz 1.5 düzeltme turu, Grup 4–6 sonrası)        | `uv run ruff check . && uv run mypy app && uv run pytest` | Temiz — 28 dosya mypy; **pytest 82/82, kapsam %94.94**                                          | 2026-08-17 |
 | `npm audit` (Faz 1.5 düzeltme turu, Grup 4–6 sonrası)                  | `npm audit --audit-level=high --omit=dev`                 | **0 zafiyet** (önceden 7 high — T-04 `next-pwa`'nın `devDependencies`'e taşınması)              | 2026-08-17 |
 | E2E testleri (Faz 1.5 düzeltme turu, Grup 4–6 sonrası)                 | `npm run test:e2e`                                        | **42/42 geçti** (21 senaryo × 2 profil — chromium + Mobile Chrome, 43.2 sn, sıfır hata)         | 2026-08-17 |
+| Tip kontrolü (Faz 1.6 — görsel kimlik, Katman A sonrası)               | `npm run type-check`                                      | Temiz                                                                                           | 2026-08-17 |
+| Lint (Faz 1.6 — görsel kimlik, Katman A sonrası)                       | `npm run lint`                                            | Temiz — 0 hata, 12 bilinen uyarı                                                                | 2026-08-17 |
+| Biçim (Faz 1.6 — görsel kimlik, Katman A sonrası)                      | `npm run format:check`                                    | Temiz                                                                                           | 2026-08-17 |
+| Birim/bileşen testleri (Faz 1.6 — görsel kimlik, Katman A sonrası)     | `npm run test`                                            | **363/363 (31 dosya)** — önceki tur 308                                                         | 2026-08-17 |
+| Production build (Faz 1.6 — görsel kimlik, Katman A sonrası)           | `npm run build`                                           | Başarılı, fontlar self-host edildi                                                              | 2026-08-17 |
+| E2E testleri (Faz 1.6 — görsel kimlik, Katman A sonrası)               | `npm run test:e2e`                                        | **42/42** (21 senaryo × 2 profil) — ekran metnine dokunulmadı, tek locator kırılmadı            | 2026-08-17 |
+| CI ratchet (Faz 1.6 — görsel kimlik, Katman A sonrası)                 | `npm run ratchet`                                         | **6/6 sayaç yeşil**                                                                             | 2026-08-17 |
 
 Kalan 12 lint uyarısı bilinçlidir: 8 adet `@next/next/no-img-element` (Supabase public
 URL'leri ve `ui-avatars.com` için `next/image` bilerek tercih edilmedi — harici/dinamik
@@ -577,6 +584,125 @@ Chrome, 43.2 sn, sıfır hata; önceki turun "21/21" kaydı tek profil sayımıy
 **Durum:** Faz 1.5 tamamlandı — A-05/A-14 (kullanıcı kararıyla ertelendi) ve AC-12 (hosted
 proje doğrulaması, açık soru) hariç. Sıradaki iş: Faz 1.6 (görsel kimlik) ve ardından Faz 2.
 
+### Faz 1.6 — Görsel Kimlik Oturumu, Katman A (2026-08-17)
+
+Kaynak kararlar ADR-0015/0016/0017/0018, plan `active_planprogram.md` §3b. İki commit
+halinde atıldı (`599974c` token sistemi, `167f65e` ratchet).
+
+**Token kaynağı:**
+
+- Yeni `src/design/tokens.ts` — düz TS objesi, light + dark iki set, 12 semantik anahtar
+  (`bg`, `surface`, `surfaceRaised`, `border`, `textPrimary`, `textSecondary`, `accent`,
+  `accentContrast`, `success`, `warning`, `danger`, `focusRing`), tüm değerler düz
+  `#RRGGBB`. Web'e özgü hiçbir değer yok — Faz 4.5'te Expo bu dosyayı aynen import edecek.
+- `tailwind.config.ts` token'ları CSS değişkenlerine bağlıyor; `brand-purple` ve
+  `brand-purpleHover` silindi (AC-1.6.2). CSS değişkenleri `tailwindcss/plugin`'in
+  `addBase`'i ile tokens.ts'ten TEK KAYNAKTAN üretiliyor (globals.css'e elle yazılsaydı
+  kaçınılmaz olarak kayardı).
+
+**Kritik teknik karar — opaklık değiştiricileri:** CSS değişkenleri ham RGB kanalı tutuyor
+(`--color-accent: 91 72 217`, `rgb()` sarmalayıcısı yok) ve config `rgb(var(--color-accent)
+/ <alpha-value>)` kalıbını kullanıyor. Düz hex yazılsaydı koddaki 32 opaklık değiştiricili
+kullanım (`bg-accent/10`, `border-accent/20` …) sessizce bozulurdu — hata vermez, sadece
+renk üretmezdi. Üretilen CSS'te `rgb(var(--color-accent)/.3)` doğrulandı.
+
+**Mekanik yeniden adlandırma:** 18 dosyada 140 `brand-purple` kullanımı `accent`'e çevrildi,
+opaklık değiştiricileri korunarak. Token commit'iyle aynı commit'te birleştirildi — ayrı
+atılsalardı aradaki commit'te 140 sınıf hiçbir CSS üretmez, uygulama görsel olarak kırık
+olurdu. Sıra tuzağı: `brand-purpleHover` önce ele alındı, yoksa `brand-purple` dönüşümü onun
+önekiyle eşleşip bozuk sınıf bırakırdı; tek kullanımı `hover:bg-accent/90` oldu.
+
+**Ham renk temizliği — grep'in yakalamadığı iki kaçak:** `globals.css`'te 4 adet
+`#8b5cf6`, `CoachUserManagement.tsx`'te 3 (Recharts), `StatsTab.tsx`'te 1 (Chart.js) token'a
+çekildi. Ancak iki yerde eski marka moru ondalık biçimde saklanmış hâlde bulundu ve
+`8b5cf6` grep'i bunları görmüyordu: `StatsTab.tsx` `rgba(139, 92, 246, 0.2)` ve
+`DashboardTabs.tsx` `shadow-[0_0_8px_rgba(139,92,246,0.8)]`. 139,92,246 ondalık olarak tam
+olarak `#8b5cf6`'dır; ikisi de elle bulundu. Bu keşif üzerine ratchet'a kalıcı bir ondalık
+sayaç eklendi. Grafik renkleri bilerek statik bırakıldı (tema duyarlılık Faz 4, AC-4.3).
+
+**Tipografi (AC-1.6.6):** `next/font` ile Archivo (600/700), Hanken Grotesk (400/500/600),
+IBM Plex Mono (500); hepsi `latin`+`latin-ext`, `display: swap`, self-host (12 woff2).
+`weight: 'variable'` kullanılmadı — değişken kesim 100–900'ün tamamını açar ve "900 sistemde
+hiç tanımlanmaz" kuralını delerdi. Kabul edilen bedel: Archivo'nun `wdth` genişlik ekseni
+kullanılamıyor, ADR-0015'in "hiyerarşi boyut + genişlik ile kurulur" cümlesindeki genişlik
+Katman B'de yalnızca boyutla telafi edilecek. Tabular figürler `.font-mono`'da varsayılan
+yapıldı (opt-in unutulabilir, ADR "şarttır" diyor).
+
+**Görünür yan etki (borç olarak kaydedildi):** yazı tipleri 700'de tavanlandığı için mevcut
+49 `font-black` (900) artık gerçek 900 kesimi bulamıyor; tarayıcı sentetik kalın üretiyor.
+ADR-0015 bunu bilerek istiyor; kullanımlar Faz 2 Katman B'de sökülecek.
+
+**Zeminler (AC-1.6.8):** `viewport.themeColor` çifti `#F4F4F1` / `#14161B`; koyu zemin
+`#0f0f12` → `#14161B`, `.dark .glass-panel` ile senkron.
+**Odak/seçim (AC-1.6.3):** `:focus-visible` ve `selection` token'dan besleniyor.
+
+**ADR-0015 revizyonu — Kehribar `#B45D00` → `#A65600`:** Kontrastlar hesaplandığında altı
+adlandırılmış hex'ten biri AA'yı geçmiyordu: Kehribar, Tebeşir üstünde **4.23:1** (eşik
+4.5). Yalnız zeminde değil, `surface` kademesinde de kalıyordu (4.46). Karar kullanıcı
+tarafından **Fable'a** danışılarak verildi. Dayanağı kod tabanındaki gerçek kullanım: uyarı
+rengi bu projede rozet/ikon değil, ezici çoğunlukla METİN olarak kullanılıyor
+(`WorkoutTab.tsx:519,529`, `DashboardTabs.tsx:141,148`, `NutritionTab.tsx:343`) ve çoğu
+`text-xs`/`text-sm` — yani 3:1 UI eşiğine sığınmak geçersiz. Ayrıca ADR-0015'in kurucu
+gerekçesi zaten "eski mor beyaz üstünde ~4.2:1 verdiği için kaydırıldı"; Kehribar'ı 4.23'te
+bırakmak aynı hata modunu kalıcılaştırırdı.
+`#A65600` sonuçları (iki ajan bağımsız hesapladı, birebir tuttu): bg **4.82** · surface
+**5.08** · surfaceRaised **5.31**. Ton 31° ve tam doygunluk korundu, yalnız parlaklık %35.3
+→ %32.5 düştü. `dark.warning` (`#F78000`) değişmedi. Reddedilen `#A85700` yalnızca 4.73 ile
+sınırda kalıyordu; `#A65600` Kapanış'ın 4.88'i ve Plaka Kırmızısı'nın 5.09'uyla aynı emniyet
+bandına oturuyor.
+Ayrıca ADR'deki tahmini Menevis oranları ("yaklaşık 6:1 / 6.5:1") ölçülen gerçek değerlerle
+(**5.65** / **7.56**) değiştirildi.
+
+**Kontrast testi neden axe değil:** axe-core'un `color-contrast` kuralı jsdom'da çalışmıyor
+(gerçek layout/boyama gerektirir, otomatik devre dışı kalır). Token seviyesinde hesaplanan
+kontrast hem daha güvenilir hem de kaynağın kendisini test ediyor. AC-1.6.5 bu şekilde
+karşılandı.
+
+**CI ratchet (AC-1.6.4):** `scripts/identity-ratchet.mjs` — bağımlılıksız Node ESM,
+`src/**/*.{ts,tsx,css}` tarar, baseline'lar koda gömülü (değişiklik code review'da görünsün
+diye). Kilitlenen tavanlar: `font-black` 49 · `bg-gradient-to-` 14 · `rounded-3xl` 17 ·
+`8b5cf6` 0 · `eski-marka-moru-ondalik` 0 · `emoji` 60.
+Emoji sayımı `Intl.Segmenter` ile grafem kümesine bölünüp `\p{Extended_Pictographic}` ile
+test ediliyor — naif aralık regex'i ZWJ birleşik emojileri (👨‍👩‍👧) birden çok sayar ve BMP
+sembollerini (☀ ⚠) kaçırır. Ölçüm 60 emoji / 15 dosya, ADR'nin "~60, 15 dosya" tahminiyle
+birebir. Kod yorumlarındaki emojiyi hariç tutmak için küçük bir sözcük çözümleyici kullanıldı
+— tam TS/TSX ayrıştırıcı değil, ADR-0018'in grep tabanlı yaklaşım için kabul ettiği takas.
+`allowJs: false` (ADR-0001) altında TypeScript `.mjs` kaynağından JSDoc okumadığı için elle
+yazılmış `scripts/identity-ratchet.d.mts` bildirim dosyası gerekti; `tsconfig.json`'a
+dokunulmadı. CI'da `frontend` job'una adım olarak eklendi.
+
+**Kırmızı-yeşil kanıtları:** fazladan bir `font-black` eklenince ratchet `50 / tavan 49` ile
+kırıldı ve suçlu dosyayı listeledi (çıkış kodu 1), geri alınınca yeşile döndü. Ondalık sayaç
+için aynı kanıt üretim fonksiyonları sentetik girdiyle çalıştırılarak alındı — script yalnızca
+`src/**` tarıyor ve o dizin ratchet ajanının kapsamı dışındaydı; ajan kapsamı ihlal etmek
+yerine bu uyarlamayı açıkça bildirdi.
+
+**Doğrulama (§1 tablosuna işlendi):** `npm run type-check` temiz · `npm run lint` 0 hata/12
+bilinen uyarı · `npm run test` **363/363** (31 dosya, faz başında 308) · `npm run build`
+başarılı, fontlar self-host edildi · `npm run test:e2e` **42/42** (21 senaryo × 2 profil) —
+ekran metnine dokunulmadığı için tek locator kırılmadı (AC-1.6.9) · `npm run ratchet` 6/6
+sayaç yeşil · `npm run format:check` temiz · AC-1.6.2 grep'leri: `brand-purple` 0 ·
+`8b5cf6` 0 · ondalık mor 0. Veritabanı ve backend bu fazda değişmedi; `db reset`/
+`test:rls`/`pytest` koşulmadı (gereksiz).
+
+**Kaydedilen borçlar (§5'e işlendi):**
+
+- `border` token'ı 1.52:1 (light) / 1.80:1 (dark) — dekoratif ayırıcı için yeterli, form
+  input sınırı gibi anlamlı UI sınırları için WCAG 1.4.11'in 3:1'ini geçmiyor. 12 token'lık
+  sözleşmede `border-strong` yok; ihtiyaç Katman B'de doğacak.
+- `globals.css`'te `::-webkit-scrollbar-thumb` hâlâ ham `#3f3f46` — token'a çekmek açık
+  temada scrollbar'ı belirgin biçimde açardı, bilinçli olarak sistemin dışında bırakıldı.
+- Revize edilen `warning` token'ı ekranlara henüz akmıyor — bileşenler hâlâ ham
+  `text-orange-*`/`amber-*` kullanıyor. Kontrast kazancı Katman B'de bu sınıflar
+  `text-warning`'e çevrilince gerçekleşecek.
+- AC-1.6.7 (`LoopRing`, `prefers-reduced-motion` altında bilgi kaybetmeme) tasarımı gereği
+  Faz 2'ye devredildi (ADR-0017).
+- Ratchet emoji sayacının sözcük çözümleyicisi tam ayrıştırıcı değil (regex literali içindeki
+  `/` teorik olarak durum takibini şaşırtabilir).
+
+**Durum:** Faz 1.6 tamamlandı (AC-1.6.7 hariç, Faz 2'ye devredildi). Sıradaki iş Faz 1.7 —
+Borç Temizliği (bkz. §6), ardından Faz 2.
+
 ---
 
 ## 4. Alınan kararlar (karar kaydı)
@@ -692,15 +818,24 @@ kalemidir.
 **GÖRSEL KİMLİK BORÇLARI (Faz 1.6 / Faz 2 kapsamına alındı — `active_planprogram.md` §3b):**
 Aşağıdakiler 2026-08-17'de kaynaktan ölçüldü; hiçbiri bu oturumda düzeltilmedi.
 
-| Kısıt / borç                                                                 | Kanıt ve kapanış yeri                                                                                                                                                                                                                                                                                                                                                                               |
-| ---------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Mevcut marka moru `#8b5cf6` WCAG AA'yı geçmiyor                              | Birebir Tailwind `violet-500` (bir seçim değil, varsayılan); beyaz üstünde ~4.2:1 < 4.5:1. Aynı renk hem birincil aksiyon zemini hem `:focus-visible` outline'ı (`src/app/globals.css:62`). 3 dosyada 8 yerde ham hex: `globals.css` (4), `CoachUserManagement.tsx` (3), `StatsTab.tsx` (1). **Kapanış:** ADR-0015 → `#5B48D9` (~6:1) / koyu temada `#A79BFF` (~6.5:1); Faz 1.6 AC-1.6.2 + AC-1.6.5 |
-| `text-gray-400` / `text-gray-500` kontrast borcu                             | `src/app/globals.css` sonundaki kontrast notu bunu zaten kayda geçirmiş: `.text-gray-400` beyaz kart üstünde AA'yı zor geçiyor/geçmiyor, `.text-gray-500` sınırda; `text-xs` ile birlikte riskli. Tek tek sınıf avlanmadı. **Kapanış:** semantik `text-secondary` token'ı ile yapısal olarak — Faz 1.6 (ADR-0015)                                                                                   |
-| Emoji sökümünün E2E locator maliyeti                                         | `tests/e2e/**` senaryoları birebir Türkçe metinlere bakıyor ve emoji, emoji taşıyan butonların **erişilebilir adının parçası**. ~60 emoji / 15 dosya. Aynı kırılma yüzeyi bekleyen ürün dili düzeltmesiyle ("Öğrenci Paneli" vb.) çakışıyor — ayrı yapılırsa aynı locator'lar iki kez kırılır. **Kapanış:** ADR-0016; Faz 2'nin ilk mekanik işi, locator güncellemesi aynı PR'da                    |
-| Koyu zemin `#0f0f12` üç yerde ayrı ayrı yazılı                               | `src/app/layout.tsx:23` (`viewport.themeColor`), `src/app/layout.tsx:32` (`dark:bg-[#0f0f12]`), `src/app/globals.css:30` (`.dark .glass-panel` rgba). Biri değişirse diğerleri sessizce kayar. **Kapanış:** ADR-0015 → `#14161B`, üçü birlikte; Faz 1.6 AC-1.6.8                                                                                                                                    |
-| `next/font` hiç kullanılmıyor                                                | `src/app/layout.tsx` yalnızca `font-sans` diyor; yazı tipi ailesi hiç tanımlanmamış, tarayıcı/işletim sistemi varsayılanı render ediliyor. **Kapanış:** Faz 1.6 AC-1.6.6                                                                                                                                                                                                                            |
-| Ekranlar Faz 1.6 ile Faz 2 arasında **iki dil** taşıyacak                    | 49 `font-black`, 17 `rounded-3xl`, 14 `bg-gradient-to-*` Katman A'da dönüştürülmüyor. Bilinçli kabul edilen ara dönem (ADR-0018); CI ratchet yalnızca **kötüleşmeyi** engeller, iyileşmeyi zorlamaz — sayaçlar Faz 2 çıkışında hâlâ sıfırlanmamış olabilir.                                                                                                                                         |
-| Chart.js eksen rengi ve `html2canvas` dışa aktarımı kimliğin dışında kalıyor | Grafik eksenlerinde ham `#888`; `html2canvas` PNG çıktısının CSS değişkenleriyle doğru render ettiği doğrulanmadı. Faz 1.6 kapsamına **alınmadı**. **Kapanış:** Faz 4 grafik tekleştirme işi (`active_planprogram.md` §6, AC-4.3)                                                                                                                                                                   |
+| Kısıt / borç                                                                 | Kanıt ve kapanış yeri                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Mevcut marka moru `#8b5cf6` WCAG AA'yı geçmiyor                              | Birebir Tailwind `violet-500` (bir seçim değil, varsayılan); beyaz üstünde ~4.2:1 < 4.5:1. Aynı renk hem birincil aksiyon zemini hem `:focus-visible` outline'ı (`src/app/globals.css:62`). 3 dosyada 8 yerde ham hex: `globals.css` (4), `CoachUserManagement.tsx` (3), `StatsTab.tsx` (1). **ÇÖZÜLDÜ (2026-08-17, Faz 1.6):** `accent` token'ına taşındı — açık `#5B48D9` (ölçülen **5.65:1**, ADR'nin tahmini "~6:1" yerine), koyu `#A79BFF` (ölçülen **7.56:1**, tahmini "~6.5:1" yerine); `8b5cf6` grep'i sıfır.                                                                                             |
+| `text-gray-400` / `text-gray-500` kontrast borcu                             | `src/app/globals.css` sonundaki kontrast notu bunu zaten kayda geçirmiş: `.text-gray-400` beyaz kart üstünde AA'yı zor geçiyor/geçmiyor, `.text-gray-500` sınırda; `text-xs` ile birlikte riskli. Tek tek sınıf avlanmadı. **KISMEN ÇÖZÜLDÜ (2026-08-17, Faz 1.6):** semantik `text-secondary` token'ı `src/design/tokens.ts`'te tanımlı ve AA doğrulamalı; ancak ekranlardaki mevcut `text-gray-400`/`text-gray-500` kullanımları **henüz `text-secondary`'ye çevrilmedi** — ekran restilizasyonu Katman A'nın kapsamı dışında (ADR-0018). Gerçek kapanış Katman B, Faz 2.                                       |
+| Emoji sökümünün E2E locator maliyeti                                         | `tests/e2e/**` senaryoları birebir Türkçe metinlere bakıyor ve emoji, emoji taşıyan butonların **erişilebilir adının parçası**. ~60 emoji / 15 dosya. Aynı kırılma yüzeyi bekleyen ürün dili düzeltmesiyle ("Öğrenci Paneli" vb.) çakışıyor — ayrı yapılırsa aynı locator'lar iki kez kırılır. **Kapanış:** ADR-0016; Faz 2'nin ilk mekanik işi, locator güncellemesi aynı PR'da. Faz 1.6'nın CI ratchet'ı ölçümü **60 emoji / 15 dosya** olarak doğruladı ve tavan olarak kilitledi — sayı ADR'nin tahminiyle birebir.                                                                                           |
+| Koyu zemin `#0f0f12` üç yerde ayrı ayrı yazılı                               | `src/app/layout.tsx:23` (`viewport.themeColor`), `src/app/layout.tsx:32` (`dark:bg-[#0f0f12]`), `src/app/globals.css:30` (`.dark .glass-panel` rgba). Biri değişirse diğerleri sessizce kayar. **ÇÖZÜLDÜ (2026-08-17, Faz 1.6):** üçü de `#14161B`'ye taşındı ve `src/design/tokens.ts`'ten tek kaynaktan besleniyor.                                                                                                                                                                                                                                                                                             |
+| `next/font` hiç kullanılmıyor                                                | `src/app/layout.tsx` yalnızca `font-sans` diyor; yazı tipi ailesi hiç tanımlanmamış, tarayıcı/işletim sistemi varsayılanı render ediliyor. **ÇÖZÜLDÜ (2026-08-17, Faz 1.6):** `next/font` ile Archivo/Hanken Grotesk/IBM Plex Mono self-host edildi (12 woff2), `latin-ext` açık.                                                                                                                                                                                                                                                                                                                                 |
+| Ekranlar Faz 1.6 ile Faz 2 arasında **iki dil** taşıyacak                    | 49 `font-black`, 17 `rounded-3xl`, 14 `bg-gradient-to-*` Katman A'da dönüştürülmüyor. Bilinçli kabul edilen ara dönem (ADR-0018); CI ratchet yalnızca **kötüleşmeyi** engeller, iyileşmeyi zorlamaz — sayaçlar Faz 2 çıkışında hâlâ sıfırlanmamış olabilir. **DOĞRULANDI (2026-08-17, Faz 1.6):** üç sayaç öngörüldüğü gibi değişmeden ratchet tavanı oldu (`font-black` 49 · `rounded-3xl` 17 · `bg-gradient-to-` 14); ayrıca yazı tipi tavanı 700'e sabitlenince mevcut 49 `font-black` artık gerçek 900 kesimi bulamıyor, tarayıcı sentetik kalın üretiyor — yeni bir görünür yan etki, Katman B'de sökülecek. |
+| Chart.js eksen rengi ve `html2canvas` dışa aktarımı kimliğin dışında kalıyor | Grafik eksenlerinde ham `#888`; `html2canvas` PNG çıktısının CSS değişkenleriyle doğru render ettiği doğrulanmadı. Faz 1.6 kapsamına **alınmadı**. **Kapanış:** Faz 4 grafik tekleştirme işi (`active_planprogram.md` §6, AC-4.3)                                                                                                                                                                                                                                                                                                                                                                                 |
+
+**YENİ BORÇLAR (Faz 1.6'da kaynaktan tespit edildi, 2026-08-17):**
+
+| Borç                                                               | Not                                                                                                                                                                                                         |
+| ------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `border` token'ı anlamlı UI sınırları için WCAG 1.4.11'i geçmiyor  | 1.52:1 (light) / 1.80:1 (dark) — dekoratif ayırıcı için yeterli ama form input sınırı gibi kullanımlar için 3:1 eşiğinin altında. 12 token'lık sözleşmede `border-strong` yok; ihtiyaç Katman B'de doğacak. |
+| `::-webkit-scrollbar-thumb` hâlâ ham `#3f3f46`                     | `globals.css` — token'a çekmek açık temada scrollbar'ı belirgin biçimde açardı, bilinçli olarak sistemin dışında bırakıldı.                                                                                 |
+| Revize edilen `warning` token'ı ekranlara henüz akmıyor            | Bileşenler hâlâ ham `text-orange-*`/`amber-*` kullanıyor; kontrast kazancı (`#A65600`, AA) bu sınıflar `text-warning`'e çevrilince Katman B'de gerçekleşecek.                                               |
+| Ratchet emoji sayacının sözcük çözümleyicisi tam ayrıştırıcı değil | Regex literali içindeki `/` teorik olarak durum takibini şaşırtabilir; tam TS/TSX ayrıştırıcı değil, ADR-0018'in grep tabanlı yaklaşım için kabul ettiği takas.                                             |
 
 ---
 
@@ -739,7 +874,7 @@ Aşağıdakiler 2026-08-17'de kaynaktan ölçüldü; hiçbiri bu oturumda düzel
    cookie + nonce CSP geçişi, kullanıcı kararıyla ayrı bir tura ertelendi) ve **AC-12** (hosted
    proje doğrulaması, açık soru). Detay: `docs/security/AUDIT.md` §4b/§4c,
    `docs/PROGRESS.md` §3 "Faz 1.5 — düzeltme turu, Grup 1–3" ve "Grup 4–6".
-8. **Faz 1.6 — Görsel Kimlik Oturumu** (`active_planprogram.md` §3b). **Faz 1.5 ile paralel
+8. ~~**Faz 1.6 — Görsel Kimlik Oturumu** (`active_planprogram.md` §3b). **Faz 1.5 ile paralel
    yürütülebilir** — dosya bakımından çakışmıyorlar (Faz 1.5: `supabase/**`, `src/lib/**`,
    `src/proxy.ts`, CI güvenlik adımları; Faz 1.6: `src/design/**`, `tailwind.config.ts`,
    `src/app/globals.css`, `src/app/layout.tsx`). İkisi de **Faz 2'den önce** bitmelidir.
@@ -749,11 +884,22 @@ Aşağıdakiler 2026-08-17'de kaynaktan ölçüldü; hiçbiri bu oturumda düzel
    - CI ratchet script'i. **Ekran restilizasyonu ve emoji → Lucide dönüşümü KAPSAM DIŞI**
      (Katman B, Faz 2 — ADR-0018). Timebox: tek oturum, tek PR.
      **Kabul kriteri:** AC-1.6.1–AC-1.6.9 karşılanır (AC-1.6.7 `LoopRing` ile birlikte Faz 2'ye
-     devredilir). Kaynak kararlar: ADR-0015, ADR-0016, ADR-0017, ADR-0018.
-9. Ardından Faz 2 (koç-danışan çekirdek akışı) — güvenlik temeli sağlamlaştırıldıktan **ve**
-   kimlik sistemi kurulduktan sonra. Faz 2'nin ilk mekanik işi emoji → Lucide dönüşümüdür ve
-   E2E locator güncellemeleriyle aynı PR'da yapılır (ADR-0016); `LoopRing` ilk göründüğü
-   ekranla (gym modu dinlenme sayacı) birlikte yazılır (ADR-0017).
+     devredilir). Kaynak kararlar: ADR-0015, ADR-0016, ADR-0017, ADR-0018.~~
+     **TAMAMLANDI (2026-08-17):** Katman A iki commit'te uygulandı (`599974c`, `167f65e`).
+     AC-1.6.1–AC-1.6.6, AC-1.6.8, AC-1.6.9 karşılandı; **AC-1.6.7 tasarımı gereği Faz 2'ye
+     devredildi** (`LoopRing` ile birlikte). Doğrulama: birim 363/363, E2E 42/42, ratchet 6/6,
+     build başarılı. Detay: `docs/PROGRESS.md` §3 "Faz 1.6 — Görsel Kimlik Oturumu, Katman A".
+9. **(SIRADAKI İŞ)** **Faz 1.7 — Borç Temizliği** (kullanıcı onaylı kapsam): bayat
+   kayıtların temizlenmesi · `playwright.config.ts` yorumu `src/env.server.ts`'e ·
+   `npm run db:types` diff'i · katalog import'u (`exercises` ve `food_database`
+   tablolarında yalnızca 10'ar demo satır var, `data/exercises.csv` 8.7 MB hiç yüklenmedi) ·
+   `42501` RLS reddi için `logSecurityEvent()` çağrı noktaları · AC-05 bildirim şablonunun
+   `SECURITY DEFINER` RPC'ye taşınması · yetim storage dosyaları ve koç avatarının danışana
+   görünmemesi · sequence yetkileri (`authenticated=w`).
+10. Ardından Faz 2 (koç-danışan çekirdek akışı) — güvenlik temeli sağlamlaştırıldıktan **ve**
+    kimlik sistemi kurulduktan sonra. Faz 2'nin ilk mekanik işi emoji → Lucide dönüşümüdür ve
+    E2E locator güncellemeleriyle aynı PR'da yapılır (ADR-0016); `LoopRing` ilk göründüğü
+    ekranla (gym modu dinlenme sayacı) birlikte yazılır (ADR-0017).
 
 **Not:** Mevcut RLS politikalarını cilalamaya vakit harcanmamalı; Faz 1 şemayı yeniden
 yazacak ve 35 politikanın çoğu değişecek. `db reset`'in amacı "production kalitesi" değil,
@@ -876,3 +1022,4 @@ sütuna taşınması.
 | 2026-08-17                           | Faz 1.5 güvenlik denetim turu: üç paralel denetim (erişim kontrolü/IDOR/RLS, uygulama yüzeyi, araç zinciri) tamamlandı, `docs/security/AUDIT.md` birleşik raporu yazıldı; turun tek kod değişikliği bağımlılık yükseltmesiydi (`next` 16.2.10 → 16.3.1)                                                                                                                                                                                                                                                                                                                   | 39 bulgu (Critical 0 · High 10 · Medium 12 · Low 17); doğrulama zinciri 12/12 yeşil, `npm audit` 18 → 14. Düzeltmeler kullanıcı onayı bekliyor, henüz uygulanmadı.                                                                                                                                                                                        |
 | 2026-08-17 (düzeltme turu)           | Faz 1.5 düzeltme turu: kullanıcı onaylı Grup 1 (kimlik/yetki kapıları), Grup 2 (rate limiting/kaba kuvvet), Grup 3 (sütun seviyesi sözleşmeler) uygulandı — 3 yeni migration, `ai_backend` guard/fail-fast sertleştirmesi, `src/proxy.ts` XFF güven modeli, A-01 için uygulama katmanı giriş denemesi sınırlayıcısı (upstream Supabase hatası nedeniyle `[auth.rate_limit]` yolu işe yaramadı)                                                                                                                                                                            | 19 bulgu kapandı (toplam 22/39 `fixed`); doğrulama 10/10 yeşil — vitest 264/264, test:rls 70/70, pytest 82/82 (%94.94), Playwright 21/21. Grup 4/5/6 açık; AC-05 şablon kuplajı borç olarak kaydedildi.                                                                                                                                                   |
 | 2026-08-17 (düzeltme turu, Grup 4–6) | Faz 1.5'in ikinci ve son düzeltme turu: kullanıcı onaylı Grup 4 (girdi doğrulama/gövde sınırları), Grup 5 (DB yetki/RLS, loglama/gizlilik, yapılandırma sertleştirme — A-05/A-14 hariç), Grup 6 (dokümantasyon/CI tarama zinciri) dört paralel ajanla uygulandı — yeni `src/lib/upload-validation.ts`, `supabase/migrations/20260817170000_force_rls_and_grants.sql` (AC-03'ün severity'si yeniden değerlendirildi — canlı kanıt tam veritabanı silmeyi gösterdi), `src/env.server.ts` ayrıştırması, `docs/security/THREAT-MODEL.md` + `SECURITY.md`, CI `security` job'u | 16 bulgu daha kapandı (toplam **36/39 kapandı** — sayım `AUDIT.md` §2'den doğrulandı); doğrulama tam zincir yeşil — vitest 308/308, test:rls 76/76, pytest 82/82 (%94.94), `npm audit --omit=dev` 0 zafiyet, Playwright 42/42 (21×2 profil). Kalan açık: A-05/A-14 (kullanıcı kararıyla ertelendi), AC-12 (hosted proje doğrulaması). Faz 1.5 tamamlandı. |
+| 2026-08-17 (Faz 1.6)                 | Faz 1.6 — Görsel Kimlik Oturumu, Katman A: `src/design/tokens.ts` (light/dark, 12 semantik anahtar) + `tailwind.config.ts` bağlaması (RGB kanal + `<alpha-value>` kalıbı, opaklık değiştiricileri korundu), 140 `brand-purple` kullanımı `accent`'e çevrildi, `next/font` ile üç yazı tipi self-host edildi, gömülü `#8b5cf6` (8 yer) + grep'in kaçırdığı 2 ondalık kullanım token'a çekildi, ADR-0015'in Kehribar hex'i `#B45D00` → `#A65600` revize edildi (AA), `scripts/identity-ratchet.mjs` CI'a eklendi (6 sayaç)                                                  | AC-1.6.1–AC-1.6.6/1.6.8/1.6.9 karşılandı, AC-1.6.7 Faz 2'ye devredildi; doğrulama tam zincir yeşil — vitest 363/363, Playwright 42/42 (21×2 profil), ratchet 6/6, build başarılı. Faz 1.6 tamamlandı; sıradaki iş Faz 1.7 (borç temizliği).                                                                                                               |
