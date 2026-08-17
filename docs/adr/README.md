@@ -51,19 +51,23 @@ ama karar metni silinmez — tarihsel bağlam korunur.
 
 ## İndeks
 
-| No                                                                  | Başlık                                                                 | Durum                               | Tarih      |
-| ------------------------------------------------------------------- | ---------------------------------------------------------------------- | ----------------------------------- | ---------- |
-| [0001](0001-typescript-strict-migrasyonu.md)                        | TypeScript strict moduna geçiş                                         | Kabul edildi (devam eden migrasyon) | 2026-08-16 |
-| [0002](0002-tanstack-query-secimi.md)                               | Sunucu state yönetimi için TanStack Query seçimi                       | Kabul edildi                        | 2026-08-16 |
-| [0003](0003-rol-enum-degerlerinin-korunmasi.md)                     | Veritabanı rol enum değerlerinin (`admin`/`student`) korunması         | Yerini aldı: 0013                   | 2026-08-16 |
-| [0004](0004-ai-servisi-proxy-zorunlu.md)                            | AI servisine erişimin Next.js proxy'si üzerinden zorunlu kılınması     | Kabul edildi                        | 2026-08-16 |
-| [0005](0005-bellek-ici-rate-limiter-siniri.md)                      | Bellek içi rate limiter'ın sınırı                                      | Kabul edildi (bilinen kısıtla)      | 2026-08-16 |
-| [0006](0006-next-pwa-korunmasi.md)                                  | `next-pwa`'nın korunması                                               | Kabul edildi                        | 2026-08-16 |
-| [0007](0007-tek-kocluk-model.md)                                    | Tek koçlu model benimsendi                                             | Kabul edildi                        | 2026-08-16 |
-| [0008](0008-apierror-firlatma.md)                                   | `Result<T>` yerine tipli `ApiError` fırlatma                           | Kabul edildi                        | 2026-08-16 |
-| [0009](0009-monorepo-ve-mobil-ertelendi.md)                         | Monorepo ve mobil uygulamanın Faz 4.5'e ertelenmesi                    | Kabul edildi                        | 2026-08-16 |
-| [0010](0010-koc-profili-herkese-gorunur.md)                         | Koç profilinin tüm authenticated kullanıcılara görünür kılınması       | Kabul edildi                        | 2026-08-16 |
-| [0011](0011-ai-proxy-bearer-token.md)                               | AI proxy'lerinin Bearer token ile korunması                            | Kabul edildi                        | 2026-08-16 |
-| [0012](0012-pwa-webpack-build.md)                                   | PWA'nın korunması ve build'in `next build --webpack` ile alınması      | Kabul edildi                        | 2026-08-16 |
-| [0013](0013-rollerin-coach-client-olarak-yeniden-adlandirilmasi.md) | Rollerin (`admin`/`student` → `coach`/`client`) yeniden adlandırılması | Kabul edildi                        | 2026-08-17 |
-| [0014](0014-danisanin-kendi-beslenme-planini-kaydedebilmesi.md)     | Danışanın kendi beslenme planını kaydedebilmesi                        | Kabul edildi                        | 2026-08-17 |
+| No                                                                  | Başlık                                                                   | Durum                               | Tarih      |
+| ------------------------------------------------------------------- | ------------------------------------------------------------------------ | ----------------------------------- | ---------- |
+| [0001](0001-typescript-strict-migrasyonu.md)                        | TypeScript strict moduna geçiş                                           | Kabul edildi (devam eden migrasyon) | 2026-08-16 |
+| [0002](0002-tanstack-query-secimi.md)                               | Sunucu state yönetimi için TanStack Query seçimi                         | Kabul edildi                        | 2026-08-16 |
+| [0003](0003-rol-enum-degerlerinin-korunmasi.md)                     | Veritabanı rol enum değerlerinin (`admin`/`student`) korunması           | Yerini aldı: 0013                   | 2026-08-16 |
+| [0004](0004-ai-servisi-proxy-zorunlu.md)                            | AI servisine erişimin Next.js proxy'si üzerinden zorunlu kılınması       | Kabul edildi                        | 2026-08-16 |
+| [0005](0005-bellek-ici-rate-limiter-siniri.md)                      | Bellek içi rate limiter'ın sınırı                                        | Kabul edildi (bilinen kısıtla)      | 2026-08-16 |
+| [0006](0006-next-pwa-korunmasi.md)                                  | `next-pwa`'nın korunması                                                 | Kabul edildi                        | 2026-08-16 |
+| [0007](0007-tek-kocluk-model.md)                                    | Tek koçlu model benimsendi                                               | Kabul edildi                        | 2026-08-16 |
+| [0008](0008-apierror-firlatma.md)                                   | `Result<T>` yerine tipli `ApiError` fırlatma                             | Kabul edildi                        | 2026-08-16 |
+| [0009](0009-monorepo-ve-mobil-ertelendi.md)                         | Monorepo ve mobil uygulamanın Faz 4.5'e ertelenmesi                      | Kabul edildi                        | 2026-08-16 |
+| [0010](0010-koc-profili-herkese-gorunur.md)                         | Koç profilinin tüm authenticated kullanıcılara görünür kılınması         | Kabul edildi                        | 2026-08-16 |
+| [0011](0011-ai-proxy-bearer-token.md)                               | AI proxy'lerinin Bearer token ile korunması                              | Kabul edildi                        | 2026-08-16 |
+| [0012](0012-pwa-webpack-build.md)                                   | PWA'nın korunması ve build'in `next build --webpack` ile alınması        | Kabul edildi                        | 2026-08-16 |
+| [0013](0013-rollerin-coach-client-olarak-yeniden-adlandirilmasi.md) | Rollerin (`admin`/`student` → `coach`/`client`) yeniden adlandırılması   | Kabul edildi                        | 2026-08-17 |
+| [0014](0014-danisanin-kendi-beslenme-planini-kaydedebilmesi.md)     | Danışanın kendi beslenme planını kaydedebilmesi                          | Kabul edildi                        | 2026-08-17 |
+| [0015](0015-gorsel-kimlik-sistemi.md)                               | Görsel kimlik sistemi ("Demir & Tebeşir": palet, tema, token, tipografi) | Kabul edildi (uygulama Faz 1.6'da)  | 2026-08-17 |
+| [0016](0016-emoji-yerine-lucide-ikon-seti.md)                       | Fonksiyonel emoji'nin emekli edilmesi, `lucide-react`'e geçiş            | Kabul edildi (uygulama Faz 2'de)    | 2026-08-17 |
+| [0017](0017-imza-oge-halka.md)                                      | İmza öğe: Halka, tek anlam kuralıyla                                     | Kabul edildi (uygulama Faz 2'de)    | 2026-08-17 |
+| [0018](0018-kimlik-gecisi-iki-katman-ve-ci-ratchet.md)              | Kimlik geçişinin iki katmana bölünmesi ve CI ratchet'i                   | Kabul edildi                        | 2026-08-17 |

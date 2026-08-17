@@ -1260,17 +1260,605 @@ end $$;
 rollback;
 
 
+-- #############################################################################
+-- FAZ 1b / ADIM 4 — MESAJLARIN KONUSMA ANAHTARI (client_id / read_at / kind)
+-- (supabase/migrations/20260817140000_messages_conversation_key.sql)
+--
+-- DIKKAT: bu bolumdeki senaryolar mesaj SAYISINA degil ILISKISEL iddialara
+-- (yabanci satir sayisi = 0, count > 0 gibi) dayanir -- npm run test:rls
+-- reset'siz de kosabildigi ve e2e testleri ek satir birakabildigi icin sabit
+-- mesaj sayimi KIRILGAN olurdu (bkz. seed.sql §8 yorumu).
+-- #############################################################################
+
+
+-- =============================================================================
+-- MESAJLASMA (KONUSMA ANAHTARI) — 36) Danışan A -> gördüğü TÜM mesajların client_id'si kendisidir
+-- =============================================================================
+begin;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+do $$
+declare
+  v_foreign int;
+begin
+  select count(*) into v_foreign
+  from public.messages
+  where client_id <> '22222222-2222-2222-2222-222222222222';
+
+  if v_foreign is distinct from 0 then
+    raise exception 'BASARISIZ [Danisan A - gordugu mesajlarin client_id si kendisi]: beklenen 0 yabanci client_id, gelen %', v_foreign;
+  end if;
+  raise notice 'GECTI [Danisan A - gordugu mesajlarin client_id si kendisi]';
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- MESAJLASMA (KONUSMA ANAHTARI) — 37) Koç -> hem A hem B konuşmasının mesajlarını görür
+-- =============================================================================
+begin;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+do $$
+declare
+  v_a int;
+  v_b int;
+begin
+  select count(*) into v_a from public.messages where client_id = '22222222-2222-2222-2222-222222222222';
+  select count(*) into v_b from public.messages where client_id = '33333333-3333-3333-3333-333333333333';
+
+  if v_a <= 0 then
+    raise exception 'BASARISIZ [Koc - Danisan A konusmasini gorur]: beklenen > 0, gelen %', v_a;
+  end if;
+  if v_b <= 0 then
+    raise exception 'BASARISIZ [Koc - Danisan B konusmasini gorur]: beklenen > 0, gelen %', v_b;
+  end if;
+  raise notice 'GECTI [Koc - hem A hem B konusmasinin mesajlarini gorur]';
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- MESAJLASMA (KONUSMA ANAHTARI) — 38) Danışan A -> client_id'yi Danışan B yaparak mesaj YAZAMAZ
+-- Trigger messages_apply_conversation_key, gonderilen client_id turetilenle
+-- eslesmiyorsa errcode 22023 ile hata verir (bkz. migration §6).
+-- =============================================================================
+begin;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+do $$
+declare
+  v_caught boolean := false;
+  v_msg    text;
+begin
+  begin
+    insert into public.messages (sender_id, receiver_id, client_id, message)
+    values (
+      '22222222-2222-2222-2222-222222222222',
+      '11111111-1111-1111-1111-111111111111',
+      '33333333-3333-3333-3333-333333333333',
+      'RLS testi - yanlis client_id denemesi'
+    );
+  exception when others then
+    v_caught := true;
+    v_msg := sqlerrm;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [Danisan A - client_id Danisan B yaparak yazamaz]: beklenen trigger hatasi, hata alinmadi';
+  end if;
+  if v_msg not like '%client_id%' then
+    raise exception 'BASARISIZ [Danisan A - client_id Danisan B yaparak yazamaz]: hata mesaji client_id icermiyor: %', v_msg;
+  end if;
+  raise notice 'GECTI [Danisan A - client_id Danisan B yaparak mesaj yazamaz]';
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- MESAJLASMA (KONUSMA ANAHTARI) — 39) Danışan A -> client_id NULL gönderince trigger doğru türetir
+-- =============================================================================
+begin;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+do $$
+declare
+  v_id        uuid;
+  v_client_id uuid;
+begin
+  insert into public.messages (sender_id, receiver_id, message)
+  values (
+    '22222222-2222-2222-2222-222222222222',
+    '11111111-1111-1111-1111-111111111111',
+    'RLS testi - client_id turetme'
+  )
+  returning id, client_id into v_id, v_client_id;
+
+  if v_id is null then
+    raise exception 'BASARISIZ [Danisan A - client_id NULL gonderince turetilir]: insert basarisiz oldu';
+  end if;
+  if v_client_id is distinct from '22222222-2222-2222-2222-222222222222'::uuid then
+    raise exception 'BASARISIZ [Danisan A - client_id NULL gonderince turetilir]: beklenen %, gelen %',
+      '22222222-2222-2222-2222-222222222222'::uuid, v_client_id;
+  end if;
+  raise notice 'GECTI [Danisan A - client_id NULL gonderince dogru turetiliyor]';
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- MESAJLASMA (KONUSMA ANAHTARI) — 40) ALICI kendisine gelen mesajın read_at'ini güncelleyebilir
+-- KURULUM: postgres kimligiyle A'dan koca, read_at NULL bir mesaj eklenir;
+-- set local role BUNDAN SONRA gelir.
+-- =============================================================================
+begin;
+
+insert into public.messages (id, sender_id, receiver_id, message, read_at)
+values (
+  'e0000000-0000-0000-0000-000000000040'::uuid,
+  '22222222-2222-2222-2222-222222222222',
+  '11111111-1111-1111-1111-111111111111',
+  'RLS testi - okundu isaretleme (alici)',
+  null
+);
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+
+do $$
+declare
+  v_rows int;
+begin
+  update public.messages set read_at = now()
+   where id = 'e0000000-0000-0000-0000-000000000040'::uuid;
+  get diagnostics v_rows = row_count;
+
+  if v_rows is distinct from 1 then
+    raise exception 'BASARISIZ [Koc(alici) - read_at gunceller]: beklenen 1 satir, etkilenen %', v_rows;
+  end if;
+  raise notice 'GECTI [Koc(alici) - kendine gelen mesajin read_at ini gunceller]';
+end $$;
+
+rollback;
+
+
+-- =============================================================================
+-- MESAJLASMA (KONUSMA ANAHTARI) — 41) GÖNDEREN read_at güncelleyemez (0 satır etkilenir)
+-- =============================================================================
+begin;
+
+insert into public.messages (id, sender_id, receiver_id, message, read_at)
+values (
+  'e0000000-0000-0000-0000-000000000041'::uuid,
+  '22222222-2222-2222-2222-222222222222',
+  '11111111-1111-1111-1111-111111111111',
+  'RLS testi - gonderen read_at guncelleme denemesi',
+  null
+);
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+
+do $$
+declare
+  v_rows int;
+begin
+  update public.messages set read_at = now()
+   where id = 'e0000000-0000-0000-0000-000000000041'::uuid;
+  get diagnostics v_rows = row_count;
+
+  if v_rows is distinct from 0 then
+    raise exception 'BASARISIZ [Danisan A(gonderen) - read_at guncelleyemez]: beklenen 0 satir, etkilenen %', v_rows;
+  end if;
+  raise notice 'GECTI [Danisan A(gonderen) - kendi gonderdigi mesajin read_at ini guncelleyemez]';
+end $$;
+
+rollback;
+
+
+-- =============================================================================
+-- MESAJLASMA (KONUSMA ANAHTARI) — 42) anon rolü messages tablosunu OKUYAMAZ
+-- =============================================================================
+begin;
+set local role anon;
+do $$
+declare
+  v_count  int;
+  v_caught boolean := false;
+begin
+  begin
+    select count(*) into v_count from public.messages;
+  exception when insufficient_privilege then
+    v_caught := true;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [anon - messages okuyamaz]: beklenen permission denied, gelen v_count=%', v_count;
+  end if;
+  raise notice 'GECTI [anon - messages tablosunu okuyamaz]';
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- FORM CHECK INCELEME — 43) Danışan KENDİ form check'lerini ve inceleme
+-- alanlarını GÖRÜR (senaryo 6'nın pozitif eşi)
+-- =============================================================================
+begin;
+
+insert into public.form_checks (id, client_id, current_weight, notes, status, coach_feedback, reviewed_at, reviewed_by)
+values (
+  'a0000000-0000-0000-0000-000000000043'::uuid,
+  '22222222-2222-2222-2222-222222222222',
+  90.00,
+  'RLS testi - danisan kendi form checkini gorur',
+  'reviewed'::public.form_check_status,
+  'Koc geri bildirimi (gorunurluk testi)',
+  now() - interval '1 day',
+  '11111111-1111-1111-1111-111111111111'
+);
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+
+do $$
+declare
+  v_status   public.form_check_status;
+  v_feedback text;
+  v_by       uuid;
+begin
+  select status, coach_feedback, reviewed_by
+    into v_status, v_feedback, v_by
+    from public.form_checks
+   where id = 'a0000000-0000-0000-0000-000000000043'::uuid;
+
+  if v_status is distinct from 'reviewed'::public.form_check_status then
+    raise exception 'BASARISIZ [Danisan A - kendi form checkini gorur]: satir okunamadi (status=%)', v_status;
+  end if;
+  if v_feedback is distinct from 'Koc geri bildirimi (gorunurluk testi)' then
+    raise exception 'BASARISIZ [Danisan A - coach_feedback okuyabilmeli]: gelen %', v_feedback;
+  end if;
+  if v_by is distinct from '11111111-1111-1111-1111-111111111111'::uuid then
+    raise exception 'BASARISIZ [Danisan A - reviewed_by okuyabilmeli]: gelen %', v_by;
+  end if;
+
+  raise notice 'GECTI [Danisan A - kendi form checkini ve inceleme alanlarini gorur]';
+end $$;
+
+rollback;
+
+
+-- =============================================================================
+-- FORM CHECK INCELEME — 44) Danışan KENDİ satırına `coach_feedback` YAZAMAZ
+-- (RLS satırı geçirir; form_checks_guard_review trigger'ı 42501 ile reddeder)
+-- =============================================================================
+begin;
+
+insert into public.form_checks (id, client_id, current_weight, notes)
+values (
+  'a0000000-0000-0000-0000-000000000044'::uuid,
+  '22222222-2222-2222-2222-222222222222',
+  90.10,
+  'RLS testi - danisan coach_feedback yazma denemesi'
+);
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+
+do $$
+declare
+  v_caught boolean := false;
+  v_state  text;
+begin
+  begin
+    update public.form_checks
+       set coach_feedback = 'Kendime harika diyorum'
+     where id = 'a0000000-0000-0000-0000-000000000044'::uuid;
+  exception when insufficient_privilege then
+    v_caught := true;
+    v_state  := sqlstate;
+  end;
+
+  if not v_caught then
+    raise exception 'BASARISIZ [Danisan A - coach_feedback yazamaz]: beklenen 42501, UPDATE BASARILI OLDU';
+  end if;
+  if v_state is distinct from '42501' then
+    raise exception 'BASARISIZ [Danisan A - coach_feedback yazamaz]: beklenen sqlstate 42501, gelen %', v_state;
+  end if;
+
+  raise notice 'GECTI [Danisan A - kendi form checkine coach_feedback YAZAMAZ (42501)]';
+end $$;
+
+rollback;
+
+
+-- =============================================================================
+-- FORM CHECK INCELEME — 45) Danışan `status`'ü 'reviewed' YAPAMAZ
+-- (bekleyen kuyruğu danışan boşaltamaz)
+-- =============================================================================
+begin;
+
+insert into public.form_checks (id, client_id, current_weight, notes)
+values (
+  'a0000000-0000-0000-0000-000000000045'::uuid,
+  '22222222-2222-2222-2222-222222222222',
+  90.20,
+  'RLS testi - danisan status reviewed denemesi'
+);
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+
+do $$
+declare
+  v_caught   boolean := false;
+  v_state    text;
+  v_status   public.form_check_status;
+  v_caught2  boolean := false;
+begin
+  -- 45a) status -> 'reviewed'
+  begin
+    update public.form_checks
+       set status = 'reviewed'::public.form_check_status
+     where id = 'a0000000-0000-0000-0000-000000000045'::uuid;
+  exception when insufficient_privilege then
+    v_caught := true;
+    v_state  := sqlstate;
+  end;
+
+  if not v_caught then
+    raise exception 'BASARISIZ [Danisan A - status reviewed yapamaz]: beklenen 42501, UPDATE BASARILI OLDU';
+  end if;
+  if v_state is distinct from '42501' then
+    raise exception 'BASARISIZ [Danisan A - status reviewed yapamaz]: beklenen sqlstate 42501, gelen %', v_state;
+  end if;
+
+  -- 45b) reviewed_at / reviewed_by taklidi de reddedilmeli
+  begin
+    update public.form_checks
+       set reviewed_at = now(), reviewed_by = '11111111-1111-1111-1111-111111111111'
+     where id = 'a0000000-0000-0000-0000-000000000045'::uuid;
+  exception when insufficient_privilege then
+    v_caught2 := true;
+  end;
+
+  if not v_caught2 then
+    raise exception 'BASARISIZ [Danisan A - reviewed_at/reviewed_by taklidi]: beklenen 42501, UPDATE BASARILI OLDU';
+  end if;
+
+  select status into v_status from public.form_checks
+   where id = 'a0000000-0000-0000-0000-000000000045'::uuid;
+  if v_status is distinct from 'pending'::public.form_check_status then
+    raise exception 'BASARISIZ [Danisan A - satir pending kalmali]: gelen %', v_status;
+  end if;
+
+  raise notice 'GECTI [Danisan A - status/reviewed_at/reviewed_by DEGISTIREMEZ (42501)]';
+end $$;
+
+rollback;
+
+
+-- =============================================================================
+-- FORM CHECK INCELEME — 46) REGRESYON KORUMASI: sütun koruması danışanın KENDİ
+-- alanlarını (notes / current_weight) güncellemesini ENGELLEMEZ
+-- =============================================================================
+begin;
+
+insert into public.form_checks (id, client_id, current_weight, notes)
+values (
+  'a0000000-0000-0000-0000-000000000046'::uuid,
+  '22222222-2222-2222-2222-222222222222',
+  90.30,
+  'RLS testi - danisan kendi notunu duzeltir (eski)'
+);
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+
+do $$
+declare
+  v_rows  int;
+  v_notes text;
+begin
+  update public.form_checks
+     set notes = 'RLS testi - duzeltilmis not', current_weight = 89.90
+   where id = 'a0000000-0000-0000-0000-000000000046'::uuid;
+  get diagnostics v_rows = row_count;
+
+  if v_rows is distinct from 1 then
+    raise exception 'BASARISIZ [Danisan A - kendi notunu duzeltebilir]: beklenen 1 satir, etkilenen %', v_rows;
+  end if;
+
+  select notes into v_notes from public.form_checks
+   where id = 'a0000000-0000-0000-0000-000000000046'::uuid;
+  if v_notes is distinct from 'RLS testi - duzeltilmis not' then
+    raise exception 'BASARISIZ [Danisan A - not guncellenmeli]: gelen %', v_notes;
+  end if;
+
+  raise notice 'GECTI [Danisan A - kendi notes/current_weight alanlarini HALA guncelleyebilir]';
+end $$;
+
+rollback;
+
+
+-- =============================================================================
+-- FORM CHECK INCELEME — 47) KOÇ `coach_feedback` yazabilir ve `status`'ü
+-- 'reviewed' yapabilir
+-- =============================================================================
+begin;
+
+insert into public.form_checks (id, client_id, current_weight, notes)
+values (
+  'a0000000-0000-0000-0000-000000000047'::uuid,
+  '22222222-2222-2222-2222-222222222222',
+  90.40,
+  'RLS testi - koc inceleme yapar'
+);
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+
+do $$
+declare
+  v_rows     int;
+  v_status   public.form_check_status;
+  v_feedback text;
+begin
+  update public.form_checks
+     set status = 'reviewed'::public.form_check_status,
+         coach_feedback = 'Duruş iyi, bel çevresi hedefte.'
+   where id = 'a0000000-0000-0000-0000-000000000047'::uuid;
+  get diagnostics v_rows = row_count;
+
+  if v_rows is distinct from 1 then
+    raise exception 'BASARISIZ [Koc - inceleme yapar]: beklenen 1 satir, etkilenen %', v_rows;
+  end if;
+
+  select status, coach_feedback into v_status, v_feedback
+    from public.form_checks where id = 'a0000000-0000-0000-0000-000000000047'::uuid;
+
+  if v_status is distinct from 'reviewed'::public.form_check_status then
+    raise exception 'BASARISIZ [Koc - status reviewed olmali]: gelen %', v_status;
+  end if;
+  if v_feedback is distinct from 'Duruş iyi, bel çevresi hedefte.' then
+    raise exception 'BASARISIZ [Koc - coach_feedback yazilmali]: gelen %', v_feedback;
+  end if;
+
+  raise notice 'GECTI [Koc - coach_feedback yazar ve status u reviewed yapar]';
+end $$;
+
+rollback;
+
+
+-- =============================================================================
+-- FORM CHECK INCELEME — 48) DENETİM İZİ SUNUCUDAN: koç 'reviewed' yapınca
+-- `reviewed_at`/`reviewed_by` OTOMATİK dolar; koçun gönderdiği SAHTE değerler EZİLİR
+-- =============================================================================
+begin;
+
+insert into public.form_checks (id, client_id, current_weight, notes)
+values (
+  'a0000000-0000-0000-0000-000000000048'::uuid,
+  '22222222-2222-2222-2222-222222222222',
+  90.50,
+  'RLS testi - denetim izi otomatik dolar'
+);
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+
+do $$
+declare
+  v_at   timestamptz;
+  v_by   uuid;
+begin
+  -- Koç BİLEREK sahte bir tarih ve BAŞKA bir kimlik gönderiyor; ikisi de ezilmeli.
+  update public.form_checks
+     set status      = 'reviewed'::public.form_check_status,
+         reviewed_at = timestamptz '2000-01-01 00:00:00+00',
+         reviewed_by = '22222222-2222-2222-2222-222222222222'
+   where id = 'a0000000-0000-0000-0000-000000000048'::uuid;
+
+  select reviewed_at, reviewed_by into v_at, v_by
+    from public.form_checks where id = 'a0000000-0000-0000-0000-000000000048'::uuid;
+
+  if v_at is null then
+    raise exception 'BASARISIZ [Koc - reviewed_at otomatik dolar]: NULL geldi';
+  end if;
+  if v_at <= timestamptz '2001-01-01 00:00:00+00' then
+    raise exception 'BASARISIZ [Koc - sahte reviewed_at EZILMELI]: gelen %', v_at;
+  end if;
+  if v_by is distinct from '11111111-1111-1111-1111-111111111111'::uuid then
+    raise exception 'BASARISIZ [Koc - reviewed_by auth.uid() olmali]: beklenen %, gelen %',
+      '11111111-1111-1111-1111-111111111111'::uuid, v_by;
+  end if;
+
+  raise notice 'GECTI [Koc - reviewed_at/reviewed_by SUNUCUDA dolar, istemcinin gonderdigi degerler ezilir]';
+end $$;
+
+rollback;
+
+
+-- =============================================================================
+-- FORM CHECK INCELEME — 49) 'reviewed' -> 'pending' dönüşünde denetim izi TEMİZLENİR
+-- =============================================================================
+begin;
+
+insert into public.form_checks (id, client_id, current_weight, notes, status, coach_feedback, reviewed_at, reviewed_by)
+values (
+  'a0000000-0000-0000-0000-000000000049'::uuid,
+  '22222222-2222-2222-2222-222222222222',
+  90.60,
+  'RLS testi - reviewed ten pending e donus',
+  'reviewed'::public.form_check_status,
+  'Ilk inceleme',
+  now() - interval '2 days',
+  '11111111-1111-1111-1111-111111111111'
+);
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+
+do $$
+declare
+  v_at     timestamptz;
+  v_by     uuid;
+  v_status public.form_check_status;
+begin
+  update public.form_checks
+     set status = 'pending'::public.form_check_status
+   where id = 'a0000000-0000-0000-0000-000000000049'::uuid;
+
+  select status, reviewed_at, reviewed_by into v_status, v_at, v_by
+    from public.form_checks where id = 'a0000000-0000-0000-0000-000000000049'::uuid;
+
+  if v_status is distinct from 'pending'::public.form_check_status then
+    raise exception 'BASARISIZ [Koc - pending e donus]: gelen status %', v_status;
+  end if;
+  if v_at is not null or v_by is not null then
+    raise exception 'BASARISIZ [Koc - pending e donuste denetim izi temizlenmeli]: reviewed_at=%, reviewed_by=%', v_at, v_by;
+  end if;
+
+  raise notice 'GECTI [Koc - reviewed -> pending donusunde reviewed_at/reviewed_by temizlenir]';
+end $$;
+
+rollback;
+
+
+-- =============================================================================
+-- FORM CHECK INCELEME — 50) anon rolü form_checks tablosunu OKUYAMAZ
+-- =============================================================================
+begin;
+set local role anon;
+do $$
+declare
+  v_count  int;
+  v_caught boolean := false;
+begin
+  begin
+    select count(*) into v_count from public.form_checks;
+  exception when insufficient_privilege then
+    v_caught := true;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [anon - form_checks okuyamaz]: beklenen permission denied, gelen v_count=%', v_count;
+  end if;
+  raise notice 'GECTI [anon - form_checks tablosunu okuyamaz]';
+end $$;
+rollback;
+
+
 -- =============================================================================
 -- TOPLAM ÖZET
--- Bu noktaya yalnızca YUKARIDAKİ 35 senaryonun HEPSİ GECTI verdiyse ulaşılır --
+-- Bu noktaya yalnızca YUKARIDAKİ 50 senaryonun HEPSİ GECTI verdiyse ulaşılır --
 -- herhangi biri BASARISIZ olsaydı raise exception + ON_ERROR_STOP psql'i
 -- daha önce sıfırdan farklı çıkış koduyla durdururdu.
 --   * 1–19  : Faz 1a ve öncesi (profiles, notifications, form_checks, daily_logs,
 --             workout_logs, messages, katalog)
 --   * 20–27 : Faz 1b Adım 1 — workout_plans / workout_plan_exercises / save_workout_plan
 --   * 28–35 : Faz 1b Adım 3a — nutrition_plans / nutrition_plan_meals / save_nutrition_plan
+--   * 36–42 : Faz 1b Adım 4 — messages konuşma anahtarı (client_id / read_at / kind)
+--   * 43–50 : Faz 1b Adım 5 — form_checks inceleme durumu (sütun koruması + denetim izi)
 -- =============================================================================
 do $$
 begin
-  raise notice 'TUM RLS TESTLERI GECTI (35 senaryo)';
+  raise notice 'TUM RLS TESTLERI GECTI (50 senaryo)';
 end $$;

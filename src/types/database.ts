@@ -99,29 +99,41 @@ export type Database = {
         Row: {
           back_pose_path: string | null
           client_id: string
+          coach_feedback: string | null
           created_at: string
           current_weight: number
           front_pose_path: string | null
           id: string
           notes: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: Database["public"]["Enums"]["form_check_status"]
         }
         Insert: {
           back_pose_path?: string | null
           client_id: string
+          coach_feedback?: string | null
           created_at?: string
           current_weight: number
           front_pose_path?: string | null
           id?: string
           notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: Database["public"]["Enums"]["form_check_status"]
         }
         Update: {
           back_pose_path?: string | null
           client_id?: string
+          coach_feedback?: string | null
           created_at?: string
           current_weight?: number
           front_pose_path?: string | null
           id?: string
           notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: Database["public"]["Enums"]["form_check_status"]
         }
         Relationships: [
           {
@@ -131,34 +143,57 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "form_checks_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
         ]
       }
       messages: {
         Row: {
+          client_id: string
           created_at: string
           id: string
           is_read: boolean
+          kind: Database["public"]["Enums"]["message_kind"]
           message: string
+          read_at: string | null
           receiver_id: string
           sender_id: string
         }
         Insert: {
+          client_id: string
           created_at?: string
           id?: string
           is_read?: boolean
+          kind?: Database["public"]["Enums"]["message_kind"]
           message: string
+          read_at?: string | null
           receiver_id: string
           sender_id: string
         }
         Update: {
+          client_id?: string
           created_at?: string
           id?: string
           is_read?: boolean
+          kind?: Database["public"]["Enums"]["message_kind"]
           message?: string
+          read_at?: string | null
           receiver_id?: string
           sender_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "messages_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "messages_receiver_id_fkey"
             columns: ["receiver_id"]
@@ -498,6 +533,23 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      backfill_form_check_review: {
+        Args: never
+        Returns: {
+          rows_cleaned: number
+          rows_demoted: number
+          rows_pending: number
+          rows_reviewed: number
+        }[]
+      }
+      backfill_messages_conversation_key: {
+        Args: never
+        Returns: {
+          client_ids_filled: number
+          read_ats_filled: number
+          rows_skipped: number
+        }[]
+      }
       explode_nutrition_day: {
         Args: { p_day: string; p_entry: Json; p_plan_id: string }
         Returns: number
@@ -538,6 +590,8 @@ export type Database = {
     }
     Enums: {
       approval_status: "pending" | "approved" | "rejected"
+      form_check_status: "pending" | "reviewed"
+      message_kind: "user" | "system"
       user_role: "coach" | "client"
     }
     CompositeTypes: {
@@ -667,6 +721,8 @@ export const Constants = {
   public: {
     Enums: {
       approval_status: ["pending", "approved", "rejected"],
+      form_check_status: ["pending", "reviewed"],
+      message_kind: ["user", "system"],
       user_role: ["coach", "client"],
     },
   },

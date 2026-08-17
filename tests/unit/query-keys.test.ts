@@ -26,6 +26,18 @@ describe('queryKeys fabrika fonksiyonları', () => {
     expect(queryKeys.messages()).toEqual(['messages', null, null])
   })
 
+  it('unreadCount anahtarı hem konuşmayı hem bakanı ayırır', () => {
+    // Aynı konuşmanın okunmamış sayısı koç ile danışan için FARKLIDIR:
+    // anahtar viewerId'yi de taşımazsa iki taraf birbirinin sayacını okur.
+    expect(queryKeys.unreadCount('c1', 'coach')).not.toEqual(queryKeys.unreadCount('c1', 'client'))
+    expect(queryKeys.unreadCount('c1', 'v1')).toEqual(queryKeys.unreadCount('c1', 'v1'))
+    expect(queryKeys.unreadCount()).toEqual(['unread-count', null, null])
+  })
+
+  it("unreadCount anahtarı messages anahtarından AYRIDIR (mesaj invalidate'i sayacı süpürmez)", () => {
+    expect(queryKeys.unreadCount('c1', 'v1')[0]).not.toBe(queryKeys.messages('c1', 'v1')[0])
+  })
+
   it('farklı kaynaklar için anahtarların ilk elemanı (ön ek) benzersizdir', () => {
     const keys = [
       queryKeys.session(),
@@ -38,6 +50,7 @@ describe('queryKeys fabrika fonksiyonları', () => {
       queryKeys.programApprovals(),
       queryKeys.workoutPlan(),
       queryKeys.messages(),
+      queryKeys.unreadCount(),
       queryKeys.exercises(),
       queryKeys.foods(),
       queryKeys.lastCheckins(),
@@ -80,6 +93,9 @@ describe('queryKeys fabrika fonksiyonları', () => {
     ])
     expect(queryKeys.messages('a', 'b').slice(0, queryKeyRoots.messages.length)).toEqual([
       ...queryKeyRoots.messages,
+    ])
+    expect(queryKeys.unreadCount('c1', 'v1').slice(0, queryKeyRoots.unreadCount.length)).toEqual([
+      ...queryKeyRoots.unreadCount,
     ])
     expect(queryKeys.exercises().slice(0, queryKeyRoots.exercises.length)).toEqual([
       ...queryKeyRoots.exercises,

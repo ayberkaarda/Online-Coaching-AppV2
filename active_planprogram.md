@@ -78,6 +78,32 @@ auth.uid())` pattern'i mevcut ve doğrulanmış `public.is_admin()`
 - **R12** — §0.3 git disiplini gerçeğe uyarlandı: **ajan commit atmaz**,
   yalnızca conventional-commit mesajı önerir; commit'i kullanıcı atar.
   `git push` yasağı korundu.
+- **R13** — **Faz 1.5 — Güvenlik Denetimi ve Sertleştirme** eklendi (§3a).
+  Kaynak: `securityhardening_prompt.md` (o doküman değiştirilmedi, kaynak olarak
+  korunuyor). Konum gerekçesi: Faz 1 RLS'i ve şemayı yeniden yazıyor — denetim
+  daha erken yapılsaydı sonucu boşa giderdi; Faz 2 ise bu temelin üstüne yeni
+  saldırı yüzeyi (plan yayınlama, form check kuyruğu, realtime mesajlaşma)
+  ekliyor, dolayısıyla temel önce sağlamlaştırılmalı. Prompt'un maddeleri
+  mevcut durumla uzlaştırıldı (§3a.3): 20 madde **zaten kapalı** (kanıtla),
+  9 madde **geçersiz/uyarlanmış** (tek koçlu model, npm/pnpm, henüz var olmayan
+  uçlar), 17 madde **açık** ve bu fazın işi. **Faz numaraları KAYMADI:** bölüm
+  `§3a` olarak eklendi (`docs/PROGRESS.md` §6a/§6b konvansiyonu), böylece
+  §4–§14 ve tüm çapraz referanslar (§7 Faz 4.5, §10 zamanlama, AC-\* adları)
+  olduğu gibi geçerli kaldı; faz adı Faz 4.5 mantığıyla **Faz 1.5**'tir.
+- **R14** — **Faz 1.6 — Görsel Kimlik Oturumu** eklendi (§3b). Kaynak: ADR-0015
+  (görsel kimlik sistemi), ADR-0016 (emoji → Lucide), ADR-0017 (imza öğe: halka),
+  ADR-0018 (iki katmanlı geçiş + CI ratchet). Plan bugüne kadar görsel dili hiç
+  karara bağlamamıştı; kimlik varsayılanların toplamı olarak oluşmuştu (`#8b5cf6`
+  = Tailwind `violet-500`, beyaz üstünde ~4.2:1 ile AA'yı geçmiyor; 49
+  `font-black`; `next/font` hiç kullanılmıyor). Faz numaraları **KAYMADI:** bölüm
+  `§3b` olarak eklendi (§3a ve `docs/PROGRESS.md` §6a/§6b konvansiyonu), §4–§14 ve
+  tüm çapraz referanslar (AC-\* adları dahil) olduğu gibi geçerli. **Faz 1.5 ile
+  paralel yürütülebilir** — dosya bakımından çakışmıyorlar (Faz 1.5 `supabase/**`,
+  `src/lib/**`, CI güvenlik adımları; Faz 1.6 `src/design/**`, `tailwind.config.ts`,
+  `src/app/globals.css`, `src/app/layout.tsx`), ama ikisi de Faz 2'den önce
+  bitmelidir. Ayrıca §4.2'deki "halka grafik" ifadesi ADR-0017'nin tek anlam
+  kuralı gereği **yatay bar** olarak düzeltildi (halka yalnızca döngü durumu
+  kodlar; makro bir döngü değil, bütçedir).
 
 ---
 
@@ -473,6 +499,308 @@ db:types` çıktısıyla diff sıfır); CI'da "types güncel mi" drift check'i
 
 ---
 
+## 3a. Faz 1.5 — Güvenlik Denetimi ve Sertleştirme
+
+Kaynak doküman: `securityhardening_prompt.md` (ASVS L2 / OWASP Top 10 / API Top 10
+temelli). O doküman **değiştirilmez**; bu bölüm onun mevcut kod tabanıyla
+uzlaştırılmış hâlidir. Çelişkide bu bölüm geçerlidir.
+
+**Konum ve numaralandırma.** Faz, Faz 1 (§3) bittikten sonra, Faz 2 (§4) başlamadan
+yürütülür. Gerekçe: (a) RLS ve şema Faz 1'de yeniden yazılıyor, denetim daha önce
+yapılsaydı sonucu boşa giderdi; (b) Faz 2 bu temelin üstüne yeni saldırı yüzeyi
+ekliyor (plan yayınlama, form check kuyruğu, realtime mesajlaşma) — temel önce
+sağlamlaştırılır. Bölüm `§3a` olarak eklendi ki §4–§14 numaraları ve çapraz
+referanslar kaymasın (`docs/PROGRESS.md` §6a/§6b ile aynı konvansiyon); fazın adı
+Faz 4.5 mantığıyla **Faz 1.5**'tir.
+
+### 3a.1 Amaç ve kapsam sınırı
+
+- Amaç **savunma**dır: kendi kod tabanımızdaki zafiyetleri bulmak ve kapatmak.
+  Saldırı/exploit geliştirme değildir.
+- Hedef **yalnızca bu repo**dur. Dış sistemlere tarama/istek yapılmaz.
+- Gerçek kullanıcı verisiyle test yapılmaz; tüm doğrulama yerel yığın + seed ile.
+- **Canlı/barındırılan ortama dokunulmaz.** Barındırılan projeyle ilgili bulgular
+  yalnızca raporlanır (bkz. §3a.4 K7), migration/`db push` bu fazda çalıştırılmaz.
+
+### 3a.2 Protokol
+
+1. **Önce rapor, sonra düzeltme.** Hiçbir düzeltme yapılmadan önce tüm bulgular
+   `docs/security/AUDIT.md`'ye yazılır: **severity** (Critical/High/Medium/Low),
+   **kanıt** (`dosya:satır`), **etki**, **düzeltme önerisi**, **durum**
+   (open/fixed/accepted). Rapor kullanıcıya sunulur ve **onay beklenir**.
+2. **Her düzeltme bir regresyon testiyle gelir.** Önce zafiyeti tetikleyen
+   (başarısız olan) test yazılır, düzeltme o testi yeşile çevirir. Test katmanı
+   bulgunun katmanına göre seçilir: RLS → `supabase/tests/rls.test.sql`,
+   proxy/istemci → `tests/unit/**`, uçtan uca → `tests/e2e/**`.
+3. **Kırma değil kapatma.** Meşru bir davranış kırılıyorsa dur ve raporla; sessizce
+   özellik kaldırma yok (özellikle §3.2'deki bilinçli sapmalar — ADR-0014).
+4. **Sızıntı yapma.** Raporda gerçek secret/token/PII gösterilmez, maskelenir
+   (`sk-...abcd` biçimi). Bulunan bir secret için **rotasyon** önerilir; dosyadan
+   silmek yeterli sayılmaz.
+5. **Commit disiplini** §0.3'e tabidir: ajan commit atmaz, `fix(security): ...`
+   biçiminde mesaj önerir. Bir açık = bir commit.
+6. Faz sonunda **dur ve raporla**: kalan riskler, kabul edilen riskler (gerekçeli),
+   önerilen sonraki adımlar.
+
+### 3a.3 Uzlaştırma tablosu
+
+Prompt'un maddeleri mevcut duruma göre üç kovaya ayrıldı. **Kova 1 yeniden
+denetlenmez** — yalnızca `AUDIT.md`'ye "önceden kapatıldı, kanıt: X" satırı olarak
+işlenir.
+
+#### Kova 1 — ZATEN KAPALI (kanıtla)
+
+| #   | Prompt maddesi                                                     | Durum ve kanıt                                                                                                                                                                                                                                                                                                                                                          |
+| --- | ------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Güvenlik header'ları (§6)                                          | CSP, HSTS, `nosniff`, `X-Frame-Options: DENY`, `frame-ancestors 'none'`, `Referrer-Policy`, `Permissions-Policy` — `next.config.mjs:37-82`. Kalıntı: `script-src 'unsafe-inline'` (bkz. Kova 3 #13)                                                                                                                                                                     |
+| 2   | CORS `*` + credentials yasağı (§6)                                 | `ai_backend/app/main.py:44-50` — `allow_origins=settings.cors_origins` (allowlist), `allow_headers` dar                                                                                                                                                                                                                                                                 |
+| 3   | Proxy zorunluluğu, istemci `ai_backend`'e doğrudan gitmez (§5)     | `src/app/api/ai/{workout,nutrition,recommendations}/route.ts`; ADR-0004; I-1                                                                                                                                                                                                                                                                                            |
+| 4   | AI uçlarında auth, kimlik sunucuda JWT'den (§2, §5)                | `src/lib/api/proxy.ts:53-85` — Bearer token `getUser()` ile doğrulanır, `user_id` istemciden kabul edilmez; ADR-0011; `tests/unit/proxy-auth.test.ts` (12 test; kimliksiz istekte `fetch` hiç çağrılmıyor)                                                                                                                                                              |
+| 5   | Private bucket + kısa TTL signed URL (§4)                          | `supabase/migrations/20260817100000_private_storage.sql`, `src/lib/storage.ts` (`SIGNED_URL_TTL_SECONDS = 3600`); HTTP kanıt tablosu `docs/PROGRESS.md` §3 "Faz 1a — storage mahremiyeti" (public yol 400, imzalı 200)                                                                                                                                                  |
+| 6   | RLS her tabloda aktif (§3)                                         | 13 tablo: `20260816090200_rls_policies.sql:16-24`, `20260817110000:337-338`, `20260817130000:361-362`. (**Yalnızca `ENABLE`** — `FORCE` için bkz. Kova 3 #1)                                                                                                                                                                                                            |
+| 7   | RLS test matrisi, regresyon testi olarak (§3, §9.3)                | `supabase/tests/rls.test.sql` — 35 senaryo, `npm run test:rls`, CI `e2e` job'unda; `supabase/README.md` §4a/§4b                                                                                                                                                                                                                                                         |
+| 8   | Yetki yükseltme / dikey yetki (§3)                                 | `profiles` UPDATE `WITH CHECK role = public.profile_role(auth.uid())` — danışan kendi rolünü `coach` yapamaz; `supabase/README.md` "Yetki yükseltme koruması"; elle doğrulama `docs/PROGRESS.md` §1.1                                                                                                                                                                   |
+| 9   | Anonim istek hassas tablo → DENY (§3)                              | `anon` rolünden tüm `public` yetkileri REVOKE: `20260816090200`, `20260817110000:122-123`, `20260817130000:152-153`; `supabase/README.md` §7 madde 6                                                                                                                                                                                                                    |
+| 10  | `service_role` sızıntısı, `NEXT_PUBLIC_` ile hassas değer (§3, §7) | `src/lib/supabase/` yalnızca `client.ts` + `server.ts` (ikisi de anon key); `admin.ts` silindi. `SUPABASE_SERVICE_ROLE_KEY` yalnızca `src/env.ts:17`'de opsiyonel şema alanı — uygulama kodunda hiçbir tüketicisi yok; tek kullanım repo dışı çalışan `scripts/import-catalog.mjs` (bundle'a girmez)                                                                    |
+| 11  | Env runtime doğrulaması, `.env.example`, `.env` gitignore (§7)     | `src/env.ts` (zod, client/server şemaları ayrı, fail-fast), `.env.example` mevcut, `.gitignore:44` `.env*`                                                                                                                                                                                                                                                              |
+| 12  | Hata yanıtlarında iç detay/stack sızıntısı (§8)                    | `src/lib/api/proxy.ts:143-156` — upstream gövdesi yalnızca loglanır, istemciye generic mesaj + `request_id`                                                                                                                                                                                                                                                             |
+| 13  | Loglarda token/şifre (§8)                                          | `src/lib/logger.ts:20-28,99` — pino `redact` (`*.password`, `*.token`, `*.access_token`, `*.apiKey`, `*.authorization`, `req.headers.authorization`, `x-api-key`), `remove: true`. (PII/sağlık verisi için bkz. Kova 3 #7)                                                                                                                                              |
+| 14  | Rate limiting (§6)                                                 | İki katman: `src/proxy.ts` (`/api/*`, AI için 20/dk) ve `ai_backend/app/core/rate_limit.py` + router'larda `@limiter.limit("20/minute")`                                                                                                                                                                                                                                |
+| 15  | Server action'larda çağıran doğrulaması (§2)                       | Sorun kaynağındaki 4 server action **silindi** (ölü kod) — `docs/DISCOVERY.md` §2.5; `src/app/actions.ts` artık yok                                                                                                                                                                                                                                                     |
+| 16  | Secret dosyalarının repoya girmesi (§7)                            | `supabase/.temp/` ve `.branches/` gitignore'da (`.gitignore:75-77`) — `npx supabase start` üretimi `start-secrets` commit'e girmiyor                                                                                                                                                                                                                                    |
+| 17  | `SECURITY DEFINER` fonksiyonlarda `search_path` (§4)               | Migration'lardaki **14 `security definer` bildiriminin tamamı** hemen ardından `set search_path = public, pg_temp` içeriyor (`20260816090100`, `20260816100000`, `20260817090000`, `20260817110000`, `20260817130000`, `20260817140000`)                                                                                                                                |
+| 18  | XSS: `dangerouslySetInnerHTML` / `eval` / `new Function` (§4)      | `src/**` üzerinde grep **boş** — kullanıcı içeriği (mesaj, notlar) React'in varsayılan escape'i ile render ediliyor                                                                                                                                                                                                                                                     |
+| 19  | Kütlesel atama (§6)                                                | İstemci yazmalarının tamamı açık alan listesi kullanıyor (`src/hooks/**` — `useDailyLogs:56`, `useFormChecks:92`, `useMessages:111`, `useNotifications:53,87`, `useWorkoutLogs:49,98`, `useProgramApprovals:53,110,118`); `profiles` üzerinde istemciden güncellenen tek alan `avatar_path` (`useProfile.ts:98-102`). İstek gövdesi hiçbir yerde DB'ye spread edilmiyor |
+| 20  | Şema doğrulama (§4, I-5)                                           | Public giriş kabul eden tek yüzey `/api/ai/*`; hepsi `handleAiProxy` içinde zod ile doğrulanıyor (`src/lib/api/proxy.ts:95-107`), FastAPI tarafı Pydantic v2                                                                                                                                                                                                            |
+
+#### Kova 2 — GEÇERSİZ / UYARLANMALI
+
+| #   | Prompt varsayımı                                                                                    | Uyarlama                                                                                                                                                                                                                                                                                                                                          |
+| --- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | "Koç sınırı: `profiles.coach_id = auth.uid()`; koç tüm öğrencileri görüyorsa **kritik bulgu**" (§3) | **Geçersiz.** Tek koçlu model benimsendi (ADR-0007, §3.1–§3.2); `coach_id` kolonu bilinçli olarak YOK. "Koç tüm danışanları görür" bir **karardır**, bulgu değildir. Denetimde bu madde "çok koçluya geçilirse ikinci sahiplik katmanı gerekir" notuna indirgenir                                                                                 |
+| 2   | Test matrisinde "coach başka koçun öğrencisi → DENY" (§3)                                           | **Düşer** — ikinci koç kavramı yok. Matrisin geri kalan 5 senaryosu `rls.test.sql` ile zaten karşılanıyor                                                                                                                                                                                                                                         |
+| 3   | "Koç profili görünürlüğü" bulgu olarak raporlanmalı                                                 | **Bilinçli takas** (ADR-0010, `supabase/README.md` "Koç görünürlüğü"): koçun `profiles` satırı tüm authenticated kullanıcılara açık, aksi hâlde mesajlaşma çalışmıyor. Bulgu olarak raporlanmaz; `AUDIT.md`'de "kabul edilen risk, ADR-0010" satırı olarak kayda geçer. `profiles`'a koça ait hassas kolon eklenirse kolon-sınırlı view'a geçilir |
+| 4   | "Dikey yetki: `conversations`, `coach_notes`, sistem mesajı" (§3)                                   | **Kısmen yok.** `conversations` tablosu eklenmiyor (tek koçlu model; `messages` `conversation_key` yaklaşımıyla yürüyor — `20260817140000`), `coach_notes` Faz 1b'de ertelendi, `kind='system'` sistem mesajı Faz 2'de geliyor. Bu üç yüzeyin dikey yetki denetimi **Faz 2'nin çıkışına** bağlanır                                                |
+| 5   | "Plan atama gibi koça özel yazma işlemlerini client yapabiliyorsa kapat" (§3)                       | **Uyarlanır.** Danışanın kendi planına yazabilmesi bilinçli sapmadır (ADR-0014, `supabase/README.md`); IDOR bulgusu değildir. Kalan gerçek eksik denetim izidir (bkz. Kova 3 #16)                                                                                                                                                                 |
+| 6   | `pnpm audit` (§1, §9.4)                                                                             | Proje **npm** kullanıyor → `npm audit`. Turbo/pnpm'e geçiş Faz 4.5'te                                                                                                                                                                                                                                                                             |
+| 7   | "meal-photo endpoint", prompt injection, SSRF (§5)                                                  | Uç **henüz yok** — Faz 3'te geliyor (§5). Prompt injection, katı Pydantic parse ve SSRF maddeleri bu fazda **tasarım kısıtı** olarak yazılır, uygulama denetimi Faz 3'ün çıkış kriterine bağlanır                                                                                                                                                 |
+| 8   | "Logout push token'ı geçersiz kılıyor mu?" (§2)                                                     | `device_push_tokens` **Faz 7**'de geliyor (§10). Bu fazda yalnızca oturum sonlandırma denetlenir (`useSession.ts:93-99` — `signOut` + `queryClient.clear()` + workbox cache temizliği)                                                                                                                                                            |
+| 9   | `docs/security/rls-tests` ayrı dizini (§9.3)                                                        | **Uyarlanır:** RLS testleri zaten `supabase/tests/rls.test.sql` (35 senaryo) ve `npm run test:rls` ile CI'da. İkinci bir dizin açılmaz; `AUDIT.md` bu dosyaya link verir                                                                                                                                                                          |
+
+#### Kova 3 — AÇIK (bu fazın işi)
+
+| #   | Bulgu adayı                                           | Kanıt / doğrulama                                                                                                                                                                                                                                                                                                   | İlk severity tahmini                     |
+| --- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| 1   | `FORCE ROW LEVEL SECURITY` hiçbir tabloda yok         | `supabase/**` genelinde `force row level security` grep'i **0 sonuç**; 13 tabloda yalnızca `enable`                                                                                                                                                                                                                 | Medium                                   |
+| 2   | Token istemcide `localStorage`'da                     | `src/lib/supabase/client.ts:20-22` — `persistSession: true`, özel `storage` verilmemiş (Supabase varsayılanı `localStorage`). XSS'te token çalınabilir; httpOnly cookie'ye geçişin maliyet/fayda analizi yapılmadı                                                                                                  | High (XSS ile birlikte)                  |
+| 3   | Auth uçlarında brute-force koruması yok               | `/login` doğrudan GoTrue'ya gidiyor (`src/hooks/useSession.ts:72`); `src/proxy.ts:11` matcher yalnızca `/api/:path*`; `supabase/config.toml`'da `[auth.rate_limit]` bloğu yok                                                                                                                                       | High                                     |
+| 4   | Dosya yüklemede magic-byte doğrulaması yok            | MIME whitelist ve 5 MB sınırı bucket seviyesinde var (`20260816090300_storage.sql:24-43`) ama istemcinin bildirdiği `Content-Type`'a dayanıyor; uzantı kullanıcı dosya adından türetiliyor (`useProfile.ts:90`, `useFormChecks.ts:66-68`) — uzantı içinde `/` kalabileceği için yol enjeksiyonu ayrıca doğrulanmalı | High                                     |
+| 5   | Yüklenen dosya tarayıcıda inline servis ediliyor      | `src/lib/storage.ts` imzalı adresi `download` / `Content-Disposition` parametresi olmadan üretiyor; depolanan `Content-Type` istemciden geliyor                                                                                                                                                                     | Medium                                   |
+| 6   | Güvenlik olay günlüğü yok                             | `src/proxy.ts` 429'u loglamıyor (dosyada logger çağrısı yok); başarısız giriş denemesi hiç loglanmıyor; RLS reddi (`42501`) uygulama katmanında güvenlik olayı olarak kaydedilmiyor                                                                                                                                 | Medium                                   |
+| 7   | Loglarda PII / sağlık verisi maskelenmiyor            | `src/lib/logger.ts:20-28` redact listesi yalnızca kimlik bilgisi alanları; `email`, `full_name`, `weight`, `measurements` gibi sağlık/kişisel alanlar listede yok                                                                                                                                                   | Medium                                   |
+| 8   | `npm audit`: 18 zafiyet (3 orta, 13 yüksek, 2 kritik) | `docs/PROGRESS.md` §5 risk tablosu — büyük ölçüde `next-pwa` v5 ağacından; `npm audit fix --force` Next 16'yı düşürebilir. Karar gerekiyor: kabul / izole / `@ducanh2912/next-pwa`                                                                                                                                  | High (karar bekliyor)                    |
+| 9   | Araç zinciri yok                                      | `package.json` devDependencies'te `semgrep`/`gitleaks`/`eslint-plugin-security`/`eslint-plugin-no-unsanitized` yok; `.github/workflows/*.yml` içinde `audit`/`semgrep`/`gitleaks` grep'i **0 sonuç**; `ai_backend` için `pip-audit` de yok                                                                          | High                                     |
+| 10  | Git geçmişinde secret taraması hiç yapılmadı          | Repoda gitleaks yapılandırması/çıktısı yok; `docs/PROGRESS.md`'de böyle bir kayıt yok                                                                                                                                                                                                                               | High                                     |
+| 11  | Barındırılan Supabase projesi sertleşmemiş            | `docs/HOSTED-DATA-INVENTORY.md` §5.3: `avatars` ve `form-checks-media` hosted'da **hâlâ public**; §7 madde 5: şema sürüklenmiş, migration'lar uygulanmamış                                                                                                                                                          | High (rapor + plan; bu fazda uygulanmaz) |
+| 12  | `docs/security/` yok                                  | `AUDIT.md`, `THREAT-MODEL.md` ve kök `SECURITY.md` dosyaları mevcut değil (dizin listesi doğrulandı)                                                                                                                                                                                                                | Low (çıktı borcu)                        |
+| 13  | CSP `script-src 'unsafe-inline'`                      | `next.config.mjs:33-35` — nonce tabanlı CSP'ye geçiş ertelendi (`docs/PROGRESS.md` §8). XSS'in etkisini büyütür                                                                                                                                                                                                     | Medium                                   |
+| 14  | Rate limiter bellek içi, IP bazlı, XFF'e güveniyor    | `src/lib/rate-limit.ts` + `src/proxy.ts:17-28` — `x-forwarded-for` doğrudan okunuyor (güvenilir proxy doğrulaması yok), kullanıcı bazlı limit yok, çok örnekli dağıtımda etkisiz (ADR-0005 bilinen kısıt)                                                                                                           | Medium                                   |
+| 15  | `ai_backend` kimlik doğrulaması fail-open             | `ai_backend/app/core/security.py:22-24` — `settings.api_key is None` ise `api_key_guard` no-op; `AI_BACKEND_API_KEY` hem `src/env.ts:19` hem backend tarafında **opsiyonel**. Ağ sınırı varsayımı belgelenmemiş                                                                                                     | High                                     |
+| 16  | Plan tablolarında denetim izi yok                     | ADR-0014'ün kabul edilen bedeli: satırı kimin yazdığı tutulmuyor (yalnızca `updated_at`); koç, danışanın planı değiştirdiğini göremiyor                                                                                                                                                                             | Low/Medium                               |
+| 17  | PWA runtime cache'i cihazda 7 gün veri tutuyor        | `next.config.mjs:127-135` — `workout_logs` yanıtları (`profiles` bilinçli olarak çıkarıldı); logout'ta `caches` temizliği var (`src/hooks/useSession.ts:21-27`). Paylaşılan cihaz senaryosunda kalan risk değerlendirilecek                                                                                         | Low                                      |
+
+### 3a.4 İş kalemleri (öncelik sırasıyla)
+
+Prompt'un "Öncelik Sırası" bölümü mevcut duruma uyarlandı: erişim kontrolünün büyük
+kısmı Faz 1'de kapandığı için ağırlık araç zinciri, dosya yükleme ve oturum
+katmanına kaydı.
+
+- **K1 — Erişim kontrolü / IDOR kalanları (Kova 3 #1, #16).** Hassas tablolarda
+  `FORCE ROW LEVEL SECURITY`; `rls.test.sql`'e tablo sahibi/`postgres` bağlamını
+  kapsayan senaryo. Plan tablolarında denetim izi (`updated_by`) kararı — ADR ile.
+- **K2 — Secret taraması ve araç zinciri (Kova 3 #9, #10, #8).** `gitleaks`
+  (çalışan ağaç + **git geçmişi**), `semgrep` (owasp + typescript + python + react),
+  `eslint-plugin-security` + `eslint-plugin-no-unsanitized`, `npm audit`,
+  `ai_backend` için `pip-audit`. Hepsi CI'a bağlanır, high+ **fail** eder.
+  `npm audit`'in 18 bulgusu için karar: düzelt / izole et / gerekçeli kabul et.
+- **K3 — Dosya yükleme sertleştirmesi (Kova 3 #4, #5).** Magic-byte doğrulaması,
+  uzantının sunucuda **whitelist'ten** seçilmesi (kullanıcı dosya adından değil),
+  yol üretiminin `/`/`..` içeremeyeceğinin testle kanıtlanması, imzalı adreste
+  `Content-Disposition: attachment` / doğru `Content-Type`.
+- **K4 — Auth ve oturum (Kova 3 #2, #3, #15).** Token saklama kararı (localStorage
+  vs. httpOnly cookie — 3 seçenek + trade-off, §0.5 gereği), auth uçları için
+  brute-force koruması (GoTrue `[auth.rate_limit]` ve/veya login akışının kendi
+  sınırlayıcısı; IP + hesap bazlı), `AI_BACKEND_API_KEY`'in zorunlu hâle getirilmesi
+  (fail-closed).
+- **K5 — Gözlemlenebilirlik ve gizlilik (Kova 3 #6, #7).** Güvenlik olay günlüğü
+  (rate limit aşımı, auth başarısızlığı, yetki reddi); redact listesine PII ve
+  sağlık verisi alanlarının eklenmesi.
+- **K6 — Kalan sertleştirme (Kova 3 #13, #14, #17).** Nonce tabanlı CSP değerlendirmesi,
+  rate limiter'ın kullanıcı bazlı anahtar + güvenilir proxy doğrulaması, PWA cache
+  mahremiyet gözden geçirmesi. Uygulanmayanlar gerekçeli "accepted risk" olarak
+  yazılır.
+- **K7 — Barındırılan proje raporu (Kova 3 #11).** Yalnızca **rapor ve plan**:
+  hosted bucket'ların public olması, şema sürüklenmesi ve migration uygulama
+  sırası. Bu fazda hiçbir değişiklik uygulanmaz.
+- **K8 — Doküman çıktıları (Kova 3 #12).** `docs/security/AUDIT.md`,
+  `docs/security/THREAT-MODEL.md` (STRIDE; aktörler: anonim, danışan, koç,
+  saldırgan-danışan; güven sınırları: istemci↔Supabase, istemci↔proxy↔ai_backend),
+  kök `SECURITY.md` (sorumlu açıklama politikası taslağı).
+
+### Kabul kriterleri
+
+- **AC-1.5.1:** `docs/security/AUDIT.md` mevcut; her bulgu severity + kanıt
+  (`dosya:satır`) + etki + düzeltme önerisi + durum (open/fixed/accepted) içeriyor.
+  §3a.3 Kova 1'in 20 maddesi "önceden kapatıldı, kanıt: X" satırı olarak kayıtlı.
+- **AC-1.5.2:** Hassas tabloların tamamında `FORCE ROW LEVEL SECURITY` açık;
+  `select relname from pg_class where relrowsecurity and not relforcerowsecurity`
+  sorgusu `public` şemasında boş döner ve bu `rls.test.sql`'de bir senaryodur.
+- **AC-1.5.3:** `gitleaks` **git geçmişi** taraması çalıştırıldı; sonuç temiz ya da
+  her bulgu maskelenmiş hâlde raporlandı ve **rotasyon önerisiyle** kapatıldı.
+- **AC-1.5.4:** CI'da `semgrep`, `gitleaks`, `npm audit` ve `pip-audit` adımları var;
+  **high ve üzeri bulgu job'u kırıyor** (kanıt: kasten eklenmiş bir bulguyla kırmızı
+  koşu). Gerekçeli istisnalar allowlist dosyasında ve `AUDIT.md`'de.
+- **AC-1.5.5:** Dosya yükleme: magic-byte doğrulaması var, uzantı sunucu tarafı
+  whitelist'ten seçiliyor, `<uid>-<uuid>.<ext>` dışında bir yol üretilemiyor —
+  `../`, `/` ve sahte MIME içeren en az 3 negatif test yeşil.
+- **AC-1.5.6:** Kimliksiz veya sahte `X-API-Key` ile `ai_backend` uçlarına erişim
+  **her yapılandırmada** reddediliyor (API key artık opsiyonel değil); pytest ile
+  kanıtlı.
+- **AC-1.5.7:** Auth brute-force koruması ölçülebilir: aynı hesaba/IP'ye yapılan
+  N başarısız denemeden sonra istek reddediliyor; bir E2E veya entegrasyon testiyle
+  kanıtlı.
+- **AC-1.5.8:** Güvenlik olay günlüğü: rate limit aşımı, auth başarısızlığı ve yetki
+  reddi yapılandırılmış log kaydı üretiyor (`request_id` korelasyonlu); loglarda
+  e-posta / ad / sağlık verisi maskeli — `logger` redact testiyle kanıtlı.
+- **AC-1.5.9:** Her **Critical/High** bulgu için düzeltme + zafiyeti tetikleyen
+  regresyon testi; testin düzeltme geri alındığında **kırıldığı** gösterilmiş.
+- **AC-1.5.10:** `docs/security/THREAT-MODEL.md` (STRIDE) ve kök `SECURITY.md`
+  mevcut ve §3a.4 K8'deki aktör/sınır listesini kapsıyor.
+- **AC-1.5.11:** Faz kapısı komutları (§0.2) yeşil; `npm run test:rls` ve
+  `npm run test:transform` dahil hiçbir mevcut test düşmedi (meşru davranış
+  kırılmadı).
+- **AC-1.5.12:** Barındırılan proje için yazılı bir sertleştirme planı var
+  (`AUDIT.md` içinde ayrı bölüm) ve bu fazda **hiçbir** hosted değişiklik
+  uygulanmadı.
+
+### Kapsam dışı
+
+- Penetrasyon testi, exploit geliştirme, red team çalışması.
+- Üçüncü şahıs sistemlere tarama/istek (Supabase altyapısı, Anthropic API dahil).
+- Gerçek kullanıcı verisiyle test.
+- Canlı/barındırılan ortamda değişiklik uygulama (yalnızca rapor — K7).
+- Faz 3 (meal-photo: prompt injection, SSRF, günlük analiz limiti) ve Faz 7
+  (push token iptali) yüzeylerinin **uygulama** denetimi — bu fazda yalnızca
+  tasarım kısıtı olarak yazılır.
+- Nonce tabanlı CSP'nin **uygulanması** zorunlu değildir; değerlendirilir ve
+  gerekçeli karar `AUDIT.md`'ye yazılır (`docs/PROGRESS.md` §8'de ertelenmiş kayıt).
+
+---
+
+## 3b. Faz 1.6 — Görsel Kimlik Oturumu
+
+Kaynak kararlar: **ADR-0015** (görsel kimlik sistemi: palet, tema, token mimarisi,
+tipografi), **ADR-0016** (fonksiyonel emoji → `lucide-react`), **ADR-0017** (imza öğe:
+halka, tek anlam kuralı), **ADR-0018** (iki katmanlı geçiş + CI ratchet). Çelişkide
+ADR'ler geçerlidir; bu bölüm onların plandaki iş kalemi karşılığıdır.
+
+**Konum ve numaralandırma.** Bölüm `§3b` olarak eklendi ki §4–§14 numaraları ve çapraz
+referanslar kaymasın (§3a ve `docs/PROGRESS.md` §6a/§6b ile aynı konvansiyon); fazın adı
+Faz 4.5 / Faz 1.5 mantığıyla **Faz 1.6**'dır.
+
+**Faz sırası.** Faz 1.5 (güvenlik) ve Faz 1.6 (kimlik) **dosya bakımından çakışmaz** —
+Faz 1.5 `supabase/**`, `src/lib/**`, `src/proxy.ts` ve CI güvenlik adımlarında; Faz 1.6
+`src/design/**`, `tailwind.config.ts`, `src/app/globals.css`, `src/app/layout.tsx`
+üzerinde çalışır. Bu yüzden **paralel yürütülebilirler**. İkisi de **Faz 2'den önce**
+bitmelidir: Faz 2 ekranları yeniden yazacak, kimlik o zaman hazır olmazsa aynı ekranlar
+iki kez elden geçer.
+
+### 3b.1 Amaç ve timebox
+
+- Amaç, kimliğin **sistemini** kurmaktır: token kaynağı, yazı tipleri, tema zeminleri ve
+  odak/seçim renkleri. Ekranların görünümünü değiştirmek değildir.
+- **Timebox: tek oturum, tek PR.** Bu bir "tasarım turu" değil, sınırlı bir altyapı
+  işidir. PR büyüyorsa kapsam dışına taşınmış demektir.
+
+### 3b.2 Kapsam — Katman A
+
+- `src/design/tokens.ts` (yeni): düz TS objesi, **light ve dark iki değer seti**.
+  Semantik isimler: `bg`, `surface`, `surface-raised`, `border`, `text-primary`,
+  `text-secondary`, `accent`, `accent-contrast`, `success`, `warning`, `danger`,
+  `focus-ring`. Web'e özgü hiçbir değer (px'li `box-shadow` string'i, CSS fonksiyonu,
+  Tailwind sınıf adı) bu dosyaya girmez — Faz 4.5'te Expo aynı dosyayı import edecek.
+- `tailwind.config.ts`: `tokens.ts`'i import eder ve CSS değişkenlerine bağlar.
+  `brand-purple` / `brand-purpleHover` yerini semantik token'lara bırakır.
+- `next/font` ile üç yazı tipi, hepsi `latin-ext`: **Archivo** (display, 600–700),
+  **Hanken Grotesk** (body, 400/500/600), **IBM Plex Mono** (veri, 500, tabular
+  figürler). Ağırlık tavanı **700**; 900 sistemde tanımlanmaz.
+- Gömülü **8** ham `#8b5cf6`'nın token'a çekilmesi: `src/app/globals.css` (4),
+  `src/components/CoachUserManagement.tsx` (3), `src/components/tabs/StatsTab.tsx` (1).
+- `src/app/layout.tsx`: `viewport.themeColor` çifti yeni zeminlere (`#F4F4F1` /
+  `#14161B`), gövde zemini ve `selection:` sınıfı token'a bağlanır.
+- `src/app/globals.css`: `:focus-visible` outline'ı ve `.dark .glass-panel` rgba değeri
+  token'dan beslenir.
+
+### 3b.3 Kapsam dışı (bilinçli)
+
+- **Ekran restilizasyonu.** 49 `font-black`, 17 `rounded-3xl`, 14 `bg-gradient-to-*` bu
+  fazda dönüştürülmez — Katman B'ye, yani Faz 2'ye aittir (ADR-0018).
+- **Emoji → Lucide dönüşümü.** Faz 2'nin ilk mekanik işidir ve E2E locator
+  güncellemeleriyle aynı PR'da yapılır (ADR-0016).
+- **`LoopRing` bileşeni.** Önceden yazılmaz; ilk göründüğü ekranla (gym modu dinlenme
+  sayacı) birlikte yazılır (ADR-0017).
+- Chart.js eksen renginin ve `html2canvas` PNG dışa aktarımının token'a uyumu — Faz 4
+  grafik tekleştirme işine bağlanır (bkz. §6, AC-4.3).
+
+### 3b.4 CI ratchet (tek yönlü mandal)
+
+`scripts/` altında basit bir grep script'i aşağıdaki sayaçları ölçer; sayaç **mevcut
+değerin üstüne çıkarsa CI kırılır**. Tavan asla yükselmez, her PR düşürebilir ve
+düşürdüğünde yeni değer baseline olur.
+
+| Sayaç               | Kilitlenen tavan (2026-08-17 ölçümü)                 |
+| ------------------- | ---------------------------------------------------- |
+| `font-black`        | 49                                                   |
+| `bg-gradient-to-`   | 14                                                   |
+| `rounded-3xl`       | 17                                                   |
+| ham `#8b5cf6`       | 8 → Katman A sonrası **0**                           |
+| JSX emoji kullanımı | script'in kendi ölçümüyle sabitlenir (~60, 15 dosya) |
+
+### Kabul kriterleri
+
+- **AC-1.6.1:** `src/design/tokens.ts` mevcut; **light ve dark iki değer seti** içeriyor,
+  §3b.2'deki 12 semantik anahtarın tamamı tanımlı ve dosyada web'e özgü hiçbir değer
+  (px'li gölge string'i, CSS fonksiyonu, Tailwind sınıf adı) yok — bir birim testiyle
+  kanıtlı.
+- **AC-1.6.2:** Kod tabanında ham `#8b5cf6` **sıfır**; `grep -ri "8b5cf6" src/` boş döner.
+  `tailwind.config.ts`'te `brand-purple` sabiti kalmadı.
+- **AC-1.6.3:** `:focus-visible` outline rengi ve metin seçimi (`selection`) rengi
+  token'dan geliyor; ikisi de tema değiştiğinde birlikte değişiyor (klavye ile gezinerek
+  ve `[data-theme]`/`.dark` sınıfı değiştirilerek doğrulanır). Odak halkası hiçbir temada
+  görünmez hâle gelmiyor.
+- **AC-1.6.4:** Ratchet script'i CI'da bir adım olarak koşuyor ve §3b.4 tablosundaki
+  sayıları kilitliyor; kasten eklenmiş bir `font-black` ile **kırmızı koşu** gösterilmiş.
+- **AC-1.6.5:** Otomatik kontrast testi (axe veya eşdeğeri) **açık temada** çalışıyor ve
+  WCAG **AA**'yı geçiyor; birincil aksiyon rengi, odak halkası ve ikincil metin token'ı
+  ayrı ayrı kapsanıyor. Koyu tema için aynı test `accent` token'ının koyu değerini
+  (`#A79BFF`) kullandığını doğruluyor.
+- **AC-1.6.6:** Üç yazı tipi `next/font` ile self-host ediliyor, `latin-ext` alt kümesi
+  açık (Türkçe `ı İ ş ğ ç ö ü` render ediliyor) ve sistemde **hiçbir yerde 900 ağırlığı
+  tanımlı değil**.
+- **AC-1.6.7:** _(Faz 2'ye bağlı — `LoopRing` yazıldığında doğrulanır.)_
+  `prefers-reduced-motion: reduce` altında halka **bilgi kaybetmiyor**: dolgu
+  animasyondan değil state kaynaklı `stroke-dashoffset`'ten geliyor, kutlama dönüşü
+  geçişsiz düz renk değişimine iniyor. ADR-0017'nin kritik kısıtı budur; bu kriter Faz
+  1.6'da **karşılanmaz**, Faz 2'nin çıkış kriterine devredilir.
+- **AC-1.6.8:** `viewport.themeColor` çifti ve koyu zemin (`#14161B`) gövde/`.dark
+.glass-panel` değerleriyle senkron; PWA yüzeyinde zemin ile tarayıcı çubuğu arasında
+  renk sıçraması yok.
+- **AC-1.6.9:** Faz kapısı komutları (§0.2) yeşil; hiçbir mevcut test düşmedi. Bu fazda
+  ekran metni veya emoji **değişmediği** için E2E locator'larına dokunulmaması gerekir —
+  dokunulduysa kapsam aşılmış demektir.
+
+---
+
 ## 4. Faz 2 — Koç-Öğrenci Çekirdek Akışı
 
 ### 4.1 Antrenman
@@ -487,8 +815,9 @@ db:types` çıktısıyla diff sıfır); CI'da "types güncel mi" drift check'i
 ### 4.2 Beslenme
 
 - Koç: günlük makro hedefi + öğün şablonu CRUD.
-- Öğrenci: makro dashboard (hedef vs gerçekleşen; halka grafik), manuel öğün
-  ekleme.
+- Öğrenci: makro dashboard (hedef vs gerçekleşen; **yatay bar** — halka DEĞİL, bkz.
+  ADR-0017 tek anlam kuralı: halka yalnızca döngü durumu kodlar, makro bir döngü
+  değil bütçedir), manuel öğün ekleme.
 
 ### 4.3 Form check
 

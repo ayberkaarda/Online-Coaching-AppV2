@@ -8,6 +8,10 @@
 --                   (supabase/migrations/20260817110000_workout_plan_tables.sql §7)
 --   senaryo 11–19 : `profiles.nutrition_plan` -> `nutrition_plans` + `nutrition_plan_meals`
 --                   (supabase/migrations/20260817130000_nutrition_plan_tables.sql §7)
+--   senaryo 20–22 : messages.client_id / read_at backfill
+--                   (supabase/migrations/20260817140000_messages_conversation_key.sql §4)
+--   senaryo 23–26 : form_checks inceleme durumu backfill'i + tutarlılık kısıtı
+--                   (supabase/migrations/20260817150000_form_check_review.sql §3–§4)
 --
 -- NEDEN AYRI BİR TEST GEREKİYOR:
 --   `supabase db reset` dönüşümü TEST ETMEZ. Reset akışında migration'lar
@@ -1150,15 +1154,465 @@ end $$;
 rollback;
 
 
+-- #############################################################################
+-- FAZ 1b / ADIM 4 — MESAJLARIN KONUSMA ANAHTARI BACKFILL'I
+-- (supabase/migrations/20260817140000_messages_conversation_key.sql §4)
+--
+-- `public.backfill_messages_conversation_key()` client_id (konusmanin danisan
+-- tarafi) ve read_at (is_read=true icin created_at) kolonlarini doldurur.
+--
+-- "ESKI SEKILLI" SATIR URETME NOTU: `client_id` bugun NOT NULL ve
+-- messages_apply_conversation_key trigger'i her INSERT/UPDATE'te
+-- turetiyor/dogruluyor. Eski sekilli (client_id=null, read_at=null) bir satir
+-- uretebilmek icin:
+--   1) ONCE normal bir INSERT yapilir (trigger client_id'yi turetir, boylece
+--      NOT NULL kisitlamasi ihlal edilmez).
+--   2) `client_id` kolonunun NOT NULL kisitlamasi TRANSACTION ICINDE kaldirilir.
+--   3) Trigger GECICI OLARAK DEVRE DISI BIRAKILIR -- aksi halde
+--      `update ... set client_id = null` ifadesi `update of ... client_id` ile
+--      trigger'i tekrar TETIKLER ve NULL'i hemen A'ya geri TURETIR; yani
+--      trigger acikken client_id hicbir zaman NULL'a CEKILEMEZ.
+--   4) update sonrasi trigger yeniden ETKINLESTIRILIR.
+-- Tum bu adimlar transaction icindedir; ROLLBACK ile gercek semaya (NOT NULL
+-- kisitlamasi ve trigger durumu dahil) HICBIR KALICI ETKISI YOKTUR.
+--
+-- SAYIM GUVENILIRLIGI: `client_id` gercek (persist edilmis) semada NOT NULL
+-- oldugu icin, bu transaction disinda HICBIR satirin client_id'si NULL olamaz
+-- (kisitlama bunu imkansiz kilar). Bu yuzden asagidaki senaryolarda beklenen
+-- sayilar (client_ids_filled, rows_skipped, ...) yalnizca BU senaryonun
+-- kendi eklediği satirlari yansitir -- calisma sirasindan veya onceki
+-- test/e2e calismalarindan ETKILENMEZ.
+-- #############################################################################
+
+
+-- =============================================================================
+-- 20) MESAJLAR — TEMEL BACKFILL: client_id ve read_at (is_read=true icin) dolar
+-- =============================================================================
+begin;
+
+insert into public.messages (id, sender_id, receiver_id, message, is_read, created_at)
+values
+  ('f0000000-0000-0000-0000-000000000201'::uuid, '22222222-2222-2222-2222-222222222222', '11111111-1111-1111-1111-111111111111', 'TRANSFORM testi - okunmus eski satir',   true,  now() - interval '10 days'),
+  ('f0000000-0000-0000-0000-000000000202'::uuid, '11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222', 'TRANSFORM testi - okunmamis eski satir', false, now() - interval '9 days');
+
+alter table public.messages alter column client_id drop not null;
+alter table public.messages disable trigger messages_apply_conversation_key;
+
+update public.messages
+   set client_id = null, read_at = null
+ where id in ('f0000000-0000-0000-0000-000000000201'::uuid, 'f0000000-0000-0000-0000-000000000202'::uuid);
+
+alter table public.messages enable trigger messages_apply_conversation_key;
+
+do $$
+declare
+  v_res          record;
+  v_read_true    timestamptz;
+  v_created_true timestamptz;
+  v_read_false   timestamptz;
+  v_cid_true     uuid;
+  v_cid_false    uuid;
+begin
+  select * into v_res from public.backfill_messages_conversation_key();
+
+  if v_res.client_ids_filled is distinct from 2 then
+    raise exception 'BASARISIZ [20 - Backfill client_ids_filled]: beklenen 2, gelen %', v_res.client_ids_filled;
+  end if;
+  if v_res.rows_skipped is distinct from 0 then
+    raise exception 'BASARISIZ [20 - Backfill rows_skipped]: beklenen 0, gelen %', v_res.rows_skipped;
+  end if;
+  if v_res.read_ats_filled is distinct from 1 then
+    raise exception 'BASARISIZ [20 - Backfill read_ats_filled]: beklenen 1, gelen %', v_res.read_ats_filled;
+  end if;
+
+  select read_at, created_at, client_id into v_read_true, v_created_true, v_cid_true
+    from public.messages where id = 'f0000000-0000-0000-0000-000000000201'::uuid;
+  select read_at, client_id into v_read_false, v_cid_false
+    from public.messages where id = 'f0000000-0000-0000-0000-000000000202'::uuid;
+
+  if v_read_true is distinct from v_created_true then
+    raise exception 'BASARISIZ [20 - is_read=true read_at=created_at]: beklenen %, gelen %', v_created_true, v_read_true;
+  end if;
+  if v_read_false is not null then
+    raise exception 'BASARISIZ [20 - is_read=false read_at NULL kalmali]: gelen %', v_read_false;
+  end if;
+  if v_cid_true is distinct from '22222222-2222-2222-2222-222222222222'::uuid then
+    raise exception 'BASARISIZ [20 - okunmus satirin client_id si A]: beklenen %, gelen %', '22222222-2222-2222-2222-222222222222'::uuid, v_cid_true;
+  end if;
+  if v_cid_false is distinct from '22222222-2222-2222-2222-222222222222'::uuid then
+    raise exception 'BASARISIZ [20 - okunmamis satirin client_id si A]: beklenen %, gelen %', '22222222-2222-2222-2222-222222222222'::uuid, v_cid_false;
+  end if;
+
+  raise notice 'GECTI [20 - Mesaj backfill: client_id=2, read_at=1, atlanan=0]';
+end $$;
+
+rollback;
+
+
+-- =============================================================================
+-- 21) MESAJLAR — IDEMPOTENCY: backfill iki kez cagrilinca ikinci cagri no-op doner
+-- =============================================================================
+begin;
+
+insert into public.messages (id, sender_id, receiver_id, message, is_read, created_at)
+values
+  ('f0000000-0000-0000-0000-000000000211'::uuid, '22222222-2222-2222-2222-222222222222', '11111111-1111-1111-1111-111111111111', 'TRANSFORM testi - idempotency okunmus',   true,  now() - interval '8 days'),
+  ('f0000000-0000-0000-0000-000000000212'::uuid, '11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222', 'TRANSFORM testi - idempotency okunmamis', false, now() - interval '7 days');
+
+alter table public.messages alter column client_id drop not null;
+alter table public.messages disable trigger messages_apply_conversation_key;
+
+update public.messages
+   set client_id = null, read_at = null
+ where id in ('f0000000-0000-0000-0000-000000000211'::uuid, 'f0000000-0000-0000-0000-000000000212'::uuid);
+
+alter table public.messages enable trigger messages_apply_conversation_key;
+
+do $$
+declare
+  v_res1         record;
+  v_res2         record;
+  v_read_after_1 timestamptz;
+  v_read_after_2 timestamptz;
+  v_cid_after_1  uuid;
+  v_cid_after_2  uuid;
+begin
+  select * into v_res1 from public.backfill_messages_conversation_key();
+
+  select read_at, client_id into v_read_after_1, v_cid_after_1
+    from public.messages where id = 'f0000000-0000-0000-0000-000000000211'::uuid;
+
+  -- Ikinci cagri
+  select * into v_res2 from public.backfill_messages_conversation_key();
+
+  select read_at, client_id into v_read_after_2, v_cid_after_2
+    from public.messages where id = 'f0000000-0000-0000-0000-000000000211'::uuid;
+
+  if v_res2.client_ids_filled is distinct from 0
+     or v_res2.read_ats_filled is distinct from 0
+     or v_res2.rows_skipped   is distinct from 0 then
+    raise exception 'BASARISIZ [21 - Idempotency ikinci cagri]: beklenen (0,0,0), gelen (%,%,%)',
+      v_res2.client_ids_filled, v_res2.read_ats_filled, v_res2.rows_skipped;
+  end if;
+
+  if v_read_after_1 is distinct from v_read_after_2 then
+    raise exception 'BASARISIZ [21 - Idempotency read_at degisti]: ilk=%, ikinci=%', v_read_after_1, v_read_after_2;
+  end if;
+  if v_cid_after_1 is distinct from v_cid_after_2 then
+    raise exception 'BASARISIZ [21 - Idempotency client_id degisti]: ilk=%, ikinci=%', v_cid_after_1, v_cid_after_2;
+  end if;
+
+  raise notice 'GECTI [21 - Mesaj backfill idempotent: ikinci cagri (0,0,0) doner]';
+end $$;
+
+rollback;
+
+
+-- =============================================================================
+-- 22) MESAJLAR — ATLANAN SATIR: konusmanin danisan tarafi belirlenemeyen satir
+-- (sender=receiver=koc) backfill tarafindan ATLANIR, client_id NULL kalir.
+-- =============================================================================
+begin;
+
+alter table public.messages alter column client_id drop not null;
+alter table public.messages disable trigger messages_apply_conversation_key;
+
+insert into public.messages (id, sender_id, receiver_id, message, is_read, client_id, read_at, created_at)
+values (
+  'f0000000-0000-0000-0000-000000000221'::uuid,
+  '11111111-1111-1111-1111-111111111111',
+  '11111111-1111-1111-1111-111111111111',
+  'TRANSFORM testi - koc-koc atlanan satir',
+  false,
+  null,
+  null,
+  now() - interval '6 days'
+);
+
+alter table public.messages enable trigger messages_apply_conversation_key;
+
+do $$
+declare
+  v_res record;
+  v_cid uuid;
+begin
+  select * into v_res from public.backfill_messages_conversation_key();
+
+  if v_res.rows_skipped is distinct from 1 then
+    raise exception 'BASARISIZ [22 - Atlanan satir rows_skipped]: beklenen 1, gelen %', v_res.rows_skipped;
+  end if;
+  if v_res.client_ids_filled is distinct from 0 then
+    raise exception 'BASARISIZ [22 - Atlanan satir client_ids_filled bu satiri saymamali]: beklenen 0, gelen %', v_res.client_ids_filled;
+  end if;
+
+  select client_id into v_cid from public.messages where id = 'f0000000-0000-0000-0000-000000000221'::uuid;
+  if v_cid is not null then
+    raise exception 'BASARISIZ [22 - Atlanan satirin client_id si NULL kalmali]: gelen %', v_cid;
+  end if;
+
+  raise notice 'GECTI [22 - Cozulemeyen satir backfill tarafindan atlaniyor (rows_skipped=1)]';
+end $$;
+
+rollback;
+
+
+-- =============================================================================
+-- 23) FORM CHECK INCELEME — BACKFILL KURALI: eski sekilli satirlar 'pending' olur
+--
+-- "Eski sekilli satir" = migration oncesi form_checks satiri, yani inceleme
+-- alanlarinin HICBIRI verilmemis satir. Migration'dan sonra bu satir kolon
+-- varsayilanini alir ('pending') ve backfill fonksiyonu ONA DOKUNMAZ --
+-- uydurulacak bir gecmis yoktur (bkz. migration 20260817150000 §4).
+-- =============================================================================
+begin;
+
+insert into public.form_checks (id, client_id, current_weight, notes, created_at)
+values
+  ('b0000000-0000-0000-0000-000000000231'::uuid, '22222222-2222-2222-2222-222222222222', 91.10, 'TRANSFORM testi - eski sekilli satir 1', now() - interval '9 days'),
+  ('b0000000-0000-0000-0000-000000000232'::uuid, '33333333-3333-3333-3333-333333333333', 62.20, 'TRANSFORM testi - eski sekilli satir 2', now() - interval '8 days');
+
+do $$
+declare
+  v_res      record;
+  v_status1  public.form_check_status;
+  v_status2  public.form_check_status;
+  v_at1      timestamptz;
+  v_by1      uuid;
+begin
+  select status, reviewed_at, reviewed_by into v_status1, v_at1, v_by1
+    from public.form_checks where id = 'b0000000-0000-0000-0000-000000000231'::uuid;
+  select status into v_status2
+    from public.form_checks where id = 'b0000000-0000-0000-0000-000000000232'::uuid;
+
+  if v_status1 is distinct from 'pending'::public.form_check_status
+     or v_status2 is distinct from 'pending'::public.form_check_status then
+    raise exception 'BASARISIZ [23 - eski sekilli satir pending olmali]: gelen %, %', v_status1, v_status2;
+  end if;
+  if v_at1 is not null or v_by1 is not null then
+    raise exception 'BASARISIZ [23 - eski satirda denetim izi UYDURULMAMALI]: reviewed_at=%, reviewed_by=%', v_at1, v_by1;
+  end if;
+
+  -- Backfill bu satirlara DOKUNMAZ (0 demote, 0 clean).
+  select * into v_res from public.backfill_form_check_review();
+  if v_res.rows_demoted is distinct from 0 or v_res.rows_cleaned is distinct from 0 then
+    raise exception 'BASARISIZ [23 - backfill eski satirlara dokunmamali]: demoted=%, cleaned=%',
+      v_res.rows_demoted, v_res.rows_cleaned;
+  end if;
+
+  select status into v_status1
+    from public.form_checks where id = 'b0000000-0000-0000-0000-000000000231'::uuid;
+  if v_status1 is distinct from 'pending'::public.form_check_status then
+    raise exception 'BASARISIZ [23 - backfill sonrasi hala pending olmali]: gelen %', v_status1;
+  end if;
+
+  raise notice 'GECTI [23 - Eski sekilli form_checks satirlari pending olur, gecmis UYDURULMAZ]';
+end $$;
+
+rollback;
+
+
+-- =============================================================================
+-- 24) FORM CHECK INCELEME — TUTARLILIK KISITI ihlalleri REDDEDILIR
+--
+-- Uc hal de `form_checks_review_consistency_chk` tarafindan reddedilmeli:
+--   a) status='reviewed' ama reviewed_at NULL
+--   b) status='reviewed' ama reviewed_by NULL
+--   c) status='pending'  ama reviewed_at DOLU
+--
+-- NOT: bu satirlar `postgres` rolüyle (auth.uid() NULL) yazilir, yani
+-- form_checks_guard_review trigger'i degerlere DOKUNMAZ -> reddi yapan
+-- gercekten CHECK kisitidir, trigger degil.
+-- =============================================================================
+begin;
+
+do $$
+declare
+  v_a boolean := false;
+  v_b boolean := false;
+  v_c boolean := false;
+begin
+  -- a) reviewed ama reviewed_at NULL
+  begin
+    insert into public.form_checks (id, client_id, current_weight, status, reviewed_at, reviewed_by)
+    values ('b0000000-0000-0000-0000-000000000241'::uuid, '22222222-2222-2222-2222-222222222222', 91.20,
+            'reviewed'::public.form_check_status, null, '11111111-1111-1111-1111-111111111111');
+  exception when check_violation then
+    v_a := true;
+  end;
+
+  -- b) reviewed ama reviewed_by NULL
+  begin
+    insert into public.form_checks (id, client_id, current_weight, status, reviewed_at, reviewed_by)
+    values ('b0000000-0000-0000-0000-000000000242'::uuid, '22222222-2222-2222-2222-222222222222', 91.30,
+            'reviewed'::public.form_check_status, now(), null);
+  exception when check_violation then
+    v_b := true;
+  end;
+
+  -- c) pending ama reviewed_at DOLU
+  begin
+    insert into public.form_checks (id, client_id, current_weight, status, reviewed_at, reviewed_by)
+    values ('b0000000-0000-0000-0000-000000000243'::uuid, '22222222-2222-2222-2222-222222222222', 91.40,
+            'pending'::public.form_check_status, now(), null);
+  exception when check_violation then
+    v_c := true;
+  end;
+
+  if not v_a then
+    raise exception 'BASARISIZ [24a - reviewed + reviewed_at NULL kabul edildi]';
+  end if;
+  if not v_b then
+    raise exception 'BASARISIZ [24b - reviewed + reviewed_by NULL kabul edildi]';
+  end if;
+  if not v_c then
+    raise exception 'BASARISIZ [24c - pending + reviewed_at DOLU kabul edildi]';
+  end if;
+
+  raise notice 'GECTI [24 - Tutarlilik kisiti: reviewed/pending ile reviewed_at/by uyumsuzlugu REDDEDILIR]';
+end $$;
+
+rollback;
+
+
+-- =============================================================================
+-- 25) FORM CHECK INCELEME — BACKFILL ONARIMI (kisit gecici olarak DUSURULMUS)
+--
+-- Kisit yerindeyken bozuk satir OLUSAMAZ. Onarim mantigini kanitlamak icin
+-- kisit BU ISLEM ICINDE dusurulur, bozuk satirlar yazilir, backfill cagrilir.
+-- Islem `rollback` ile bittigi icin kisit KALICI OLARAK KAYBOLMAZ.
+--   * Kanitsiz 'reviewed' (reviewed_at ve reviewed_by IKISI DE NULL) -> 'pending'
+--   * Kalintili 'pending'  (reviewed_at/by dolu)                     -> temizlenir
+--   * KISMEN dolu 'reviewed' (biri NULL)                             -> DOKUNULMAZ
+-- =============================================================================
+begin;
+
+alter table public.form_checks drop constraint form_checks_review_consistency_chk;
+
+insert into public.form_checks (id, client_id, current_weight, notes, status, coach_feedback, reviewed_at, reviewed_by)
+values
+  -- kanitsiz reviewed -> pending'e cekilmeli
+  ('b0000000-0000-0000-0000-000000000251'::uuid, '22222222-2222-2222-2222-222222222222', 91.50,
+   'TRANSFORM testi - kanitsiz reviewed', 'reviewed'::public.form_check_status, null, null, null),
+  -- kalintili pending -> temizlenmeli
+  ('b0000000-0000-0000-0000-000000000252'::uuid, '22222222-2222-2222-2222-222222222222', 91.60,
+   'TRANSFORM testi - kalintili pending', 'pending'::public.form_check_status, null,
+   now() - interval '3 days', '11111111-1111-1111-1111-111111111111'),
+  -- kismen dolu reviewed -> DOKUNULMAMALI (gercek iz var, silmek veri kaybi olur)
+  ('b0000000-0000-0000-0000-000000000253'::uuid, '22222222-2222-2222-2222-222222222222', 91.70,
+   'TRANSFORM testi - kismen dolu reviewed', 'reviewed'::public.form_check_status, 'Yarim iz',
+   now() - interval '4 days', null);
+
+do $$
+declare
+  v_res     record;
+  v_s1      public.form_check_status;
+  v_s2      public.form_check_status;
+  v_at2     timestamptz;
+  v_by2     uuid;
+  v_s3      public.form_check_status;
+  v_at3     timestamptz;
+begin
+  select * into v_res from public.backfill_form_check_review();
+
+  if v_res.rows_demoted is distinct from 1 then
+    raise exception 'BASARISIZ [25 - kanitsiz reviewed pending e cekilmeli]: rows_demoted=%', v_res.rows_demoted;
+  end if;
+  if v_res.rows_cleaned is distinct from 1 then
+    raise exception 'BASARISIZ [25 - kalintili pending temizlenmeli]: rows_cleaned=%', v_res.rows_cleaned;
+  end if;
+
+  select status into v_s1 from public.form_checks where id = 'b0000000-0000-0000-0000-000000000251'::uuid;
+  if v_s1 is distinct from 'pending'::public.form_check_status then
+    raise exception 'BASARISIZ [25 - 251 pending olmali]: gelen %', v_s1;
+  end if;
+
+  select status, reviewed_at, reviewed_by into v_s2, v_at2, v_by2
+    from public.form_checks where id = 'b0000000-0000-0000-0000-000000000252'::uuid;
+  if v_s2 is distinct from 'pending'::public.form_check_status or v_at2 is not null or v_by2 is not null then
+    raise exception 'BASARISIZ [25 - 252 temizlenmeli]: status=%, reviewed_at=%, reviewed_by=%', v_s2, v_at2, v_by2;
+  end if;
+
+  select status, reviewed_at into v_s3, v_at3
+    from public.form_checks where id = 'b0000000-0000-0000-0000-000000000253'::uuid;
+  if v_s3 is distinct from 'reviewed'::public.form_check_status or v_at3 is null then
+    raise exception 'BASARISIZ [25 - 253 kismen dolu satira DOKUNULMAMALI]: status=%, reviewed_at=%', v_s3, v_at3;
+  end if;
+
+  raise notice 'GECTI [25 - Backfill onarimi: kanitsiz reviewed -> pending, kalinti temizlenir, KISMEN dolu satir korunur]';
+end $$;
+
+rollback;
+
+
+-- =============================================================================
+-- 26) FORM CHECK INCELEME — IDEMPOTENCY: ikinci cagri (0, 0) doner ve
+-- gercek incelemeleri BOZMAZ
+-- =============================================================================
+begin;
+
+alter table public.form_checks drop constraint form_checks_review_consistency_chk;
+
+insert into public.form_checks (id, client_id, current_weight, notes, status, coach_feedback, reviewed_at, reviewed_by)
+values
+  ('b0000000-0000-0000-0000-000000000261'::uuid, '22222222-2222-2222-2222-222222222222', 91.80,
+   'TRANSFORM testi - idempotency kanitsiz', 'reviewed'::public.form_check_status, null, null, null),
+  -- GERCEK inceleme: backfill buna ASLA dokunmamali
+  ('b0000000-0000-0000-0000-000000000262'::uuid, '22222222-2222-2222-2222-222222222222', 91.90,
+   'TRANSFORM testi - idempotency gercek inceleme', 'reviewed'::public.form_check_status, 'Gercek geri bildirim',
+   timestamptz '2026-08-10 12:00:00+00', '11111111-1111-1111-1111-111111111111');
+
+do $$
+declare
+  v_res1  record;
+  v_res2  record;
+  v_at_1  timestamptz;
+  v_at_2  timestamptz;
+  v_fb    text;
+begin
+  select * into v_res1 from public.backfill_form_check_review();
+  select reviewed_at into v_at_1 from public.form_checks where id = 'b0000000-0000-0000-0000-000000000262'::uuid;
+
+  select * into v_res2 from public.backfill_form_check_review();
+  select reviewed_at, coach_feedback into v_at_2, v_fb
+    from public.form_checks where id = 'b0000000-0000-0000-0000-000000000262'::uuid;
+
+  if v_res1.rows_demoted is distinct from 1 then
+    raise exception 'BASARISIZ [26 - ilk cagri kanitsiz satiri cekmeli]: rows_demoted=%', v_res1.rows_demoted;
+  end if;
+  if v_res2.rows_demoted is distinct from 0 or v_res2.rows_cleaned is distinct from 0 then
+    raise exception 'BASARISIZ [26 - ikinci cagri no-op olmali]: beklenen (0,0), gelen (%,%)',
+      v_res2.rows_demoted, v_res2.rows_cleaned;
+  end if;
+  if v_res1.rows_pending is distinct from v_res2.rows_pending
+     or v_res1.rows_reviewed is distinct from v_res2.rows_reviewed then
+    raise exception 'BASARISIZ [26 - dagilim degisti]: ilk (%,%), ikinci (%,%)',
+      v_res1.rows_pending, v_res1.rows_reviewed, v_res2.rows_pending, v_res2.rows_reviewed;
+  end if;
+  if v_at_1 is distinct from timestamptz '2026-08-10 12:00:00+00'
+     or v_at_2 is distinct from timestamptz '2026-08-10 12:00:00+00' then
+    raise exception 'BASARISIZ [26 - gercek inceleme bozuldu]: ilk=%, ikinci=%', v_at_1, v_at_2;
+  end if;
+  if v_fb is distinct from 'Gercek geri bildirim' then
+    raise exception 'BASARISIZ [26 - coach_feedback korunmali]: gelen %', v_fb;
+  end if;
+
+  raise notice 'GECTI [26 - form_checks backfill idempotent: ikinci cagri (0,0) doner, gercek incelemeler korunur]';
+end $$;
+
+rollback;
+
+
 -- =============================================================================
 -- TOPLAM OZET
--- Bu noktaya yalnizca YUKARIDAKI 19 senaryonun HEPSI GECTI verdiyse ulasilir --
+-- Bu noktaya yalnizca YUKARIDAKI 26 senaryonun HEPSI GECTI verdiyse ulasilir --
 -- herhangi biri BASARISIZ olsaydi raise exception + ON_ERROR_STOP psql'i
 -- daha once sifirdan farkli cikis koduyla durdururdu.
 --   * 1–10  : Faz 1b Adim 1 — workout_plans / workout_plan_exercises
 --   * 11–19 : Faz 1b Adim 3a — nutrition_plans / nutrition_plan_meals
+--   * 20–22 : Faz 1b Adim 4 — messages.client_id / read_at backfill
+--   * 23–26 : Faz 1b Adim 5 — form_checks inceleme durumu (backfill + tutarlilik kisiti)
 -- =============================================================================
 do $$
 begin
-  raise notice 'TUM TRANSFORM TESTLERI GECTI (19 senaryo)';
+  raise notice 'TUM TRANSFORM TESTLERI GECTI (26 senaryo)';
 end $$;

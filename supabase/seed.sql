@@ -318,9 +318,28 @@ on conflict (name) do nothing;
 --    DİKKAT: Bu dosyalar storage'da FİİLEN YOKTUR. Bu bilinçli bir tercihtir —
 --    imzalı adres üretimi başarısız olur, uygulama `null` döner ve UI kırık görsel
 --    yerine placeholder gösterir. Seed verisiyle bu yol test edilmiş olur.
+--
+--    İNCELEME DURUMU (20260817150000_form_check_review.sql):
+--      `status` / `coach_feedback` / `reviewed_at` / `reviewed_by` BURADA AÇIKÇA
+--      yazılır; backfill'e güvenilmez (`db reset` akışında migration'lar seed'den
+--      önce koşar ve backfill boş tabloda no-op'tur).
+--
+--      Her danışanın ESKİ haftaları 'reviewed', SON haftaları BİLEREK 'pending'
+--      bırakılmıştır: koçun bekleyen kuyruğu (`status = 'pending'`) gerçek veriyle
+--      denenebilsin ve Faz 2'nin geri bildirim akışı boş ekranla başlamasın.
+--
+--      NOT: seed `postgres` rolüyle koşar, yani `auth.uid()` NULL'dır ve
+--      `form_checks_guard_review` trigger'ı değerleri OLDUĞU GİBİ bırakır
+--      (aksi hâlde buradaki gerçekçi `reviewed_at` tarihleri now()'a ezilirdi).
+--      Tutarlılık `form_checks_review_consistency_chk` kısıtıyla korunur:
+--      'reviewed' satırlarda `reviewed_at` ve `reviewed_by` DOLU olmak ZORUNDA.
 -- =============================================================================
 
-insert into public.form_checks (client_id, current_weight, front_pose_path, back_pose_path, notes, created_at)
+-- Danışan 1: 6 haftanın ilk 4'ü incelendi, son 2'si koçun kuyruğunda bekliyor.
+insert into public.form_checks (
+  client_id, current_weight, front_pose_path, back_pose_path, notes, created_at,
+  status, coach_feedback, reviewed_at, reviewed_by
+)
 select
   '22222222-2222-2222-2222-222222222222'::uuid,
   round((92.40 - (i * 0.75))::numeric, 2),
@@ -338,14 +357,30 @@ select
     when 4 then 'Enerji seviyesi iyi, uyku düzenli.'
     else 'Hedefe yaklaşıyoruz, karbonhidrat siklusu başlıyor.'
   end,
-  now() - make_interval(weeks => (5 - i))
+  now() - make_interval(weeks => (5 - i)),
+  case when i <= 3 then 'reviewed'::public.form_check_status
+       else 'pending'::public.form_check_status end,
+  case i
+    when 0 then 'Duruş genel olarak iyi. Bu hafta kardiyoyu 3 güne çıkaralım, ağırlıklara dokunma.'
+    when 1 then 'Ödemin çözülmesi güzel işaret. Su hedefini 3 lt''de sabitle.'
+    when 2 then 'Bel ölçüsündeki düşüş plana uygun. Kaloriyi HENÜZ düşürmüyoruz.'
+    when 3 then 'Hacim artışını iyi taşımışsın. Uyku 7 saatin altına inerse haber ver.'
+    else null
+  end,
+  case when i <= 3 then now() - make_interval(weeks => (5 - i)) + interval '1 day'
+       else null end,
+  case when i <= 3 then '11111111-1111-1111-1111-111111111111'::uuid else null end
 from generate_series(0, 5) as i
 where not exists (
   select 1 from public.form_checks
   where client_id = '22222222-2222-2222-2222-222222222222'::uuid
 );
 
-insert into public.form_checks (client_id, current_weight, front_pose_path, back_pose_path, notes, created_at)
+-- Danışan 2: 6 haftanın ilk 5'i incelendi, yalnızca son hafta bekliyor.
+insert into public.form_checks (
+  client_id, current_weight, front_pose_path, back_pose_path, notes, created_at,
+  status, coach_feedback, reviewed_at, reviewed_by
+)
 select
   '33333333-3333-3333-3333-333333333333'::uuid,
   round((61.00 + (i * 0.60))::numeric, 2),
@@ -363,7 +398,20 @@ select
     when 4 then 'Protein alımı hedefte.'
     else 'Kuvvet artışı devam ediyor, form korunuyor.'
   end,
-  now() - make_interval(weeks => (5 - i))
+  now() - make_interval(weeks => (5 - i)),
+  case when i <= 4 then 'reviewed'::public.form_check_status
+       else 'pending'::public.form_check_status end,
+  case i
+    when 0 then 'Başlangıç için temiz bir taban. İlk 2 hafta teknik üzerinde duracağız.'
+    when 1 then 'Kalori artışını sindirim tarafında sorunsuz taşımışsın, devam.'
+    when 2 then 'Squat derinliği belirgin düzeldi. Ağırlığı %5 artırabilirsin.'
+    when 3 then 'Bacak gelişimi planın önünde. Üst gövde hacmini biraz artıralım.'
+    when 4 then 'Protein hedefi tutuyor. Bu haftadan itibaren kreatin ekleyelim.'
+    else null
+  end,
+  case when i <= 4 then now() - make_interval(weeks => (5 - i)) + interval '2 days'
+       else null end,
+  case when i <= 4 then '11111111-1111-1111-1111-111111111111'::uuid else null end
 from generate_series(0, 5) as i
 where not exists (
   select 1 from public.form_checks
@@ -462,23 +510,39 @@ where not exists (select 1 from public.notifications);
 
 -- =============================================================================
 -- 8) MESAJLAR — danışan başına koç ile 4 mesajlık sohbet
+--
+-- `client_id` / `read_at` / `kind` (20260817140000_messages_conversation_key.sql)
+-- BURADA AÇIKÇA YAZILIR — migration'ın backfill'ine GÜVENİLMEZ. Sebep:
+-- `supabase db reset` akışında migration'lar seed'den ÖNCE koşar, yani backfill
+-- bu satırları hiç görmez. (Trigger yine de her satırı doğrular; buradaki
+-- client_id değerleri yanlış olsaydı seed HATA verirdi — yani bu kolonlar aynı
+-- zamanda trigger'ın canlı bir dumanı testidir.)
+--
+-- OKUNMAMIŞ (read_at IS NULL) SATIRLAR BİLİNÇLİ OLARAK BIRAKILMIŞTIR ki
+-- `useUnreadCount` / `useMarkConversationRead` gerçek veriyle denenebilsin:
+--   Danışan 1 (2222…) okumadı : koçun "Harika. Gelecek hafta…" mesajı        -> 1 adet
+--   Koç      (1111…) okumadı : Danışan 2'nin "Gördüm, teşekkürler…" mesajı   -> 1 adet
+--   Danışan 2 (3333…) okumadı: koçun "Süper. Cumartesi…" mesajı              -> 1 adet
 -- =============================================================================
 
-insert into public.messages (sender_id, receiver_id, message, is_read, created_at)
-select v.sender_id, v.receiver_id, v.message, v.is_read, v.created_at
+insert into public.messages (sender_id, receiver_id, client_id, message, is_read, read_at, kind, created_at)
+select v.sender_id, v.receiver_id, v.client_id, v.message, v.read_at is not null, v.read_at, v.kind, v.created_at
 from (
   values
     -- Koç <-> Danışan 1
-    ('22222222-2222-2222-2222-222222222222'::uuid, '11111111-1111-1111-1111-111111111111'::uuid, 'Merhaba koç, bu hafta dizimde hafif bir rahatsızlık var. Squat''ı değiştirelim mi?', true,  now() - interval '3 days 4 hours'),
-    ('11111111-1111-1111-1111-111111111111'::uuid, '22222222-2222-2222-2222-222222222222'::uuid, 'Merhaba Ahmet. Bu hafta squat yerine leg press yapalım, ağırlığı %20 düşür.',           true,  now() - interval '3 days 3 hours'),
-    ('22222222-2222-2222-2222-222222222222'::uuid, '11111111-1111-1111-1111-111111111111'::uuid, 'Tamamdır, bugün öyle yaptım. Ağrı yoktu.',                                              true,  now() - interval '2 days'),
-    ('11111111-1111-1111-1111-111111111111'::uuid, '22222222-2222-2222-2222-222222222222'::uuid, 'Harika. Gelecek hafta kademeli olarak squat''a dönüyoruz.',                             false, now() - interval '1 day 20 hours'),
+    ('22222222-2222-2222-2222-222222222222'::uuid, '11111111-1111-1111-1111-111111111111'::uuid, '22222222-2222-2222-2222-222222222222'::uuid, 'Merhaba koç, bu hafta dizimde hafif bir rahatsızlık var. Squat''ı değiştirelim mi?', now() - interval '3 days 3 hours 30 minutes', 'user'::public.message_kind, now() - interval '3 days 4 hours'),
+    ('11111111-1111-1111-1111-111111111111'::uuid, '22222222-2222-2222-2222-222222222222'::uuid, '22222222-2222-2222-2222-222222222222'::uuid, 'Merhaba Ahmet. Bu hafta squat yerine leg press yapalım, ağırlığı %20 düşür.',           now() - interval '3 days 2 hours',            'user'::public.message_kind, now() - interval '3 days 3 hours'),
+    ('22222222-2222-2222-2222-222222222222'::uuid, '11111111-1111-1111-1111-111111111111'::uuid, '22222222-2222-2222-2222-222222222222'::uuid, 'Tamamdır, bugün öyle yaptım. Ağrı yoktu.',                                              now() - interval '1 day 22 hours',            'user'::public.message_kind, now() - interval '2 days'),
+    -- OKUNMAMIŞ (danışan 1 henüz görmedi)
+    ('11111111-1111-1111-1111-111111111111'::uuid, '22222222-2222-2222-2222-222222222222'::uuid, '22222222-2222-2222-2222-222222222222'::uuid, 'Harika. Gelecek hafta kademeli olarak squat''a dönüyoruz.',                             null,                                         'user'::public.message_kind, now() - interval '1 day 20 hours'),
     -- Koç <-> Danışan 2
-    ('33333333-3333-3333-3333-333333333333'::uuid, '11111111-1111-1111-1111-111111111111'::uuid, 'Koçum, kilo alımı yavaşladı. Kaloriyi artıralım mı?',                                   true,  now() - interval '2 days 6 hours'),
-    ('11111111-1111-1111-1111-111111111111'::uuid, '33333333-3333-3333-3333-333333333333'::uuid, 'Evet, günlük 200 kcal ekleyelim. Öğün planını güncelledim.',                            true,  now() - interval '2 days 5 hours'),
-    ('33333333-3333-3333-3333-333333333333'::uuid, '11111111-1111-1111-1111-111111111111'::uuid, 'Gördüm, teşekkürler. Protein hedefini de tutturuyorum.',                                false, now() - interval '1 day'),
-    ('11111111-1111-1111-1111-111111111111'::uuid, '33333333-3333-3333-3333-333333333333'::uuid, 'Süper. Cumartesi form check fotoğraflarını bekliyorum.',                                false, now() - interval '8 hours')
-) as v (sender_id, receiver_id, message, is_read, created_at)
+    ('33333333-3333-3333-3333-333333333333'::uuid, '11111111-1111-1111-1111-111111111111'::uuid, '33333333-3333-3333-3333-333333333333'::uuid, 'Koçum, kilo alımı yavaşladı. Kaloriyi artıralım mı?',                                   now() - interval '2 days 5 hours 30 minutes', 'user'::public.message_kind, now() - interval '2 days 6 hours'),
+    ('11111111-1111-1111-1111-111111111111'::uuid, '33333333-3333-3333-3333-333333333333'::uuid, '33333333-3333-3333-3333-333333333333'::uuid, 'Evet, günlük 200 kcal ekleyelim. Öğün planını güncelledim.',                            now() - interval '2 days 4 hours',            'user'::public.message_kind, now() - interval '2 days 5 hours'),
+    -- OKUNMAMIŞ (koç henüz görmedi)
+    ('33333333-3333-3333-3333-333333333333'::uuid, '11111111-1111-1111-1111-111111111111'::uuid, '33333333-3333-3333-3333-333333333333'::uuid, 'Gördüm, teşekkürler. Protein hedefini de tutturuyorum.',                                null,                                         'user'::public.message_kind, now() - interval '1 day'),
+    -- OKUNMAMIŞ (danışan 2 henüz görmedi)
+    ('11111111-1111-1111-1111-111111111111'::uuid, '33333333-3333-3333-3333-333333333333'::uuid, '33333333-3333-3333-3333-333333333333'::uuid, 'Süper. Cumartesi form check fotoğraflarını bekliyorum.',                                null,                                         'user'::public.message_kind, now() - interval '8 hours')
+) as v (sender_id, receiver_id, client_id, message, read_at, kind, created_at)
 where not exists (select 1 from public.messages);
 
 
@@ -532,6 +596,8 @@ do $$
 declare
   v_profiles  bigint;
   v_checks    bigint;
+  v_pending   bigint;
+  v_reviewed  bigint;
   v_logs      bigint;
   v_workouts  bigint;
   v_msgs      bigint;
@@ -542,8 +608,14 @@ begin
   select count(*) into v_workouts from public.workout_logs;
   select count(*) into v_msgs     from public.messages;
 
-  raise notice 'SEED TAMAM -> profiles=%, form_checks=%, daily_logs=%, workout_logs=%, messages=%',
-    v_profiles, v_checks, v_logs, v_workouts, v_msgs;
+  select
+    count(*) filter (where status = 'pending'::public.form_check_status),
+    count(*) filter (where status = 'reviewed'::public.form_check_status)
+    into v_pending, v_reviewed
+    from public.form_checks;
+
+  raise notice 'SEED TAMAM -> profiles=%, form_checks=% (pending=%, reviewed=%), daily_logs=%, workout_logs=%, messages=%',
+    v_profiles, v_checks, v_pending, v_reviewed, v_logs, v_workouts, v_msgs;
   raise notice 'Giriş: coach@example.com / client1@example.com / client2@example.com  —  parola: Passw0rd!23';
 end
 $$;

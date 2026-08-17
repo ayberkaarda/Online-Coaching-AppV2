@@ -17,7 +17,15 @@ import { FORM_CHECK_BUCKET, SIGNED_URL_STALE_TIME_MS, createSignedUrls } from '@
 import { supabase } from '@/lib/supabase/client'
 import type { FormCheck } from '@/types'
 
-/** Form check satırı + poz fotoğrafları için üretilmiş imzalı adresler. */
+/**
+ * Form check satırı + poz fotoğrafları için üretilmiş imzalı adresler.
+ *
+ * `FormCheck` = `Tables<'form_checks'>` olduğu için inceleme alanları
+ * (`status`, `coach_feedback`, `reviewed_at`, `reviewed_by` — bkz.
+ * 20260817150000_form_check_review.sql) bu tipe ŞEMADAN gelir ve aşağıdaki
+ * `select('*')` sorgusuyla otomatik olarak dönüşe dahil olur. Faz 2'nin koç
+ * geri bildirim akışı bunları burada hazır bulur.
+ */
 export interface FormCheckWithUrls extends FormCheck {
   /** `front_pose_path` için imzalı adres; dosya yoksa/erişilemiyorsa `null`. */
   frontPoseSignedUrl: string | null
@@ -87,6 +95,10 @@ export function useSubmitFormCheck() {
       const frontPath = await uploadPose(clientId, frontFile)
       const backPath = backFile ? await uploadPose(clientId, backFile) : null
 
+      // İNCELEME ALANLARI BİLEREK GÖNDERİLMEZ (status / coach_feedback /
+      // reviewed_at / reviewed_by): `status` kolon varsayılanıyla 'pending'
+      // olur, geri kalanı NULL kalır. Danışan bu alanları zaten yazamaz —
+      // `form_checks_guard_review` trigger'ı 42501 ile reddeder.
       const { data, error } = await supabase
         .from('form_checks')
         .insert({

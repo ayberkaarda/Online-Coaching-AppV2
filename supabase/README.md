@@ -15,10 +15,12 @@ supabase/
 │   ├── 20260817090000_rename_roles.sql           # rol yeniden adlandırma: admin→coach, student→client
 │   ├── 20260817100000_private_storage.sql        # bucket'lar private + *_url → *_path + imzalı okuma
 │   ├── 20260817110000_workout_plan_tables.sql    # normalize antrenman planı tabloları + dönüşüm + RPC
-│   └── 20260817130000_nutrition_plan_tables.sql  # normalize beslenme planı tabloları + dönüşüm + RPC
+│   ├── 20260817130000_nutrition_plan_tables.sql  # normalize beslenme planı tabloları + dönüşüm + RPC
+│   ├── 20260817140000_messages_conversation_key.sql # messages.client_id / read_at / kind + trigger
+│   └── 20260817150000_form_check_review.sql      # form_checks inceleme durumu + sütun koruması
 ├── tests/
-│   ├── rls.test.sql            # 35 RLS senaryosu       (npm run test:rls)
-│   └── transform.test.sql      # 19 dönüşüm senaryosu   (npm run test:transform)
+│   ├── rls.test.sql            # 50 RLS senaryosu       (npm run test:rls)
+│   └── transform.test.sql      # 26 dönüşüm senaryosu   (npm run test:transform)
 ├── seed.sql                    # SADECE YEREL demo verisi
 └── README.md
 ```
@@ -102,11 +104,11 @@ Kısaltmalar: **S** = satır sahibi (`client_id`/`id` = `auth.uid()`), **K** = k
 |---|---|---|---|---|
 | `profiles` | S veya K **veya satırın rolü `coach`** (koç profili herkese görünür) | Sadece K (normalde trigger yapar) | S (**rol sütunu değiştirilemez**) veya K | Sadece K |
 | `notifications` | S veya K | K **veya** kendi adına (`client_id = auth.uid()`) **veya alıcı koçsa** (`is_coach_profile(client_id)`) | S veya K (`is_read`) | Sadece K |
-| `form_checks` | S veya K | Sadece kendi adına | S veya K | S veya K |
+| `form_checks` | S veya K | Sadece kendi adına | S veya K — **ama inceleme sütunları (`status`, `coach_feedback`, `reviewed_*`) yalnızca K** (trigger, bkz. 4d) | S veya K |
 | `daily_logs` | S veya K | Sadece kendi adına | S veya K | S veya K |
 | `workout_logs` | S veya K | Sadece kendi adına | S veya K | S veya K |
 | `program_approvals` | S veya K | Sadece kendi adına | **Sadece K** (onay/ret) | S veya K |
-| `messages` | gönderen **veya** alıcı veya K | `sender_id = auth.uid()` | **Sadece alıcı** (`is_read`) | gönderen veya K |
+| `messages` | gönderen **veya** alıcı veya K | `sender_id = auth.uid()` + `client_id` trigger doğrulaması | **Sadece alıcı** (`read_at`) | gönderen veya K |
 | `exercises` | Tüm `authenticated` | Sadece K | Sadece K | Sadece K |
 | `food_database` | Tüm `authenticated` | Sadece K | Sadece K | Sadece K |
 | `workout_plans` | S veya K | K **veya** kendi planı | K veya kendi planı | K veya kendi planı |
@@ -298,8 +300,8 @@ Dönüşüm kuralları: NULL / boş / geçersiz JSON / JSON-nesnesi-olmayan içe
 ### Testler
 
 ```bash
-npm run test:rls         # 35 senaryo (20–27 bu tablolara ait)
-npm run test:transform   # 19 senaryo (1–10 bu tablolara ait: dönüşüm + round-trip + idempotency)
+npm run test:rls         # 50 senaryo (20–27 bu tablolara ait)
+npm run test:transform   # 26 senaryo (1–10 bu tablolara ait: dönüşüm + round-trip + idempotency)
 ```
 
 Her iki script de `BEGIN … ROLLBACK` kullanır, kalıcı veri bırakmaz ve başarısızlıkta
@@ -384,8 +386,8 @@ oluşturulur (varsa o kullanılır), planın **tüm** öğün satırları silini
 ### Testler
 
 ```bash
-npm run test:rls         # 35 senaryo (28–35 bu tablolara ait)
-npm run test:transform   # 19 senaryo (11–19 bu tablolara ait)
+npm run test:rls         # 50 senaryo (28–35 bu tablolara ait)
+npm run test:transform   # 26 senaryo (11–19 bu tablolara ait)
 ```
 
 ### Geri alma
@@ -393,6 +395,180 @@ npm run test:transform   # 19 senaryo (11–19 bu tablolara ait)
 Migration dosyasının sonunda yorum bloğu hâlinde çalıştırılabilir bir `-- DOWN`
 script'i vardır. Veri kaybı yaratmaz: kaynak veri `profiles.nutrition_plan` kolonunda
 durmaya devam eder.
+
+---
+
+## 4c. Mesajlaşma: Konuşma Anahtarı, Okundu Bilgisi ve Realtime Filtresi
+
+`20260817140000_messages_conversation_key.sql` `public.messages` tablosuna üç kolon ekler:
+
+| Kolon | Tip | Anlamı |
+|---|---|---|
+| `client_id` | `uuid NOT NULL` → `profiles(id)` | **Konuşma anahtarı**: sohbetin danışan tarafı |
+| `read_at`   | `timestamptz` | Alıcının okuduğu an. `NULL` = okunmadı |
+| `kind`      | `public.message_kind` (`user` \| `system`) | Mesaj türü; Faz 1b'de hep `user` |
+
+### Neden `conversations` tablosu YOK
+
+`useMessages` eskiden **tüm** `messages` INSERT'lerini dinleyip konuşmaya ait olup
+olmadığını **istemcide** eliyordu. Sebep teknikti: `postgres_changes` filtresi
+`sender_id=eq.X OR receiver_id=eq.X` gibi bir **OR ifadesini desteklemez**. Sonuç: her
+mesaj trafiği her istemciye ulaşıyordu (RLS satırın içeriğini gizler, ama **olayın kendisi
+yine de gider**) — ölçeklenmez.
+
+Tek koçlu modelde bir sohbet `(koç, danışan)` çiftidir, yani **danışan tarafı konuşmayı
+tek başına tanımlar**. Bu yüzden ayrı bir `conversations` tablosu (ve onun senkronizasyon
+trigger'ları, ek RLS yüzeyi, `last_message_at` bakımı) yerine tek bir `client_id` kolonu
+eklendi. Abonelik artık sunucuda filtrelenir:
+
+```ts
+// src/hooks/useMessages.ts
+{ event: 'INSERT', schema: 'public', table: 'messages', filter: `client_id=eq.${clientId}` }
+```
+
+Aynı kolon okunmamış sayacını da (`client_id` + `read_at is null`) tek indeksle
+karşılar: `messages_client_recent_idx (client_id, created_at desc)`.
+
+### `client_id`'yi kim doldurur — `messages_apply_conversation_key` trigger'ı
+
+İstemci `client_id`'yi kendi gönderir, ama **doğruluğunu sunucu belirler**:
+
+* `client_id` **NULL** gelirse gönderen/alıcı çiftinden **türetilir**.
+* `client_id` **dolu** gelirse türetilenle karşılaştırılır; **eşleşmezse hata** (`22023`).
+* Çiftin tam olarak biri `role = 'client'` değilse (koç↔koç, danışan↔danışan) **hata**.
+
+Bu olmasaydı `messages_insert` politikası (`sender_id = auth.uid()`) yalnızca kimlik
+taklidini engellerdi: danışan kendi adına yazıp `client_id`'yi **başka bir danışanınki**
+yaparak o kişinin realtime kanalına olay düşürebilirdi.
+
+Trigger `BEFORE INSERT OR UPDATE OF sender_id, receiver_id, client_id` olarak tanımlıdır —
+`read_at` güncellemeleri (toplu "okundu işaretle") trigger'ı **hiç tetiklemez**.
+
+### `read_at` backfill'i bir YAKLAŞIKTIR
+
+Eski şema okunma **anını** hiç saklamıyordu; elde yalnızca `is_read` bayrağı vardı.
+`public.backfill_messages_conversation_key()` bu yüzden `is_read = true` satırlara
+`read_at = created_at` yazar. Alternatif (NULL bırakmak) **tarihsel olarak okunmuş tüm
+mesajları okunmamış sayacında hortlatırdı**. Yani migration öncesi satırlar için `read_at`
+"en geç bu tarihte okunmuştu" demektir, gerçek okuma anı değil.
+
+Backfill fonksiyonu **idempotenttir** (yalnızca `client_id is null` / `read_at is null`
+satırlara dokunur) ve çözülemeyen satırları `raise notice` ile bildirip **atlar**;
+hiç NULL kalmadıysa `client_id` `NOT NULL` yapılır.
+
+### `is_read` SİLİNMEDİ
+
+Kolon `DEPRECATED: read_at kullanın` yorumuyla yerinde durur; DROP işlemi Faz 2
+kapısındadır. `useMarkConversationRead` iki kolonu da tutarlı tutar.
+
+### Testler
+
+```bash
+npm run test:rls         # 50 senaryo (36–42 mesajlaşma konuşma anahtarına ait)
+npm run test:transform   # 26 senaryo (20–22 backfill: temel + idempotency + atlanan satır)
+```
+
+### Geri alma
+
+Migration dosyasının sonunda çalıştırılabilir bir `-- DOWN` bloğu vardır. `is_read`
+silinmediği için "okundu mu" bilgisi korunur; yalnızca (zaten yaklaşık olan) okuma anı
+ve `kind` kaybolur.
+
+---
+
+## 4d. Form Check İnceleme Durumu (Faz 2'nin şema ön koşulu)
+
+`20260817150000_form_check_review.sql` `public.form_checks` tablosuna dört kolon ekler:
+
+| Kolon | Tip | Anlamı |
+|---|---|---|
+| `status`         | `public.form_check_status` (`pending` \| `reviewed`) `NOT NULL DEFAULT 'pending'` | İnceleme durumu |
+| `coach_feedback` | `text` | Koçun yazılı geri bildirimi |
+| `reviewed_at`    | `timestamptz` | İnceleme anı (**sunucu doldurur**) |
+| `reviewed_by`    | `uuid` → `profiles(id) ON DELETE SET NULL` | İnceleyen koç (**sunucu doldurur**) |
+
+Bu migration **yalnızca şemadır**; alanları okuyan/yazan UI akışı Faz 2'nin işidir.
+
+### Tutarlılık kısıtı: "incelendi ama kim/ne zaman belli değil" hali İMKÂNSIZ
+
+```sql
+constraint form_checks_review_consistency_chk check (
+  (status = 'pending'  and reviewed_at is null     and reviewed_by is null)
+  or
+  (status = 'reviewed' and reviewed_at is not null and reviewed_by is not null)
+)
+```
+
+Kısıt olmadan şema üç yalan söyleyebilirdi: kim/ne zaman incelediği cevapsız `reviewed`
+satırlar, ve `pending` olduğu hâlde kalıntı zaman damgası taşıyan satırlar. Sonuncusu
+Faz 2'nin **bekleyen kuyruğunu** (`where status = 'pending'`) sessizce yanlış gösterirdi.
+
+> **`ON DELETE SET NULL` ile bilinçli gerilim:** koç profili silinirse `set null` bu
+> kısıtı ihlal eder ve **silme hata verir**. Tek koçlu üründe bu yol ancak hesabın
+> tamamen kapatılmasıyla tetiklenir; günlük veri bütünlüğünden ödün vermektense bu uç
+> durumda operatöre "önce bu satırları ele al" demek tercih edilmiştir.
+
+### Sütun bazlı koruma: `form_checks_guard_review` trigger'ı
+
+`form_checks_update` politikası `client_id = auth.uid() OR is_coach()` — yani **danışan
+kendi satırını güncelleyebilir** (notunu/kilosunu düzeltebilmeli). Ama RLS **satır**
+bazlıdır, **sütun** bazlı değildir: aynı politika danışanın `status`'ü `reviewed` yapmasına
+ve kendine `coach_feedback` yazmasına da izin verirdi — bekleyen kuyruk danışan tarafından
+boşaltılabilir hâle gelirdi.
+
+Postgres'te RLS'e sütun listesi verilemez. UPDATE'i danışana tamamen kapatmak kendi
+notunu düzeltme akışını kırardı, bu yüzden kontrol **BEFORE INSERT OR UPDATE** trigger'ına
+taşındı:
+
+* **Danışan** (`not is_coach()`) `status` / `coach_feedback` / `reviewed_at` / `reviewed_by`
+  alanlarını değiştirirse **`42501`** (PostgREST → **403**). Diğer kolonlar (notes,
+  current_weight, pozlar) serbesttir.
+* **Koç** `status = 'reviewed'` yaptığında `reviewed_at` ve `reviewed_by` **sunucuda**
+  (`now()` / `auth.uid()`) doldurulur; istemcinin gönderdiği değerler **ezilir** — koç bile
+  geçmiş bir tarih veya başka bir koç kimliği yazamaz. Zaten `reviewed` olan satırda ilk
+  incelemenin izi korunur (geri bildirim metni düzeltilebilir).
+* `'pending'`e dönüşte `reviewed_at`/`reviewed_by` **temizlenir** (kısıt bunu şart koşar).
+* **`auth.uid()` NULL ise** (service_role / seed / migration) trigger değerlere **dokunmaz** —
+  aksi hâlde `seed.sql`in yazdığı gerçekçi tarihler `now()`a ezilirdi. Tutarlılığı bu yolda
+  CHECK kısıtı korur.
+
+### Backfill: geçmiş UYDURULMAZ
+
+Migration'dan önce tabloda inceleme ile ilgili **hiçbir kolon yoktu** — `coach_feedback`
+bile. Yani "bu form check daha önce incelenmiş miydi?" sorusunu cevaplayacak tek bir veri
+noktası bile yok. Dönüşüm kuralı bu yüzden fiilen kolon varsayılanıdır: **mevcut tüm
+satırlar `pending`**.
+
+`public.backfill_form_check_review()` bunun ötesinde **onarım** yapar (kısıt düşürülmüş
+bir veritabanına uygulandığında): kanıtsız `reviewed` satırları (`reviewed_at` ve
+`reviewed_by` ikisi de NULL) `pending`e çekilir, `pending` satırlardaki kalıntı alanlar
+temizlenir. **Kısmen** dolu satırlar (yalnızca biri NULL) bilerek **dokunulmadan** bırakılıp
+`raise warning` ile bildirilir: orada gerçek bir iz var, silmek veri kaybı, tamamlamak
+uydurma olurdu. Fonksiyon idempotenttir.
+
+### Kısmi (partial) indeks
+
+```sql
+create index form_checks_pending_queue_idx
+  on public.form_checks (status, created_at desc)
+  where status = 'pending';
+```
+
+Zamanla satırların ezici çoğunluğu `reviewed` olacak; tam indeks bu ölü ağırlığı da
+taşırdı. Kısmi indeksin boyutu **kuyruk uzunluğuyla** orantılıdır, arşivle değil.
+
+### Testler
+
+```bash
+npm run test:rls         # 50 senaryo (43–50 form check incelemesine ait)
+npm run test:transform   # 26 senaryo (23–26 backfill + tutarlılık kısıtı)
+```
+
+### Geri alma
+
+Migration dosyasının sonunda çalıştırılabilir bir `-- DOWN` bloğu vardır.
+**UYARI:** `coach_feedback` metinleri ve tüm inceleme geçmişi geri alma ile kalıcı olarak
+kaybolur — bu bilgiyi tutan başka bir kolon yoktur. DOWN bloğu önce yedek almayı gösterir.
 
 ---
 
@@ -447,6 +623,18 @@ sabit UUID'ler ve herkesçe bilinen bir parola ile doğrudan kullanıcı yazar.
 Her danışan için üretilen veri: 6 form check (6 haftalık kilo trendi), 14 günlük log,
 20 antrenman seti, 3 bildirim, 4 mesaj ve 1 bekleyen program onayı. Ayrıca 10 örnek
 besin ve 10 örnek egzersiz eklenir.
+
+Mesajlarda `client_id` / `read_at` / `kind` **açıkça** yazılır (backfill'e güvenilmez:
+`db reset` akışında migration'lar seed'den önce koşar). En az bir **okunmamış**
+(`read_at IS NULL`) mesaj bilerek bırakılmıştır ki okunmamış sayacı gerçek veriyle
+denenebilsin.
+
+Form check'lerde `status` / `coach_feedback` / `reviewed_at` / `reviewed_by` de aynı
+sebeple **açıkça** yazılır: Danışan 1'in ilk 4 haftası ve Danışan 2'nin ilk 5 haftası
+`reviewed` (koç kimliği + gerçekçi tarih + geri bildirim metniyle), kalanlar bilerek
+`pending` bırakılmıştır — böylece koçun **bekleyen kuyruğu** (`status = 'pending'`)
+`db reset` sonrası boş olmaz. Seed `postgres` rolüyle koştuğu için `auth.uid()` NULL'dır
+ve `form_checks_guard_review` trigger'ı bu tarihleri `now()`a **ezmez** (bkz. 4d).
 
 Tüm bloklar idempotenttir (`ON CONFLICT DO NOTHING` / `NOT EXISTS`), dosyayı birden çok
 kez çalıştırmak veri çoğaltmaz.

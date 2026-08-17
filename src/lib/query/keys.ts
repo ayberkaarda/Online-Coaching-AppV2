@@ -21,6 +21,8 @@ export const queryKeyRoots = {
   /** Beslenme planı da kendi tablolarında yaşar (Faz 1b Adım 3b). */
   nutritionPlan: ['nutrition-plan'] as const,
   messages: ['messages'] as const,
+  /** Okunmamış mesaj sayacı (messages.read_at is null) — Faz 1b Adım 4. */
+  unreadCount: ['unread-count'] as const,
   exercises: ['exercises'] as const,
   foods: ['foods'] as const,
   lastCheckins: ['last-checkins'] as const,
@@ -65,6 +67,16 @@ export const queryKeys = {
     )
     return ['messages', first ?? null, second ?? null] as const
   },
+
+  /**
+   * Bir konuşmadaki okunmamış mesaj sayısı.
+   * `messages` anahtarından AYRIDIR: sayaç, sohbet ekranı açık olmadan da
+   * (rozet/bildirim) sorgulanır ve mesaj listesi invalidate'i onu süpürmemelidir.
+   * `viewerId` anahtara dahildir çünkü aynı konuşmanın okunmamış sayısı koç ile
+   * danışan için FARKLIDIR (herkes yalnızca KENDİSİNE geleni sayar).
+   */
+  unreadCount: (clientId?: string, viewerId?: string) =>
+    ['unread-count', clientId ?? null, viewerId ?? null] as const,
 
   exercises: () => ['exercises'] as const,
   foods: () => ['foods'] as const,
