@@ -188,7 +188,7 @@ Her iki bucket da **PRIVATE**'tır (`20260817100000_private_storage.sql`).
 
 | Bucket | Public | Okuma (SELECT) | Yazma / Silme |
 |---|---|---|---|
-| `avatars` | **hayır** | sahibi (`<auth.uid()>-...`) veya koç; `anon` **hiç** | dosya adı `<auth.uid()>-...` ile başlamalı, veya koç |
+| `avatars` | **hayır** | sahibi (`<auth.uid()>-...`), **koçun avatarı (herkese)**, veya koç; `anon` **hiç** | dosya adı `<auth.uid()>-...` ile başlamalı, veya koç |
 | `form-checks-media` | **hayır** | sahibi (`poses/<auth.uid()>-...`) veya koç; `anon` **hiç** | yol `poses/<auth.uid()>-...` olmalı, veya koç |
 
 > **Neden private?** Public bucket'ta `storage.objects` SELECT politikası okuma yolunu
@@ -221,7 +221,9 @@ Her iki bucket da **PRIVATE**'tır (`20260817100000_private_storage.sql`).
 |---|---|---|
 | `public.is_coach` | `(uid uuid default auth.uid()) -> boolean` | `SECURITY DEFINER`, `STABLE`. Eski adı `is_admin` (`20260817090000_rename_roles.sql` ile yeniden adlandırıldı, aynı OID) |
 | `public.profile_role` | `(uid uuid default auth.uid()) -> user_role` | `SECURITY DEFINER`, `STABLE` |
-| `public.is_coach_profile` | `(target uuid) -> boolean` | `SECURITY DEFINER`, `STABLE`. Yalnız `notifications_insert` içinde kullanılır; `profiles` politikalarında **çağrılmamalıdır** (özyineleme) |
+| `public.is_coach_profile` | `(target uuid) -> boolean` | `SECURITY DEFINER`, `STABLE`. Faz 1.7'den beri **yalnız `notifications_guard_content()` trigger'ında** kullanılır (politikadan çıkarıldı); `profiles` politikalarında **çağrılmamalıdır** (özyineleme) |
+| `public.submit_program_for_approval` | `(p_client_id uuid, p_workout_data jsonb) -> program_approvals` | `SECURITY DEFINER`. Onay satırını **ve** koça giden bildirimi atomik yazar; koça giden bildirim metninin **tek sahibi** bu gövdedir. Sahiplik gövdede elle doğrulanır (bkz. §4g) |
+| `public.avatar_object_owner` | `(p_name text) -> uuid` | `IMMUTABLE`. `avatars` nesne adından sahip uid'i çıkarır; desene uymayan adda **NULL** (bkz. §4g) |
 | `public.increment_streak` | `(user_id uuid) -> integer` | **İmza değiştirilemez** — kod `rpc('increment_streak', { user_id })` çağırıyor |
 | `public.explode_plan_day` | `(p_plan_id uuid, p_day text, p_text text) -> integer` | `SECURITY INVOKER`. **TEK plan ayrıştırıcısı** — hem veri dönüşümü hem `save_workout_plan` bunu kullanır |
 | `public.save_workout_plan` | `(p_client_ids uuid[], p_plan jsonb) -> integer` | `SECURITY INVOKER` (RLS uygulanır). `p_plan` = `{"Pazartesi": "metin", ...}`. Etkilenen danışan sayısını döner |
@@ -653,16 +655,11 @@ sisteminin kendisidir: taklit etmek için zaten `postgres` olmak gerekir.
   **üretilemez**: o etiket "bunu uygulama yazdı" demektir, sunucu yolundan üretilir.
   Bu kural **koç için de** geçerlidir — mesaj gövdesinde "yetkili tahrifat" diye bir şey yoktur.
 * **`notifications`** — UPDATE'te son kullanıcı yalnızca `is_read` yazabilir (AC-10).
-  INSERT'te **danışan → koç** yolunda `title`/`message` sabit şablon kümesine uymak
-  zorundadır (AC-05, kimlik avı yüzeyi); koç yolu ve kendine bildirim serbesttir.
-  > **Neden trigger, neden `SECURITY DEFINER` RPC değil:** RPC'ye taşımak teknik olarak daha
-  > temiz olurdu (içerik hiç istemciden gelmez), ama `notifications_insert` politikasının
-  > `is_coach_profile(...)` dalı kalkar kalkmaz `useProgramApprovals.ts:58`'deki mevcut
-  > `insert` çağrısı **anında kırılırdı**. Trigger çağrı imzasını hiç bozmaz. **Bedeli:**
-  > şablon metni iki yerde yaşar (`notifications_guard_content()` ve
-  > `src/hooks/useProgramApprovals.ts`); uygulama metni değişir de trigger güncellenmezse
-  > akış **gürültülü** biçimde (42501) kırılır — sessiz bir açık oluşmaz. RPC'ye geçiş
-  > Faz 2'de uygulama koduyla birlikte yapılabilecek bir iyileştirme olarak açıktır.
+  INSERT'te **danışan → koç** yolu (AC-05, kimlik avı yüzeyi) kapalıdır.
+  > **Bu madde Faz 1.7'de DEĞİŞTİ.** Faz 1.5'te seçilen çözüm şablon eşleştirmeydi ve
+  > kabul edilen bedeli şablon metninin **iki yerde** (trigger + `useProgramApprovals.ts`)
+  > yaşamasıydı. O borç `20260817180000_program_submission_rpc.sql` ile kapatıldı;
+  > güncel tasarım için bkz. **§4g**. Trigger'da artık **hiçbir şablon metni yoktur**.
 * **`profiles`** — `email`, `current_streak`, `last_checkin_at` **sunucuya aittir**;
   hiçbir `authenticated` oturumu (koç dahil) bunları UPDATE ile yazamaz. Tek yazma
   kaynakları `sync_profile_email()` ve `increment_streak()`'tir. `full_name`,
@@ -678,7 +675,7 @@ almasıdır — her iki durumda da istek reddedilir, yalnızca hata kodu farklı
 ### Testler
 
 ```bash
-npm run test:rls   # 76 senaryo (51–70 Faz 1.5 güvenlik regresyonlarına ait)
+npm run test:rls   # 85 senaryo (51–70 Faz 1.5 güvenlik regresyonlarına ait)
 ```
 
 Kapsanan boşluklar (`findings-access-control.md` §6): G-01, G-02, G-03, G-06 (51–57),
@@ -686,10 +683,12 @@ G-07, G-08, G-09 (58–61), G-10, G-11 (62–65), G-13, G-14 (66–69), G-16 (70
 senaryosunun yanında bir **pozitif kontrol** vardır (53, 60, 63, 65, 67, 69): düzeltmenin
 meşru uygulama akışını kırmadığını kanıtlar.
 
-> **Senaryo 12 güncellendi.** Eskiden danışanın koça **serbest metinli** bildirim yazdığını
-> doğruluyordu; AC-05'ten sonra test, uygulamanın **gerçekten gönderdiği** şablon
-> payload'ına çevrildi. Koruduğu şey değişmedi ("danışan koça program onay bildirimi
-> yazabiliyor mu?"), yalnızca gerçek payload'la soruluyor.
+> **Senaryo 12 iki kez güncellendi.** Eskiden danışanın koça **serbest metinli** bildirim
+> yazdığını doğruluyordu; AC-05'ten sonra uygulamanın **gerçekten gönderdiği** şablon
+> payload'ına çevrildi; Faz 1.7'den sonra ise ölçüm noktası
+> `submit_program_for_approval()` RPC'sine taşındı (doğrudan yazma yolu kapatıldığı için).
+> Koruduğu **ürün garantisi** üç sürümde de aynı: "danışan programı gönderince koç
+> haberdar oluyor mu?"
 
 ### Geri alma
 
@@ -773,7 +772,7 @@ ve profil oluştu; `POST /auth/v1/admin/users` gerçek HTTP çağrısı `200` d�
 ### Testler
 
 ```bash
-npm run test:rls   # 76 senaryo (71–76 bu migration'a ait)
+npm run test:rls   # 85 senaryo (71–76 bu migration'a ait)
 ```
 
 * **71** — `authenticated` TRUNCATE edemez (`profiles cascade`, `messages`, `form_checks`)
@@ -792,6 +791,121 @@ Migration dosyasının sonunda çalıştırılabilir bir `-- DOWN` bloğu vardı
 **UYARI:** geri alma AC-03'ü yeniden açar — `authenticated` rolündeki herhangi bir
 kullanıcı yeniden `truncate table public.profiles cascade` ile tüm veritabanını
 silebilir hâle gelir. `anon` bilerek geri verilmez.
+
+---
+
+## 4g. Faz 1.7 — Kuplaj Borcu, Avatar Görünürlüğü, Sequence Yetkileri
+
+Üç migration: `20260817180000_program_submission_rpc.sql`,
+`20260817180100_avatar_visibility.sql`, `20260817180200_sequence_grants.sql`.
+
+### Program gönderimi tek bir RPC'ye taşındı (AC-05 kuplaj borcu)
+
+Faz 1.5'te danışan → koç bildirim metni **iki yerde** yaşıyordu: trigger'daki
+`c_client_to_coach_messages` dizisi ve `src/hooks/useProgramApprovals.ts`. Biri
+diğerinden bağımsız değişirse program gönderimi `42501` ile kırılırdı. Faz 1.5 o turda
+RPC'ye geçemedi çünkü uygulama kodu başka bir ajanın sahipliğindeydi.
+
+Yeni akış — `public.submit_program_for_approval(p_client_id, p_workout_data)`:
+
+1. `program_approvals` satırını **her zaman `pending`**, `reviewed_*` boş yazar.
+2. `role = 'coach'` olan **tüm** profillere bildirimi yazar (metin RPC gövdesindeki
+   `c_coach_notification` sabiti — **tek sahip**). Koç bulunamazsa onay kaydı yine
+   oluşur, sunucu günlüğüne `warning` düşer.
+3. İkisi de tek çağrıda, tek işlemde: **atomik**.
+
+Politika değişikliği: `notifications_insert` içinden `is_coach_profile(client_id)` dalı
+**kaldırıldı**. Danışan artık `notifications` tablosuna **yalnızca kendi satırını**
+yazabilir. Grep ile doğrulandı: bu dalı kullanan tek çağrı taşınan çağrıydı
+(`useNotifications.ts`'teki koç duyurusu `is_coach()` dalından geçer, `ai_backend`
+`notifications`'a hiç yazmaz, `seed.sql` `postgres` ile yazar).
+
+> **Onay kapısı (AC-01) ATLANMIYOR — bu ölçüldü, varsayılmadı.** RPC `SECURITY DEFINER`
+> olduğu için `postgres` kimliğiyle çalışır ve `postgres` `rolbypassrls` taşır: **RLS
+> politikaları** bu yolda devrede değildir (bu yüzden sahiplik kontrolü —
+> `p_client_id = auth.uid()` — gövdede **elle** yapılır). Ama onay kapısı bir politika
+> değil, bir **trigger**'dır (`program_approvals_guard_review`) ve trigger'lar
+> BYPASSRLS'ten etkilenmez; ayrıca `auth.uid()` `SECURITY DEFINER` içinde de doludur
+> (`request.jwt.claims` bir oturum GUC'udur). RLS testi **senaryo 80** bunu canlı kanıtlar:
+> işlem içinde geçici bir `SECURITY DEFINER` fonksiyon kurulup `status='approved'`
+> INSERT'i denenir ve `42501` alır.
+
+`notifications_guard_content()` **korundu ama şablonu söküldü**: UPDATE dalı (AC-10) hâlâ
+gereklidir (`useMarkAsRead` bu yolu kullanıyor, RLS sütun kısıtı yazamaz). INSERT dalı
+artık metin içermez; danışan → koç yolunda **rol tabanlı** bir 42501 verir. Bu, RLS'in
+söylediğini tekrarlar — kasıtlı: (1) biri politikaya dalı geri koyarsa delik **sessizce**
+açılmaz, (2) hata mesajı geliştiriciyi doğrudan RPC'ye yönlendirir.
+
+### Koçun avatarı danışana açıldı
+
+`avatars` SELECT politikasına üçüncü bir dal eklendi: **dosyanın sahibi koçsa herkes
+okuyabilir**. Sahiplik dosya adından çıkarılır (`public.avatar_object_owner(text)`), çünkü
+bu bucket'ta ad biçimi `<uid>-<uuid>.<ext>` ve mevcut altı politikanın hepsi zaten ad ön
+ekine dayanıyor.
+
+> **Ad ayrıştırmasıyla yetki vermek neden burada güvenli:** (1) desen **katı** — kanonik
+> 36 karakterlik UUID + ardından `-`, ve adda hiç `/` olmaması; (2) `::uuid` cast'i
+> yalnızca regex'in doğruladığı dalda çalışır, yani **asla patlamaz** (politika içinde
+> fırlayan hata `createSignedUrl`'i herkes için kırardı); (3) ayrıştırma başarısızsa
+> `NULL` döner ve `is_coach(NULL)` **false**'tur — belirsizlik daima **redde** düşer;
+> (4) ön ek **sahtelenemez**: `avatars_insert_own`/`avatars_update_own` politikaları adın
+> `auth.uid()` ile başlamasını şart koşar, yani danışan koçun uid'iyle başlayan bir dosya
+> **yaratamaz**. `form-checks-media` politikası **değişmedi**.
+
+RLS testi **senaryo 82** en kritik regresyonu kapatır: danışan başka bir danışanın
+avatarını göremez; ayrıca ayrıştırıcıyı sömürmeye çalışan dört bozuk ad (UUID'siz,
+ayırıcısız, alt dizinli, uid'i ortada geçen) ve `form-checks-media`'ya sızma denenir.
+
+### Sequence yetkileri: `setval` kapatıldı, `nextval` korundu
+
+`authenticated` rolü `exercises_id_seq` ve `food_database_id_seq` üzerinde `UPDATE`
+(`setval`) yetkisine sahipti — Supabase platform varsayılanından miras. RLS baypası değil
+ama en-az-yetki ihlali: sayacı geri alıp sonraki katalog INSERT'lerini benzersizlik
+çakışmasıyla düşürmek mümkündü (bu, kırmızı-yeşil kanıtı sırasında **gerçekten yaşandı**).
+
+`REVOKE ALL` **yapılmadı** — ayrım cerrahidir: `USAGE` (nextval için zorunlu) ve `SELECT`
+kalır, yalnızca `UPDATE` gider. Ayrıca `alter default privileges` ile **gelecekteki**
+sequence'ler için varsayılan `usage, select`'e sabitlendi; sadece mevcut nesneleri
+düzeltmek yetmezdi (AC-03 turunda tablolarda aynı tuzağa düşülmüştü). Senaryo **85** bunu
+işlem içinde gerçek bir `serial` tablo yaratarak ölçer.
+
+> **Kapatılamayan boşluk (tablolardakiyle aynı):** `pg_default_acl`'deki `supabase_admin`
+> satırı sequence'ler için de `anon=rwU, authenticated=rwU` verir ve `postgres` bunu
+> değiştiremez ("must be member of role supabase_admin"). Uygulamanın iki sequence'i de
+> `postgres` sahipliğinde olduğu için pratik etkisi yoktur; senaryo **84** listeyi
+> `pg_class`'tan **dinamik** okuduğu için bir istisna doğarsa test kırılır.
+
+> **`as materialized` neden zorunlu:** `has_sequence_privilege()` ile `relkind='S'` filtresi
+> aynı `WHERE`'de olursa planlayıcı fonksiyonu filtreden **önce** çalıştırabilir ve bir
+> TOAST tablosunun OID'iyle `42809 ("... is not a sequence")` fırlatır. Bu, migration
+> yazılırken `db reset`'i gerçekten patlattı; hem migration hem senaryo 84 CTE çitiyle
+> düzeltildi.
+
+### Testler
+
+```bash
+npm run test:rls   # 85 senaryo (77–85 bu üç migration'a ait)
+```
+
+* **77** — pozitif: RPC onay satırını + koç bildirimini atomik yazar (`title` NULL)
+* **78** — danışan koça **doğrudan** bildirim yazamaz — **eski şablon metniyle bile**
+* **79** — RPC başkası adına çağrılamaz (SECURITY DEFINER IDOR koruması)
+* **80** — **AC-01 regresyonu**: `SECURITY DEFINER` bir fonksiyon bile `status='approved'`
+  yazamaz — kapı politika değil trigger olduğu için
+* **81** — pozitif: danışan koçun avatarını (ve kendi avatarını) görür
+* **82** — danışan **başka danışanın** avatarını göremez; ayrıştırıcı sömürülemez
+* **83** — `setval` reddedilir (42501), `nextval` üzerinden INSERT çalışır
+* **84** — dinamik sequence yetki denetimi (UPDATE yok, USAGE var)
+* **85** — **gelecekteki** sequence de doğru varsayılanı alır
+
+### Geri alma
+
+Üç migration dosyasının da sonunda çalıştırılabilir bir `-- DOWN` bloğu vardır.
+**UYARI:** `20260817180000`'in geri alınması, `src/hooks/useProgramApprovals.ts`'nin de
+eski `.from('notifications').insert(...)` hâline döndürülmesini **gerektirir** — yoksa
+program gönderimi bildirimsiz kalır ve koç habersiz olur. Avatar geri alması güvenlik
+açığı yaratmaz (yalnızca koç avatarını tekrar görünmez kılar); sequence geri alması
+`setval` yüzeyini yeniden açar.
 
 ---
 

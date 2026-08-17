@@ -277,28 +277,62 @@ rollback;
 --
 -- 2026-08-17 GÜNCELLEMESİ (AC-05 / Faz 1.5, bkz. 20260817160200_column_guards.sql):
 -- Bu senaryo eskiden SERBEST bir metin ("RLS testi - Danisan A'dan koca bildirim")
--- yazıyordu. Danışan -> koç yolunda içerik artık SABİT ŞABLONA bağlı olduğu için
--- test, uygulamanın GERÇEKTEN gönderdiği payload'a çevrildi
--- (src/hooks/useProgramApprovals.ts:58-61). Senaryonun KORUDUĞU ŞEY DEĞİŞMEDİ:
--- "danışan koça program onay bildirimi yazabiliyor mu?" — yalnızca artık gerçek
--- uygulama payload'ıyla soruluyor. Şablon dışı metnin reddedildiği senaryo 62'de
--- ayrıca doğrulanır.
+-- yazıyordu. Danışan -> koç yolunda içerik SABİT ŞABLONA bağlandığı için test,
+-- uygulamanın GERÇEKTEN gönderdiği payload'a çevrilmişti.
+--
+-- 2026-08-17 İKİNCİ GÜNCELLEMESİ (Faz 1.7, bkz. 20260817180000_program_submission_rpc.sql):
+-- Danışanın koça DOĞRUDAN `insert into notifications` yapma yolu KAPATILDI
+-- (`notifications_insert` politikasından `is_coach_profile(...)` dalı kalktı).
+-- Bildirimi artık `submit_program_for_approval()` RPC'si SUNUCUDA yazıyor.
+-- SENARYONUN KORUDUĞU ÜRÜN GARANTİSİ DEĞİŞMEDİ — "danışan programı gönderince
+-- koç haberdar oluyor mu?" — yalnızca ölçüm noktası, uygulamanın bugün kullandığı
+-- yola (RPC) taşındı. Doğrudan yazma yolunun KAPALI olduğu senaryo 78'de,
+-- RPC'nin dönüş sözleşmesi senaryo 77'de ayrıca doğrulanır.
 -- =============================================================================
+-- MUTLAK DEĞİL, FARK (delta) ÖLÇÜLÜR: veritabanında bu bildirimden önceden
+-- (E2E koşusu, gerçek kullanım, seed) satır olabilir; test veriden BAĞIMSIZ olmalı.
 begin;
+
+create temp table zz_notify_base as
+select count(*) as n
+  from public.notifications
+ where client_id = '11111111-1111-1111-1111-111111111111'
+   and message   = '🔔 Yeni bir antrenman programı onayınıza sunuldu.';
+
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
 do $$
 declare
-  v_rows int;
+  v_row public.program_approvals;
 begin
-  insert into public.notifications (client_id, message)
-  values ('11111111-1111-1111-1111-111111111111', '🔔 Yeni bir antrenman programı onayınıza sunuldu.');
-  get diagnostics v_rows = row_count;
-
-  if v_rows is distinct from 1 then
-    raise exception 'BASARISIZ [Danisan A - koca bildirim yazar]: beklenen 1 satir eklendi, gelen %', v_rows;
+  select * into v_row
+    from public.submit_program_for_approval(
+      '22222222-2222-2222-2222-222222222222'::uuid,
+      '{"Pazartesi":"1. Bench Press - 4x8"}'::jsonb
+    );
+  if v_row.id is null then
+    raise exception 'BASARISIZ [Danisan A - program gonderimi]: onay satiri olusmadi';
   end if;
-  raise notice 'GECTI [Danisan A - koca bildirim yazar]';
+end $$;
+
+-- Bildirim KOÇ adına yazıldığı için danışan onu kendi oturumunda GÖREMEZ
+-- (`notifications_select` -> client_id = auth.uid()); sayım postgres ile yapılır.
+reset role;
+do $$
+declare
+  v_base int;
+  v_now  int;
+begin
+  select n into v_base from zz_notify_base;
+  select count(*) into v_now
+    from public.notifications
+   where client_id = '11111111-1111-1111-1111-111111111111'
+     and message   = '🔔 Yeni bir antrenman programı onayınıza sunuldu.';
+
+  if (v_now - v_base) is distinct from 1 then
+    raise exception 'BASARISIZ [Danisan A - koca bildirim gider]: beklenen +1 satir, gelen +% -- koc programdan HABERSIZ kalir', (v_now - v_base);
+  end if;
+  raise notice 'GECTI [Danisan A - program gonderiminde koca bildirim gider (RPC yoluyla)]';
 end $$;
 rollback;
 
@@ -2990,8 +3024,536 @@ rollback;
 
 
 -- =============================================================================
+-- FAZ 1.7 — AC-05 KUPLAJININ ÇÖZÜLMESİ (20260817180000_program_submission_rpc.sql)
+-- =============================================================================
+
+
+-- =============================================================================
+-- PROGRAM GONDERIMI — 77) POZİTİF: `submit_program_for_approval()` RPC'si
+-- onay satırını VE koça giden bildirimi ATOMİK yazar
+--
+-- `useSubmitProgramForApproval` (src/hooks/useProgramApprovals.ts) artık TAM
+-- OLARAK bu çağrıyı yapar. Bildirim metni istemcide YOKTUR; şablonun tek sahibi
+-- RPC gövdesidir. Bu senaryo hem akışın çalıştığını hem de metnin sunucudan
+-- geldiğini kanıtlar.
+-- =============================================================================
+-- Senaryo 12'deki gibi FARK (delta) ölçülür — test veriden bağımsızdır.
+begin;
+
+create temp table zz_notify_base_77 as
+select
+  count(*) filter (where title is null)     as n_ok,
+  count(*) filter (where title is not null) as n_titled
+  from public.notifications
+ where client_id = '11111111-1111-1111-1111-111111111111'
+   and message   = '🔔 Yeni bir antrenman programı onayınıza sunuldu.';
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+do $$
+declare
+  v_row public.program_approvals;
+begin
+  select * into v_row
+    from public.submit_program_for_approval(
+      '22222222-2222-2222-2222-222222222222'::uuid,
+      '{"Pazartesi":"1. Bench Press - 4x8"}'::jsonb
+    );
+
+  if v_row.id is null then
+    raise exception 'BASARISIZ [77 RPC onay satiri]: satir DONMEDI';
+  end if;
+  if v_row.client_id is distinct from '22222222-2222-2222-2222-222222222222'::uuid then
+    raise exception 'BASARISIZ [77 RPC client_id]: gelen %', v_row.client_id;
+  end if;
+  if v_row.status is distinct from 'pending'::public.approval_status then
+    raise exception 'BASARISIZ [77 RPC status]: beklenen pending, gelen % -- ONAY KAPISI ZAYIFLADI!', v_row.status;
+  end if;
+  if v_row.reviewed_by is not null or v_row.reviewed_at is not null then
+    raise exception 'BASARISIZ [77 RPC denetim izi]: reviewed_by=%, reviewed_at=% (bos olmaliydi)',
+      v_row.reviewed_by, v_row.reviewed_at;
+  end if;
+end $$;
+
+-- Bildirimi KOÇ adına yazıldığı için danışan kendi oturumunda GÖREMEZ
+-- (`notifications_select` -> client_id = auth.uid()); doğrulama postgres ile.
+reset role;
+do $$
+declare
+  v_base_ok     int;
+  v_base_titled int;
+  v_ok          int;
+  v_titled      int;
+begin
+  select n_ok, n_titled into v_base_ok, v_base_titled from zz_notify_base_77;
+
+  select
+    count(*) filter (where title is null),
+    count(*) filter (where title is not null)
+    into v_ok, v_titled
+    from public.notifications
+   where client_id = '11111111-1111-1111-1111-111111111111'
+     and message   = '🔔 Yeni bir antrenman programı onayınıza sunuldu.';
+
+  if (v_ok - v_base_ok) is distinct from 1 then
+    raise exception 'BASARISIZ [77 koca bildirim]: beklenen +1 satir, gelen +% -- koc habersiz kalir!', (v_ok - v_base_ok);
+  end if;
+  if (v_titled - v_base_titled) is distinct from 0 then
+    raise exception 'BASARISIZ [77 bildirim basligi]: RPC title yazdi (beklenen NULL), fark +%', (v_titled - v_base_titled);
+  end if;
+  raise notice 'GECTI [77 submit_program_for_approval() onay satirini + koc bildirimini ATOMIK yazar]';
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- PROGRAM GONDERIMI — 78) [AC-05] Danışan koça DOĞRUDAN bildirim YAZAMAZ —
+-- ESKİ ŞABLON METNİYLE BİLE
+--
+-- Kuplaj borcunun kapandığının asıl kanıtı budur: eskiden bu tam metin KABUL
+-- EDİLİYORDU (trigger'daki `c_client_to_coach_messages` dizisi). Artık
+-- `notifications_insert` politikasında `is_coach_profile(...)` dalı YOK ve
+-- trigger da yönlendirici bir 42501 veriyor. Yani istemcinin yazabildiği
+-- HİÇBİR bildirim metni kalmadı — "şablon dışı içerik" diye bir yüzey yok.
+-- =============================================================================
+begin;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+do $$
+declare
+  v_caught_template boolean := false;
+  v_caught_free     boolean := false;
+  v_state           text;
+begin
+  -- (a) ESKİ ŞABLON METNİ — eskiden GEÇERDİ, artık reddedilmeli.
+  begin
+    insert into public.notifications (client_id, message)
+    values ('11111111-1111-1111-1111-111111111111',
+            '🔔 Yeni bir antrenman programı onayınıza sunuldu.');
+  exception when insufficient_privilege then
+    v_caught_template := true;
+    get stacked diagnostics v_state = returned_sqlstate;
+  end;
+
+  -- (b) SERBEST METİN (kimlik avı) — zaten reddediliyordu, reddedilmeye devam.
+  begin
+    insert into public.notifications (client_id, title, message)
+    values ('11111111-1111-1111-1111-111111111111',
+            'ACIL: Sifreni sifirla', 'https://kotu-site.example/reset');
+  exception when insufficient_privilege then
+    v_caught_free := true;
+  end;
+
+  if not v_caught_template then
+    raise exception 'BASARISIZ [78 sablon metni reddedilmeli]: hata ALINMADI -- danisan -> koc dogrudan yazma yolu HALA ACIK!';
+  end if;
+  if v_state is distinct from '42501' then
+    raise exception 'BASARISIZ [78 hata kodu]: beklenen 42501, gelen %', v_state;
+  end if;
+  if not v_caught_free then
+    raise exception 'BASARISIZ [78 serbest metin reddedilmeli]: hata ALINMADI';
+  end if;
+  raise notice 'GECTI [78 Danisan koca DOGRUDAN bildirim yazamaz - eski sablon metniyle bile (42501)]';
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- PROGRAM GONDERIMI — 79) RPC BAŞKASI ADINA çağrılamaz
+--
+-- RPC `SECURITY DEFINER`dır, yani `program_approvals_insert` politikası
+-- (`client_id = auth.uid()`) bu yolda DEVREDE DEĞİLDİR. Sahiplik kontrolü RPC
+-- gövdesinde ELLE yapılır (§1b). Bu senaryo o kontrolün varlığını kanıtlar —
+-- kaldırılırsa herhangi bir danışan BAŞKASI adına program gönderebilir.
+-- =============================================================================
+begin;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+do $$
+declare
+  v_caught boolean := false;
+  v_state  text;
+  v_row    public.program_approvals;
+begin
+  begin
+    select * into v_row
+      from public.submit_program_for_approval(
+        '33333333-3333-3333-3333-333333333333'::uuid,   -- Danışan B
+        '{"Pazartesi":"sahte"}'::jsonb
+      );
+  exception when insufficient_privilege then
+    v_caught := true;
+    get stacked diagnostics v_state = returned_sqlstate;
+  end;
+
+  if not v_caught then
+    raise exception 'BASARISIZ [79 baskasi adina gonderim]: hata ALINMADI -- SECURITY DEFINER RPC IDOR yuzeyi ACIK!';
+  end if;
+  if v_state is distinct from '42501' then
+    raise exception 'BASARISIZ [79 hata kodu]: beklenen 42501, gelen %', v_state;
+  end if;
+  raise notice 'GECTI [79 submit_program_for_approval() baskasi adina cagrilamaz (42501)]';
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- PROGRAM GONDERIMI — 80) [AC-01 REGRESYONU] ONAY KAPISI HÂLÂ KAPALI:
+-- `SECURITY DEFINER` bir fonksiyon BİLE `status='approved'` yazamaz
+--
+-- ############################################################################
+-- # BU SENARYONUN VAR OLMA SEBEBİ                                            #
+-- # Faz 1.7'de program gönderimi SECURITY DEFINER bir RPC'ye taşındı. SECURITY#
+-- # DEFINER `postgres` kimliğiyle çalışır ve `postgres` rolü `rolbypassrls`   #
+-- # taşır -> RLS POLİTİKALARI o yolda DEVREYE GİRMEZ. Akla gelen soru şudur:  #
+-- # "onay kapısı da böyle atlanabilir mi?"                                    #
+-- #                                                                           #
+-- # HAYIR — çünkü kapı bir POLİTİKA değil, bir TRIGGER'dır                    #
+-- # (`program_approvals_guard_review`, 20260817160000 §3) ve trigger'lar       #
+-- # BYPASSRLS'ten etkilenmez. Bu senaryo bunu VARSAYMAZ, ÖLÇER: işlem içinde  #
+-- # geçici bir SECURITY DEFINER fonksiyon kurulur, `authenticated` rolüyle    #
+-- # çağrılır ve `status='approved'` INSERT'i 42501 ALMALIDIR.                 #
+-- #                                                                           #
+-- # Bu senaryo düşerse AC-01 (High) yeniden AÇILMIŞ demektir.                 #
+-- ############################################################################
+begin;
+
+create function public.zz_definer_gate_probe(p_client uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $probe$
+begin
+  insert into public.program_approvals (client_id, workout_data, status, reviewed_by, reviewed_at)
+  values (p_client, '{"Pazartesi":"sahte"}'::jsonb, 'approved'::public.approval_status,
+          '11111111-1111-1111-1111-111111111111', now());
+end;
+$probe$;
+
+grant execute on function public.zz_definer_gate_probe(uuid) to authenticated;
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+
+do $$
+declare
+  v_caught boolean := false;
+  v_state  text;
+begin
+  begin
+    perform public.zz_definer_gate_probe('22222222-2222-2222-2222-222222222222'::uuid);
+  exception when insufficient_privilege then
+    v_caught := true;
+    get stacked diagnostics v_state = returned_sqlstate;
+  end;
+
+  if not v_caught then
+    raise exception 'BASARISIZ [80 SECURITY DEFINER onay kapisini ATLADI]: hata ALINMADI -- AC-01 YENIDEN ACIK!';
+  end if;
+  if v_state is distinct from '42501' then
+    raise exception 'BASARISIZ [80 hata kodu]: beklenen 42501, gelen %', v_state;
+  end if;
+  raise notice 'GECTI [80 SECURITY DEFINER fonksiyon bile status=approved yazamaz - onay kapisi TRIGGER, politika degil]';
+end $$;
+
+rollback;
+
+
+-- =============================================================================
+-- FAZ 1.7 — AVATAR GÖRÜNÜRLÜĞÜ (20260817180100_avatar_visibility.sql)
+--
+-- KURULUM NOTU: `storage.objects` bu projede seed'lenmez (canlıda Storage API
+-- doldurur). Senaryolar kendi nesnelerini `postgres` kimliğiyle yaratır ve
+-- ROLLBACK ile geri alır — kalıcı satır bırakmaz.
+-- =============================================================================
+
+
+-- =============================================================================
+-- AVATAR — 81) POZİTİF: Danışan KOÇUN avatarını GÖREBİLİR (ve kendi avatarını)
+-- docs/PROGRESS.md §5 borcu: sohbet başlığına koç avatarı eklendiğinde
+-- sessizce placeholder'a düşmesin.
+-- =============================================================================
+begin;
+
+insert into storage.objects (bucket_id, name, owner, owner_id) values
+  ('avatars', '11111111-1111-1111-1111-111111111111-aaaaaaaa-0000-0000-0000-00000000aaaa.jpg',
+              '11111111-1111-1111-1111-111111111111', '11111111-1111-1111-1111-111111111111'),
+  ('avatars', '22222222-2222-2222-2222-222222222222-cccccccc-0000-0000-0000-00000000cccc.jpg',
+              '22222222-2222-2222-2222-222222222222', '22222222-2222-2222-2222-222222222222');
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+
+do $$
+declare
+  v_coach_avatar int;
+  v_own_avatar   int;
+begin
+  select count(*) into v_coach_avatar from storage.objects
+   where bucket_id = 'avatars'
+     and name = '11111111-1111-1111-1111-111111111111-aaaaaaaa-0000-0000-0000-00000000aaaa.jpg';
+
+  select count(*) into v_own_avatar from storage.objects
+   where bucket_id = 'avatars'
+     and name = '22222222-2222-2222-2222-222222222222-cccccccc-0000-0000-0000-00000000cccc.jpg';
+
+  if v_coach_avatar is distinct from 1 then
+    raise exception 'BASARISIZ [81 danisan kocun avatarini gorur]: beklenen 1, gelen % -- createSignedUrl RLS ile reddedilir', v_coach_avatar;
+  end if;
+  if v_own_avatar is distinct from 1 then
+    raise exception 'BASARISIZ [81 danisan KENDI avatarini gorur]: beklenen 1, gelen %', v_own_avatar;
+  end if;
+  raise notice 'GECTI [81 POZITIF - Danisan kocun avatarini VE kendi avatarini gorebilir]';
+end $$;
+
+rollback;
+
+
+-- =============================================================================
+-- AVATAR — 82) EN KRİTİK REGRESYON: Danışan BAŞKA BİR DANIŞANIN avatarını
+-- GÖREMEZ; dosya adı ayrıştırıcısı SÖMÜRÜLEMEZ
+--
+-- Yetkiyi dosya adından çıkarmak riskli bir kalıptır: gevşek bir ayrıştırma
+-- "herkes her dosyayı görür" hâline düşürür. Bu senaryo beş ayrı adı test eder:
+--   (a) başka danışanın GERÇEK avatarı            -> GÖRÜNMEZ
+--   (b) hiç UUID içermeyen ad                     -> GÖRÜNMEZ (NULL -> false)
+--   (c) koç uid'i AMA ayırıcı '-' YOK             -> GÖRÜNMEZ (katı desen)
+--   (d) koç uid'i AMA alt dizinde ('/' içeriyor)  -> GÖRÜNMEZ
+--   (e) koç uid'i ORTADA geçen ad                 -> GÖRÜNMEZ (yalnızca ÖN EK)
+-- Ayrıca `form-checks-media` kapsamına sızma OLMADIĞI (f) doğrulanır.
+-- =============================================================================
+begin;
+
+insert into storage.objects (bucket_id, name, owner, owner_id) values
+  -- (a) Danışan B'nin gerçek avatarı
+  ('avatars', '33333333-3333-3333-3333-333333333333-bbbbbbbb-0000-0000-0000-00000000bbbb.jpg',
+              '33333333-3333-3333-3333-333333333333', '33333333-3333-3333-3333-333333333333'),
+  -- (b) ayrıştırılamayan ad
+  ('avatars', 'kotu-ad.jpg', null, null),
+  -- (c) koç uid'i ama ayırıcı yok
+  ('avatars', '11111111-1111-1111-1111-111111111111.jpg', null, null),
+  -- (d) koç uid'i ama alt dizinde
+  ('avatars', 'gizli/11111111-1111-1111-1111-111111111111-x.jpg', null, null),
+  -- (e) koç uid'i ortada
+  ('avatars', 'zz-11111111-1111-1111-1111-111111111111-x.jpg', null, null),
+  -- (f) koç adına yazılmış bir form-check nesnesi (kapsam sızması kontrolü)
+  ('form-checks-media', 'poses/11111111-1111-1111-1111-111111111111-dddddddd-0000-0000-0000-00000000dddd.jpg',
+              '11111111-1111-1111-1111-111111111111', '11111111-1111-1111-1111-111111111111');
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+
+do $$
+declare
+  v_name    text;
+  v_visible int;
+begin
+  foreach v_name in array array[
+    '33333333-3333-3333-3333-333333333333-bbbbbbbb-0000-0000-0000-00000000bbbb.jpg',
+    'kotu-ad.jpg',
+    '11111111-1111-1111-1111-111111111111.jpg',
+    'gizli/11111111-1111-1111-1111-111111111111-x.jpg',
+    'zz-11111111-1111-1111-1111-111111111111-x.jpg'
+  ] loop
+    select count(*) into v_visible
+      from storage.objects
+     where bucket_id = 'avatars' and name = v_name;
+
+    if v_visible is distinct from 0 then
+      raise exception 'BASARISIZ [82 avatar sizintisi]: "%" danisana GORUNUYOR (beklenen 0, gelen %) -- dosya adi ayristirmasi SOMURULEBILIR!',
+        v_name, v_visible;
+    end if;
+  end loop;
+
+  -- (f) form-checks-media kapsamı DEĞİŞMEMELİ: koçun pose dosyası da görünmez.
+  select count(*) into v_visible
+    from storage.objects
+   where bucket_id = 'form-checks-media'
+     and name = 'poses/11111111-1111-1111-1111-111111111111-dddddddd-0000-0000-0000-00000000dddd.jpg';
+
+  if v_visible is distinct from 0 then
+    raise exception 'BASARISIZ [82 kapsam sizmasi]: avatar dali form-checks-media ye sizmis (gelen %)', v_visible;
+  end if;
+
+  raise notice 'GECTI [82 Danisan BASKA DANISANIN avatarini goremez; bozuk/sahte adlar ayristiriciyi somuremez; form-checks kapsami saglam]';
+end $$;
+
+rollback;
+
+
+-- =============================================================================
+-- FAZ 1.7 — SEQUENCE YETKİLERİ (20260817180200_sequence_grants.sql)
+-- =============================================================================
+
+
+-- =============================================================================
+-- SEQUENCE — 83) `authenticated` `setval` ÇALIŞTIRAMAZ, ama normal INSERT
+-- (yani `nextval`) HÂLÂ ÇALIŞIR
+--
+-- NOT: INSERT senaryosu KOÇ kimliğiyle koşar — `exercises_insert_coach`
+-- politikası yazmayı koça kilitler (senaryo 19). Ölçülen şey RLS değil,
+-- sequence USAGE yetkisidir.
+-- YAN ETKİ (bilinçli): `nextval` işlemsel DEĞİLDİR; ROLLBACK sonrası sayaç
+-- geri gelmez, katalog id'lerinde bir boşluk kalır. Zararsızdır.
+-- =============================================================================
+begin;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+do $$
+declare
+  v_rows       int;
+  v_seq        text;
+  v_caught     boolean;
+  v_state      text;
+begin
+  -- POZİTİF: nextval üzerinden INSERT çalışmalı.
+  insert into public.exercises (name, body_part) values ('zz-seq-probe-83', 'test');
+  get diagnostics v_rows = row_count;
+  if v_rows is distinct from 1 then
+    raise exception 'BASARISIZ [83 INSERT calismali]: beklenen 1 satir, etkilenen % -- USAGE yetkisi KAYBEDILDI', v_rows;
+  end if;
+
+  -- NEGATİF: setval her iki sequence'te de reddedilmeli.
+  foreach v_seq in array array['public.exercises_id_seq', 'public.food_database_id_seq']
+  loop
+    v_caught := false;
+    begin
+      execute format('select setval(%L, 1)', v_seq);
+    exception when insufficient_privilege then
+      v_caught := true;
+      get stacked diagnostics v_state = returned_sqlstate;
+    end;
+
+    if not v_caught then
+      raise exception 'BASARISIZ [83 setval reddedilmeli]: "%" GECTI -- en-az-yetki ihlali ACIK!', v_seq;
+    end if;
+    if v_state is distinct from '42501' then
+      raise exception 'BASARISIZ [83 hata kodu / %]: beklenen 42501, gelen %', v_seq, v_state;
+    end if;
+  end loop;
+
+  raise notice 'GECTI [83 authenticated setval calistiramaz (42501) ama nextval ile INSERT HALA calisir]';
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- SEQUENCE — 84) Toplu yetki denetimi — DİNAMİK
+--
+-- Sequence listesi `pg_class`'tan okunur: gelecekte eklenen (veya
+-- `supabase_admin` varsayılanından yetki geri kazanan) bir sequence bu senaryoyu
+-- KIRAR. Migration'ın §2 adımı tam olarak bunu engellemek içindir.
+-- POZİTİF KONTROL aynı blokta: USAGE HÂLÂ durmalı — aksi hâlde "güvenli ama
+-- INSERT edilemeyen" bir veritabanı üretmiş olurduk.
+--
+-- `as materialized` ZORUNLUDUR: filtre ile `has_sequence_privilege()` aynı
+-- WHERE'de olursa planlayıcı fonksiyonu `relkind` filtresinden ÖNCE
+-- çalıştırabilir ve bir TOAST tablosunun OID'i ile 42809 ("... is not a
+-- sequence") fırlatır. Bu, migration yazılırken CANLI olarak yaşandı.
+-- =============================================================================
+begin;
+do $$
+declare
+  v_leak text;
+  v_miss text;
+  v_seqs int;
+begin
+  with seqs as materialized (
+    select c.oid, c.relname
+      from pg_class c join pg_namespace n on n.oid = c.relnamespace
+     where n.nspname = 'public' and c.relkind = 'S'
+  )
+  select count(*) into v_seqs from seqs;
+
+  if v_seqs < 2 then
+    raise exception 'BASARISIZ [84 kurulum]: public semada beklenenden az sequence var (%)', v_seqs;
+  end if;
+
+  with seqs as materialized (
+    select c.oid, c.relname
+      from pg_class c join pg_namespace n on n.oid = c.relnamespace
+     where n.nspname = 'public' and c.relkind = 'S'
+  )
+  select string_agg(format('%s/%s', g.role_name, s.relname), ', ' order by s.relname) into v_leak
+    from seqs s
+    cross join (values ('authenticated'), ('anon')) as g(role_name)
+   where has_sequence_privilege(g.role_name, s.oid, 'UPDATE');
+
+  if v_leak is not null then
+    raise exception 'BASARISIZ [84 setval yetkisi acik]: % -- setval ile sayac oynatilabilir', v_leak;
+  end if;
+
+  with seqs as materialized (
+    select c.oid, c.relname
+      from pg_class c join pg_namespace n on n.oid = c.relnamespace
+     where n.nspname = 'public' and c.relkind = 'S'
+  )
+  select string_agg(s.relname, ', ' order by s.relname) into v_miss
+    from seqs s
+   where not has_sequence_privilege('authenticated', s.oid, 'USAGE');
+
+  if v_miss is not null then
+    raise exception 'BASARISIZ [84 USAGE kaybi]: % -- INSERT ler kirilir', v_miss;
+  end if;
+
+  raise notice 'GECTI [84 % sequence: authenticated/anon UPDATE=yok, authenticated USAGE=var]', v_seqs;
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- SEQUENCE — 85) GELECEKTEKİ sequence'ler de doğru varsayılanı alır
+--
+-- AC-03 turunda öğrenilen ders: mevcut nesnelerden REVOKE etmek YETMEZ; yeni
+-- nesne yetkiyi platform varsayılanından geri kazanır. Bu senaryo işlem içinde
+-- GERÇEKTEN yeni bir tablo + `serial` sequence yaratır ve iki şeyi birden ölçer:
+--   * `authenticated` yeni sequence'te setval EDEMEZ  (varsayılan revoke tuttu)
+--   * `authenticated` INSERT EDEBİLİR                 (varsayılan usage/select tuttu)
+-- Her şey ROLLBACK içindedir; DDL Postgres'te işlemseldir, kalıcı iz kalmaz.
+-- =============================================================================
+begin;
+
+create table public.zz_seq_default_probe (id serial primary key, v text);
+grant select, insert on public.zz_seq_default_probe to authenticated;
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+
+do $$
+declare
+  v_rows   int;
+  v_caught boolean := false;
+  v_state  text;
+begin
+  insert into public.zz_seq_default_probe (v) values ('x');
+  get diagnostics v_rows = row_count;
+  if v_rows is distinct from 1 then
+    raise exception 'BASARISIZ [85 yeni sequence USAGE]: INSERT calismadi (etkilenen %) -- varsayilan yetki fazla daraltilmis', v_rows;
+  end if;
+
+  begin
+    perform setval('public.zz_seq_default_probe_id_seq', 1);
+  exception when insufficient_privilege then
+    v_caught := true;
+    get stacked diagnostics v_state = returned_sqlstate;
+  end;
+
+  if not v_caught then
+    raise exception 'BASARISIZ [85 yeni sequence setval]: hata ALINMADI -- alter default privileges TUTMADI, delik yeni nesnelerde geri aciliyor!';
+  end if;
+  if v_state is distinct from '42501' then
+    raise exception 'BASARISIZ [85 hata kodu]: beklenen 42501, gelen %', v_state;
+  end if;
+  raise notice 'GECTI [85 GELECEKTEKI sequence de dogru varsayilani alir: setval YOK, nextval VAR]';
+end $$;
+
+rollback;
+
+
+-- =============================================================================
 -- TOPLAM ÖZET
--- Bu noktaya yalnızca YUKARIDAKİ 76 senaryonun HEPSİ GECTI verdiyse ulaşılır --
+-- Bu noktaya yalnızca YUKARIDAKİ 85 senaryonun HEPSİ GECTI verdiyse ulaşılır --
 -- herhangi biri BASARISIZ olsaydı raise exception + ON_ERROR_STOP psql'i
 -- daha önce sıfırdan farklı çıkış koduyla durdururdu.
 --   * 1–19  : Faz 1a ve öncesi (profiles, notifications, form_checks, daily_logs,
@@ -3006,8 +3568,15 @@ rollback;
 --   * 66–69 : Faz 1.5 — profiles sunucu sütunları          (AC-08, AC-09 / G-13, G-14)
 --   * 70    : Faz 1.5 — handle_new_user rol sertleştirmesi (AC-02 / G-16)
 --   * 71–76 : Faz 1.5 Grup 5 — yetki sökümü + FORCE RLS   (AC-03, AC-06 / G-17, G-18)
+--   * 77–80 : Faz 1.7 — AC-05 kuplajının çözülmesi        (submit_program_for_approval
+--             RPC'si, danışan -> koç doğrudan yazma yolunun kapanması, SECURITY
+--             DEFINER'ın onay kapısını ATLAMADIĞININ kanıtı)
+--   * 81–82 : Faz 1.7 — avatar görünürlüğü                (koç avatarı açık,
+--             danışan -> danışan KAPALI, dosya adı ayrıştırıcısı sömürülemez)
+--   * 83–85 : Faz 1.7 — sequence yetkileri                (setval kapalı, nextval
+--             açık, gelecekteki sequence'ler için varsayılan doğru)
 -- =============================================================================
 do $$
 begin
-  raise notice 'TUM RLS TESTLERI GECTI (76 senaryo)';
+  raise notice 'TUM RLS TESTLERI GECTI (85 senaryo)';
 end $$;

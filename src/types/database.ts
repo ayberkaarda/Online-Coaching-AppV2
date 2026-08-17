@@ -533,6 +533,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      avatar_object_owner: { Args: { p_name: string }; Returns: string }
       backfill_form_check_review: {
         Args: never
         Returns: {
@@ -550,6 +551,15 @@ export type Database = {
           rows_skipped: number
         }[]
       }
+      backfill_program_approval_review: {
+        Args: never
+        Returns: {
+          rows_cleaned: number
+          rows_decided: number
+          rows_demoted: number
+          rows_pending: number
+        }[]
+      }
       explode_nutrition_day: {
         Args: { p_day: string; p_entry: Json; p_plan_id: string }
         Returns: number
@@ -561,6 +571,7 @@ export type Database = {
       increment_streak: { Args: { user_id: string }; Returns: number }
       is_coach: { Args: { uid?: string }; Returns: boolean }
       is_coach_profile: { Args: { target: string }; Returns: boolean }
+      is_end_user_write: { Args: never; Returns: boolean }
       migrate_nutrition_plans_from_profiles: {
         Args: never
         Returns: {
@@ -586,6 +597,24 @@ export type Database = {
       save_workout_plan: {
         Args: { p_client_ids: string[]; p_plan: Json }
         Returns: number
+      }
+      submit_program_for_approval: {
+        Args: { p_client_id: string; p_workout_data: Json }
+        Returns: {
+          client_id: string
+          created_at: string
+          id: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: Database["public"]["Enums"]["approval_status"]
+          workout_data: Json
+        }
+        SetofOptions: {
+          from: "*"
+          to: "program_approvals"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
     }
     Enums: {
