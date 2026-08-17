@@ -669,6 +669,27 @@ export type Database = {
           profiles_converted: number
         }[]
       }
+      post_system_message: {
+        Args: { p_client_id: string; p_event_type: string; p_ref_id?: string }
+        Returns: {
+          attachment_path: string | null
+          client_id: string
+          created_at: string
+          id: string
+          is_read: boolean
+          kind: Database["public"]["Enums"]["message_kind"]
+          message: string
+          read_at: string | null
+          receiver_id: string
+          sender_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "messages"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       profile_role: {
         Args: { uid?: string }
         Returns: Database["public"]["Enums"]["user_role"]
@@ -698,6 +719,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      workout_plan_has_history: {
+        Args: { p_plan_id: string }
+        Returns: boolean
       }
     }
     Enums: {

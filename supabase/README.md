@@ -29,9 +29,11 @@ supabase/
 │   ├── 20260817190100_nutrition_targets_and_logs.sql # nutrition_plans.target_* + nutrition_logs tablosu
 │   ├── 20260817190200_message_attachments.sql    # messages.attachment_path + message-attachments bucket'ı
 │   ├── 20260817190300_message_read_state.sql     # read_at KANONİK / is_read TÜREV (trigger + CHECK)
-│   └── 20260817190400_realtime_publication.sql   # realtime yayını insert+update (delete/truncate kapalı)
+│   ├── 20260817190400_realtime_publication.sql   # realtime yayını insert+update (delete/truncate kapalı)
+│   ├── 20260817200000_system_message_rpc.sql     # post_system_message RPC (tek kind='system' yazma kanalı)
+│   └── 20260817210000_workout_plan_versioning.sql # plan yayınlama = yeni version, eski is_active=false
 ├── tests/
-│   ├── rls.test.sql            # 95 RLS senaryosu       (npm run test:rls)
+│   ├── rls.test.sql            # 104 RLS senaryosu      (npm run test:rls)
 │   └── transform.test.sql      # 26 dönüşüm senaryosu   (npm run test:transform)
 ├── seed.sql                    # SADECE YEREL demo verisi
 └── README.md
@@ -236,13 +238,15 @@ Her iki bucket da **PRIVATE**'tır (`20260817100000_private_storage.sql`).
 | `public.avatar_object_owner` | `(p_name text) -> uuid` | `IMMUTABLE`. `avatars` nesne adından sahip uid'i çıkarır; desene uymayan adda **NULL** (bkz. §4g) |
 | `public.increment_streak` | `(user_id uuid) -> integer` | **İmza değiştirilemez** — kod `rpc('increment_streak', { user_id })` çağırıyor |
 | `public.explode_plan_day` | `(p_plan_id uuid, p_day text, p_text text) -> integer` | `SECURITY INVOKER`. **TEK plan ayrıştırıcısı** — hem veri dönüşümü hem `save_workout_plan` bunu kullanır |
-| `public.save_workout_plan` | `(p_client_ids uuid[], p_plan jsonb) -> integer` | `SECURITY INVOKER` (RLS uygulanır). `p_plan` = `{"Pazartesi": "metin", ...}`. Etkilenen danışan sayısını döner |
+| `public.save_workout_plan` | `(p_client_ids uuid[], p_plan jsonb) -> integer` | `SECURITY INVOKER` (RLS uygulanır). `p_plan` = `{"Pazartesi": "metin", ...}`. Etkilenen danışan sayısını döner. **Faz 2'den beri versiyonlu yayınlar** (bkz. §4j) |
+| `public.workout_plan_has_history` | `(p_plan_id uuid) -> boolean` | `SECURITY DEFINER`, `STABLE`. "Bu planın satırlarına bağlı bir `workout_logs` satırı var mı?" — `save_workout_plan()`'ın yayınla/taslak dallanma koşulu. DEFINER olmak **zorunda**: INVOKER'da RLS körlüğü **fail-open** olurdu (§4j) |
 | `public.migrate_workout_plans_from_profiles` | `() -> table(profiles_converted int, exercises_inserted int)` | `SECURITY DEFINER`, yalnız `service_role`. Idempotent veri dönüşümü; `transform.test.sql` bunu çağırır |
 | `public.explode_nutrition_day` | `(p_plan_id uuid, p_day text, p_entry jsonb) -> integer` | `SECURITY INVOKER`. **TEK beslenme günü yazıcısı** — hem dönüşüm hem `save_nutrition_plan` bunu kullanır. Ayrıştırma YAPMAZ |
 | `public.save_nutrition_plan` | `(p_client_ids uuid[], p_plan jsonb) -> integer` | `SECURITY INVOKER` (RLS uygulanır). `p_plan` = `{"Pazartesi": {"items": "metin", "total": 1850}, ...}`. Etkilenen danışan sayısını döner |
 | `public.migrate_nutrition_plans_from_profiles` | `() -> table(profiles_converted int, meals_inserted int)` | `SECURITY DEFINER`, yalnız `service_role`. Idempotent veri dönüşümü; `transform.test.sql` bunu çağırır |
 | `public.message_attachment_conversation` | `(p_name text) -> uuid` | `IMMUTABLE`. `message-attachments` nesne adından konuşma anahtarını (client_id) çıkarır; desene uymazsa **NULL** (fail-closed, bkz. §4h) |
 | `public.message_attachment_uploader` | `(p_name text) -> uuid` | `IMMUTABLE`. Aynı addan yükleyenin uid'ini çıkarır; desene uymazsa **NULL** (fail-closed, bkz. §4h) |
+| `public.post_system_message` | `(p_client_id uuid, p_event_type text, p_ref_id uuid default null) -> messages` | `SECURITY DEFINER`. **Tek** `kind='system'` yazma kanalı; yalnız koç çağırabilir. Serbest metin **almaz** — mesaj metni `p_event_type`'a göre gövdede şablondan üretilir (bkz. §4i) |
 
 `increment_streak` mantığı: `last_checkin_at` bugünse seri değişmez, dünse +1,
 daha eski/`NULL` ise 1'e sıfırlanır; her durumda `last_checkin_at = now()`.
@@ -298,11 +302,16 @@ select string_agg(raw_line, E'\n' order by position)
 çağırır. İkinci bir implementasyon yazılmamalıdır — `transform.test.sql` senaryo 9
 iki yolun **birebir aynı** satırları ürettiğini doğrular.
 
-### `save_workout_plan()` semantiği (Faz 1b)
+### `save_workout_plan()` semantiği
 
-* Aktif plan satırı yoksa `version = 1` ile oluşturulur; **varsa o kullanılır**.
-* Planın **tüm** `workout_plan_exercises` satırları silinip yeniden yazılır.
-* **Yeni versiyon ÜRETİLMEZ** — versiyon-yayınlama semantiği Faz 2'dedir.
+> **Bu bölüm Faz 2'de DEĞİŞTİ.** Faz 1b'de her kaydetme aktif planın satırlarını
+> silip yeniden yazıyordu ve **yeni versiyon üretmiyordu**. Güncel (versiyonlu)
+> davranış ve gerekçesi için bkz. **§4j** —
+> `20260817210000_workout_plan_versioning.sql`. Özet: aktif plana bağlı bir
+> antrenman logu **varsa** kaydetme bir **yayınlamadır** (eski plan
+> `is_active=false`, satırları korunur, `version+1` ile yeni aktif plan);
+> **yoksa** plan hâlâ taslaktır ve satırları yerinde yeniden yazılır.
+
 * `SECURITY INVOKER`: RLS ihlalinde hata **yükselir** (yakalanmaz) → çağrı atomiktir.
 * Geçersiz gün anahtarı **hata verir** (yazma yolunda sessiz veri kaybı kabul edilmez);
   dönüşüm yolunda ise atlanır (eski/bozuk veriyi kurtarabilmek için).
@@ -321,7 +330,7 @@ Dönüşüm kuralları: NULL / boş / geçersiz JSON / JSON-nesnesi-olmayan içe
 ### Testler
 
 ```bash
-npm run test:rls         # 95 senaryo (20–27 bu tablolara ait)
+npm run test:rls         # 104 senaryo (20–27 bu tablolara ait)
 npm run test:transform   # 26 senaryo (1–10 bu tablolara ait: dönüşüm + round-trip + idempotency)
 ```
 
@@ -396,18 +405,30 @@ Gün nesnesinde `items`/`total` dışında ek anahtar varsa o anahtar saklanmaz.
 `transform.test.sql` senaryo 18 iki yolun `EXCEPT ALL` ile **birebir aynı** satırları
 ürettiğini doğrular.
 
-### `save_nutrition_plan()` semantiği (Faz 1b)
+### `save_nutrition_plan()` semantiği
 
-`save_workout_plan()` ile birebir aynı desendedir: aktif plan yoksa `version = 1` ile
-oluşturulur (varsa o kullanılır), planın **tüm** öğün satırları silinip yeniden yazılır,
-**yeni versiyon üretilmez**, `SECURITY INVOKER` olduğu için RLS ihlali hatayı yükseltir
-(çağrı atomiktir). Geçersiz gün anahtarı **hata verir** ve doğrulama hiçbir satır yazılmadan
-**önce, toptan** yapılır; dönüşüm yolunda ise bilinmeyen gün atlanır.
+Aktif plan yoksa `version = 1` ile oluşturulur (varsa o kullanılır), planın **tüm** öğün
+satırları silinip yeniden yazılır, **yeni versiyon üretilmez**, `SECURITY INVOKER` olduğu
+için RLS ihlali hatayı yükseltir (çağrı atomiktir). Geçersiz gün anahtarı **hata verir** ve
+doğrulama hiçbir satır yazılmadan **önce, toptan** yapılır; dönüşüm yolunda ise bilinmeyen
+gün atlanır.
+
+> **Antrenman tarafı Faz 2'de versiyonlu yayınlamaya geçti; beslenme tarafı BİLİNÇLİ
+> OLARAK GEÇMEDİ** (`20260817210000_workout_plan_versioning.sql` KARAR 2, bkz. §4j).
+> Kısa gerekçe: `nutrition_plan_meals` satırlarına işaret eden **hiçbir FK yoktur** —
+> `nutrition_logs` plana bağlı değildir, serbest metin `description` tutar. Antrenman
+> tarafındaki veri kaybının (`workout_logs.plan_exercise_id` `ON DELETE SET NULL`)
+> beslenme karşılığı **yoktur**, dolayısıyla versiyonlamanın koruyacağı bir geçmiş de
+> yoktur; aynı kural buraya kopyalansaydı hiçbir zaman tetiklenmeyen ölü kod olurdu.
+>
+> **Gözden geçirme koşulu:** `nutrition_plan_meals`'e işaret eden bir FK eklendiği gün
+> (ör. `nutrition_logs.plan_meal_id`) bu fonksiyon da §4j'deki copy-on-write desenine
+> çevrilmelidir. Koşul `nutrition_plans` tablo yorumuna da yazılmıştır.
 
 ### Testler
 
 ```bash
-npm run test:rls         # 95 senaryo (28–35 bu tablolara ait)
+npm run test:rls         # 104 senaryo (28–35 bu tablolara ait)
 npm run test:transform   # 26 senaryo (11–19 bu tablolara ait)
 ```
 
@@ -485,7 +506,7 @@ kapısındadır. `useMarkConversationRead` iki kolonu da tutarlı tutar.
 ### Testler
 
 ```bash
-npm run test:rls         # 95 senaryo (36–42 mesajlaşma konuşma anahtarına ait)
+npm run test:rls         # 104 senaryo (36–42 mesajlaşma konuşma anahtarına ait)
 npm run test:transform   # 26 senaryo (20–22 backfill: temel + idempotency + atlanan satır)
 ```
 
@@ -581,7 +602,7 @@ taşırdı. Kısmi indeksin boyutu **kuyruk uzunluğuyla** orantılıdır, arşi
 ### Testler
 
 ```bash
-npm run test:rls         # 95 senaryo (43–50 form check incelemesine ait)
+npm run test:rls         # 104 senaryo (43–50 form check incelemesine ait)
 npm run test:transform   # 26 senaryo (23–26 backfill + tutarlılık kısıtı)
 ```
 
@@ -687,7 +708,7 @@ almasıdır — her iki durumda da istek reddedilir, yalnızca hata kodu farklı
 ### Testler
 
 ```bash
-npm run test:rls   # 95 senaryo (51–70 Faz 1.5 güvenlik regresyonlarına ait)
+npm run test:rls   # 104 senaryo (51–70 Faz 1.5 güvenlik regresyonlarına ait)
 ```
 
 Kapsanan boşluklar (`findings-access-control.md` §6): G-01, G-02, G-03, G-06 (51–57),
@@ -784,7 +805,7 @@ ve profil oluştu; `POST /auth/v1/admin/users` gerçek HTTP çağrısı `200` d�
 ### Testler
 
 ```bash
-npm run test:rls   # 95 senaryo (71–76 bu migration'a ait)
+npm run test:rls   # 104 senaryo (71–76 bu migration'a ait)
 ```
 
 * **71** — `authenticated` TRUNCATE edemez (`profiles cascade`, `messages`, `form_checks`)
@@ -896,7 +917,7 @@ işlem içinde gerçek bir `serial` tablo yaratarak ölçer.
 ### Testler
 
 ```bash
-npm run test:rls   # 95 senaryo (77–85 bu üç migration'a ait)
+npm run test:rls   # 104 senaryo (77–85 bu üç migration'a ait)
 ```
 
 * **77** — pozitif: RPC onay satırını + koç bildirimini atomik yazar (`title` NULL)
@@ -1092,7 +1113,7 @@ abone edilip `messages` üzerinde INSERT/UPDATE/DELETE tetiklendi.
 ### Testler
 
 ```bash
-npm run test:rls         # 95 senaryo (86–95 bu beş migration'a ait)
+npm run test:rls         # 99 senaryo (86–95 bu beş migration'a ait, 96–99 §4i'ye ait)
 npm run test:transform   # 26 senaryo (20/21 Faz 2b invaryantına göre güncellendi)
 ```
 
@@ -1104,6 +1125,7 @@ npm run test:transform   # 26 senaryo (20/21 Faz 2b invaryantına göre güncell
   kapalıyken CHECK reddeder
 * **93–94** — `nutrition_logs` erişim matrisi (koç **salt okur**) + günlük makro hedefi
 * **95** — realtime yayın sözleşmesi (sürüklenme testi)
+* **96–99** — `post_system_message()` RPC'si (bkz. §4i)
 
 `nutrition_logs` ayrıca **dinamik** senaryo 73 (yetki) ve 74 (RLS + FORCE) tarafından
 otomatik kapsanır.
@@ -1114,6 +1136,164 @@ Beş migration dosyasının da sonunda çalıştırılabilir bir `-- DOWN` bloğ
 **UYARI:** `nutrition_logs` ve `workout_logs`'un yeni kolonları geri alınırsa o veriyi
 tutan **başka bir yer yoktur** (DOWN blokları önce yedek almayı gösterir);
 `20260817190400`'ün geri alınması ölçülen DELETE sızıntısını yeniden açar.
+
+---
+
+## 4i. Faz 2e/f — Sistem Mesajı RPC'si (`kind='system'` yazma kanalı)
+
+Faz 2e `messages_guard_columns()`'in (§4e) `kind='system'`'i PostgREST üzerinden gelen
+**hiçbir** oturumdan (koç dahil) kabul etmediğini keşfetti ve bunu **kapsam dışı**
+bıraktı: `src/hooks/useFormChecks.ts` best-effort bir `.insert()` deniyor, `42501`'i
+BEKLENEN sayıp yutuyordu — plan §4.3/§4.4'ün "form check incelendi -> sistem mesajı"
+akışı sessizce **inert**ti. `20260817200000_system_message_rpc.sql` bu kanalı açar.
+
+### `public.post_system_message(p_client_id uuid, p_event_type text, p_ref_id uuid default null) -> messages`
+
+* **Kim çağırabilir: yalnızca koç.** `auth.uid() is null` (service_role / migration /
+  seed) zaten doğrudan INSERT ile serbesttir (`is_end_user_write()` false); bu RPC'nin
+  muhatabı PostgREST'ten gelen bir **koç** oturumudur (`is_coach(auth.uid())`).
+  Danışan — kendi adına ya da başkası adına fark etmez — `42501` alır (senaryo 97).
+* **Serbest metin YOK — AC-05'in dersi tekrarlanmadı.** RPC bir "mesaj metni"
+  parametresi almaz; yalnızca bir **olay türü** (`p_event_type`) ve o olayın sunucuda
+  zaten var olan kaydına bir **referans** (`p_ref_id`) alır. Metin RPC gövdesinde,
+  referansın sunucuda doğrulanmış alanlarından üretilir — AC-05'te (`notifications`,
+  §4e) aynı hata "şablonu sunucuya taşı" ile kapatılmıştı; burada bir adım öteye
+  gidilip **şablon parametresi hiç açılmadı**. Bugün tek olay türü:
+  `'form_check_reviewed'` (`p_ref_id = form_checks.id`) — `useFormChecks.ts`'in tek
+  ihtiyacı budur. Yeni bir olay türü eklemek yeni bir migration'da `create or replace
+  function` + CASE'e yeni bir `when` dalıdır; **imza değişmez**.
+* **`form_check_reviewed` doğrulaması** (hepsi gövdede, RLS'e güvenilmez —
+  `SECURITY DEFINER` onu zaten baypas eder): hedef gerçek bir `role='client'` profili
+  olmalı; `form_checks.id = p_ref_id` bulunmalı; o kaydın `client_id`'si
+  `p_client_id` ile eşleşmeli; `status = 'reviewed'` olmalı; `reviewed_by` **çağıran
+  koçun kendisi** olmalı. Dördü de düşerse `42501`; bilinmeyen `p_event_type` `22023`
+  alır (senaryo 99).
+* **Trigger'larla uyum: ATLAMA yok, GEÇME var.** RPC düz bir `insert into messages`
+  yapar; `messages_apply_conversation_key`, `messages_guard_columns`,
+  `messages_sync_read_state` bu INSERT'te de **ad sırasına göre** ateşlenir.
+  `messages_guard_columns` `is_end_user_write()`'ı `SECURITY DEFINER` sayesinde
+  `false` görüp çekilir (guard zayıflamadı — **koç dahil hiç kimse hâlâ doğrudan
+  `.insert()` ile `kind='system'` yazamaz**, senaryo 98); `messages_sync_read_state`
+  koşulsuz çalışıp yeni mesajı "okunmamış" (`read_at is null` / `is_read=false`)
+  bırakır. `attachment_path` bilerek `null` yazılır.
+* **`src/hooks/useFormChecks.ts`** artık `.rpc('post_system_message', { p_client_id,
+  p_event_type: 'form_check_reviewed', p_ref_id: formCheckId })` çağırır. Hata artık
+  **BEKLENMİYOR** (`42501` regresyonu değil, gerçek arıza) — `logger.error` +
+  görünür bir `toast.error` ile yüzeye çıkar. Yine de mutasyonu `throw` ile
+  **bloke etmez**: asıl işlem (`form_checks.status='reviewed'`) o ana kadar zaten
+  yazılmıştır ve geri alınmaz; hatayı `throw` etmek "geri bildirim kaydedilmedi"
+  gibi yanlış bir sinyal verirdi.
+
+### Testler
+
+```bash
+npm run test:rls   # senaryo 96–99
+```
+
+* **96** — POZİTİF: koç RPC ile sistem mesajı yazar; `kind='system'`, `client_id`
+  doğru, ek yok, `read_at`/`is_read` invaryantı sistem mesajında da tutuyor
+* **97** — danışan RPC'yi çağıramaz — ne kendi adına ne başkası adına (`42501`)
+* **98** — **kritik regresyon**: koç dahi doğrudan `.insert()` ile `kind='system'`
+  yazamaz (senaryo 61 aynısını danışan tarafında zaten kapatıyordu)
+* **99** — şablon dışı / sahte referans reddedilir: bilinmeyen olay türü (`22023`),
+  başka danışanın kaydı / henüz incelenmemiş / başka koç tarafından incelenmiş
+  (`42501`)
+
+### Geri alma
+
+`20260817200000_system_message_rpc.sql`'in sonundaki `-- DOWN` bloğu fonksiyonu
+düşürür. **UYARI:** bu, `kind='system'` yazma kanalını yeniden kapatır —
+`useFormChecks.ts`'in de eski best-effort `.insert()` yoluna döndürülmesi gerekir,
+aksi hâlde `useReviewFormCheck` her çağrıda gürültülü bir hata verir (bilerek).
+
+---
+
+## 4j. Faz 2 — Plan Versiyonlama (`save_workout_plan` copy-on-write)
+
+`20260817210000_workout_plan_versioning.sql`. `active_planprogram.md` §4.1 madde 1:
+"plan yayınlama = yeni `version`, eski versiyon `is_active=false`
+(**geçmiş loglar eski versiyona bağlı kalır — FK versiyonlu satıra**)".
+
+### Kapatılan gerçek veri kaybı
+
+`workout_logs.plan_exercise_id` FK'si **`ON DELETE SET NULL`**'dur (§4h).
+Faz 1b'nin `save_workout_plan()`'i her çağrıda planın **tüm**
+`workout_plan_exercises` satırlarını **silip yeniden yazıyordu** — yani koç bir plan
+üzerinde çalışırken her "Kaydet" tıklaması, o satırlara bağlı **tüm geçmiş antrenman
+loglarının plan bağını NULL'a düşürüyordu**. Log satırı yaşıyor, geriye yalnızca serbest
+metin `exercise_name` etiketi kalıyordu. Plandaki parantez içi garanti **sağlanmıyordu**.
+
+### Copy-on-write: bir versiyon, üzerine geçmiş düştüğü an DONAR
+
+Danışan başına üç dal:
+
+| Durum | Davranış |
+|---|---|
+| Aktif plan **yok** | `max(version)+1` (arşiv varsa onun üstünden) ile yeni aktif plan |
+| Aktif plan var, satırlarına bağlı **log VAR** | **YAYINLAMA**: eski plan `is_active=false`, **satırlarına DOKUNULMAZ**, `version+1` ile yeni aktif plan açılır (`notes` taşınır) |
+| Aktif plan var, bağlı log **YOK** | **TASLAK**: satırlar yerinde silinip yeniden yazılır (Faz 1b davranışı); kimse bağlı olmadığı için kayıp yoktur |
+
+Dallanma koşulu `public.workout_plan_has_history(plan_id)`'dir.
+
+**Neden "her kaydetme = yeni versiyon" DEĞİL:** üründe ayrı bir "Yayınla" eylemi yok
+(tek yazma yolu `save_workout_plan`), bu yüzden her tıklama yeni versiyon üretseydi
+`version` "koç kaç kez kaydetti"yi ölçen anlamsız bir sayıya döner ve arşiv görünmez çöple
+şişerdi. Copy-on-write ile `version` **anlamlıdır**: v3 = danışan bu plandan üç kez geçti.
+Çift tıklama **kendiliğinden** elenir — yayından hemen sonra yeni aktif versiyonun henüz
+logu yoktur, ikinci kaydetme taslak dalına düşer.
+
+**Neden RPC imzası değişmedi:** `(uuid[], jsonb) -> integer` korundu; ayrım
+parametreden değil **veriden** türetilir. `src/hooks/usePlans.ts` ve
+`src/hooks/useWorkoutSession.ts` hiç değişmedi.
+
+**Toplu atama:** `version` GLOBAL değil **danışan başına** sayaçtır — aynı çağrıda
+danışan A v3'e, danışan B v1'e gidebilir. Yeni
+`workout_plans_client_version_uniq` (`unique (client_id, version)`) bunu şemada kilitler.
+
+**Sıralama:** `workout_plans_one_active_idx` (`unique (client_id) where is_active`) ihlal
+edilmez çünkü gövde **önce** eskiyi `is_active=false` yapar, **sonra** yenisini ekler.
+
+### `workout_plan_has_history()` neden `SECURITY DEFINER`
+
+Bu bir **görünürlük** değil **bütünlük** sorusudur — desen
+`workout_logs_guard_plan_exercise()` (§4h) ile aynıdır. `INVOKER` olsaydı ve
+`workout_logs` RLS'i çağırandan tek bir satırı bile gizleseydi, fonksiyon "geçmiş yok"
+der ve `save_workout_plan()` **tam da önlemek için yazıldığı veri kaybını** yapardı:
+hata modu **fail-open** olurdu. Döndürdüğü tek şey bir boolean'dır.
+
+### Okuma yolları etkilenmez
+
+`useWorkoutPlan` / `useWorkoutPlanExercises` zaten `.eq('is_active', true).maybeSingle()`
+ile okuyor; arşiv satırları bu filtreden geçmez. Arşiv **okunabilir** olmaya devam eder
+(danışan kendi arşivini görür) — geçmiş logun bağlı olduğu satır aksi hâlde
+çözümlenemezdi.
+
+### Testler
+
+```bash
+npm run test:rls   # 104 senaryo (100–104 bu migration'a ait)
+```
+
+* **100** — yayınlama: eski plan arşivlenir, satırları korunur, yeni plan `version = eski+1`
+* **101** — **EN KRİTİK:** geçmiş `workout_logs.plan_exercise_id` **NULL'a düşmez** ve
+  arşiv (eski) versiyona bağlı kalır
+* **102** — okuma yolları yayından sonra da **tek** aktif planı görür (`maybeSingle()`
+  kırılmaz); arşiv okunabilir ama aktif değil
+* **103** — toplu atamada versiyon danışan başına bağımsız ilerler (A v2, B v1); çift
+  kaydetme versiyon şişirmez
+* **104** — `workout_plans_one_active_idx` ve `workout_plans_client_version_uniq` ihlal
+  edilmez; elle ikinci aktif plan yazma denemesi `23505`
+
+> Kırmızı-yeşil doğrulandı: migration'ın `-- DOWN` bloğu uygulanınca 100, 101, 102b ve 103
+> **başarısız olur** (101 tam olarak "GECMIS LOGUN PLAN BAGI NULL A DUSTU" mesajıyla).
+> 104 bir **koruma** testidir (indeksler zaten vardı), değişiklik dedektörü değildir.
+
+### Geri alma
+
+Migration dosyasının sonunda çalıştırılabilir bir `-- DOWN` bloğu vardır.
+**UYARI:** geri alma yukarıdaki veri kaybını **yeniden açar**. Zaten oluşmuş arşiv
+versiyonları silinmez (onlara bağlı loglar vardır); okuma yolları `is_active=true`
+filtrelediği için görünmezler.
 
 ---
 

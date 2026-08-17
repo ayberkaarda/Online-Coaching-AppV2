@@ -4265,8 +4265,674 @@ rollback;
 
 
 -- =============================================================================
+-- FAZ 2f — SISTEM MESAJI RPC (20260817200000_system_message_rpc.sql)
+-- =============================================================================
+
+
+-- =============================================================================
+-- SISTEM MESAJI — 96) POZITIF: koc RPC ile sistem mesaji yazabiliyor
+-- `messages_guard_columns()`'in dogrudan INSERT'te kapattigi kanal artik
+-- `post_system_message()` RPC'si uzerinden GERCEKTEN acik. Mesaj kind='system',
+-- client_id konusmanin dogru tarafinda, ek yok, ve read_at/is_read invaryanti
+-- (messages_read_state_chk / messages_sync_read_state) sistem mesajinda da
+-- tutuyor (yeni mesaj "okunmamis" olarak dogar).
+-- =============================================================================
+begin;
+do $$
+declare
+  v_fc_id uuid;
+begin
+  set local role authenticated;
+  set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+  insert into public.form_checks (client_id, current_weight, front_pose_path)
+  values ('22222222-2222-2222-2222-222222222222'::uuid, 81.4,
+          'poses/22222222-2222-2222-2222-222222222222-96000000-0000-0000-0000-000000000096.jpg')
+  returning id into v_fc_id;
+  perform set_config('zz.fc_96', v_fc_id::text, true);
+end $$;
+
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+do $$
+declare
+  v_fc_id uuid := current_setting('zz.fc_96')::uuid;
+  v_msg   public.messages;
+begin
+  update public.form_checks
+     set status = 'reviewed', coach_feedback = 'zz-96 harika gidiyorsun'
+   where id = v_fc_id;
+
+  select * into v_msg from public.post_system_message(
+    '22222222-2222-2222-2222-222222222222'::uuid, 'form_check_reviewed', v_fc_id);
+
+  if v_msg.id is null then
+    raise exception 'BASARISIZ [96 RPC]: satir DONMEDI';
+  end if;
+  if v_msg.kind is distinct from 'system'::public.message_kind then
+    raise exception 'BASARISIZ [96 kind]: beklenen system, gelen %', v_msg.kind;
+  end if;
+  if v_msg.client_id is distinct from '22222222-2222-2222-2222-222222222222'::uuid then
+    raise exception 'BASARISIZ [96 client_id]: gelen %', v_msg.client_id;
+  end if;
+  if v_msg.sender_id is distinct from '11111111-1111-1111-1111-111111111111'::uuid
+     or v_msg.receiver_id is distinct from '22222222-2222-2222-2222-222222222222'::uuid then
+    raise exception 'BASARISIZ [96 sender/receiver]: gonderen=%, alici=%', v_msg.sender_id, v_msg.receiver_id;
+  end if;
+  if v_msg.attachment_path is not null then
+    raise exception 'BASARISIZ [96 attachment_path]: sistem mesajinin eki OLMAMALI, gelen %', v_msg.attachment_path;
+  end if;
+  if v_msg.message not like '%zz-96 harika gidiyorsun%' then
+    raise exception 'BASARISIZ [96 metin]: koc geri bildirimini ICERMIYOR -- gelen %', v_msg.message;
+  end if;
+  if v_msg.read_at is not null or v_msg.is_read then
+    raise exception 'BASARISIZ [96 okundu invaryanti]: yeni sistem mesaji OKUNMUS dogdu (read_at=%, is_read=%)', v_msg.read_at, v_msg.is_read;
+  end if;
+  if v_msg.is_read is distinct from (v_msg.read_at is not null) then
+    raise exception 'BASARISIZ [96 is_read/read_at invaryanti]: is_read=%, read_at=%', v_msg.is_read, v_msg.read_at;
+  end if;
+
+  raise notice 'GECTI [96 POZITIF - post_system_message() kind=system yazar, client_id dogru, ek yok, okunmamis dogar]';
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- SISTEM MESAJI — 97) Danisan RPC'yi CAGIRAMAZ -- ne kendi adina ne baskasi adina
+-- `post_system_message()` yalnizca `is_coach(auth.uid())` icin acik (Tasarim
+-- Karari 2). Danisanin sistem mesaji "tetikleyecegi" hicbir mesru senaryo yok.
+-- =============================================================================
+begin;
+do $$
+declare
+  v_fc_id uuid;
+begin
+  set local role authenticated;
+  set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+  insert into public.form_checks (client_id, current_weight, front_pose_path)
+  values ('22222222-2222-2222-2222-222222222222'::uuid, 81.4,
+          'poses/22222222-2222-2222-2222-222222222222-97000000-0000-0000-0000-000000000097.jpg')
+  returning id into v_fc_id;
+  perform set_config('zz.fc_97', v_fc_id::text, true);
+end $$;
+
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+do $$
+declare
+  v_fc_id uuid := current_setting('zz.fc_97')::uuid;
+begin
+  update public.form_checks set status = 'reviewed', coach_feedback = 'zz-97' where id = v_fc_id;
+end $$;
+
+-- (a) Danisan A kendi adina cagiriyor
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+do $$
+declare
+  v_fc_id  uuid := current_setting('zz.fc_97')::uuid;
+  v_caught boolean := false;
+  v_state  text;
+begin
+  begin
+    perform public.post_system_message('22222222-2222-2222-2222-222222222222'::uuid, 'form_check_reviewed', v_fc_id);
+  exception when insufficient_privilege then
+    v_caught := true; get stacked diagnostics v_state = returned_sqlstate;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [97a]: danisan KENDI adina RPC yi cagirabildi -- sadece koc cagirabilmeliydi!';
+  end if;
+  if v_state is distinct from '42501' then
+    raise exception 'BASARISIZ [97a hata kodu]: beklenen 42501, gelen %', v_state;
+  end if;
+  raise notice 'GECTI [97a Danisan kendi adina RPC yi cagiramaz (42501)]';
+end $$;
+
+-- (b) Danisan B, danisan A adina cagirmaya calisiyor
+set local request.jwt.claims = '{"sub":"33333333-3333-3333-3333-333333333333","role":"authenticated"}';
+do $$
+declare
+  v_fc_id  uuid := current_setting('zz.fc_97')::uuid;
+  v_caught boolean := false;
+  v_state  text;
+begin
+  begin
+    perform public.post_system_message('22222222-2222-2222-2222-222222222222'::uuid, 'form_check_reviewed', v_fc_id);
+  exception when insufficient_privilege then
+    v_caught := true; get stacked diagnostics v_state = returned_sqlstate;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [97b]: danisan B, A adina RPC yi cagirabildi!';
+  end if;
+  if v_state is distinct from '42501' then
+    raise exception 'BASARISIZ [97b hata kodu]: beklenen 42501, gelen %', v_state;
+  end if;
+  raise notice 'GECTI [97b Danisan B, A adina RPC yi cagiramaz (42501)]';
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- SISTEM MESAJI — 98) [KRITIK REGRESYON] KOC bile DOGRUDAN .insert() ile
+-- kind='system' YAZAMAZ -- RPC eklenmesi guard'i ZAYIFLATMADI
+--
+-- Senaryo 61 bunu DANISAN tarafinda zaten kanitliyor; bu senaryo KOC tarafini
+-- kapatir (guard KOC DAHIL herkese kapali, 20260817160200 §1). Tek yazma
+-- kanali post_system_message() RPC'sidir.
+-- =============================================================================
+begin;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+do $$
+declare
+  v_caught boolean := false;
+  v_state  text;
+begin
+  begin
+    insert into public.messages (sender_id, receiver_id, client_id, kind, message)
+    values ('11111111-1111-1111-1111-111111111111'::uuid,
+            '22222222-2222-2222-2222-222222222222'::uuid,
+            '22222222-2222-2222-2222-222222222222'::uuid,
+            'system'::public.message_kind,
+            'zz-98 dogrudan sistem mesaji denemesi');
+  exception when insufficient_privilege then
+    v_caught := true; get stacked diagnostics v_state = returned_sqlstate;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [98]: KOC dogrudan insert ile kind=system YAZABILDI -- guard RPC eklenirken ZAYIFLADI!';
+  end if;
+  if v_state is distinct from '42501' then
+    raise exception 'BASARISIZ [98 hata kodu]: beklenen 42501, gelen %', v_state;
+  end if;
+  raise notice 'GECTI [98 KRITIK - Koc dahi dogrudan insert ile kind=system yazamaz (42501), guard zayiflamadi]';
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- SISTEM MESAJI — 99) RPC serbest metin / sahte referans KABUL ETMEZ
+--   (a) bilinmeyen olay turu                        -> 22023
+--   (b) form_checks kaydi baska danisana ait         -> 42501
+--   (c) form_checks kaydi henuz incelenmedi(pending) -> 42501
+--   (d) form_checks kaydi cagiran KOC tarafindan degil BASKASI tarafindan
+--       incelenmis                                   -> 42501
+--       (tek koclu modelde bu yolu tetiklemek icin postgres kimligiyle --
+--        form_checks_guard_review auth.uid() NULL iken CEKILIR (§6a) -- elle
+--        sahte reviewed_by yaziliyor; gercek uygulama akisinda olusmaz, tek
+--        amac RPC'nin KENDI kontrolunu olcmek)
+-- =============================================================================
+begin;
+
+insert into public.form_checks (client_id, current_weight, front_pose_path, status, coach_feedback, reviewed_at, reviewed_by)
+values
+  -- (b) icin: B'ye ait, incelenmis
+  ('33333333-3333-3333-3333-333333333333'::uuid, 70.0,
+   'poses/33333333-3333-3333-3333-333333333333-99000000-0000-0000-0000-000000000b01.jpg',
+   'reviewed'::public.form_check_status, 'zz-99b', now(), '11111111-1111-1111-1111-111111111111'::uuid),
+  -- (c) icin: A'ya ait, HALA pending
+  ('22222222-2222-2222-2222-222222222222'::uuid, 82.0,
+   'poses/22222222-2222-2222-2222-222222222222-99000000-0000-0000-0000-000000000c01.jpg',
+   'pending'::public.form_check_status, null, null, null),
+  -- (d) icin: A'ya ait, incelenmis AMA reviewed_by cagiran KOC DEGIL
+  ('22222222-2222-2222-2222-222222222222'::uuid, 82.0,
+   'poses/22222222-2222-2222-2222-222222222222-99000000-0000-0000-0000-000000000d01.jpg',
+   'reviewed'::public.form_check_status, 'zz-99d', now(), '33333333-3333-3333-3333-333333333333'::uuid);
+
+do $$
+begin
+  perform set_config('zz.fc_99b',
+    (select id::text from public.form_checks where coach_feedback = 'zz-99b'), true);
+  perform set_config('zz.fc_99c',
+    (select id::text from public.form_checks
+      where client_id = '22222222-2222-2222-2222-222222222222'::uuid
+        and status = 'pending'::public.form_check_status
+        and current_weight = 82.0 and reviewed_by is null), true);
+  perform set_config('zz.fc_99d',
+    (select id::text from public.form_checks where coach_feedback = 'zz-99d'), true);
+end $$;
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+do $$
+declare
+  v_caught boolean;
+  v_state  text;
+begin
+  -- (a) bilinmeyen olay turu
+  v_caught := false;
+  begin
+    perform public.post_system_message('22222222-2222-2222-2222-222222222222'::uuid, 'plan_published', null);
+  exception when others then
+    v_caught := true; get stacked diagnostics v_state = returned_sqlstate;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [99a]: bilinmeyen olay turu KABUL EDILDI -- serbest bicimde yeni olay uydurulabilir!';
+  end if;
+  if v_state is distinct from '22023' then
+    raise exception 'BASARISIZ [99a hata kodu]: beklenen 22023, gelen %', v_state;
+  end if;
+
+  -- (b) baska danisanin form_check'i A'ya baglanmaya calisiliyor
+  v_caught := false;
+  begin
+    perform public.post_system_message('22222222-2222-2222-2222-222222222222'::uuid, 'form_check_reviewed', current_setting('zz.fc_99b')::uuid);
+  exception when insufficient_privilege then
+    v_caught := true; get stacked diagnostics v_state = returned_sqlstate;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [99b]: baska danisanin form_check i baska birine BAGLANABILDI!';
+  end if;
+  if v_state is distinct from '42501' then
+    raise exception 'BASARISIZ [99b hata kodu]: beklenen 42501, gelen %', v_state;
+  end if;
+
+  -- (c) henuz incelenmemis (pending) form_check
+  v_caught := false;
+  begin
+    perform public.post_system_message('22222222-2222-2222-2222-222222222222'::uuid, 'form_check_reviewed', current_setting('zz.fc_99c')::uuid);
+  exception when insufficient_privilege then
+    v_caught := true; get stacked diagnostics v_state = returned_sqlstate;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [99c]: HENUZ incelenmemis form_check icin sistem mesaji URETILEBILDI!';
+  end if;
+  if v_state is distinct from '42501' then
+    raise exception 'BASARISIZ [99c hata kodu]: beklenen 42501, gelen %', v_state;
+  end if;
+
+  -- (d) reviewed_by cagiran koc DEGIL
+  v_caught := false;
+  begin
+    perform public.post_system_message('22222222-2222-2222-2222-222222222222'::uuid, 'form_check_reviewed', current_setting('zz.fc_99d')::uuid);
+  exception when insufficient_privilege then
+    v_caught := true; get stacked diagnostics v_state = returned_sqlstate;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [99d]: reviewed_by BASKASI iken cagiran koc yine de sistem mesaji URETEBILDI!';
+  end if;
+  if v_state is distinct from '42501' then
+    raise exception 'BASARISIZ [99d hata kodu]: beklenen 42501, gelen %', v_state;
+  end if;
+
+  raise notice 'GECTI [99 RPC sablon disi / sahte referans kabul etmiyor: bilinmeyen olay(22023), yanlis danisan/henuz incelenmemis/baska koc(42501)]';
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- PLAN VERSIYONLAMA — 100) YAYINLAMA: eski plan arşivlenir, satırları KORUNUR,
+-- yeni plan `version = eski + 1` ve `is_active = true` olur.
+--
+-- Kaynak: active_planprogram.md §4.1 "plan yayınlama = yeni version, eski
+-- versiyon is_active=false". Uygulama: 20260817210000_workout_plan_versioning.sql
+--
+-- KURULUM ÖNEMLİ: yayınlama dalına ancak aktif planın satırlarına bağlı BİR LOG
+-- varsa girilir (copy-on-write, migration KARAR 1/C). Bu yüzden önce danışan
+-- kendi adına bir set yazar (koç `workout_logs`'a INSERT EDEMEZ — senaryo 88).
+-- =============================================================================
+begin;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+do $$
+declare
+  v_plan uuid;
+  v_pe   uuid;
+begin
+  select wp.id into v_plan
+    from public.workout_plans wp
+   where wp.client_id = '22222222-2222-2222-2222-222222222222'::uuid and wp.is_active;
+  if v_plan is null then
+    raise exception 'BASARISIZ [100 kurulum]: Danisan A nin aktif plani yok (seed bozuk)';
+  end if;
+
+  select wpe.id into v_pe from public.workout_plan_exercises wpe where wpe.plan_id = v_plan
+   order by wpe.day, wpe.position limit 1;
+  if v_pe is null then
+    raise exception 'BASARISIZ [100 kurulum]: aktif planin egzersiz satiri yok';
+  end if;
+
+  insert into public.workout_logs (client_id, exercise_name, set_number, plan_exercise_id)
+  values ('22222222-2222-2222-2222-222222222222'::uuid, 'zz-100-gecmis', 1, v_pe);
+
+  perform set_config('zz.plan_v1', v_plan::text, true);
+  perform set_config('zz.pe_v1',   v_pe::text,   true);
+  perform set_config('zz.rows_v1', (select count(*)::text from public.workout_plan_exercises where plan_id = v_plan), true);
+end $$;
+
+-- Yayınlamayı KOÇ yapar (gerçek akış: koç planı kaydeder).
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+do $$
+declare
+  v_old      uuid := current_setting('zz.plan_v1')::uuid;
+  v_new      uuid;
+  v_ver      integer;
+  v_old_ver  integer;
+  v_old_act  boolean;
+  v_rows_old integer;
+begin
+  select version into v_old_ver from public.workout_plans where id = v_old;
+
+  perform public.save_workout_plan(
+    array['22222222-2222-2222-2222-222222222222'::uuid],
+    '{"Pazartesi": "1. Zz Yayin - 4x8"}'::jsonb
+  );
+
+  select id, version into v_new, v_ver
+    from public.workout_plans
+   where client_id = '22222222-2222-2222-2222-222222222222'::uuid and is_active;
+  select is_active into v_old_act from public.workout_plans where id = v_old;
+  select count(*) into v_rows_old from public.workout_plan_exercises where plan_id = v_old;
+
+  if v_new is null or v_new = v_old then
+    raise exception 'BASARISIZ [100a]: yayinlama YENI bir plan satiri uretmedi (hala %)', v_old;
+  end if;
+  if v_ver is distinct from (v_old_ver + 1) then
+    raise exception 'BASARISIZ [100b version]: beklenen %, gelen %', v_old_ver + 1, v_ver;
+  end if;
+  if coalesce(v_old_act, true) then
+    raise exception 'BASARISIZ [100c]: eski plan hala is_active=true -- arsivlenmedi';
+  end if;
+  if v_rows_old is distinct from current_setting('zz.rows_v1')::integer then
+    raise exception 'BASARISIZ [100d]: eski VERSIYONUN satirlari degisti (beklenen %, gelen %) -- yayinlama arsivi BOZUYOR',
+      current_setting('zz.rows_v1')::integer, v_rows_old;
+  end if;
+
+  raise notice 'GECTI [100 Yayinlama: eski plan arsivlendi (v%), yeni aktif plan v% acildi, arsiv satirlari korundu]', v_old_ver, v_ver;
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- PLAN VERSIYONLAMA — 101) *** EN KRİTİK *** GEÇMİŞ LOGUN PLAN BAĞI KOPMUYOR
+--
+-- ÖLÇTÜĞÜ GERÇEK KAYIP: `workout_logs.plan_exercise_id` FK'si
+-- `ON DELETE SET NULL`'dur (20260817190000). Faz 1b'de `save_workout_plan()`
+-- plan satırlarını SİLİP yeniden yazdığı için koç her kaydettiğinde danışanın
+-- GEÇMİŞ LOGLARININ plan bağı NULL'a düşüyordu; geriye yalnızca serbest metin
+-- `exercise_name` etiketi kalıyordu. §4.1'in "geçmiş loglar eski versiyona
+-- bağlı kalır — FK versiyonlu satıra" garantisi SAĞLANMIYORDU.
+--
+-- Bu senaryo 20260817210000 geri alınırsa KIRILIR (kırmızı-yeşil kanıtı).
+-- =============================================================================
+begin;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+do $$
+declare
+  v_plan uuid;
+  v_pe   uuid;
+  v_log  uuid;
+begin
+  select wp.id into v_plan from public.workout_plans wp
+   where wp.client_id = '22222222-2222-2222-2222-222222222222'::uuid and wp.is_active;
+  select wpe.id into v_pe from public.workout_plan_exercises wpe where wpe.plan_id = v_plan
+   order by wpe.day, wpe.position limit 1;
+  if v_pe is null then
+    raise exception 'BASARISIZ [101 kurulum]: aktif planin egzersiz satiri yok';
+  end if;
+
+  insert into public.workout_logs (client_id, exercise_name, weight_kg, reps, set_number, plan_exercise_id, completed_at)
+  values ('22222222-2222-2222-2222-222222222222'::uuid, 'zz-101-gecmis', 62.5, 8, 1, v_pe, now())
+  returning id into v_log;
+
+  perform set_config('zz.log_101', v_log::text, true);
+  perform set_config('zz.pe_101',  v_pe::text,  true);
+  perform set_config('zz.plan_101', v_plan::text, true);
+end $$;
+
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+do $$
+declare
+  v_log   uuid := current_setting('zz.log_101')::uuid;
+  v_pe    uuid := current_setting('zz.pe_101')::uuid;
+  v_plan  uuid := current_setting('zz.plan_101')::uuid;
+  v_fk    uuid;
+  v_owner uuid;
+  v_act   boolean;
+begin
+  -- Koç planı kaydeder (gerçek akış). Faz 1b'de bu satır logu koparıyordu.
+  perform public.save_workout_plan(
+    array['22222222-2222-2222-2222-222222222222'::uuid],
+    '{"Pazartesi": "1. Zz Yeni Plan - 5x5", "Salı": "1. Zz Ikinci - 3x12"}'::jsonb
+  );
+
+  select plan_exercise_id into v_fk from public.workout_logs where id = v_log;
+
+  if v_fk is null then
+    raise exception 'BASARISIZ [101]: GECMIS LOGUN PLAN BAGI NULL A DUSTU -- plan kaydetmek antrenman gecmisini KOPARIYOR (§4.1 ihlali)';
+  end if;
+  if v_fk is distinct from v_pe then
+    raise exception 'BASARISIZ [101 hedef]: log baska bir plan satirina kaydi (beklenen %, gelen %)', v_pe, v_fk;
+  end if;
+
+  -- FK gerçekten ESKİ (arşiv) versiyona işaret etmeli, yenisine değil.
+  select wp.id, wp.is_active into v_owner, v_act
+    from public.workout_plan_exercises wpe
+    join public.workout_plans wp on wp.id = wpe.plan_id
+   where wpe.id = v_fk;
+
+  if v_owner is distinct from v_plan then
+    raise exception 'BASARISIZ [101 versiyon]: log un bagli oldugu satir % planina ait, beklenen %', v_owner, v_plan;
+  end if;
+  if coalesce(v_act, true) then
+    raise exception 'BASARISIZ [101 arsiv]: log un bagli oldugu plan hala aktif -- eski versiyon arsivlenmemis';
+  end if;
+
+  raise notice 'GECTI [101 KRITIK: gecmis log ESKI (arsiv) versiyona bagli KALDI, FK NULL a dusmedi]';
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- PLAN VERSIYONLAMA — 102) OKUMA YOLLARI YAYINDAN SONRA DA AKTİF PLANI GÖRÜR
+--
+-- Arşiv satırları eklendikten sonra `useWorkoutPlan` / `useWorkoutPlanExercises`
+-- sorgularının (`.eq('is_active', true).maybeSingle()`) hâlâ TEK satır döndürmesi
+-- ve o satırın YENİ versiyon olması şart. `maybeSingle()` birden çok satırda
+-- HATA verir — yani arşiv sızarsa uygulama kırılırdı.
+-- =============================================================================
+begin;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+do $$
+declare
+  v_plan uuid;
+  v_pe   uuid;
+begin
+  select wp.id into v_plan from public.workout_plans wp
+   where wp.client_id = '22222222-2222-2222-2222-222222222222'::uuid and wp.is_active;
+  select wpe.id into v_pe from public.workout_plan_exercises wpe where wpe.plan_id = v_plan limit 1;
+  insert into public.workout_logs (client_id, exercise_name, set_number, plan_exercise_id)
+  values ('22222222-2222-2222-2222-222222222222'::uuid, 'zz-102', 1, v_pe);
+end $$;
+
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+select public.save_workout_plan(
+  array['22222222-2222-2222-2222-222222222222'::uuid],
+  '{"Pazartesi": "1. Zz Aktif - 4x8"}'::jsonb
+);
+
+-- KOÇ gözünden okuma (usePlans.useWorkoutPlan sorgusu).
+do $$
+declare
+  v_n    integer;
+  v_text text;
+begin
+  select count(*) into v_n from public.workout_plans
+   where client_id = '22222222-2222-2222-2222-222222222222'::uuid and is_active;
+  if v_n is distinct from 1 then
+    raise exception 'BASARISIZ [102a koc]: aktif plan sayisi % -- maybeSingle() kirilirdi', v_n;
+  end if;
+
+  select string_agg(wpe.raw_line, E'\n' order by wpe.position) into v_text
+    from public.workout_plans wp
+    join public.workout_plan_exercises wpe on wpe.plan_id = wp.id
+   where wp.client_id = '22222222-2222-2222-2222-222222222222'::uuid
+     and wp.is_active and wpe.day = 'Pazartesi';
+  if v_text is distinct from '1. Zz Aktif - 4x8' then
+    raise exception 'BASARISIZ [102a icerik]: koc YENI plani gormuyor, gelen %', coalesce(v_text, '<null>');
+  end if;
+  raise notice 'GECTI [102a Koc yayindan sonra TEK aktif plani ve YENI icerigi goruyor]';
+end $$;
+
+-- DANIŞAN gözünden okuma (aynı sorgu + gym modu satırları).
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+do $$
+declare
+  v_n     integer;
+  v_rows  integer;
+  v_arch  integer;
+begin
+  select count(*) into v_n from public.workout_plans
+   where client_id = '22222222-2222-2222-2222-222222222222'::uuid and is_active;
+  if v_n is distinct from 1 then
+    raise exception 'BASARISIZ [102b danisan]: aktif plan sayisi %', v_n;
+  end if;
+
+  -- useWorkoutSession.useWorkoutPlanExercises: aktif planin satirlari.
+  select count(*) into v_rows
+    from public.workout_plans wp
+    join public.workout_plan_exercises wpe on wpe.plan_id = wp.id
+   where wp.client_id = '22222222-2222-2222-2222-222222222222'::uuid and wp.is_active;
+  if v_rows is distinct from 1 then
+    raise exception 'BASARISIZ [102b gym modu]: aktif plan satir sayisi %, beklenen 1', v_rows;
+  end if;
+
+  -- Arsiv GORUNUR olmali (gecmis log cozumlenebilsin diye) ama AKTIF olmamali.
+  select count(*) into v_arch from public.workout_plans
+   where client_id = '22222222-2222-2222-2222-222222222222'::uuid and not is_active;
+  if v_arch < 1 then
+    raise exception 'BASARISIZ [102b arsiv]: danisan kendi arsiv versiyonunu goremiyor -- gecmis log cozumlenemez';
+  end if;
+
+  raise notice 'GECTI [102b Danisan aktif plani goruyor, arsiv okunabilir ama aktif degil]';
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- PLAN VERSIYONLAMA — 103) TOPLU ATAMADA VERSİYON HER DANIŞAN İÇİN BAĞIMSIZ
+-- ilerler + TASLAK dalı versiyon şişirmez (çift kaydetme v3 üretmez).
+--
+-- `save_workout_plan(p_client_ids uuid[], ...)` aynı planı N danışana yazar;
+-- `version` GLOBAL değil DANIŞAN BAŞINA sayaçtır. Bu senaryoda A'nın geçmişi
+-- vardır (yayınlanır, v1 -> v2), B'nin yoktur (taslak, v1'de kalır).
+-- =============================================================================
+begin;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+do $$
+declare v_plan uuid; v_pe uuid;
+begin
+  select wp.id into v_plan from public.workout_plans wp
+   where wp.client_id = '22222222-2222-2222-2222-222222222222'::uuid and wp.is_active;
+  select wpe.id into v_pe from public.workout_plan_exercises wpe where wpe.plan_id = v_plan limit 1;
+  insert into public.workout_logs (client_id, exercise_name, set_number, plan_exercise_id)
+  values ('22222222-2222-2222-2222-222222222222'::uuid, 'zz-103', 1, v_pe);
+end $$;
+
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+do $$
+declare
+  v_a uuid := '22222222-2222-2222-2222-222222222222';
+  v_b uuid := '33333333-3333-3333-3333-333333333333';
+  v_va integer; v_vb integer; v_na integer; v_nb integer;
+begin
+  -- TEK cagri, IKI danisan: A yayinlanmali, B taslak kalmali.
+  perform public.save_workout_plan(array[v_a, v_b], '{"Pazartesi": "1. Zz Toplu - 3x10"}'::jsonb);
+
+  select version into v_va from public.workout_plans where client_id = v_a and is_active;
+  select version into v_vb from public.workout_plans where client_id = v_b and is_active;
+  select count(*) into v_na from public.workout_plans where client_id = v_a;
+  select count(*) into v_nb from public.workout_plans where client_id = v_b;
+
+  if v_va is distinct from 2 then
+    raise exception 'BASARISIZ [103a]: gecmisi OLAN danisan A nin versiyonu %, beklenen 2', v_va;
+  end if;
+  if v_vb is distinct from 1 then
+    raise exception 'BASARISIZ [103b]: gecmisi OLMAYAN danisan B nin versiyonu % -- versiyon sayaci GLOBAL olmus, danisan basina degil', v_vb;
+  end if;
+  if v_na is distinct from 2 or v_nb is distinct from 1 then
+    raise exception 'BASARISIZ [103c]: plan satir sayilari A=% B=%, beklenen 2/1', v_na, v_nb;
+  end if;
+
+  -- CIFT KAYDETME: yeni aktif versiyonun henuz logu yok -> taslak dali.
+  perform public.save_workout_plan(array[v_a, v_b], '{"Pazartesi": "1. Zz Ikinci Kayit - 3x10"}'::jsonb);
+  select version into v_va from public.workout_plans where client_id = v_a and is_active;
+  select count(*) into v_na from public.workout_plans where client_id = v_a;
+  if v_va is distinct from 2 or v_na is distinct from 2 then
+    raise exception 'BASARISIZ [103d]: ikinci kaydetme yeni versiyon uretti (v=%, toplam=%) -- her tikla versiyon sisiyor', v_va, v_na;
+  end if;
+
+  raise notice 'GECTI [103 Toplu atamada versiyon danisan basina ilerliyor (A v2, B v1); cift kaydetme sismiyor]';
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- PLAN VERSIYONLAMA — 104) TEKİLLİK KISITLARI İHLAL EDİLMİYOR
+--   (a) `workout_plans_one_active_idx` — yayınlamadan sonra da danışan başına
+--       TEK aktif plan (sıra: önce deaktivasyon, sonra insert).
+--   (b) `workout_plans_client_version_uniq` — aynı danışanda aynı versiyon
+--       numarası iki kez üretilemez (fail-closed emniyet kemeri).
+--   (c) İki aktif plan ELLE de yazılamaz — indeks 23505 verir.
+-- =============================================================================
+begin;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+do $$
+declare v_plan uuid; v_pe uuid;
+begin
+  select wp.id into v_plan from public.workout_plans wp
+   where wp.client_id = '22222222-2222-2222-2222-222222222222'::uuid and wp.is_active;
+  select wpe.id into v_pe from public.workout_plan_exercises wpe where wpe.plan_id = v_plan limit 1;
+  insert into public.workout_logs (client_id, exercise_name, set_number, plan_exercise_id)
+  values ('22222222-2222-2222-2222-222222222222'::uuid, 'zz-104', 1, v_pe);
+end $$;
+
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+do $$
+declare
+  v_a       uuid := '22222222-2222-2222-2222-222222222222';
+  v_active  integer;
+  v_dupver  integer;
+  v_caught  boolean := false;
+  v_state   text;
+begin
+  perform public.save_workout_plan(array[v_a], '{"Pazartesi": "1. Zz 104 - 4x8"}'::jsonb);
+
+  select count(*) into v_active from public.workout_plans where client_id = v_a and is_active;
+  if v_active is distinct from 1 then
+    raise exception 'BASARISIZ [104a]: yayindan sonra aktif plan sayisi % -- one_active_idx anlamsizlasmis', v_active;
+  end if;
+
+  select count(*) into v_dupver
+    from (select version from public.workout_plans where client_id = v_a
+           group by version having count(*) > 1) d;
+  if v_dupver is distinct from 0 then
+    raise exception 'BASARISIZ [104b]: ayni danisanda tekrarli version numarasi var (% adet)', v_dupver;
+  end if;
+
+  -- (c) Indeks gercekten CANLI mi? Elle ikinci bir aktif plan denenir.
+  begin
+    insert into public.workout_plans (client_id, version, is_active)
+    values (v_a, 999, true);
+  exception when others then
+    v_caught := true;
+    get stacked diagnostics v_state = returned_sqlstate;
+  end;
+
+  if not v_caught then
+    raise exception 'BASARISIZ [104c]: IKINCI AKTIF PLAN yazilabildi -- workout_plans_one_active_idx yok/etkisiz';
+  end if;
+  if v_state is distinct from '23505' then
+    raise exception 'BASARISIZ [104c hata kodu]: beklenen 23505, gelen %', v_state;
+  end if;
+
+  raise notice 'GECTI [104 Tekillik korundu: tek aktif plan, tekrarsiz versiyon, ikinci aktif plan 23505]';
+end $$;
+rollback;
+
+
+-- =============================================================================
 -- TOPLAM ÖZET
--- Bu noktaya yalnızca YUKARIDAKİ 95 senaryonun HEPSİ GECTI verdiyse ulaşılır --
+-- Bu noktaya yalnızca YUKARIDAKİ 104 senaryonun HEPSİ GECTI verdiyse ulaşılır --
 -- herhangi biri BASARISIZ olsaydı raise exception + ON_ERROR_STOP psql'i
 -- daha önce sıfırdan farklı çıkış koduyla durdururdu.
 --   * 1–19  : Faz 1a ve öncesi (profiles, notifications, form_checks, daily_logs,
@@ -4298,11 +4964,24 @@ rollback;
 --             normalleştirir; trigger kapalıyken CHECK reddeder)
 --   * 93–94 : Faz 2b — nutrition_logs + günlük makro hedefi
 --   * 95    : Faz 2b — realtime yayın sözleşmesi (sürüklenme testi)
+--   * 96–99 : Faz 2e/f — sistem mesajı RPC'si (post_system_message): RPC koç
+--             adına kind='system' yazar (invaryantlar dahil), danışan RPC'yi
+--             çağıramaz, koç dahi doğrudan .insert() ile kind='system'
+--             yazamaz (guard zayıflamadı), RPC şablon dışı/sahte referans
+--             kabul etmez (bilinmeyen olay türü, yanlış danışan, henüz
+--             incelenmemiş, başka koç tarafından incelenmiş)
+--   * 100–104: Faz 2 — plan versiyonlama (§4.1 madde 1): yayınlama eski planı
+--             arşivler ve `version+1` ile yeni aktif plan açar (100); GEÇMİŞ
+--             LOGUN plan bağı NULL'a DÜŞMEZ ve arşiv versiyona bağlı kalır
+--             (101 — bu maddenin asıl kazancı); okuma yolları yayından sonra
+--             da TEK aktif planı görür (102); toplu atamada versiyon danışan
+--             başına bağımsız ilerler ve taslak dalı versiyon şişirmez (103);
+--             tekillik indeksleri ihlal edilmez (104)
 --
 -- NOT: `nutrition_logs` ayrıca senaryo 73 (yetki) ve 74 (RLS+FORCE) tarafından
 -- DİNAMİK olarak kapsanır — o iki senaryo tablo listesini `pg_tables`'tan okur.
 -- =============================================================================
 do $$
 begin
-  raise notice 'TUM RLS TESTLERI GECTI (95 senaryo)';
+  raise notice 'TUM RLS TESTLERI GECTI (104 senaryo)';
 end $$;
