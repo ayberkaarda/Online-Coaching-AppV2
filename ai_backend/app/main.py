@@ -22,13 +22,19 @@ def create_app() -> FastAPI:
     settings = get_settings()
     configure_logging(settings)
 
+    # A-13: production'da /docs, /redoc, /openapi.json kapalı — tam uç envanteri +
+    # şema keşfini kimliksiz olarak dışarı vermez. Development/staging'de açık kalır.
+    docs_url = None if settings.is_production else "/docs"
+    redoc_url = None if settings.is_production else "/redoc"
+    openapi_url = None if settings.is_production else "/openapi.json"
+
     app = FastAPI(
         title=settings.app_name,
         description="Koçluk platformu için antrenman/beslenme planı üretimi ve öneri motoru servisi.",
         version=settings.version,
-        docs_url="/docs",
-        redoc_url="/redoc",
-        openapi_url="/openapi.json",
+        docs_url=docs_url,
+        redoc_url=redoc_url,
+        openapi_url=openapi_url,
     )
 
     app.state.start_time = time.monotonic()

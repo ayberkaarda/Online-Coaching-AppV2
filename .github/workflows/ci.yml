@@ -182,12 +182,36 @@ jobs:
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ env.API_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ env.ANON_KEY }}
+          # A-12 (src/env.ts, superRefine): NODE_ENV === 'production' iken
+          # AI_BACKEND_API_KEY zorunlu, aksi halde middleware (`src/proxy.ts`)
+          # her `/api/*` isteğinde fail-fast eder. `npm run build` bunu
+          # doğrudan tetiklemiyor (doğrulama build zamanında değil, istek
+          # zamanında `proxy()` içinde çalışıyor — yerelde build tek başına
+          # bu değişken olmadan da doğrulandı, geçti). Yine de bu adımın
+          # ürettiği `.next` çıktısı aşağıdaki "Run E2E tests" adımında
+          # `next start` ile servis edileceğinden, aynı prod-benzeri ortamı
+          # bu adımdan itibaren tutarlı kurmak için burada da açıkça set
+          # ediliyor (bkz. aşağıdaki not).
+          AI_BACKEND_API_KEY: ci-e2e-placeholder-key
         run: npm run build
 
       - name: Run E2E tests
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ env.API_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ env.ANON_KEY }}
+          # A-12 (src/env.ts): bu adım `playwright.config.ts`'in `webServer`
+          # bloğu üzerinden `npm run start` (next start, NODE_ENV=production)
+          # çalıştırır; middleware her `/api/*` isteğinde AI_BACKEND_API_KEY
+          # arar. `playwright.config.ts` zaten kendi içinde bu değişken için
+          # 'playwright-e2e-local-test-key' varsayılanını taşıdığından (o
+          # dosya bu iş kapsamında değil, DOKUNULMADI) bu satır olmasa da
+          # webServer alt process'i çökmez — ama CI'ın doğruluğunu başka bir
+          # dosyadaki gizli bir varsayılana bağımlı bırakmamak için, tıpkı
+          # yukarıdaki Supabase değişkenlerinde olduğu gibi burada da açıkça
+          # geçiriyoruz (defense-in-depth). GERÇEK SIR DEĞİLDİR — ai_backend
+          # servisi bu job'ta ayağa kalkmaz, zod doğrulamasını geçecek boş
+          # olmayan bir CI-yerel test değeri yeterlidir.
+          AI_BACKEND_API_KEY: ci-e2e-placeholder-key
         run: npm run test:e2e
 
       - name: Upload Playwright report

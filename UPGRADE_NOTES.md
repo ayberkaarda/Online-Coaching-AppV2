@@ -431,3 +431,106 @@ entegrasyon sorununu belgeler.
 kullanılıp mevcut tırnaklama/kaçırma kuralı (`"`→`""`, hücre çift tırnak içine alınır)
 korundu. Başlık satırı, BOM, `isText` dalı, boş veri kontrolü ve indirme akışı
    değiştirilmedi.
+
+---
+
+## 9. Faz 1.5 — Güvenlik Denetimi ve Sertleştirme (2026-08-17)
+
+v1.0 yükseltmesi ve ardındaki Faz 1a/1b çalışmalarından sonra, Faz 2'ye (koç-danışan çekirdek
+akışı) geçmeden önce ayrı bir faz olarak güvenlik denetimi ve sertleştirme yürütüldü
+(`active_planprogram.md` §3a). Bu bölüm bu belgenin orijinal amacına uygun olarak neyin
+yapıldığını, hangi bulguların kapandığını ve kalan önerileri özetler. Tam kanıt ve gerekçe:
+`docs/security/AUDIT.md`; oturum kaydı: `docs/PROGRESS.md` §3.
+
+### 9.1 Denetim
+
+Üç paralel denetim — erişim kontrolü/IDOR/RLS, uygulama yüzeyi (kimlik doğrulama, girdi
+doğrulama, dosya yükleme, AI backend, loglama/gizlilik, yapılandırma), otomatik araç taraması
+(`npm audit`, `pip-audit`, `semgrep`, `gitleaks`) — canlı SQL rol taklidi ve gerçek HTTP
+istekleriyle yürütüldü. **39 bulgu** üretti: Critical 0 · High 10 · Medium 12 · Low 17. Hiçbir
+Critical bulgu çıkmadı — RLS satır izolasyonu ve Storage yol tabanlı sahiplik sınırları yapılan
+her canlı denemede tuttu. Bulguların ağırlıklı kısmı iki katmandaydı: (a) sunucu tarafı
+sütun/durum sözleşme eksikleri (RLS satır seviyesinde doğruydu ama `program_approvals`,
+`messages`, `notifications`, `profiles` üzerinde içerik sahteciliğine açıktı), (b) uygulama
+yüzeyi koruma katmanları (giriş denemesi sınırı yoktu, tek hız sınırlayıcı `X-Forwarded-For` ile
+atlanabiliyordu, deprecated FastAPI uçları API key guard'ından muaftı).
+
+### 9.2 Düzeltme turu — Grup 1, 2, 3 (kullanıcı onaylı, bu turda tamamlandı)
+
+Kullanıcı `docs/security/AUDIT.md` §5'teki altı gruplu düzeltme planının ilk üç grubunu onayladı.
+
+**Kapanan bulgular:**
+
+| Grup                              | Bulgular                                                     | Ne yapıldı                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| --------------------------------- | ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1 — Kimlik ve yetki kapıları      | AC-01, AC-07, AC-02, A-03, A-04, A-12, A-13                  | `program_approvals` onay kapısı artık BEFORE INSERT/UPDATE trigger'la korunuyor (`status`/`reviewed_by`/`reviewed_at` sunucudan); `handle_new_user()` artık istemci metadata'sından rol okumuyor; deprecated FastAPI uçlarına API key guard + rate limit eklendi; production'da `AI_BACKEND_API_KEY` eksikse Next.js ve FastAPI ikisi de başlangıçta hata veriyor; FastAPI `/docs`/`/redoc`/`/openapi.json` prod'da kapalı. |
+| 2 — Rate limiting ve kaba kuvvet  | A-02, A-09, A-17, A-18, A-19, A-06 (+ A-01 kısmen, bkz. 9.3) | `src/proxy.ts` artık güvenilir proxy sayısına göre XFF'e güveniyor (varsayılan: hiçbir başlığa güvenme); bellek içi hız sınırlayıcı taşmada tüm sayaçları sıfırlamak yerine LRU tahliyesi kullanıyor; `/api/health` hız sınırına tabi; FastAPI hız sınırı doğrulanmış kullanıcı bazında; `jwt_expiry` 3600→900 (kullanıcı kararı).                                                                                          |
+| 3 — Sütun seviyesi sözleşmeler    | AC-04, AC-05, AC-08, AC-09, AC-10                            | Mesajlarda alıcı yalnızca `read_at`/`is_read` değiştirebiliyor; danışan→koç bildirim içeriği sabit şablona bağlandı; `profiles.email`/`current_streak`/`last_checkin_at` artık sunucu-sahipli.                                                                                                                                                                                                                              |
+| Entegrasyon temizliği (plan dışı) | A-22 fiilen kapandı                                          | `.gitignore`'a `!.env.example` + `!**/.env.example` istisnası eklendi, `.env.example` dosyaları artık takip ediliyor.                                                                                                                                                                                                                                                                                                       |
+
+Toplamda **19 bulgu bu turda kapandı**; önceki bağımlılık yükseltmesi turundan kapanan T-01/T-02/
+T-03 ile birlikte **toplam 22/39 bulgu `fixed`**, 17'si açık (Grup 4/5/6 — bkz. 9.4).
+
+**Doğrulama (10/10 yeşil):** type-check temiz · lint 0 hata/12 uyarı · vitest **264/264**
+(önceki tur: 230) · `npx supabase db reset` 14 migration temiz · **test:rls 70/70** (önceki tur: 50) · test:transform 26/26 · ruff+mypy temiz · **pytest 82/82, kapsam %94.94** (önceki tur:
+%92) · build başarılı · **Playwright 21/21** (iki ardışık koşumda) · format:check temiz.
+Kırmızı-yeşil kanıtları (guard/trigger kaldırılınca beklenen reddin gerçekten kayboluşu)
+`docs/security/AUDIT.md` §4b'de kayıtlı.
+
+### 9.3 A-01 — plan hedeflenen yoldan kapanmadı, uygulama katmanına taşındı
+
+Bu, en önemli tek istisna olduğu için ayrıca vurgulanıyor: `supabase/config.toml`'a resmi
+şemaya uygun bir `[auth.rate_limit]` bölümü eklendi ve konteynerde gerçekten ayarlandığı
+doğrulandı — ama düzeltme sonrası 180 ardışık yanlış şifre denemesi hâlâ 180/180 `400` döndürdü,
+sıfır `429`. Kök neden doğrulanmış açık bir upstream Supabase hatası:
+[supabase/supabase#41947](https://github.com/supabase/supabase/issues/41947) (ayar yanlışlıkla
+`rate_limit_otp`'ye yazılıyor, `/token?grant_type=password` hiç korunmuyor).
+
+**`supabase/config.toml`'da `[auth.rate_limit]` bölümünün var olması giriş denemelerinin
+korunduğu anlamına gelmez.** Yapılandırma kaldırılmadı (upstream düzelirse otomatik etkinleşir)
+ama fiili koruma **uygulama katmanına** taşındı: yeni `src/app/api/auth/sign-in/route.ts` +
+`src/lib/api/auth-rate-limit.ts` — e-posta başına 10 başarısız deneme / 15 dakika, başarılı
+girişte sayaç sıfırlanır, aşımda `429` + `Retry-After`; `src/hooks/useSession.ts` artık doğrudan
+GoTrue'ya değil bu uca gidiyor.
+
+**Kabul edilen artık risk (yumuşatılmadı):** saldırgan bilinen bir e-postayı hedef alarak 15
+dakikalığına kilitleyebilir (hedefli hesap kilitleme). Alternatif olan paylaşılan IP kovası
+değerlendirildi ve reddedildi — tek saldırganın aynı NAT/proxy arkasındaki **tüm** kullanıcıları
+kilitleyebileceği daha kötü bir takas olurdu; IP kovası yalnızca güvenilir bir proxy sayısı
+yapılandırıldığında (`TRUSTED_PROXY_COUNT > 0`) devreye giriyor.
+
+### 9.4 Kalan öneriler (Grup 4, 5, 6 — henüz uygulanmadı)
+
+Düzeltme planının geri kalanı `docs/security/AUDIT.md` §5'te tanımlı, kullanıcı onayı bekliyor:
+
+- **Grup 4 — girdi doğrulama ve gövde sınırları** (AC bulgusu yok; A-07, A-08, A-20, A-21):
+  yükleme öncesi magic-byte doğrulaması, istemci tarafı boyut/tip kontrolü, uzantı allowlist'i,
+  proxy `Content-Length` sınırı.
+- **Grup 5 — yapılandırma sertleştirme ve savunma derinliği** (AC-03, AC-06, AC-11, A-05, A-10,
+  A-11, A-14, A-15, A-16, T-04 — A-06/A-13/A-22 bu turda erken kapandığı için listeden çıkarıldı,
+  bkz. `AUDIT.md` §5 Grup 5 notu): `authenticated` rolünden `TRUNCATE` yetkisinin geri alınması,
+  `FORCE ROW LEVEL SECURITY`, `serverSchema`'nın `server-only` modüle taşınması, güvenlik olayı
+  loglaması, logger redact listesinin genişletilmesi, CSP nonce'a geçiş (`unsafe-inline`
+  kaldırma), oturum token'larının httpOnly cookie'ye taşınması, `next-pwa`'nın `devDependencies`'e
+  taşınması.
+- **Grup 6 — dokümantasyon ve CI tarama zinciri** (T-05): `docs/security/THREAT-MODEL.md`, kök
+  `SECURITY.md`, CI'a semgrep/gitleaks/`npm audit`/`pip-audit` adımları.
+
+**Ayrıca kaydedilmesi gereken borç (yeni, bu turdan):** AC-05'in danışan→koç bildirim şablon
+metni artık iki yerde yaşıyor — `supabase/migrations/20260817160200_column_guards.sql`
+(`notifications_guard_content()` trigger'ı) ve `src/hooks/useProgramApprovals.ts`. Biri
+diğerinden bağımsız değişirse program gönderimi `42501` ile **gürültülü** kırılır (sessiz değil,
+RLS test paketi bu senaryoyu kilitliyor). Doğru çözüm ikisini `SECURITY DEFINER` bir RPC'ye
+taşımak; uygulama kodunun da değiştirilebildiği bir sonraki turda yapılmalı.
+
+**Kısmen kapanan / gözden geçirilmesi gereken bulgular:**
+
+- **A-06 (logout token iptali)** — `jwt_expiry` 900'e düşürüldü ama logout hâlâ access token'ı
+  sunucu tarafında iptal etmiyor; yalnızca geçerlilik penceresi kısaldı.
+- **A-19 (bellek içi rate limiter)** — taşma davranışı LRU'ya çevrildi (artık taşmada tüm
+  sayaçlar sıfırlanmıyor) ama mimari hâlâ bellek içi ve tek instance; çok-instance dağıtımda
+  gerçek limit `N × limit`'e çıkar.
+- **A-01'in upstream bağımlılığı** — [supabase/supabase#41947](https://github.com/supabase/supabase/issues/41947)
+  düzeldiğinde `[auth.rate_limit]`'in gerçekten koruma sağlayıp sağlamadığı yeniden test
+  edilmeli; koruyorsa uygulama katmanı sınırlayıcısıyla çakışma/gereksiz katman durumu gözden
+  geçirilmeli.

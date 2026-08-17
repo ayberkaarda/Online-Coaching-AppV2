@@ -16,7 +16,10 @@ from app.services.workout_generator import generate_workout
 
 router = APIRouter(tags=["workout"], dependencies=[Depends(api_key_guard)])
 
-legacy_router = APIRouter(tags=["workout", "deprecated"])
+# A-03: legacy_router, router ile AYNI guard + hız sınırı disiplinine tabidir.
+# api_key_guard'sız veya @limiter.limit'siz yeni bir route eklenirse bu bilinçli
+# olmalı; aksi halde deprecated uç, korumanın tamamını atlatan bir arka kapı olur.
+legacy_router = APIRouter(tags=["workout", "deprecated"], dependencies=[Depends(api_key_guard)])
 
 
 @router.post("/analyze/workout", response_model=WorkoutAnalyzeResponse)
@@ -32,6 +35,7 @@ async def analyze_workout(request: Request, payload: WorkoutAnalyzeRequest) -> W
     deprecated=True,
     summary="[Deprecated] bkz. POST /analyze/workout",
 )
-async def generate_ai_workout_legacy(payload: WorkoutAnalyzeRequest) -> WorkoutAnalyzeResponse:
+@limiter.limit("20/minute")
+async def generate_ai_workout_legacy(request: Request, payload: WorkoutAnalyzeRequest) -> WorkoutAnalyzeResponse:
     """Eski (deprecated) antrenman üretim endpoint'i. Bkz. ``POST /analyze/workout``."""
     return generate_workout(payload)

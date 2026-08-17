@@ -43,6 +43,10 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 
+# ...ama .env.example dosyaları kurulum dokümantasyonudur, kök ve alt dizinlerde takip edilsin
+!.env.example
+!**/.env.example
+
 # vercel
 .vercel
 

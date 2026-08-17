@@ -17,7 +17,10 @@ async def api_key_guard(
 ) -> None:
     """``settings.api_key`` ayarlanmışsa ``X-API-Key`` header'ını sabit-zamanlı karşılaştırır.
 
-    ``settings.api_key`` ``None`` ise (ayarlanmamışsa) bu dependency no-op'tur.
+    ``settings.api_key`` ``None`` ise (ayarlanmamışsa) bu dependency no-op'tur. Bu yalnızca
+    development/staging'de mümkündür: ``Settings._enforce_api_key_policy``
+    (``app/core/config.py``) production'da ``API_KEY`` olmadan başlangıcı reddeder (A-04),
+    dolayısıyla bu no-op dal production'da hiçbir zaman çalışma zamanına ulaşmaz.
     """
     if settings.api_key is None:
         return

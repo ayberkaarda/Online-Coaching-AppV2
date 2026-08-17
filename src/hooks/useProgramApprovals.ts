@@ -55,6 +55,15 @@ export function useSubmitProgramForApproval() {
         .single()
       if (error) throw new Error(error.message)
 
+      // !!! BU METNİ TEK BAŞINA DEĞİŞTİRMEYİN !!!
+      // Danışan -> koç bildirim metni artık sunucuda BİREBİR doğrulanıyor:
+      // `notifications_guard_content()` trigger'ı (supabase/migrations/
+      // 20260817160200_column_guards.sql, `c_client_to_coach_messages` dizisi)
+      // yalnızca bu tam metni kabul ediyor. `title` alanı da HİÇ gönderilmemeli
+      // (trigger onun NULL olmasını şart koşuyor). Metin burada değişir de o
+      // migration'daki dizi güncellenmezse program gönderme akışı 42501
+      // (insufficient_privilege) ile KIRILIR. Değiştirmeniz gerekiyorsa ÖNCE
+      // yeni bir migration ile trigger'ı, SONRA bu satırı güncelleyin.
       const { error: notifyError } = await supabase.from('notifications').insert({
         client_id: coachId ?? clientId,
         message: '🔔 Yeni bir antrenman programı onayınıza sunuldu.',
@@ -78,20 +87,13 @@ export interface ApproveProgramInput {
   approvalId: string
   clientId: string
   plan: WorkoutPlan
-  /** Onaylayan koçun id'si (`reviewed_by`). */
-  reviewerId?: string
 }
 
 export function useApproveProgram() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async ({
-      approvalId,
-      clientId,
-      plan,
-      reviewerId,
-    }: ApproveProgramInput): Promise<void> => {
+    mutationFn: async ({ approvalId, clientId, plan }: ApproveProgramInput): Promise<void> => {
       // SIRA KRİTİK: önce plan yazılır, sonra onay 'approved' işaretlenir.
       // Plan yazımı başarısız olursa onay 'pending' kalır — "onaylandı ama plan
       // işlenmedi" tutarsızlığı oluşmaz.
@@ -105,12 +107,17 @@ export function useApproveProgram() {
       })
       if (planError) throw new Error(planError.message)
 
+      // `reviewed_by` / `reviewed_at` artık burada GÖNDERİLMİYOR: sunucuda
+      // `program_approvals_guard_review()` trigger'ı (supabase/migrations/
+      // 20260817160000_program_approval_guard.sql) bu iki alanı `auth.uid()` /
+      // `now()` ile dolduruyor ve istemciden gelen HER değeri EZİYOR (AC-07).
+      // Onları yine de göndermek kodu okuyanı "denetim izi istemciden geliyor"
+      // diye yanıltırdı. `status: 'approved'` gönderimi KALIYOR — trigger hangi
+      // dalın çalışacağına bunun eski/yeni değerine bakarak karar veriyor.
       const { error: approvalError } = await supabase
         .from('program_approvals')
         .update({
           status: 'approved',
-          reviewed_by: reviewerId ?? null,
-          reviewed_at: new Date().toISOString(),
         })
         .eq('id', approvalId)
       if (approvalError) throw new Error(approvalError.message)

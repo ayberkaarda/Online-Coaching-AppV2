@@ -48,3 +48,13 @@ Sub-agent'lar ana modeli otomatik devralmaz. Her Agent çağrısında `model` pa
 - `db:seed`, `db:reset`, `db:drop`, `delete_all`, `destroy_all`, `TRUNCATE` veya eşdeğeri herhangi bir toplu silme/reset işlemi içeren komut — main thread VEYA herhangi bir sub-agent tarafından — o çağrıya özel açık kullanıcı onayı olmadan çalıştırılamaz.
 - Bu, repoda zaten var olan dosya/scriptler için de geçerlidir (örn. `db/seeds.rb`) — bir script'in var olması onu çalıştırma onayı değildir. Etkileri bilinmiyorsa çalıştırmadan önce script içeriğini oku.
 - Sub-agent'lar bu tür komutları `git` destructive işlemleriyle aynı onay seviyesinde ele almalı (bkz. Rule 2/5) ve doğrudan çalıştırmak yerine main thread'e sormalıdır.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

@@ -8,6 +8,7 @@ import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tan
 import { useEffect } from 'react'
 import { toast } from 'sonner'
 
+import { apiFetch } from '@/lib/api/client'
 import { logger } from '@/lib/logger'
 import { queryKeyRoots, queryKeys } from '@/lib/query/keys'
 import { supabase } from '@/lib/supabase/client'
@@ -64,12 +65,40 @@ export interface SignInInput {
   password: string
 }
 
+/** `/api/auth/sign-in` başarı yanıtı (bkz. `src/app/api/auth/sign-in/route.ts`). */
+interface SignInResponse {
+  access_token: string
+  refresh_token: string
+  expires_at: number | null
+}
+
 export function useSignIn() {
   const queryClient = useQueryClient()
 
   return useMutation({
+    // A-01: giriş artık tarayıcıdan DOĞRUDAN GoTrue'ya gitmez. `supabase.auth.
+    // signInWithPassword` çağrısı sunucuya (`/api/auth/sign-in`) taşındı; böylece uygulama
+    // katmanı kaba kuvvet sınırı (e-posta başına 10 başarısız deneme / 15 dk) araya girebilir.
+    // Supabase'in kendi hız sınırı fiilen uygulanmıyor (upstream hatası — bkz. route.ts).
+    //
+    // Dönen token'larla `setSession` çağrılır: bu, `onAuthStateChange` olayını tetikler,
+    // dolayısıyla mevcut istemci oturum yönetimi (TanStack Query invalidation, realtime
+    // abonelikleri, `useSession` tüketicileri) HİÇ DEĞİŞMEDEN çalışmaya devam eder.
+    // Hook'un dışa dönük imzası ve dönüş şekli de aynı kaldı.
     mutationFn: async ({ email, password }: SignInInput): Promise<Session> => {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+      // `apiFetch` başarısız yanıtı `ApiError`a çevirir; `ApiError.message` sunucunun
+      // Türkçe mesajıdır (401 için jenerik "E-posta veya şifre hatalı!", 429 için ne
+      // yapılacağını söyleyen kilit mesajı). `ApiError extends Error` olduğundan
+      // `onError`/`signIn.error` tüketicileri değişmez.
+      const tokens = await apiFetch<SignInResponse>('/api/auth/sign-in', {
+        method: 'POST',
+        json: { email, password },
+      })
+
+      const { data, error } = await supabase.auth.setSession({
+        access_token: tokens.access_token,
+        refresh_token: tokens.refresh_token,
+      })
       if (error) throw new Error(error.message)
       if (!data.session) throw new Error('Oturum başlatılamadı. Lütfen tekrar deneyin.')
       return data.session

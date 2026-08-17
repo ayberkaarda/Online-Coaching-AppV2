@@ -198,7 +198,6 @@ export default function WorkoutTab({
       approvalId: firstApproval.id,
       clientId: firstApproval.client_id,
       plan: jsonToWorkoutPlan(firstApproval.workout_data),
-      ...(currentUserId ? { reviewerId: currentUserId } : {}),
     })
   }
 

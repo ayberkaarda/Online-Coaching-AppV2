@@ -20,6 +20,9 @@ services:
       - .env.local
     environment:
       AI_BACKEND_URL: http://ai-backend:8000
+      # ai-backend'in API_KEY'iyle BİREBİR AYNI olmalı (bkz. A-04/A-12). Kök `.env`
+      # dosyasında tanımlı değilse compose açık bir hatayla durur.
+      AI_BACKEND_API_KEY: ${AI_BACKEND_API_KEY:?AI_BACKEND_API_KEY .env dosyasinda tanimli olmalidir (ai-backend API_KEY ile ayni deger)}
     depends_on:
       ai-backend:
         condition: service_healthy
@@ -34,6 +37,11 @@ services:
       - '8000:8000'
     environment:
       CORS_ORIGINS: http://localhost:3000
+      # A-04: eskiden hiç verilmiyordu -> guard fail-open, servis kimliksiz erişilebilirdi.
+      # Kök `.env` dosyasında tanımlı değilse compose açık bir hatayla durur (sessizce
+      # anahtarsız ayağa kalkmaz). `web` servisindeki AI_BACKEND_API_KEY ile aynı değeri
+      # kullanır — bkz. yukarıdaki yorum.
+      API_KEY: ${AI_BACKEND_API_KEY:?AI_BACKEND_API_KEY .env dosyasinda tanimli olmalidir (ai-backend API_KEY ile ayni deger)}
     healthcheck:
       test:
         [

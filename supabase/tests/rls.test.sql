@@ -274,6 +274,15 @@ rollback;
 -- beklenen bir RLS davranışı). Gerçek uygulama kodu da (useProgramApprovals.ts)
 -- bu insert'te `.select()` çağırmaz -> davranış eşleşiyor. Bu yüzden burada
 -- yalnızca satırın gerçekten eklendiği GET DIAGNOSTICS ROW_COUNT ile doğrulanır.
+--
+-- 2026-08-17 GÜNCELLEMESİ (AC-05 / Faz 1.5, bkz. 20260817160200_column_guards.sql):
+-- Bu senaryo eskiden SERBEST bir metin ("RLS testi - Danisan A'dan koca bildirim")
+-- yazıyordu. Danışan -> koç yolunda içerik artık SABİT ŞABLONA bağlı olduğu için
+-- test, uygulamanın GERÇEKTEN gönderdiği payload'a çevrildi
+-- (src/hooks/useProgramApprovals.ts:58-61). Senaryonun KORUDUĞU ŞEY DEĞİŞMEDİ:
+-- "danışan koça program onay bildirimi yazabiliyor mu?" — yalnızca artık gerçek
+-- uygulama payload'ıyla soruluyor. Şablon dışı metnin reddedildiği senaryo 62'de
+-- ayrıca doğrulanır.
 -- =============================================================================
 begin;
 set local role authenticated;
@@ -283,7 +292,7 @@ declare
   v_rows int;
 begin
   insert into public.notifications (client_id, message)
-  values ('11111111-1111-1111-1111-111111111111', 'RLS testi - Danisan A''dan koca bildirim');
+  values ('11111111-1111-1111-1111-111111111111', '🔔 Yeni bir antrenman programı onayınıza sunuldu.');
   get diagnostics v_rows = row_count;
 
   if v_rows is distinct from 1 then
@@ -1846,9 +1855,817 @@ end $$;
 rollback;
 
 
+-- #############################################################################
+-- ## FAZ 1.5 — GÜVENLİK DENETİMİ REGRESYON SENARYOLARI (51–70)               ##
+-- ##                                                                         ##
+-- ## Kaynak: docs/security/findings-access-control.md §6 (G-01 … G-26).      ##
+-- ## Her senaryonun başlığında karşılık geldiği boşluk numarası (G-xx) ve    ##
+-- ## bulgu numarası (AC-xx) belirtilmiştir.                                  ##
+-- ##                                                                         ##
+-- ## Düzeltmeler:                                                            ##
+-- ##   20260817160000_program_approval_guard.sql   (AC-01, AC-07)            ##
+-- ##   20260817160100_signup_role_hardening.sql    (AC-02)                   ##
+-- ##   20260817160200_column_guards.sql            (AC-04, AC-05, AC-08,     ##
+-- ##                                                AC-09, AC-10)            ##
+-- #############################################################################
+
+
+-- =============================================================================
+-- PROGRAM ONAYI — 51) [G-01 / AC-01] Danışan `status='approved'` ile INSERT YAPAMAZ
+-- Canlı sömürü W5'in kapandığını kanıtlar: danışan tek istekle kendi programını
+-- "koç onayladı" diye işaretleyemez.
+-- =============================================================================
+begin;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+do $$
+declare
+  v_caught boolean := false;
+  v_state  text;
+begin
+  begin
+    insert into public.program_approvals (client_id, workout_data, status)
+    values ('22222222-2222-2222-2222-222222222222', '{"Pazartesi":"sahte"}'::jsonb, 'approved');
+  exception when insufficient_privilege then
+    v_caught := true;
+    get stacked diagnostics v_state = returned_sqlstate;
+  end;
+
+  if not v_caught then
+    raise exception 'BASARISIZ [G-01 Danisan approved INSERT edemez]: beklenen 42501, hata ALINMADI (onay kapisi ACIK!)';
+  end if;
+  if v_state is distinct from '42501' then
+    raise exception 'BASARISIZ [G-01 hata kodu]: beklenen 42501, gelen %', v_state;
+  end if;
+  raise notice 'GECTI [G-01 Danisan program_approvals a status=approved ile INSERT edemez (42501)]';
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- PROGRAM ONAYI — 52) [G-02 / AC-01+AC-07] Danışan `reviewed_by` / `reviewed_at`
+-- BELİRLEYEMEZ (status 'pending' olsa bile)
+-- =============================================================================
+begin;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+do $$
+declare
+  v_caught_by boolean := false;
+  v_caught_at boolean := false;
+begin
+  begin
+    insert into public.program_approvals (client_id, workout_data, status, reviewed_by)
+    values ('22222222-2222-2222-2222-222222222222', '{"Pazartesi":"sahte"}'::jsonb, 'pending',
+            '11111111-1111-1111-1111-111111111111');
+  exception when insufficient_privilege then
+    v_caught_by := true;
+  end;
+
+  begin
+    insert into public.program_approvals (client_id, workout_data, status, reviewed_at)
+    values ('22222222-2222-2222-2222-222222222222', '{"Pazartesi":"sahte"}'::jsonb, 'pending', now());
+  exception when insufficient_privilege then
+    v_caught_at := true;
+  end;
+
+  if not v_caught_by then
+    raise exception 'BASARISIZ [G-02 reviewed_by belirlenemez]: beklenen 42501, hata ALINMADI';
+  end if;
+  if not v_caught_at then
+    raise exception 'BASARISIZ [G-02 reviewed_at belirlenemez]: beklenen 42501, hata ALINMADI';
+  end if;
+  raise notice 'GECTI [G-02 Danisan reviewed_by / reviewed_at belirleyemez (42501)]';
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- PROGRAM ONAYI — 53) POZİTİF KONTROL: danışan NORMAL ('pending') onay talebini
+-- HÂLÂ açabilir — `useSubmitProgramForApproval` (useProgramApprovals.ts:51-56)
+-- payload'ının birebir aynısı. Düzeltmenin uygulamayı kırmadığını kanıtlar.
+-- =============================================================================
+begin;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+do $$
+declare
+  v_rows   int;
+  v_status public.approval_status;
+  v_by     uuid;
+  v_at     timestamptz;
+begin
+  insert into public.program_approvals (client_id, workout_data, status)
+  values ('22222222-2222-2222-2222-222222222222', '{"Pazartesi":"1. Bench Press - 4x8"}'::jsonb, 'pending');
+  get diagnostics v_rows = row_count;
+
+  if v_rows is distinct from 1 then
+    raise exception 'BASARISIZ [Danisan pending onay talebi acar]: beklenen 1 satir, etkilenen %', v_rows;
+  end if;
+
+  select status, reviewed_by, reviewed_at into v_status, v_by, v_at
+    from public.program_approvals
+   where client_id = '22222222-2222-2222-2222-222222222222'
+     and workout_data = '{"Pazartesi":"1. Bench Press - 4x8"}'::jsonb;
+
+  if v_status is distinct from 'pending'::public.approval_status or v_by is not null or v_at is not null then
+    raise exception 'BASARISIZ [Danisan pending onay talebi]: status=%, reviewed_by=%, reviewed_at=%', v_status, v_by, v_at;
+  end if;
+  raise notice 'GECTI [POZITIF - Danisan normal pending onay talebini HALA acabilir]';
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- PROGRAM ONAYI — 54) [G-03 / AC-01] Danışan kendi `pending` satırını SİLİP
+-- `approved` olarak yeniden EKLEYEMEZ (canlı sömürü W7'nin kapanışı)
+-- =============================================================================
+begin;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+do $$
+declare
+  v_deleted int;
+  v_caught  boolean := false;
+begin
+  -- 1. adım: kendi BEKLEYEN talebini geri çekebilir (bilinçli olarak serbest).
+  delete from public.program_approvals
+   where client_id = '22222222-2222-2222-2222-222222222222'
+     and status = 'pending'::public.approval_status;
+  get diagnostics v_deleted = row_count;
+
+  if v_deleted < 1 then
+    raise exception 'BASARISIZ [G-03 hazirlik]: danisan kendi pending talebini silemedi (silinen=%)', v_deleted;
+  end if;
+
+  -- 2. adım: SÖMÜRÜ — aynı satırı 'approved' olarak geri yazmayı dener.
+  begin
+    insert into public.program_approvals (client_id, workout_data, status, reviewed_by, reviewed_at)
+    values ('22222222-2222-2222-2222-222222222222', '{"Pazartesi":"sahte"}'::jsonb, 'approved',
+            '11111111-1111-1111-1111-111111111111', now());
+  exception when insufficient_privilege then
+    v_caught := true;
+  end;
+
+  if not v_caught then
+    raise exception 'BASARISIZ [G-03 sil-ve-yeniden-ekle]: beklenen 42501, hata ALINMADI (W7 sömürüsü HALA acik!)';
+  end if;
+  raise notice 'GECTI [G-03 Danisan pending kaydini silip approved olarak yeniden EKLEYEMEZ]';
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- PROGRAM ONAYI — 55) [AC-01/DELETE] Danışan KARARA BAĞLANMIŞ ('approved')
+-- kaydı SİLEMEZ — denetim izi korunur (yeni program_approvals_delete politikası)
+-- KURULUM: postgres kimliğiyle tutarlı bir 'approved' satır eklenir.
+-- =============================================================================
+begin;
+
+insert into public.program_approvals (id, client_id, workout_data, status, reviewed_by, reviewed_at)
+values (
+  'b0000000-0000-0000-0000-000000000055'::uuid,
+  '22222222-2222-2222-2222-222222222222',
+  '{"Pazartesi":"1. Squat - 5x5"}'::jsonb,
+  'approved'::public.approval_status,
+  '11111111-1111-1111-1111-111111111111',
+  now() - interval '1 day'
+);
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+
+do $$
+declare
+  v_deleted int;
+begin
+  delete from public.program_approvals
+   where id = 'b0000000-0000-0000-0000-000000000055'::uuid;
+  get diagnostics v_deleted = row_count;
+
+  if v_deleted is distinct from 0 then
+    raise exception 'BASARISIZ [Danisan approved kaydi silemez]: beklenen 0 satir, silinen % (denetim izi silinebiliyor!)', v_deleted;
+  end if;
+  raise notice 'GECTI [Danisan karara baglanmis (approved) onay kaydini SILEMEZ - denetim izi korunur]';
+end $$;
+
+rollback;
+
+
+-- =============================================================================
+-- PROGRAM ONAYI — 56) [G-06 / AC-07] KOÇ `status`'ü güncelleyebilir ve
+-- `reviewed_by` / `reviewed_at` SUNUCUDAN dolar; koçun gönderdiği SAHTE değerler
+-- EZİLİR (canlı kanıt P8'in kapanışı). `useApproveProgram` payload'ıyla birebir.
+-- =============================================================================
+begin;
+
+insert into public.program_approvals (id, client_id, workout_data, status)
+values (
+  'b0000000-0000-0000-0000-000000000056'::uuid,
+  '22222222-2222-2222-2222-222222222222',
+  '{"Pazartesi":"1. Deadlift - 4x5"}'::jsonb,
+  'pending'::public.approval_status
+);
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+
+do $$
+declare
+  v_rows   int;
+  v_status public.approval_status;
+  v_by     uuid;
+  v_at     timestamptz;
+begin
+  -- Koç BİLEREK sahte bir kimlik ve geçmiş bir tarih gönderiyor; ikisi de ezilmeli.
+  update public.program_approvals
+     set status      = 'approved'::public.approval_status,
+         reviewed_by = '22222222-2222-2222-2222-222222222222',
+         reviewed_at = timestamptz '2000-01-01 00:00:00+00'
+   where id = 'b0000000-0000-0000-0000-000000000056'::uuid;
+  get diagnostics v_rows = row_count;
+
+  if v_rows is distinct from 1 then
+    raise exception 'BASARISIZ [G-06 Koc onaylar]: beklenen 1 satir, etkilenen %', v_rows;
+  end if;
+
+  select status, reviewed_by, reviewed_at into v_status, v_by, v_at
+    from public.program_approvals where id = 'b0000000-0000-0000-0000-000000000056'::uuid;
+
+  if v_status is distinct from 'approved'::public.approval_status then
+    raise exception 'BASARISIZ [G-06 status]: beklenen approved, gelen %', v_status;
+  end if;
+  if v_by is distinct from '11111111-1111-1111-1111-111111111111'::uuid then
+    raise exception 'BASARISIZ [G-06 reviewed_by SUNUCUDAN dolmali]: beklenen %, gelen %',
+      '11111111-1111-1111-1111-111111111111'::uuid, v_by;
+  end if;
+  if v_at is null or v_at <= timestamptz '2001-01-01 00:00:00+00' then
+    raise exception 'BASARISIZ [G-06 sahte reviewed_at EZILMELI]: gelen %', v_at;
+  end if;
+  raise notice 'GECTI [G-06 Koc onaylar; reviewed_by/reviewed_at SUNUCUDA dolar, sahte degerler ezilir]';
+end $$;
+
+rollback;
+
+
+-- =============================================================================
+-- PROGRAM ONAYI — 57) [AC-01] Danışan mevcut satırın `status`'ünü UPDATE ile
+-- değiştiremez (canlı kanıt W6; RLS + trigger iki katmanlı savunma)
+-- =============================================================================
+begin;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+do $$
+declare
+  v_rows int;
+begin
+  update public.program_approvals
+     set status = 'approved'::public.approval_status
+   where client_id = '22222222-2222-2222-2222-222222222222';
+  get diagnostics v_rows = row_count;
+
+  if v_rows is distinct from 0 then
+    raise exception 'BASARISIZ [Danisan status UPDATE edemez]: beklenen 0 satir, etkilenen %', v_rows;
+  end if;
+  raise notice 'GECTI [Danisan mevcut onay kaydinin status unu UPDATE ile degistiremez]';
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- MESAJLASMA — 58) [G-07 / AC-04] ALICI mesaj GÖVDESİNİ değiştiremez
+-- Canlı kanıt M1 (etkilenen=3) kapanır. `messages` tablosunda `edited_at`
+-- olmadığı için tahrifat fark edilemezdi.
+-- =============================================================================
+begin;
+
+insert into public.messages (id, sender_id, receiver_id, message)
+values (
+  'e0000000-0000-0000-0000-000000000058'::uuid,
+  '11111111-1111-1111-1111-111111111111',
+  '22222222-2222-2222-2222-222222222222',
+  'Kocun orijinal mesaji'
+);
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+
+do $$
+declare
+  v_caught boolean := false;
+  v_state  text;
+begin
+  begin
+    update public.messages set message = 'TAHRIF EDILMIS METIN'
+     where id = 'e0000000-0000-0000-0000-000000000058'::uuid;
+  exception when insufficient_privilege then
+    v_caught := true;
+    get stacked diagnostics v_state = returned_sqlstate;
+  end;
+
+  if not v_caught then
+    raise exception 'BASARISIZ [G-07 alici govdeyi degistiremez]: beklenen 42501, hata ALINMADI';
+  end if;
+  if v_state is distinct from '42501' then
+    raise exception 'BASARISIZ [G-07 hata kodu]: beklenen 42501, gelen %', v_state;
+  end if;
+  raise notice 'GECTI [G-07 Alici kendisine gelen mesajin govdesini DEGISTIREMEZ (42501)]';
+end $$;
+
+rollback;
+
+
+-- =============================================================================
+-- MESAJLASMA — 59) [G-08 / AC-04] ALICI `kind` / `created_at` değiştiremez
+-- Canlı kanıt M5 (etkilenen=3) kapanır.
+-- =============================================================================
+begin;
+
+insert into public.messages (id, sender_id, receiver_id, message)
+values (
+  'e0000000-0000-0000-0000-000000000059'::uuid,
+  '11111111-1111-1111-1111-111111111111',
+  '22222222-2222-2222-2222-222222222222',
+  'Kind ve created_at tahrifat denemesi'
+);
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+
+do $$
+declare
+  v_caught_kind boolean := false;
+  v_caught_date boolean := false;
+begin
+  begin
+    update public.messages set kind = 'system'::public.message_kind
+     where id = 'e0000000-0000-0000-0000-000000000059'::uuid;
+  exception when insufficient_privilege then
+    v_caught_kind := true;
+  end;
+
+  begin
+    update public.messages set created_at = timestamptz '2000-01-01 00:00:00+00'
+     where id = 'e0000000-0000-0000-0000-000000000059'::uuid;
+  exception when insufficient_privilege then
+    v_caught_date := true;
+  end;
+
+  if not v_caught_kind then
+    raise exception 'BASARISIZ [G-08 kind degistirilemez]: beklenen 42501, hata ALINMADI';
+  end if;
+  if not v_caught_date then
+    raise exception 'BASARISIZ [G-08 created_at degistirilemez]: beklenen 42501, hata ALINMADI';
+  end if;
+  raise notice 'GECTI [G-08 Alici kind / created_at alanlarini DEGISTIREMEZ (42501)]';
+end $$;
+
+rollback;
+
+
+-- =============================================================================
+-- MESAJLASMA — 60) POZİTİF KONTROL: ALICI `read_at` + `is_read` alanlarını HÂLÂ
+-- güncelleyebilir — `useMarkConversationRead` (useMessages.ts:269-277) payload'ı.
+-- Sütun korumasının okundu işaretlemeyi kırmadığını kanıtlar.
+-- =============================================================================
+begin;
+
+insert into public.messages (id, sender_id, receiver_id, message, read_at)
+values (
+  'e0000000-0000-0000-0000-000000000060'::uuid,
+  '11111111-1111-1111-1111-111111111111',
+  '22222222-2222-2222-2222-222222222222',
+  'Okundu isaretleme regresyon testi',
+  null
+);
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+
+do $$
+declare
+  v_rows int;
+  v_at   timestamptz;
+  v_read boolean;
+begin
+  update public.messages set read_at = now(), is_read = true
+   where id = 'e0000000-0000-0000-0000-000000000060'::uuid;
+  get diagnostics v_rows = row_count;
+
+  if v_rows is distinct from 1 then
+    raise exception 'BASARISIZ [Alici read_at/is_read gunceller]: beklenen 1 satir, etkilenen %', v_rows;
+  end if;
+
+  select read_at, is_read into v_at, v_read
+    from public.messages where id = 'e0000000-0000-0000-0000-000000000060'::uuid;
+  if v_at is null or v_read is distinct from true then
+    raise exception 'BASARISIZ [Alici read_at/is_read yazilmali]: read_at=%, is_read=%', v_at, v_read;
+  end if;
+  raise notice 'GECTI [POZITIF - Alici read_at + is_read alanlarini HALA guncelleyebilir]';
+end $$;
+
+rollback;
+
+
+-- =============================================================================
+-- MESAJLASMA — 61) [G-09 / AC-04] Danışan `kind='system'` mesaj ÜRETEMEZ
+-- Canlı kanıt M4 kapanır. 'system' etiketi "bunu UYGULAMA yazdı" demektir;
+-- insan eliyle üretilebilirse etiket yalan söyler.
+-- =============================================================================
+begin;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+do $$
+declare
+  v_caught boolean := false;
+  v_state  text;
+begin
+  begin
+    insert into public.messages (sender_id, receiver_id, message, kind)
+    values ('22222222-2222-2222-2222-222222222222',
+            '11111111-1111-1111-1111-111111111111',
+            'SISTEM: hesabiniz askiya alindi.',
+            'system'::public.message_kind);
+  exception when insufficient_privilege then
+    v_caught := true;
+    get stacked diagnostics v_state = returned_sqlstate;
+  end;
+
+  if not v_caught then
+    raise exception 'BASARISIZ [G-09 danisan system mesaj uretemez]: beklenen 42501, hata ALINMADI';
+  end if;
+  if v_state is distinct from '42501' then
+    raise exception 'BASARISIZ [G-09 hata kodu]: beklenen 42501, gelen %', v_state;
+  end if;
+  raise notice 'GECTI [G-09 Danisan kind=system mesaj URETEMEZ (42501)]';
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- BILDIRIM — 62) [G-10 / AC-05] Danışan koça SERBEST METİN yazamaz
+-- Canlı kanıt P3 ("ACIL: Sifreni sifirla" + kötü amaçlı bağlantı) kapanır.
+-- =============================================================================
+begin;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+do $$
+declare
+  v_caught_msg   boolean := false;
+  v_caught_title boolean := false;
+  v_state        text;
+begin
+  -- Kimlik avı denemesi: şablon dışı gövde.
+  begin
+    insert into public.notifications (client_id, title, message)
+    values ('11111111-1111-1111-1111-111111111111',
+            'ACIL: Sifreni sifirla',
+            'https://kotu-site.example/reset');
+  exception when insufficient_privilege then
+    v_caught_msg := true;
+    get stacked diagnostics v_state = returned_sqlstate;
+  end;
+
+  -- Şablon gövdesi DOĞRU ama `title` ekleniyor -> yine reddedilmeli.
+  begin
+    insert into public.notifications (client_id, title, message)
+    values ('11111111-1111-1111-1111-111111111111',
+            'Sahte baslik',
+            '🔔 Yeni bir antrenman programı onayınıza sunuldu.');
+  exception when insufficient_privilege then
+    v_caught_title := true;
+  end;
+
+  if not v_caught_msg then
+    raise exception 'BASARISIZ [G-10 serbest metin reddedilmeli]: beklenen 42501, hata ALINMADI (kimlik avi yuzeyi ACIK!)';
+  end if;
+  if v_state is distinct from '42501' then
+    raise exception 'BASARISIZ [G-10 hata kodu]: beklenen 42501, gelen %', v_state;
+  end if;
+  if not v_caught_title then
+    raise exception 'BASARISIZ [G-10 sablon disi title reddedilmeli]: beklenen 42501, hata ALINMADI';
+  end if;
+  raise notice 'GECTI [G-10 Danisan koca SERBEST METIN bildirim yazamaz (42501)]';
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- BILDIRIM — 63) POZİTİF KONTROL: KOÇ serbest metinli duyuru yazmaya DEVAM eder
+-- (`useSendNotification`, useNotifications.ts:81-88). Şablon kısıtı yalnızca
+-- danışan -> koç yolundadır; koçun ürün işlevi kırılmamalıdır.
+-- =============================================================================
+begin;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+do $$
+declare
+  v_rows int;
+begin
+  insert into public.notifications (client_id, title, message)
+  values ('22222222-2222-2222-2222-222222222222',
+          'Haftalik Duyuru',
+          'Bu hafta bacak gunu Cumaya alindi.');
+  get diagnostics v_rows = row_count;
+
+  if v_rows is distinct from 1 then
+    raise exception 'BASARISIZ [Koc serbest duyuru yazar]: beklenen 1 satir, etkilenen %', v_rows;
+  end if;
+  raise notice 'GECTI [POZITIF - Koc serbest metinli duyuruyu HALA yazabilir]';
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- BILDIRIM — 64) [G-11 / AC-10] Danışan KENDİ bildiriminin `title`/`message`
+-- metnini değiştiremez. Canlı kanıt P4 (etkilenen=3) kapanır.
+-- =============================================================================
+begin;
+
+insert into public.notifications (id, client_id, title, message)
+values (
+  'c0000000-0000-0000-0000-000000000064'::uuid,
+  '22222222-2222-2222-2222-222222222222',
+  'Kocun duyurusu',
+  'Bu hafta protein hedefin 150g.'
+);
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+
+do $$
+declare
+  v_caught_msg   boolean := false;
+  v_caught_title boolean := false;
+begin
+  begin
+    update public.notifications set message = 'TAHRIF EDILMIS DUYURU'
+     where id = 'c0000000-0000-0000-0000-000000000064'::uuid;
+  exception when insufficient_privilege then
+    v_caught_msg := true;
+  end;
+
+  begin
+    update public.notifications set title = 'TAHRIF EDILMIS BASLIK'
+     where id = 'c0000000-0000-0000-0000-000000000064'::uuid;
+  exception when insufficient_privilege then
+    v_caught_title := true;
+  end;
+
+  if not v_caught_msg or not v_caught_title then
+    raise exception 'BASARISIZ [G-11 bildirim metni degistirilemez]: message yakalandi=%, title yakalandi=%',
+      v_caught_msg, v_caught_title;
+  end if;
+  raise notice 'GECTI [G-11 Danisan kendi bildiriminin title/message metnini DEGISTIREMEZ (42501)]';
+end $$;
+
+rollback;
+
+
+-- =============================================================================
+-- BILDIRIM — 65) POZİTİF KONTROL: danışan kendi bildirimini `is_read` ile
+-- okundu işaretlemeye DEVAM eder (`useMarkNotificationRead`, useNotifications.ts:53)
+-- =============================================================================
+begin;
+
+insert into public.notifications (id, client_id, message)
+values (
+  'c0000000-0000-0000-0000-000000000065'::uuid,
+  '22222222-2222-2222-2222-222222222222',
+  'Okundu isaretleme regresyon testi'
+);
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+
+do $$
+declare
+  v_rows int;
+  v_read boolean;
+begin
+  update public.notifications set is_read = true
+   where id = 'c0000000-0000-0000-0000-000000000065'::uuid;
+  get diagnostics v_rows = row_count;
+
+  if v_rows is distinct from 1 then
+    raise exception 'BASARISIZ [Danisan bildirimi okundu isaretler]: beklenen 1 satir, etkilenen %', v_rows;
+  end if;
+
+  select is_read into v_read from public.notifications
+   where id = 'c0000000-0000-0000-0000-000000000065'::uuid;
+  if v_read is distinct from true then
+    raise exception 'BASARISIZ [Danisan is_read yazmali]: gelen %', v_read;
+  end if;
+  raise notice 'GECTI [POZITIF - Danisan kendi bildirimini is_read ile okundu isaretleyebilir]';
+end $$;
+
+rollback;
+
+
+-- =============================================================================
+-- PROFIL — 66) [G-13 / AC-08] Danışan `current_streak` / `last_checkin_at`
+-- alanlarını DOĞRUDAN yazamaz. Canlı kanıt R11 (streak=9999) kapanır.
+-- =============================================================================
+begin;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+do $$
+declare
+  v_caught_streak  boolean := false;
+  v_caught_checkin boolean := false;
+  v_state          text;
+begin
+  begin
+    update public.profiles set current_streak = 9999
+     where id = '22222222-2222-2222-2222-222222222222';
+  exception when insufficient_privilege then
+    v_caught_streak := true;
+    get stacked diagnostics v_state = returned_sqlstate;
+  end;
+
+  begin
+    update public.profiles set last_checkin_at = now() + interval '10 days'
+     where id = '22222222-2222-2222-2222-222222222222';
+  exception when insufficient_privilege then
+    v_caught_checkin := true;
+  end;
+
+  if not v_caught_streak then
+    raise exception 'BASARISIZ [G-13 current_streak yazilamaz]: beklenen 42501, hata ALINMADI (seri sahtelenebilir!)';
+  end if;
+  if v_state is distinct from '42501' then
+    raise exception 'BASARISIZ [G-13 hata kodu]: beklenen 42501, gelen %', v_state;
+  end if;
+  if not v_caught_checkin then
+    raise exception 'BASARISIZ [G-13 last_checkin_at yazilamaz]: beklenen 42501, hata ALINMADI';
+  end if;
+  raise notice 'GECTI [G-13 Danisan current_streak / last_checkin_at alanlarini DOGRUDAN yazamaz (42501)]';
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- PROFIL — 67) POZİTİF KONTROL: `increment_streak()` RPC'si HÂLÂ ÇALIŞIR
+-- Sütun sabitleme mekanizmasının (`is_end_user_write()` -> `current_user`)
+-- SECURITY DEFINER RPC'yi ENGELLEMEDİĞİNİ kanıtlar. Bu senaryo, mekanizma
+-- seçiminin (GUC bayrağı yerine current_user) doğruluğunun testidir.
+-- =============================================================================
+begin;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+do $$
+declare
+  v_streak  integer;
+  v_db_at   timestamptz;
+  v_db_val  integer;
+begin
+  select public.increment_streak('22222222-2222-2222-2222-222222222222'::uuid) into v_streak;
+
+  if v_streak is null or v_streak < 1 then
+    raise exception 'BASARISIZ [increment_streak calisir]: donen deger %', v_streak;
+  end if;
+
+  select current_streak, last_checkin_at into v_db_val, v_db_at
+    from public.profiles where id = '22222222-2222-2222-2222-222222222222';
+
+  if v_db_val is distinct from v_streak then
+    raise exception 'BASARISIZ [increment_streak yazmali]: rpc=%, db=%', v_streak, v_db_val;
+  end if;
+  if v_db_at is null or v_db_at < now() - interval '1 minute' then
+    raise exception 'BASARISIZ [increment_streak last_checkin_at tazelemeli]: gelen %', v_db_at;
+  end if;
+  raise notice 'GECTI [POZITIF - increment_streak() RPC si sutun sabitlemeye RAGMEN calisir (streak=%)]', v_streak;
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- PROFIL — 68) [G-14 / AC-09] Danışan `profiles.email` alanını değiştiremez
+-- Canlı kanıt P9 (email=sahte@example.com) kapanır; koç panelinde görünen
+-- e-posta her zaman `auth.users` ile eşleşir.
+-- =============================================================================
+begin;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+do $$
+declare
+  v_caught boolean := false;
+  v_state  text;
+  v_email  text;
+begin
+  begin
+    update public.profiles set email = 'sahte@example.com'
+     where id = '22222222-2222-2222-2222-222222222222';
+  exception when insufficient_privilege then
+    v_caught := true;
+    get stacked diagnostics v_state = returned_sqlstate;
+  end;
+
+  if not v_caught then
+    raise exception 'BASARISIZ [G-14 email degistirilemez]: beklenen 42501, hata ALINMADI';
+  end if;
+  if v_state is distinct from '42501' then
+    raise exception 'BASARISIZ [G-14 hata kodu]: beklenen 42501, gelen %', v_state;
+  end if;
+
+  select email into v_email from public.profiles
+   where id = '22222222-2222-2222-2222-222222222222';
+  if v_email is distinct from 'client1@example.com' then
+    raise exception 'BASARISIZ [G-14 email degismemeli]: gelen %', v_email;
+  end if;
+  raise notice 'GECTI [G-14 Danisan profiles.email alanini DEGISTIREMEZ (42501)]';
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- PROFIL — 69) POZİTİF KONTROL: danışan `avatar_path` ve `full_name` alanlarını
+-- HÂLÂ güncelleyebilir (`useUploadAvatar`, useProfile.ts:99-101). Sütun
+-- sabitlemenin profil düzenlemeyi kırmadığını kanıtlar.
+-- =============================================================================
+begin;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+do $$
+declare
+  v_rows int;
+  v_path text;
+begin
+  update public.profiles
+     set avatar_path = '22222222-2222-2222-2222-222222222222-1700000000.png',
+         full_name   = 'Ahmet Y.'
+   where id = '22222222-2222-2222-2222-222222222222';
+  get diagnostics v_rows = row_count;
+
+  if v_rows is distinct from 1 then
+    raise exception 'BASARISIZ [Danisan avatar_path gunceller]: beklenen 1 satir, etkilenen %', v_rows;
+  end if;
+
+  select avatar_path into v_path from public.profiles
+   where id = '22222222-2222-2222-2222-222222222222';
+  if v_path is distinct from '22222222-2222-2222-2222-222222222222-1700000000.png' then
+    raise exception 'BASARISIZ [Danisan avatar_path yazilmali]: gelen %', v_path;
+  end if;
+  raise notice 'GECTI [POZITIF - Danisan avatar_path / full_name alanlarini HALA guncelleyebilir]';
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- KAYIT (SIGNUP) — 70) [G-16 / AC-02] `raw_user_meta_data.role='coach'` ile
+-- oluşan kullanıcı `client` olur.
+--
+-- Bu senaryo doğrudan `auth.users`'a yazar (postgres kimliğiyle) çünkü GoTrue'nun
+-- `/auth/v1/signup` uç noktası `data` alanını AYNEN buraya koyar — yani bu satır,
+-- saldırganın gönderebileceği payload'ın veritabanındaki tam karşılığıdır.
+-- `full_name` metadata'sının HÂLÂ okunduğu da doğrulanır (yalnızca `role` yok sayılır).
+-- =============================================================================
+begin;
+
+insert into auth.users (
+  instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
+  raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
+  confirmation_token, email_change, email_change_token_new, recovery_token
+)
+values (
+  '00000000-0000-0000-0000-000000000000',
+  '99999999-9999-9999-9999-999999999999',
+  'authenticated',
+  'authenticated',
+  'attacker@example.com',
+  'x',
+  now(),
+  '{"provider":"email","providers":["email"]}'::jsonb,
+  '{"full_name":"Saldirgan","role":"coach"}'::jsonb,
+  now(), now(), '', '', '', ''
+);
+
+do $$
+declare
+  v_role public.user_role;
+  v_name text;
+begin
+  select role, full_name into v_role, v_name
+    from public.profiles where id = '99999999-9999-9999-9999-999999999999';
+
+  if v_role is null then
+    raise exception 'BASARISIZ [G-16 kurulum]: handle_new_user profil olusturmadi (trigger bagli mi?)';
+  end if;
+  if v_role is distinct from 'client'::public.user_role then
+    raise exception 'BASARISIZ [G-16 metadata rolu YOK SAYILMALI]: beklenen client, gelen % (YETKI YUKSELTME ACIK!)', v_role;
+  end if;
+  if v_name is distinct from 'Saldirgan' then
+    raise exception 'BASARISIZ [G-16 full_name metadata si okunmali]: beklenen Saldirgan, gelen %', v_name;
+  end if;
+  raise notice 'GECTI [G-16 raw_user_meta_data.role=coach YOK SAYILIR; yeni kullanici client olur]';
+end $$;
+
+rollback;
+
+
 -- =============================================================================
 -- TOPLAM ÖZET
--- Bu noktaya yalnızca YUKARIDAKİ 50 senaryonun HEPSİ GECTI verdiyse ulaşılır --
+-- Bu noktaya yalnızca YUKARIDAKİ 70 senaryonun HEPSİ GECTI verdiyse ulaşılır --
 -- herhangi biri BASARISIZ olsaydı raise exception + ON_ERROR_STOP psql'i
 -- daha önce sıfırdan farklı çıkış koduyla durdururdu.
 --   * 1–19  : Faz 1a ve öncesi (profiles, notifications, form_checks, daily_logs,
@@ -1857,8 +2674,13 @@ rollback;
 --   * 28–35 : Faz 1b Adım 3a — nutrition_plans / nutrition_plan_meals / save_nutrition_plan
 --   * 36–42 : Faz 1b Adım 4 — messages konuşma anahtarı (client_id / read_at / kind)
 --   * 43–50 : Faz 1b Adım 5 — form_checks inceleme durumu (sütun koruması + denetim izi)
+--   * 51–57 : Faz 1.5 — program_approvals onay kapısı      (AC-01, AC-07 / G-01,02,03,06)
+--   * 58–61 : Faz 1.5 — messages sütun koruması            (AC-04 / G-07, G-08, G-09)
+--   * 62–65 : Faz 1.5 — notifications içerik koruması      (AC-05, AC-10 / G-10, G-11)
+--   * 66–69 : Faz 1.5 — profiles sunucu sütunları          (AC-08, AC-09 / G-13, G-14)
+--   * 70    : Faz 1.5 — handle_new_user rol sertleştirmesi (AC-02 / G-16)
 -- =============================================================================
 do $$
 begin
-  raise notice 'TUM RLS TESTLERI GECTI (50 senaryo)';
+  raise notice 'TUM RLS TESTLERI GECTI (70 senaryo)';
 end $$;

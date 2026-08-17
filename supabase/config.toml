@@ -62,7 +62,12 @@ file_size_limit = "50MiB"
 enabled = true
 site_url = "http://localhost:3000"
 additional_redirect_urls = ["http://localhost:3000/**"]
-jwt_expiry = 3600
+# A-06 (güvenlik denetimi, findings-app-surface.md §3.6): 3600 -> 900. Access token imza
+# tabanlı bir JWT olduğu için `signOut()` yalnızca refresh token'ı iptal eder; access token
+# PostgREST/Storage tarafından süresi dolana kadar kabul edilmeye devam eder. Kısa `jwt_expiry`
+# bu pencereyi daraltır (1 saat -> 15 dk). Refresh token rotasyonu zaten açık olduğu için
+# kullanıcı deneyimi bozulmaz (supabase-js süresi dolmadan otomatik yeniler).
+jwt_expiry = 900
 enable_refresh_token_rotation = true
 refresh_token_reuse_interval = 10
 # Kayıt kapalı: danışan hesaplarını yalnızca koç (admin) service_role ile açar
@@ -87,6 +92,66 @@ enable_signup = true
 double_confirm_changes = true
 # Yerelde e-posta doğrulaması istemiyoruz
 enable_confirmations = false
+
+# A-01 (güvenlik denetimi, findings-app-surface.md §3.1): bu bölüm YOKTU; canlı testte 100
+# ardışık yanlış şifre denemesinin 100'ü de işleme alındı (hiç 429, hiç kilitleme). Anahtar
+# adları Supabase CLI 2.114.0 ile doğrulandı: `npx supabase init` çıktısı olan taze bir
+# config.toml şablonundaki [auth.rate_limit] bölümüyle birebir karşılaştırıldı (CLI'ın
+# desteklediği tek 7 anahtar budur; [auth.email]'de daha önce yaşanan "var olmayan anahtar
+# sessizce yok sayılır" tuzağı burada tekrarlanmadı — bu yüzden şablonda GERÇEKTEN var olan
+# anahtarlar kullanıldı).
+#
+# ÖNEMLİ (ikinci bir tuzak, konteyner ortam değişkeniyle YAKALANDI): CLI bu TOML anahtarlarını
+# İSİMLERİYLE BİREBİR AYNI `GOTRUE_RATE_LIMIT_*` değişkenine çevirmiyor. Ayırt edici test
+# değerleriyle (`sign_in_sign_ups = 77`, `token_verifications = 88`) `stop`/`start` yapılıp
+# `docker exec supabase_auth_my-coaching-app printenv | grep RATE_LIMIT` ile doğrulandı:
+#   sign_in_sign_ups     -> GOTRUE_RATE_LIMIT_OTP     (GOTRUE_RATE_LIMIT_SIGN_IN_SIGN_UPS DEĞİL)
+#   token_verifications  -> GOTRUE_RATE_LIMIT_VERIFY  (GOTRUE_RATE_LIMIT_TOKEN_VERIFICATIONS DEĞİL)
+# Diğer beş anahtar (email_sent, sms_sent, anonymous_users, token_refresh, web3) isimleriyle
+# birebir aynı `GOTRUE_RATE_LIMIT_*` değişkenine çevriliyor. Nihai (30/30) değerlerle
+# doğrulanmış hal: `GOTRUE_RATE_LIMIT_OTP=30` ve diğer altı `GOTRUE_RATE_LIMIT_*` değişkeni
+# beklenen değerlerle konteynerde göründü.
+#
+# KRİTİK AÇIK RİSK (bu bölümü ekledikten SONRA canlı testle keşfedildi, ÇÖZÜLEMEDİ):
+# `sign_in_sign_ups` -> `GOTRUE_RATE_LIMIT_OTP` konteynerde DOĞRU göründüğü halde, GoTrue'nun
+# kendisi bunu `/token?grant_type=password` (asıl login uç noktası) üzerinde UYGULAMIYOR.
+# Aynı IP'den art arda 180 yanlış şifre denemesi (bu depoda, bu değişiklik SONRASI) gönderildi,
+# 180/180'i 400 (invalid_credentials) döndü, HİÇ 429 gelmedi — yani config seviyesindeki bu
+# düzeltme LOGIN BRUTE-FORCE'U (A-01'in asıl senaryosu) FİİLEN DURDURMUYOR. Bu, GoTrue/Supabase
+# CLI'da bilinen ve bu satır yazıldığı tarihte AÇIK olan bir üst akış (upstream) hatası:
+# github.com/supabase/supabase/issues/41947 ("Auth rate limit for sign-ups and sign-ins is not
+# enforced despite configuration") — raportör de aynı deseni bildiriyor: config 5'e ayarlansa
+# bile ~30-50 istek engellenmeden geçiyor; kod tabanındaki bir önceki düzeltme denemesi bu
+# ayarı yanlışlıkla `RATE_LIMIT_OTP`'ye bağlamış (biz de burada bunu canlı doğruladık) ama OTP
+# değeri password grant akışında hiç okunmuyor.
+#
+# BU BÖLÜM YİNE DE KORUNUYOR (kaldırılmadı): CLI'ın resmi şeması budur, ileride upstream
+# düzeltilirse (issue kapanınca) otomatik olarak çalışır hale gelir; diğer altı anahtar
+# (email_sent, token_refresh, vb.) kendi uçlarında halihazırda GEÇERLİ olabilir — yalnızca
+# `sign_in_sign_ups`ın password-grant üzerindeki etkisi doğrulanamadı/etkisiz bulundu.
+# GERÇEK A-01 KAPANIŞI İÇİN ÖNERİ (bu ajanın dosya kapsamı dışında, main thread'e devrediliyor):
+# (a) `[auth.captcha]` (hCaptcha/Turnstile) açıp login formuna captcha widget'ı eklemek
+#     (`src/app/login/page.tsx`, bu ajanın sahiplik listesinde YOK), ya da
+# (b) `/login`'i doğrudan GoTrue'ya değil kendi hız sınırlı bir Next.js route'una
+#     yönlendirmek (yeni bir `src/app/api/auth/**` route'u + `useSession.ts` değişikliği,
+#     ikisi de bu ajanın sahiplik listesinde YOK).
+# Bu risk raporda AÇIK olarak işaretlenmiştir; "kapatıldı" DENEMEMELİDİR.
+[auth.rate_limit]
+# Saatte gönderilebilecek e-posta sayısı (auth.email.smtp açık olmalı).
+email_sent = 2
+# Saatte gönderilebilecek SMS sayısı (auth.sms açık olmalı) — bu projede SMS kullanılmıyor.
+sms_sent = 30
+# IP başına saatte yapılabilecek anonim giriş sayısı (enable_anonymous_sign_ins = true gerekir) — kapalı.
+anonymous_users = 30
+# IP başına 5 dakikada yenilenebilecek oturum (refresh token) sayısı.
+token_refresh = 150
+# IP başına 5 dakikada yapılabilecek kayıt + giriş isteği sayısı (anonim girişler hariç).
+# A-01'i kapatan asıl anahtar budur.
+sign_in_sign_ups = 30
+# IP başına 5 dakikada yapılabilecek OTP/magic-link doğrulama sayısı.
+token_verifications = 30
+# IP başına 5 dakikada yapılabilecek Web3 girişi sayısı — bu projede kullanılmıyor.
+web3 = 30
 
 [analytics]
 enabled = false

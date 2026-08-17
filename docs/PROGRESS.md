@@ -370,6 +370,135 @@ tabanında hiçbir yerden çağrılmıyor (`useRecommendations` hook'u tanımlı
 kullanmıyor); adı hizalamak izole, riski olmayan bir değişiklik ama bu turun kapsamı dışında
 bırakıldı — ayrı bir işte, gerçek bir tüketici eklendiğinde hizalanacak.
 
+### Faz 1.5 — güvenlik denetim turu (2026-08-17)
+
+`active_planprogram.md` §3a kapsamındaki Faz 1.5'in **denetim yarısı** tamamlandı; düzeltmeler
+henüz başlamadı.
+
+**Denetim sonucu:** Üç paralel denetim tamamlandı, üç rapor diskte:
+
+- `docs/security/findings-access-control.md` (631 satır) — erişim kontrolü / IDOR / RLS, 12
+  bulgu (AC-01…AC-12) + 26 test boşluğu (G-01…G-26).
+- `docs/security/findings-app-surface.md` (~48 KB) — uygulama yüzeyi, 22 bulgu (A-01…A-22).
+- `docs/security/tooling-baseline.md` — otomatik araç taraması, 5 bulgu (T-01…T-05).
+- `docs/security/AUDIT.md` — birleşik yönetici raporu (§1 özet, §2 39 bulguluk birleşik tablo,
+  §3 çakışma analizi, §4 yükseltme sonrası durum, §5 altı gruplu bağımlılık sıralı düzeltme
+  planı, §6 bulgu değil, §7 açık sorular).
+
+**Severity dağılımı:** Critical 0 · High 10 · Medium 12 · Low 17 · toplam 39. Critical bulgu
+üretilmemesinin nedeni: RLS satır izolasyonu ve Storage yol tabanlı sahiplik sınırları canlı SQL
+rol taklidi ve gerçek HTTP istekleriyle yapılan her denemede tuttu.
+
+**En ciddi dört bulgu (hepsi `open`):** AC-01 `program_approvals` onay kapısı INSERT ile
+atlatılıyor · AC-02 `handle_new_user()` rolü kullanıcı metadata'sından geliyor · A-01 giriş
+denemeleri hiçbir katmanda sınırlanmıyor · A-02/A-03 hız sınırlayıcı XFF ile atlanıyor ve
+deprecated FastAPI uçları API key guard'ından muaf.
+
+**Yöntem:** statik inceleme + canlı SQL rol taklidi (`set local role authenticated` +
+`set local request.jwt.claims`, tüm yazma testleri `ROLLBACK` içinde) + gerçek HTTP istekleri
+(GoTrue / PostgREST / Storage API / FastAPI) + `npm audit`, `pip-audit`, `semgrep`, `gitleaks`
+(çalışma ağacı + 34 commitlik geçmiş).
+
+**Bu turda uygulanan tek değişiklik — bağımlılık yükseltmesi:** `next` 16.2.10 → 16.3.1,
+`eslint-config-next` 16.2.10 → 16.3.1, `sharp` transitif 0.34.5 → 0.35.3 (`overrides` gerekmedi),
+`postcss` ve `nanoid` düzeldi. `next-pwa` kırılmadı, `next build --webpack` sıfır uyarıyla
+derledi. Doğrulama zinciri 12/12 yeşil: type-check temiz · lint 0 hata / 12 beklenen uyarı · 230
+birim · 50 RLS · 26 transform · build başarılı · 21 Playwright E2E · format temiz. `npm audit`
+18 → 14; kapanan T-01/T-02/T-03. Kalan 14'ün hiçbiri çalışma zamanına ulaşmıyor (7 test zinciri,
+7 `next-pwa@5.6.0` build eklentisi kökünden).
+
+**Durum ve sonraki adım:** Faz 1.5'in denetim yarısı bitti. **Düzeltmeler kullanıcı onayı
+bekliyor** — faz protokolü gereği önce rapor, sonra onay, sonra düzeltme; her düzeltme kendi
+regresyon testiyle. Düzeltme planı `docs/security/AUDIT.md` §5'te altı gruba ayrıldı: Grup 1
+kimlik ve yetki kapıları (M) · Grup 2 rate limiting ve kaba kuvvet (L) · Grup 3 sütun seviyesi
+sözleşmeler (M) · Grup 4 girdi doğrulama ve gövde sınırları (M) · Grup 5 yapılandırma
+sertleştirme ve savunma derinliği (L) · Grup 6 dokümantasyon ve CI tarama zinciri (M).
+
+**Açık kullanıcı kararları:** AC-12 hosted projede ayrı doğrulama · A-06 logout'un access
+token'ı iptal etmemesi (`jwt_expiry=3600`) · `next-pwa` legacy `--webpack` yolunun ne zaman terk
+edileceği.
+
+**Operasyonel notlar (gelecek oturumlar için):**
+
+- Harness alt-ajanların rapor `.md` dosyalarını `Write` ile yazmasını engelliyor
+  (`"Subagents should return findings as text, not write report files."`) — çözüm: `Edit` aracı
+  veya Bash heredoc.
+- Bash komutları ~8 KB üzerinde içerik ortasında kırpılıyor ve yanıltıcı `unexpected EOF` hatası
+  veriyor — uzun dosyalar 6 KB'ın altındaki parçalara bölünüp `>>` ile eklenmeli.
+
+**Plan dokümanı güncel değil:** `active_planprogram.md` §3a.3 Kova 1 madde 7,
+`supabase/tests/rls.test.sql`'in 35 senaryo içerdiğini söylüyor; dosya artık 50 senaryo içeriyor
+(bu turun doğrulama zincirindeki "50 RLS" sonucuyla uyumlu). `active_planprogram.md` bilerek
+değiştirilmedi; bu not onun yerine geçen güncel kayıttır.
+
+### Faz 1.5 — düzeltme turu, Grup 1–3 (2026-08-17)
+
+Kullanıcı `docs/security/AUDIT.md` §5'teki altı gruplu planın Grup 1 → 2 → 3'ünü onayladı; bu
+oturumda üçü de uygulandı ve regresyon kanıtıyla kapatıldı (tam detay: `docs/security/AUDIT.md`
+§4b). Kova 4, 5, 6 (girdi doğrulama/gövde sınırları, yapılandırma sertleştirme, dokümantasyon/CI
+tarama zinciri) **açık** kaldı.
+
+**Kapanan bulgular (19/39, önceki turdan T-01/T-02/T-03 ile birlikte toplam 22/39):**
+
+- **Grup 1 (kimlik ve yetki kapıları):** AC-01, AC-07, AC-02, A-03, A-04, A-12, A-13. Yeni
+  migration'lar `supabase/migrations/20260817160000_program_approval_guard.sql` (onay kapısı
+  BEFORE INSERT/UPDATE trigger'ı, `status`/`reviewed_by`/`reviewed_at` sunucudan) ve
+  `20260817160100_signup_role_hardening.sql` (`handle_new_user()` artık istemci metadata'sından
+  rol okumuyor); `ai_backend` legacy router'lara API key guard + rate limit; production'da
+  `AI_BACKEND_API_KEY` eksikse Next.js ve FastAPI ikisi de fail-fast; FastAPI `/docs` prod'da
+  kapalı.
+- **Grup 2 (rate limiting ve kaba kuvvet):** A-02, A-09, A-17, A-18, A-19 + bonus A-06 (kullanıcı
+  kararı, `jwt_expiry` 3600→900). `src/proxy.ts` artık `TRUSTED_PROXY_COUNT` tabanlı bir güven
+  modeliyle çalışıyor (varsayılan: hiçbir XFF başlığına güvenme); `src/lib/rate-limit.ts` taşmada
+  LRU tahliye kullanıyor (önceden tüm sayaçları sıfırlıyordu — bu, sınırlayıcının kendisini bir
+  DoS koluna çeviriyordu); FastAPI hız sınırı artık doğrulanmış kullanıcı bazında.
+  **A-01 (giriş denemesi sınırı) planlandığı gibi kapanmadı** — `[auth.rate_limit]`
+  yapılandırması doğru eklendi ve konteynerde ayarlandığı kanıtlandı, ama 180 ardışık yanlış
+  şifre denemesi hâlâ `429` üretmedi. Kök neden doğrulanmış bir upstream Supabase hatası
+  (`supabase/supabase#41947` — ayar `rate_limit_otp`'ye yazılıyor, şifre girişini korumuyor).
+  Koruma bunun yerine `src/app/api/auth/sign-in/route.ts` + `src/lib/api/auth-rate-limit.ts` ile
+  **uygulama katmanında** kuruldu (e-posta başına 10 deneme/15 dk). **`[auth.rate_limit]`'in
+  config.toml'da duruyor olması korunduğumuz anlamına gelmiyor — bu tuzağa düşülmemeli, bkz.
+  `docs/security/AUDIT.md` §4b/§7.**
+- **Grup 3 (sütun seviyesi sözleşmeler):** AC-04, AC-05, AC-08, AC-09, AC-10 — tek migration
+  `supabase/migrations/20260817160200_column_guards.sql`. Mesajlarda alıcı yalnızca
+  `read_at`/`is_read` değiştirebiliyor; danışan→koç bildirim içeriği bilinen şablona
+  bağlandı (RPC değil trigger — RPC'ye geçiş mevcut `notifications_insert` politikasını
+  kırardı); `profiles.email`/`current_streak`/`last_checkin_at` yeni `is_end_user_write()`
+  yardımcısıyla sunucu-sahipli hale geldi.
+
+**Kayıtlı borç:** AC-05'in danışan→koç bildirim şablon metni artık iki yerde yaşıyor (trigger +
+`src/hooks/useProgramApprovals.ts`). Biri diğerinden bağımsız değişirse program gönderimi
+`42501` ile kırılır (sessiz değil, RLS test paketi yakalıyor). Doğru çözüm — ikisini
+`SECURITY DEFINER` bir RPC'ye taşımak — uygulama kodunun da değiştirilebildiği bir sonraki turda
+yapılmalı.
+
+**Entegrasyon temizliği:** `.gitignore`'a `!.env.example` + `!**/.env.example` istisnası eklendi
+(A-22'yi fiilen kapatıyor, bkz. `AUDIT.md` §4b tutarsızlık notu); `useProgramApprovals.ts`'teki
+ölü `reviewed_by`/`reviewed_at`/`reviewerId` kodu temizlendi; `playwright.config.ts` ve
+`.github/workflows/ci.yml`'e A-12 sertleştirmesi nedeniyle gereken `AI_BACKEND_API_KEY` eklendi;
+`ai_backend/.env.example` yeni eklendi; `docker-compose.override.yml.example`'daki
+`uvicorn main:app` → `uvicorn app.main:app` hatası düzeltildi.
+
+**Doğrulama (10/10 yeşil):** type-check temiz · lint 0 hata/12 uyarı · vitest **264/264**
+(önceki tur: 230) · `db reset` 14 migration temiz · **test:rls 70/70** (önceki tur: 50) ·
+test:transform 26/26 · ruff+mypy temiz · **pytest 82/82, kapsam %94.94** (önceki tur: %92) ·
+build başarılı · **Playwright 21/21** (iki ardışık koşumda) · format:check temiz.
+
+**Kırmızı-yeşil kanıtları:** trigger düşürülünce AC-01/AC-07 senaryosu beklenen `42501` yerine
+hatasız geçti ("onay kapısı açık"); `handle_new_user` eski haline alınınca AC-02 istemci
+metadata'sıyla gerçekten koç oluşturulabildiğini gösterdi; A-03 guard'ı kaldırılınca 4 pytest
+`assert 200 == 401` ile kırıldı; A-02 sahte XFF ile `[200,200,200,200,200]` (bypass) → düzeltme
+sonrası `[200,200,200,429,429]`; A-01 uygulama katmanı kontrolü kapatılınca 10 test
+`expected 401 to be 429` ile kırıldı; `is_end_user_write()` sunucu bağlamı taklit edecek şekilde
+bozulunca G-16 beklenen `client` yerine `coach` döndü ("yetki yükseltme açık").
+
+**Durum:** Grup 1–3 tamamlandı. Grup 4 (girdi doğrulama/gövde sınırları), Grup 5 (yapılandırma
+sertleştirme/savunma derinliği), Grup 6 (dokümantasyon/CI tarama zinciri) açık — sıradaki iş.
+Açık kullanıcı kararları: AC-12 hosted projede ayrı doğrulama (değişmedi), `next-pwa` legacy
+`--webpack` yolu (değişmedi). A-06 bu turda çözüldü (`jwt_expiry=900`, kısmi — logout hâlâ
+token'ı sunucu tarafında iptal etmiyor).
+
 ---
 
 ## 4. Alınan kararlar (karar kaydı)
@@ -397,6 +526,7 @@ bırakıldı — ayrı bir işte, gerçek bir tüketici eklendiğinde hizalanaca
 | 2026-08-17 | **Fonksiyonel emoji emekli edildi, `lucide-react`'e geçiliyor**     | ~60 emoji / 15 dosya fonksiyonel ikon rolünde. Emoji hiçbir platformda aynı render edilmiyor, `currentColor` ile token'lara uymuyor, ağırlık/hizalama kontrolü yok. Belirleyici gerekçe: `lucide-react-native` **aynı ikon adlarıyla** Expo'ya birebir taşınıyor. Tek istisna: kutlama anları emoji ile değil imza öğeyle (halka kapanır)                                                                                                                                                                                                                                                                                                                                     | Planlandı — ADR-0016; uygulama Faz 2'nin ilk mekanik işi, E2E locator güncellemeleriyle aynı PR'da                                                            |
 | 2026-08-17 | **İmza öğe: halka, tek anlam kuralıyla**                            | Halka **yalnızca döngü/çevrim durumu** kodlar; dekorasyon (avatar çerçevesi, buton süsü) yasak. Üç görünme yeri: danışan panosu haftalık döngü halkası, gym modu dinlenme sayacı, koç triyaj kartı 4 yaylı rozet. **Bilinçli kesinti:** NutritionTab makroları halka OLMAZ (Apple Watch klişesi + makro bir döngü değil bütçedir) → yatay bar; plan §4.2 buna göre düzeltildi. **Kritik kısıt:** halka bilgi taşır — CSS animasyonuyla çizilirse `globals.css`'teki global `prefers-reduced-motion` kuralı onu dondurur ve **yanlış bilgi gösterir**; state kaynaklı `stroke-dashoffset` zorunlu                                                                              | Planlandı — ADR-0017; `LoopRing` ilk göründüğü ekranla (gym modu) birlikte yazılır, AC-1.6.7 Faz 2'ye bağlandı                                                |
 | 2026-08-17 | **Kimlik geçişi iki katman + CI ratchet; büyük patlama yok**        | Katman A (Faz 1.6, tek oturum/tek PR): token + font + gömülü 8 hex + odak/seçim rengi; **ekran restilizasyonu kapsam dışı**. Katman B (Faz 2): 49 `font-black` / 17 `rounded-3xl` / 14 gradyan ekranlar yeniden yazılırken doğal dönüşür, ayrı "restyle PR"ı yok. Arada CI ratchet mevcut sayıları tavan olarak kilitler, tavan asla yükselmez                                                                                                                                                                                                                                                                                                                                | Planlandı — ADR-0018; `active_planprogram.md` §3b.4                                                                                                           |
+| 2026-08-17 | **Laboratuvar (kan/hormon) yorumlama motoru plandan çıkarıldı**     | Değer zaten raporda basılı, severity formülü (§5.4) tıbbi kaynağı olmayan keyfi bir eşik, isim doğrulama/boru hattı sırasında iki tasarım kusuru pratikte çalışmazdı, bloklayıcı açık sorular (katalog lisansı, saklama süresi, açık rıza) çözülmemişti, kalibrasyon verisi yoktu                                                                                                                                                                                                                                                                                                                                                                                             | Reddedildi — ADR-0019; `docs/LAB-INSIGHTS-SPEC.md` tarihsel kayıt olarak korunuyor, plana hiç işlenmemişti                                                    |
 
 ---
 
@@ -654,12 +784,14 @@ sütuna taşınması.
 
 ## 9. Oturum günlüğü
 
-| Tarih                        | Oturum özeti                                                                                                                                                                    | Sonuç                                                                                                                                                                                   |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 2026-08-16                   | v1.0 production-ready yükseltmesi (TS migrasyonu, FastAPI servisleştirme, Supabase RLS, test/CI/Docker altyapısı, dokümantasyon) + lint/test/build zincirinin yeşile alınması   | lint 0 hata, 180/180 test, build başarılı. DB/E2E doğrulaması Docker eksikliği nedeniyle bekliyor.                                                                                      |
-| 2026-08-16                   | `docs/PROGRESS.md` oluşturuldu (oturumlar arası süreklilik için); `supabase/config.toml`'daki `[inbucket]` → `[local_smtp]` deprecation uyarısı düzeltildi                      | `PROGRESS.md` ilk sürümü yazıldı; `config.toml` düzeltmesi tek bölüm adı değişikliği, anahtarlar korundu.                                                                               |
-| 2026-08-16 (ikinci oturum)   | Sağlamlaştırma turu: DB/RLS doğrulaması, tip üretimi, ai_backend ilk çalıştırma, PWA mahremiyet düzeltmesi, Prettier hizalama, gitignore artıkları                              | Tüm kapılar yeşil (lint/type/format/test/build + ruff/mypy/pytest/docker). Storage düzeltmesi Faz 1'e ertelendi. E2E koşuluyor.                                                         |
-| 2026-08-16 (üçüncü oturum)   | E2E doğrulaması: Playwright ilk kez koşturuldu; Türkçe İ locator tuzağı, kapalı e-posta sağlayıcısı, CSP'nin yerel Supabase'i bloklaması ve iki kararsız/hatalı test düzeltildi | 28/28 E2E geçti (chromium + Mobile Chrome). Sağlamlaştırma turu kapandı.                                                                                                                |
-| 2026-08-16 (dördüncü oturum) | Keşif envanteri (`docs/DISCOVERY.md`), plan v1.1 revizyonu, üç kritik kırığın düzeltilmesi ve regresyon korumalarının eklenmesi                                                 | 192 birim + 16×2 E2E + 19 RLS senaryosu geçiyor. Faz 1'e hazır.                                                                                                                         |
-| 2026-08-17                   | Faz 1a: rol yeniden adlandırma (`admin`/`student` → `coach`/`client`) + ADR ayrıştırması                                                                                        | `db reset` sıfırdan, 19/19 RLS, 192/192 birim, 16/16 E2E, build başarılı; 13 ADR (`0013` `0003`'ün yerini aldı); AI backend `student_id` ve Türkçe arayüz metinleri bilinçli ertelendi. |
-| 2026-08-17                   | Faz 1a tamamlandı: rol yeniden adlandırma, ADR ayrıştırması, storage mahremiyeti, AI tel protokolü                                                                              | 203 birim + 19 RLS + 16 E2E, db reset temiz                                                                                                                                             |
+| Tarih                        | Oturum özeti                                                                                                                                                                                                                                                                                                                                                                                   | Sonuç                                                                                                                                                                                                   |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-08-16                   | v1.0 production-ready yükseltmesi (TS migrasyonu, FastAPI servisleştirme, Supabase RLS, test/CI/Docker altyapısı, dokümantasyon) + lint/test/build zincirinin yeşile alınması                                                                                                                                                                                                                  | lint 0 hata, 180/180 test, build başarılı. DB/E2E doğrulaması Docker eksikliği nedeniyle bekliyor.                                                                                                      |
+| 2026-08-16                   | `docs/PROGRESS.md` oluşturuldu (oturumlar arası süreklilik için); `supabase/config.toml`'daki `[inbucket]` → `[local_smtp]` deprecation uyarısı düzeltildi                                                                                                                                                                                                                                     | `PROGRESS.md` ilk sürümü yazıldı; `config.toml` düzeltmesi tek bölüm adı değişikliği, anahtarlar korundu.                                                                                               |
+| 2026-08-16 (ikinci oturum)   | Sağlamlaştırma turu: DB/RLS doğrulaması, tip üretimi, ai_backend ilk çalıştırma, PWA mahremiyet düzeltmesi, Prettier hizalama, gitignore artıkları                                                                                                                                                                                                                                             | Tüm kapılar yeşil (lint/type/format/test/build + ruff/mypy/pytest/docker). Storage düzeltmesi Faz 1'e ertelendi. E2E koşuluyor.                                                                         |
+| 2026-08-16 (üçüncü oturum)   | E2E doğrulaması: Playwright ilk kez koşturuldu; Türkçe İ locator tuzağı, kapalı e-posta sağlayıcısı, CSP'nin yerel Supabase'i bloklaması ve iki kararsız/hatalı test düzeltildi                                                                                                                                                                                                                | 28/28 E2E geçti (chromium + Mobile Chrome). Sağlamlaştırma turu kapandı.                                                                                                                                |
+| 2026-08-16 (dördüncü oturum) | Keşif envanteri (`docs/DISCOVERY.md`), plan v1.1 revizyonu, üç kritik kırığın düzeltilmesi ve regresyon korumalarının eklenmesi                                                                                                                                                                                                                                                                | 192 birim + 16×2 E2E + 19 RLS senaryosu geçiyor. Faz 1'e hazır.                                                                                                                                         |
+| 2026-08-17                   | Faz 1a: rol yeniden adlandırma (`admin`/`student` → `coach`/`client`) + ADR ayrıştırması                                                                                                                                                                                                                                                                                                       | `db reset` sıfırdan, 19/19 RLS, 192/192 birim, 16/16 E2E, build başarılı; 13 ADR (`0013` `0003`'ün yerini aldı); AI backend `student_id` ve Türkçe arayüz metinleri bilinçli ertelendi.                 |
+| 2026-08-17                   | Faz 1a tamamlandı: rol yeniden adlandırma, ADR ayrıştırması, storage mahremiyeti, AI tel protokolü                                                                                                                                                                                                                                                                                             | 203 birim + 19 RLS + 16 E2E, db reset temiz                                                                                                                                                             |
+| 2026-08-17                   | Faz 1.5 güvenlik denetim turu: üç paralel denetim (erişim kontrolü/IDOR/RLS, uygulama yüzeyi, araç zinciri) tamamlandı, `docs/security/AUDIT.md` birleşik raporu yazıldı; turun tek kod değişikliği bağımlılık yükseltmesiydi (`next` 16.2.10 → 16.3.1)                                                                                                                                        | 39 bulgu (Critical 0 · High 10 · Medium 12 · Low 17); doğrulama zinciri 12/12 yeşil, `npm audit` 18 → 14. Düzeltmeler kullanıcı onayı bekliyor, henüz uygulanmadı.                                      |
+| 2026-08-17 (düzeltme turu)   | Faz 1.5 düzeltme turu: kullanıcı onaylı Grup 1 (kimlik/yetki kapıları), Grup 2 (rate limiting/kaba kuvvet), Grup 3 (sütun seviyesi sözleşmeler) uygulandı — 3 yeni migration, `ai_backend` guard/fail-fast sertleştirmesi, `src/proxy.ts` XFF güven modeli, A-01 için uygulama katmanı giriş denemesi sınırlayıcısı (upstream Supabase hatası nedeniyle `[auth.rate_limit]` yolu işe yaramadı) | 19 bulgu kapandı (toplam 22/39 `fixed`); doğrulama 10/10 yeşil — vitest 264/264, test:rls 70/70, pytest 82/82 (%94.94), Playwright 21/21. Grup 4/5/6 açık; AC-05 şablon kuplajı borç olarak kaydedildi. |

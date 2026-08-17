@@ -51,6 +51,14 @@ export default defineConfig({
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
         'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0',
       NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000',
+      // A-12 (src/env.ts) NODE_ENV=production iken AI_BACKEND_API_KEY'i zorunlu kılar
+      // (fail-fast). `next start` NODE_ENV=production ile çalıştığından bu değer
+      // olmadan middleware HER istekte throw eder ve e2e paketi tamamen kırılır.
+      // ai_backend servisi bu webServer komutuyla ayağa kalkmadığından (yalnızca
+      // Next.js `build && start`), AI uçlarına giden istekler zaten bağlantı
+      // hatası alacaktır — burada gereken tek şey zod doğrulamasını geçecek
+      // boş olmayan bir yerel test değeri sağlamaktır, gerçek sır DEĞİLDİR.
+      AI_BACKEND_API_KEY: process.env.AI_BACKEND_API_KEY ?? 'playwright-e2e-local-test-key',
     },
     // CI'da yalnızca `next start` çalıştığı için 120 sn fazlasıyla yeterli;
     // yerelde build de dahil olduğundan daha cömert bir süre tanınıyor.

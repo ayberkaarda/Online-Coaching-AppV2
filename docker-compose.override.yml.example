@@ -27,4 +27,9 @@ services:
       context: ./ai_backend
     volumes:
       - ./ai_backend:/app
-    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    # `docker-compose.yml`'deki `environment.API_KEY` (kök `.env`'deki
+    # AI_BACKEND_API_KEY'den) buraya da miras kalır — compose birden fazla
+    # dosyadaki `environment` map'lerini birleştirir, burada tekrar tanımlamaya
+    # gerek yok. ENVIRONMENT ayarlanmazsa varsayılan `development` kalır (A-04
+    # fail-closed guard yalnızca `ENVIRONMENT=production` iken devreye girer).
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload

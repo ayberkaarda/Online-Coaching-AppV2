@@ -17,7 +17,10 @@ from app.services.nutrition_calculator import calculate_bmr, calculate_macro_tar
 
 router = APIRouter(tags=["nutrition"], dependencies=[Depends(api_key_guard)])
 
-legacy_router = APIRouter(tags=["nutrition", "deprecated"])
+# A-03: legacy_router, router ile AYNI guard + hız sınırı disiplinine tabidir.
+# api_key_guard'sız veya @limiter.limit'siz yeni bir route eklenirse bu bilinçli
+# olmalı; aksi halde deprecated uç, korumanın tamamını atlatan bir arka kapı olur.
+legacy_router = APIRouter(tags=["nutrition", "deprecated"], dependencies=[Depends(api_key_guard)])
 
 
 def _build_nutrition_response(payload: NutritionAnalyzeRequest) -> NutritionAnalyzeResponse:
@@ -55,6 +58,7 @@ async def analyze_nutrition(request: Request, payload: NutritionAnalyzeRequest) 
     deprecated=True,
     summary="[Deprecated] bkz. POST /analyze/nutrition",
 )
-async def generate_ai_diet_legacy(payload: NutritionAnalyzeRequest) -> NutritionAnalyzeResponse:
+@limiter.limit("20/minute")
+async def generate_ai_diet_legacy(request: Request, payload: NutritionAnalyzeRequest) -> NutritionAnalyzeResponse:
     """Eski (deprecated) diyet üretim endpoint'i. Bkz. ``POST /analyze/nutrition``."""
     return _build_nutrition_response(payload)

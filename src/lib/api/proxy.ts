@@ -7,35 +7,17 @@ import { NextResponse } from 'next/server'
 import type { z } from 'zod'
 
 import { getServerEnv } from '@/env'
+import { errorResponse } from '@/lib/api/response'
 import { createRequestLogger } from '@/lib/logger'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { formatZodError } from '@/lib/validation/schemas'
 
 const UPSTREAM_TIMEOUT_MS = 30_000
 
-/** Standart hata gövdesi (`ApiErrorBody`) üretir. */
-export function errorResponse(
-  status: number,
-  code: string,
-  message: string,
-  requestId: string,
-  details?: unknown
-): NextResponse {
-  return NextResponse.json(
-    {
-      error: {
-        code,
-        message,
-        request_id: requestId,
-        ...(details !== undefined ? { details } : {}),
-      },
-    },
-    {
-      status,
-      headers: { 'X-Request-ID': requestId, 'Cache-Control': 'no-store' },
-    }
-  )
-}
+// `errorResponse` `./response.ts`'e taşındı (A-01: `/api/auth/sign-in` de kullanıyor).
+// Mevcut içe aktarmalar (`import { errorResponse } from '@/lib/api/proxy'`) kırılmasın diye
+// buradan yeniden dışa aktarılır.
+export { errorResponse }
 
 /**
  * Gövdeyi doğrulayıp Python AI backend'ine iletir ve yanıtını aynen döndürür.
@@ -110,9 +92,17 @@ export async function handleAiProxy<TOut>(
   const env = getServerEnv()
   const upstreamUrl = `${env.AI_BACKEND_URL.replace(/\/+$/, '')}${upstreamPath}`
 
+  // A-09 (güvenlik denetimi, findings-app-surface.md §7 Grup 2 — ajanlar arası sözleşme):
+  // FastAPI hız sınırlayıcısı `get_remote_address` ile PROXY'nin IP'sini görüyor, yani tüm
+  // kullanıcılar tek ortak kovayı paylaşıyordu. Doğrulanmış kullanıcı kimliği (adım 0'da
+  // `auth.getUser(accessToken)` ile GoTrue'ya karşı doğrulandı) burada upstream'e AYRI bir
+  // başlıkla iletilir — GÖVDEYE DEĞİL. Backend bu başlığa yalnızca geçerli bir API anahtarı
+  // taşıyan istekte güvenir (ai_backend tarafı). Kimlik İSTEMCİ GÖVDESİNDEN ASLA alınmaz;
+  // `userData.user.id` yalnızca yukarıdaki doğrulanmış Supabase oturumundan gelir.
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     'X-Request-ID': requestId,
+    'X-User-Id': userData.user.id,
   }
   if (env.AI_BACKEND_API_KEY) headers['X-API-Key'] = env.AI_BACKEND_API_KEY
 

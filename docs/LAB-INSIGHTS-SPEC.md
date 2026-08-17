@@ -1,5 +1,13 @@
 # Laboratuvar Sonuçları — Mühendislik Spesifikasyonu
 
+> **DURUM (2026-08-17): UYGULANMADI — kapsam dışı bırakıldı.**
+> Bu özellik `docs/adr/0019-laboratuvar-yorumlama-motoru-kapsam-disi.md` kararıyla plandan
+> çıkarıldı. Aşağıdaki spesifikasyonun **hiçbir kısmı hayata geçirilmedi** — ne migration, ne
+> servis, ne uç, ne test yazıldı. Belge **tarihsel kayıt** olarak korunuyor ve özellik
+> ileride yeniden değerlendirilirse başlangıç noktası olacak; ADR'deki "gözden geçirme
+> koşulları" bölümüne bakın (V0/V1/V2 kademeleri ve referans aralığı kararı). Aşağıdaki
+> içerik bu not dışında **değiştirilmedi**.
+
 > **Durum:** Taslak (tasarım). Bu belge **kod, migration veya tablo üretmez**; bir sonraki
 > ajanın migration ve servis yazabilmesi için gereken kararları ve sözleşmeleri tanımlar.
 > **Kaynak hiyerarşisi:** `active_planprogram.md` > `docs/adr/**` > bu belge > mevcut kod.

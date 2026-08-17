@@ -7,5 +7,6 @@ playwright-report/
 test-results/
 public/
 supabase/
+docs/security/raw/
 # `npm run db:types` ile üretilir — formatı Supabase CLI belirler.
 src/types/database.ts

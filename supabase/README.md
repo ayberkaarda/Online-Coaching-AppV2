@@ -17,9 +17,12 @@ supabase/
 │   ├── 20260817110000_workout_plan_tables.sql    # normalize antrenman planı tabloları + dönüşüm + RPC
 │   ├── 20260817130000_nutrition_plan_tables.sql  # normalize beslenme planı tabloları + dönüşüm + RPC
 │   ├── 20260817140000_messages_conversation_key.sql # messages.client_id / read_at / kind + trigger
-│   └── 20260817150000_form_check_review.sql      # form_checks inceleme durumu + sütun koruması
+│   ├── 20260817150000_form_check_review.sql      # form_checks inceleme durumu + sütun koruması
+│   ├── 20260817160000_program_approval_guard.sql # onay kapısı: CHECK + trigger + DELETE daraltma (AC-01/AC-07)
+│   ├── 20260817160100_signup_role_hardening.sql  # handle_new_user rolü sabit 'client' (AC-02)
+│   └── 20260817160200_column_guards.sql          # messages/notifications/profiles sütun korumaları (AC-04/05/08/09/10)
 ├── tests/
-│   ├── rls.test.sql            # 50 RLS senaryosu       (npm run test:rls)
+│   ├── rls.test.sql            # 70 RLS senaryosu       (npm run test:rls)
 │   └── transform.test.sql      # 26 dönüşüm senaryosu   (npm run test:transform)
 ├── seed.sql                    # SADECE YEREL demo verisi
 └── README.md
@@ -102,13 +105,13 @@ Kısaltmalar: **S** = satır sahibi (`client_id`/`id` = `auth.uid()`), **K** = k
 
 | Tablo | SELECT | INSERT | UPDATE | DELETE |
 |---|---|---|---|---|
-| `profiles` | S veya K **veya satırın rolü `coach`** (koç profili herkese görünür) | Sadece K (normalde trigger yapar) | S (**rol sütunu değiştirilemez**) veya K | Sadece K |
-| `notifications` | S veya K | K **veya** kendi adına (`client_id = auth.uid()`) **veya alıcı koçsa** (`is_coach_profile(client_id)`) | S veya K (`is_read`) | Sadece K |
+| `profiles` | S veya K **veya satırın rolü `coach`** (koç profili herkese görünür) | Sadece K (normalde trigger yapar) | S (**rol sütunu değiştirilemez**) veya K — **`email` / `current_streak` / `last_checkin_at` hiçbir oturumdan yazılamaz** (trigger, bkz. 4e) | Sadece K |
+| `notifications` | S veya K | K **veya** kendi adına (`client_id = auth.uid()`) **veya alıcı koçsa** (`is_coach_profile(client_id)`) — **danışan → koç yolunda içerik sabit şablona bağlıdır** (trigger, bkz. 4e) | S veya K — **ama son kullanıcı yalnızca `is_read`** (trigger, bkz. 4e) | Sadece K |
 | `form_checks` | S veya K | Sadece kendi adına | S veya K — **ama inceleme sütunları (`status`, `coach_feedback`, `reviewed_*`) yalnızca K** (trigger, bkz. 4d) | S veya K |
 | `daily_logs` | S veya K | Sadece kendi adına | S veya K | S veya K |
 | `workout_logs` | S veya K | Sadece kendi adına | S veya K | S veya K |
-| `program_approvals` | S veya K | Sadece kendi adına | **Sadece K** (onay/ret) | S veya K |
-| `messages` | gönderen **veya** alıcı veya K | `sender_id = auth.uid()` + `client_id` trigger doğrulaması | **Sadece alıcı** (`read_at`) | gönderen veya K |
+| `program_approvals` | S veya K | Sadece kendi adına — **her zaman `status='pending'`, `reviewed_*` boş** (trigger, bkz. 4e) | **Sadece K** (onay/ret; `reviewed_by`/`reviewed_at` **sunucudan** dolar) | K **veya** S ama **yalnızca `status='pending'` satırında** (bkz. 4e) |
+| `messages` | gönderen **veya** alıcı veya K | `sender_id = auth.uid()` + `client_id` trigger doğrulaması — **`kind='system'` istemciden üretilemez** (bkz. 4e) | **Sadece alıcı** — **ve yalnızca `read_at` / `is_read`** (trigger, bkz. 4e) | gönderen veya K |
 | `exercises` | Tüm `authenticated` | Sadece K | Sadece K | Sadece K |
 | `food_database` | Tüm `authenticated` | Sadece K | Sadece K | Sadece K |
 | `workout_plans` | S veya K | K **veya** kendi planı | K veya kendi planı | K veya kendi planı |
@@ -300,7 +303,7 @@ Dönüşüm kuralları: NULL / boş / geçersiz JSON / JSON-nesnesi-olmayan içe
 ### Testler
 
 ```bash
-npm run test:rls         # 50 senaryo (20–27 bu tablolara ait)
+npm run test:rls         # 70 senaryo (20–27 bu tablolara ait)
 npm run test:transform   # 26 senaryo (1–10 bu tablolara ait: dönüşüm + round-trip + idempotency)
 ```
 
@@ -386,7 +389,7 @@ oluşturulur (varsa o kullanılır), planın **tüm** öğün satırları silini
 ### Testler
 
 ```bash
-npm run test:rls         # 50 senaryo (28–35 bu tablolara ait)
+npm run test:rls         # 70 senaryo (28–35 bu tablolara ait)
 npm run test:transform   # 26 senaryo (11–19 bu tablolara ait)
 ```
 
@@ -464,7 +467,7 @@ kapısındadır. `useMarkConversationRead` iki kolonu da tutarlı tutar.
 ### Testler
 
 ```bash
-npm run test:rls         # 50 senaryo (36–42 mesajlaşma konuşma anahtarına ait)
+npm run test:rls         # 70 senaryo (36–42 mesajlaşma konuşma anahtarına ait)
 npm run test:transform   # 26 senaryo (20–22 backfill: temel + idempotency + atlanan satır)
 ```
 
@@ -560,7 +563,7 @@ taşırdı. Kısmi indeksin boyutu **kuyruk uzunluğuyla** orantılıdır, arşi
 ### Testler
 
 ```bash
-npm run test:rls         # 50 senaryo (43–50 form check incelemesine ait)
+npm run test:rls         # 70 senaryo (43–50 form check incelemesine ait)
 npm run test:transform   # 26 senaryo (23–26 backfill + tutarlılık kısıtı)
 ```
 
@@ -569,6 +572,125 @@ npm run test:transform   # 26 senaryo (23–26 backfill + tutarlılık kısıtı
 Migration dosyasının sonunda çalıştırılabilir bir `-- DOWN` bloğu vardır.
 **UYARI:** `coach_feedback` metinleri ve tüm inceleme geçmişi geri alma ile kalıcı olarak
 kaybolur — bu bilgiyi tutan başka bir kolon yoktur. DOWN bloğu önce yedek almayı gösterir.
+
+---
+
+## 4e. Faz 1.5 Güvenlik Sertleştirmeleri (erişim kontrolü denetimi)
+
+Kaynak: `docs/security/findings-access-control.md`. Üç migration, denetimde bulunan yedi
+bulguyu kapatır. **Ortak kök neden:** Postgres'te RLS **satır** bazlıdır; politikaya
+**sütun listesi verilemez**. "Bu satıra dokunabilir misin?" doğru cevaplanıyordu, "bu
+satırın hangi sütununa dokunabilirsin?" hiç sorulmuyordu. Çözüm her yerde aynı: sütun
+kontrolü `BEFORE` trigger'ına taşınır ve **42501** (`insufficient_privilege`) ile
+reddedilir — PostgREST bunu **403**'e çevirir. Desen `form_checks_guard_review()`
+(bkz. 4d) ile birebir aynıdır.
+
+| Migration | Bulgu | Ne değişti |
+|---|---|---|
+| `20260817160000_program_approval_guard.sql` | AC-01 (High), AC-07 (Low) | `program_approvals_review_consistency_chk` kısıtı + `program_approvals_guard_review` trigger'ı + DELETE politikasının daraltılması |
+| `20260817160100_signup_role_hardening.sql` | AC-02 (High) | `handle_new_user()` rolü artık `raw_user_meta_data`'dan **almaz**; `'client'` sabittir |
+| `20260817160200_column_guards.sql` | AC-04, AC-05, AC-08, AC-09, AC-10 | `is_end_user_write()` yardımcısı + `messages` / `notifications` / `profiles` sütun koruma trigger'ları |
+
+### Onay kapısı sunucuda zorlanır (AC-01 / AC-07)
+
+Denetimde danışan tek bir `POST /rest/v1/program_approvals` isteğiyle
+`status='approved'`, `reviewed_by=<koç id>` yazabiliyordu; UPDATE koça kilitli olsa da
+**DELETE + yeniden INSERT** ile kısıt anlamsızdı. Yeni sözleşme:
+
+* **INSERT her zaman `pending`** ve `reviewed_at`/`reviewed_by` **boş**tur — koç dahil
+  herkes için. ("Onay kaydı her zaman kuyruktan başlar" tek cümlelik değişmez.)
+* `status`'ü `pending` dışına **yalnızca koç** çıkarabilir.
+* Koç yolunda `reviewed_by := auth.uid()`, `reviewed_at := now()` **sunucuda ezilir**;
+  istemcinin gönderdiği değer (bugün `useProgramApprovals.ts` gönderiyor) **kabul edilmez**.
+* **DELETE daraltıldı:** `is_coach() OR (client_id = auth.uid() AND status = 'pending')`.
+  Danışan yanlışlıkla gönderdiği, koçun **henüz bakmadığı** talebi geri çekebilir; ama
+  karara bağlanmış (`approved`/`rejected`) bir kaydı silip **denetim izini yok edemez**.
+  `src/hooks/useProgramApprovals.ts` bu tabloda hiç `.delete()` çağırmaz — daraltma
+  mevcut hiçbir akışı kırmaz.
+
+### Rol artık kullanıcı metadata'sından gelmez (AC-02)
+
+`handle_new_user()` rolü `raw_user_meta_data ->> 'role'` alanından alıyordu; bu alan
+GoTrue'da `/auth/v1/signup` gövdesindeki `data`'dan dolar, yani **tamamen istemci
+denetimindedir**. Kayıt/davet akışı açıldığı gün herkes `coach` olurdu. Artık
+`'client'` **sabittir** ve `role` alanı okunmaz bile (`full_name` okunmaya devam eder).
+
+> **Koç yükseltmesi yalnızca ayrıcalıklı yoldan yapılır:** ya `service_role`/`postgres`
+> ile doğrudan `update public.profiles set role='coach' …` (seed §2 bunu yapar), ya da
+> **mevcut bir koç** üzerinden (`profiles_update_coach`). `seed.sql` zaten trigger'a
+> güvenmiyor, rolü trigger'dan sonra açık bir UPDATE ile sabitliyordu — bu yüzden
+> seed'e **hiçbir değişiklik gerekmedi**.
+
+### `is_end_user_write()` — neden `current_user`, neden GUC bayrağı değil
+
+Sütun korumalarının çekilmesi gereken bir "sunucu bağlamı" vardır (seed, migration,
+`service_role`, `SECURITY DEFINER` RPC'ler). `form_checks` deseni bunu `auth.uid() IS NULL`
+ile ayırır; `profiles` için bu **yetmez**: `increment_streak()` ve `sync_profile_email()`
+`SECURITY DEFINER`'dır ama **kullanıcının oturumunda** çalışır — `auth.uid()` onların
+içinde de doludur. Sadece `auth.uid()`'e bakılsaydı sütun sabitlemesi `increment_streak()`
+RPC'sini de engellerdi.
+
+Seçilen ayrım **`current_user`**'dır: PostgREST istemcisinde `authenticated`, postgres'e ait
+bir `SECURITY DEFINER` fonksiyonun içinde `postgres`. Oturum değişkeni (`set_config('app.…')`)
+**seçilmedi**, çünkü özel GUC'lar rezerve değildir — `authenticated` rolü de onu set
+edebilir, yani koruma sahtelenebilir bir bayrağa dayanırdı. `current_user` ise rol
+sisteminin kendisidir: taklit etmek için zaten `postgres` olmak gerekir.
+
+> ⚠️ `public.is_end_user_write()` **`SECURITY INVOKER` olmak zorundadır**. `DEFINER`
+> yapılırsa `current_user` içeride her zaman `postgres` olur, fonksiyon her zaman `false`
+> döner ve **tüm sütun korumaları sessizce kapanır**. Senaryo 67 (`increment_streak`
+> hâlâ çalışıyor mu?) bu mekanizmanın canlı testidir.
+
+### Sütun sözleşmeleri (AC-04, AC-05, AC-08, AC-09, AC-10)
+
+* **`messages`** — son kullanıcı UPDATE'te yalnızca `read_at` / `is_read` değiştirebilir;
+  `message`, `kind`, `created_at`, `sender_id`, `receiver_id`, `client_id` **dokunulmazdır**
+  (tabloda `edited_at` yok, tahrifat fark edilemezdi). INSERT'te `kind='system'`
+  **üretilemez**: o etiket "bunu uygulama yazdı" demektir, sunucu yolundan üretilir.
+  Bu kural **koç için de** geçerlidir — mesaj gövdesinde "yetkili tahrifat" diye bir şey yoktur.
+* **`notifications`** — UPDATE'te son kullanıcı yalnızca `is_read` yazabilir (AC-10).
+  INSERT'te **danışan → koç** yolunda `title`/`message` sabit şablon kümesine uymak
+  zorundadır (AC-05, kimlik avı yüzeyi); koç yolu ve kendine bildirim serbesttir.
+  > **Neden trigger, neden `SECURITY DEFINER` RPC değil:** RPC'ye taşımak teknik olarak daha
+  > temiz olurdu (içerik hiç istemciden gelmez), ama `notifications_insert` politikasının
+  > `is_coach_profile(...)` dalı kalkar kalkmaz `useProgramApprovals.ts:58`'deki mevcut
+  > `insert` çağrısı **anında kırılırdı**. Trigger çağrı imzasını hiç bozmaz. **Bedeli:**
+  > şablon metni iki yerde yaşar (`notifications_guard_content()` ve
+  > `src/hooks/useProgramApprovals.ts`); uygulama metni değişir de trigger güncellenmezse
+  > akış **gürültülü** biçimde (42501) kırılır — sessiz bir açık oluşmaz. RPC'ye geçiş
+  > Faz 2'de uygulama koduyla birlikte yapılabilecek bir iyileştirme olarak açıktır.
+* **`profiles`** — `email`, `current_streak`, `last_checkin_at` **sunucuya aittir**;
+  hiçbir `authenticated` oturumu (koç dahil) bunları UPDATE ile yazamaz. Tek yazma
+  kaynakları `sync_profile_email()` ve `increment_streak()`'tir. `full_name`,
+  `avatar_path`, `nutrition_plan`, `workout_plan` serbest kalır.
+
+### Trigger sırası notu
+
+`messages` tablosunda iki `BEFORE` trigger'ı vardır ve Postgres bunları **ad sırasına**
+göre çalıştırır: `messages_apply_conversation_key` → `messages_guard_columns`. Pratik
+sonuç, alıcı `sender_id`'yi bozuk bir değere çekmeye çalışırsa 42501 yerine 22023
+almasıdır — her iki durumda da istek reddedilir, yalnızca hata kodu farklıdır.
+
+### Testler
+
+```bash
+npm run test:rls   # 70 senaryo (51–70 Faz 1.5 güvenlik regresyonlarına ait)
+```
+
+Kapsanan boşluklar (`findings-access-control.md` §6): G-01, G-02, G-03, G-06 (51–57),
+G-07, G-08, G-09 (58–61), G-10, G-11 (62–65), G-13, G-14 (66–69), G-16 (70). Her bulgu
+senaryosunun yanında bir **pozitif kontrol** vardır (53, 60, 63, 65, 67, 69): düzeltmenin
+meşru uygulama akışını kırmadığını kanıtlar.
+
+> **Senaryo 12 güncellendi.** Eskiden danışanın koça **serbest metinli** bildirim yazdığını
+> doğruluyordu; AC-05'ten sonra test, uygulamanın **gerçekten gönderdiği** şablon
+> payload'ına çevrildi. Koruduğu şey değişmedi ("danışan koça program onay bildirimi
+> yazabiliyor mu?"), yalnızca gerçek payload'la soruluyor.
+
+### Geri alma
+
+Üç migration dosyasının da sonunda çalıştırılabilir bir `-- DOWN` bloğu vardır.
+**UYARI:** geri alma ilgili bulguları (AC-01 High ve AC-02 High dahil) yeniden açar.
 
 ---
 
