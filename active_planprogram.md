@@ -115,7 +115,10 @@ auth.uid())` pattern'i mevcut ve doğrulanmış `public.is_admin()`
    bekle**.
 2. **Faz kapıları (phase gates).** Her fazın sonunda: (a) tanımlı kabul
    kriterlerinin (AC) tamamının karşılandığını doğrula, (b) aşağıdaki kapı
-   komutlarının tamamı yeşil olsun, (c) `docs/PROGRESS.md`'yi güncelle,
+   komutlarının tamamı yeşil olsun, (c) `docs/PROGRESS.md`'yi güncelle —
+   faz/tur kapanınca **anlatı doğrudan `docs/archive/progress-<slug>.md`'ye
+   yazılır**; `docs/PROGRESS.md`'ye yalnızca durum özeti, borç tablosu
+   güncellemesi ve tek satırlık faz kaydı işlenir —,
    (d) **dur ve raporla** — bir sonraki faza benim onayım olmadan geçme.
 
    ```

@@ -1,5 +1,20 @@
 # Barındırılan (Hosted) Veri Envanteri — Faz 1b Adım 0
 
+> **GÜNCELLEME (2026-08-17, hosted senkronizasyonu — bkz.
+> `docs/adr/0020-hosted-senkronizasyon-stratejisi.md`):** Bu envanterin tarif ettiği durum
+> **GEÇERSİZDİR**. Aynı gün, bu envanterden sonra, `docs/adr/0020-hosted-senkronizasyon-stratejisi.md`
+> kararı uygulandı: barındırılan projenin `public` şeması ve storage politika/bucket durumu
+> **sıfırlandı** (`auth` şemasına dokunulmadı, 2 hesap korundu) ve yerel zincirin birebir
+> aynısı olan **25 migration** sıfırdan `db push` ile uygulandı. Aşağıda belgelenen her şey —
+> eski `admin`/`student` enum'u, `notifications.target_student_id`, `daily_logs`'taki
+> `morning_weight`/`notes`, eksik `reviewed_by`/`reviewed_at`, legacy `workouts`/
+> `program_templates` tabloları, public bucket'lar — artık **tarihsel bir kayıttır**, hosted'ın
+> BUGÜNKÜ durumunu yansıtmaz. Aşağıdaki içerik bu nedenle **SİLİNMEDİ**, olduğu gibi
+> korunuyor. Hosted'ın güncel durumu (25 migration, `coach`/`client` rolleri, yerel ile birebir
+> şema/politika/fonksiyon paritesi, private bucket'lar, kapatılmış bir yetki yükseltme açığı)
+> için bkz. `docs/PROGRESS.md` §3 "Hosted senkronizasyonu — ADR-0020 uygulaması" ve
+> `docs/adr/0020-hosted-senkronizasyon-stratejisi.md` "Uygulama sonucu".
+
 **Tarih:** 2026-08-17
 **Kaynak:** Barındırılan Supabase projesi (`nxftmxkpmuyeelrmwofv.supabase.co`), yalnızca
 `SUPABASE_SERVICE_ROLE_KEY` ile **salt okunarak** (PostgREST `select` / `head:true` count /

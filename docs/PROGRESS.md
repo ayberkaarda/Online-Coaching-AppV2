@@ -1,1491 +1,238 @@
-# İlerleme Günlüğü
+# İlerleme Günlüğü — canlı durum
 
-Bu dosya, oturumlar arası sürekliliği sağlayan tek doğruluk kaynağıdır. `CLAUDE.md` gereği
-**her oturumun başında** okunmalıdır. Her anlamlı iş biriminden sonra (faz kapısı, düzeltme
-turu, önemli bir keşif) güncellenmelidir. Güncelleme formatı: en üste yeni bir "Oturum" girdisi
-eklenir, eski girdiler **silinmez** — bu dosya proje boyunca yalnızca büyür.
+Bu dosya bir **oturum başlangıç kitidir**: bugünkü durum, açık borçlar, sıradaki iş ve hâlâ
+geçerli tuzaklar. `CLAUDE.md` gereği her oturumun başında okunur ve çalışmaya başlamak için
+**tek başına** yeterlidir. Ayrıntı gerekiyorsa arşivden okunur.
 
----
+**Dosya kuralı (2026-08-17'de değişti).** Eskiden bu dosya "yalnızca büyür, eski girdiler
+silinmez" kuralıyla tutuluyordu ve 1755 satıra ulaşmıştı. Yeni kural:
 
-## 1. Mevcut durum (özet)
+> **Bir faz/tur kapandığında ANLATI DOĞRUDAN `docs/archive/progress-<slug>.md`'ye yazılır.**
+> Bu dosyaya yalnızca (a) durum özeti, (b) borç tablosu güncellemesi ve (c) tek satırlık faz
+> kaydı işlenir. Arşivden hiçbir şey silinmez — taşınır, silinmez.
 
-Proje, düz JavaScript/tek dosyalık bir hobi projesinden TypeScript strict + FastAPI + Supabase
-RLS + test/CI/Docker altyapısına sahip bir mimariye yükseltildi ("v1.0 production-ready
-yükseltmesi", `UPGRADE_NOTES.md`). Bu yükseltmenin ardından çıkan lint/tip/test/build hataları
-ayrı bir düzeltme turunda giderildi. 2026-08-16 (ikinci yarı) oturumunda kalan tüm doğrulama
-adımları — backend araç zinciri, veritabanı migration'ları, RLS izolasyonu — gerçekten
-çalıştırıldı ve hepsi yeşil. Docker blokajı çözüldü (Docker Desktop çalışıyor). 2026-08-16
-(üçüncü oturum) E2E testleri ilk kez koşturuldu; dört gerçek sorun ortaya çıkardı, hepsi
-düzeltildi ve paket artık 28/28 yeşil (bkz. §3 "E2E doğrulaması ve ortaya çıkardığı hatalar").
+Arşiv indeksi: [`docs/archive/README.md`](archive/README.md).
 
-| Kontrol                                                                | Komut                                                     | Durum                                                                                                                                    | Tarih      |
-| ---------------------------------------------------------------------- | --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
-| Lint                                                                   | `npm run lint`                                            | Temiz — 0 hata, 12 bilinçli uyarı                                                                                                        | 2026-08-16 |
-| Tip kontrolü                                                           | `npm run type-check`                                      | Temiz                                                                                                                                    | 2026-08-16 |
-| Biçim                                                                  | `npm run format:check`                                    | Temiz                                                                                                                                    | 2026-08-16 |
-| Birim/bileşen testleri                                                 | `npm run test`                                            | 192/192 (17 dosya)                                                                                                                       | 2026-08-16 |
-| Production build                                                       | `npm run build`                                           | Başarılı                                                                                                                                 | 2026-08-16 |
-| Backend lint                                                           | `uv run ruff check .`                                     | Temiz                                                                                                                                    | 2026-08-16 |
-| Backend tip (strict)                                                   | `uv run mypy app`                                         | Temiz, 28 dosya                                                                                                                          | 2026-08-16 |
-| Backend testleri                                                       | `uv run pytest`                                           | 63 test, kapsam %92 (eşik %70)                                                                                                           | 2026-08-16 |
-| Backend Docker imajı                                                   | `docker build` + container                                | Derlendi, `/health` doğrulandı                                                                                                           | 2026-08-16 |
-| Veritabanı migration'ları                                              | `npx supabase db reset`                                   | Uygulandı — 9 tablo, 37 politika, 8 storage politikası, 6 fonksiyon                                                                      | 2026-08-16 |
-| RLS izolasyonu                                                         | Manuel SQL testi                                          | Doğrulandı (bkz. §1.1)                                                                                                                   | 2026-08-16 |
-| E2E testleri                                                           | `npm run test:e2e`                                        | 16 senaryo × 2 profil (chromium + Mobile Chrome)                                                                                         | 2026-08-16 |
-| RLS politika testleri                                                  | `npm run test:rls`                                        | 19 senaryo, hepsi geçti                                                                                                                  | 2026-08-16 |
-| Veritabanı migration'ları (rol yeniden adlandırması sonrası)           | `npx supabase db reset`                                   | Sıfırdan uygulandı, hatasız (`20260817090000_rename_roles.sql` dahil)                                                                    | 2026-08-17 |
-| RLS politika testleri (rol yeniden adlandırması sonrası)               | `npm run test:rls`                                        | 19/19 — tekrar doğrulandı, hiçbir senaryo düşmedi                                                                                        | 2026-08-17 |
-| Birim/bileşen testleri (rol yeniden adlandırması sonrası)              | `npm run test`                                            | 192/192 — tekrar doğrulandı                                                                                                              | 2026-08-17 |
-| E2E testleri (rol yeniden adlandırması sonrası)                        | `npm run test:e2e`                                        | 16 senaryo × 2 profil — tekrar doğrulandı                                                                                                | 2026-08-17 |
-| Production build (rol yeniden adlandırması sonrası)                    | `npm run build`                                           | Başarılı — tekrar doğrulandı                                                                                                             | 2026-08-17 |
-| Tip kontrolü (storage mahremiyeti + AI tel protokolü sonrası)          | `npm run type-check`                                      | Temiz                                                                                                                                    | 2026-08-17 |
-| Lint (storage mahremiyeti + AI tel protokolü sonrası)                  | `npm run lint`                                            | Temiz — 0 hata, 12 bilinçli uyarı                                                                                                        | 2026-08-17 |
-| Biçim (storage mahremiyeti + AI tel protokolü sonrası)                 | `npm run format:check`                                    | Temiz                                                                                                                                    | 2026-08-17 |
-| Birim/bileşen testleri (storage mahremiyeti sonrası)                   | `npm run test`                                            | **203/203 (18 dosya)** — `src/lib/storage.ts` testleri dahil                                                                             | 2026-08-17 |
-| Production build (storage mahremiyeti sonrası)                         | `npm run build`                                           | Başarılı                                                                                                                                 | 2026-08-17 |
-| Veritabanı migration'ları (storage mahremiyeti sonrası)                | `npx supabase db reset`                                   | Sıfırdan uygulandı, hatasız (`20260817100000_private_storage.sql` dahil), katalog geri yüklendi                                          | 2026-08-17 |
-| RLS politika testleri (storage mahremiyeti sonrası)                    | `npm run test:rls`                                        | 19/19 — tekrar doğrulandı                                                                                                                | 2026-08-17 |
-| E2E testleri (storage mahremiyeti sonrası)                             | `npm run test:e2e`                                        | 16/16 (chromium) — signed URL akışıyla tekrar doğrulandı                                                                                 | 2026-08-17 |
-| Backend lint/tip/test (storage mahremiyeti + AI tel protokolü sonrası) | `uv run ruff check . && uv run mypy app && uv run pytest` | Temiz — 63 test, kapsam %92                                                                                                              | 2026-08-17 |
-| Tip kontrolü (Faz 1.5 düzeltme turu, Grup 4–6 sonrası)                 | `npm run type-check`                                      | Temiz                                                                                                                                    | 2026-08-17 |
-| Lint (Faz 1.5 düzeltme turu, Grup 4–6 sonrası)                         | `npm run lint`                                            | Temiz — 0 hata, 12 bilinçli uyarı                                                                                                        | 2026-08-17 |
-| Biçim (Faz 1.5 düzeltme turu, Grup 4–6 sonrası)                        | `npm run format:check`                                    | Temiz (turun tek kırığı `THREAT-MODEL.md`'ydi, `prettier --write` ile düzeltildi)                                                        | 2026-08-17 |
-| Birim/bileşen testleri (Faz 1.5 düzeltme turu, Grup 4–6 sonrası)       | `npm run test`                                            | **308/308 (29 dosya)** — önceki tur 264                                                                                                  | 2026-08-17 |
-| Production build (Faz 1.5 düzeltme turu, Grup 4–6 sonrası)             | `npm run build`                                           | Başarılı                                                                                                                                 | 2026-08-17 |
-| Veritabanı migration'ları (Faz 1.5 düzeltme turu, Grup 4–6 sonrası)    | `npx supabase db reset`                                   | Sıfır hata — 16 migration + seed                                                                                                         | 2026-08-17 |
-| RLS politika testleri (Faz 1.5 düzeltme turu, Grup 4–6 sonrası)        | `npm run test:rls`                                        | **76/76** — önceki tur 70                                                                                                                | 2026-08-17 |
-| Plan transform testleri (Faz 1.5 düzeltme turu, Grup 4–6 sonrası)      | `npm run test:transform`                                  | 26/26                                                                                                                                    | 2026-08-17 |
-| Backend lint/tip/test (Faz 1.5 düzeltme turu, Grup 4–6 sonrası)        | `uv run ruff check . && uv run mypy app && uv run pytest` | Temiz — 28 dosya mypy; **pytest 82/82, kapsam %94.94**                                                                                   | 2026-08-17 |
-| `npm audit` (Faz 1.5 düzeltme turu, Grup 4–6 sonrası)                  | `npm audit --audit-level=high --omit=dev`                 | **0 zafiyet** (önceden 7 high — T-04 `next-pwa`'nın `devDependencies`'e taşınması)                                                       | 2026-08-17 |
-| E2E testleri (Faz 1.5 düzeltme turu, Grup 4–6 sonrası)                 | `npm run test:e2e`                                        | **42/42 geçti** (21 senaryo × 2 profil — chromium + Mobile Chrome, 43.2 sn, sıfır hata)                                                  | 2026-08-17 |
-| Tip kontrolü (Faz 1.6 — görsel kimlik, Katman A sonrası)               | `npm run type-check`                                      | Temiz                                                                                                                                    | 2026-08-17 |
-| Lint (Faz 1.6 — görsel kimlik, Katman A sonrası)                       | `npm run lint`                                            | Temiz — 0 hata, 12 bilinen uyarı                                                                                                         | 2026-08-17 |
-| Biçim (Faz 1.6 — görsel kimlik, Katman A sonrası)                      | `npm run format:check`                                    | Temiz                                                                                                                                    | 2026-08-17 |
-| Birim/bileşen testleri (Faz 1.6 — görsel kimlik, Katman A sonrası)     | `npm run test`                                            | **363/363 (31 dosya)** — önceki tur 308                                                                                                  | 2026-08-17 |
-| Production build (Faz 1.6 — görsel kimlik, Katman A sonrası)           | `npm run build`                                           | Başarılı, fontlar self-host edildi                                                                                                       | 2026-08-17 |
-| E2E testleri (Faz 1.6 — görsel kimlik, Katman A sonrası)               | `npm run test:e2e`                                        | **42/42** (21 senaryo × 2 profil) — ekran metnine dokunulmadı, tek locator kırılmadı                                                     | 2026-08-17 |
-| CI ratchet (Faz 1.6 — görsel kimlik, Katman A sonrası)                 | `npm run ratchet`                                         | **6/6 sayaç yeşil**                                                                                                                      | 2026-08-17 |
-| Tip kontrolü (Faz 1.7 — borç temizliği sonrası)                        | `npm run type-check`                                      | Temiz                                                                                                                                    | 2026-08-17 |
-| Lint (Faz 1.7 — borç temizliği sonrası)                                | `npm run lint`                                            | Temiz — 0 hata, 12 bilinen uyarı                                                                                                         | 2026-08-17 |
-| Birim/bileşen testleri (Faz 1.7 — borç temizliği sonrası)              | `npm run test`                                            | **426/426 (35 dosya)** — faz başında 363                                                                                                 | 2026-08-17 |
-| Production build (Faz 1.7 — borç temizliği sonrası)                    | `npm run build`                                           | Başarılı                                                                                                                                 | 2026-08-17 |
-| Veritabanı migration'ları (Faz 1.7 — borç temizliği sonrası)           | `npx supabase db reset`                                   | 0 hata — 18 migration + seed                                                                                                             | 2026-08-17 |
-| RLS politika testleri (Faz 1.7 — borç temizliği sonrası)               | `npm run test:rls`                                        | **85/85** — faz başında 76                                                                                                               | 2026-08-17 |
-| Plan transform testleri (Faz 1.7 — borç temizliği sonrası)             | `npm run test:transform`                                  | 26/26                                                                                                                                    | 2026-08-17 |
-| CI ratchet (Faz 1.7 — borç temizliği sonrası)                          | `npm run ratchet`                                         | Yeşil — emoji tavanı 60 → 59'a indirildi (`[OK] emoji: 59 / tavan 59`)                                                                   | 2026-08-17 |
-| Biçim (Faz 1.7 — borç temizliği sonrası)                               | `npm run format:check`                                    | Temiz                                                                                                                                    | 2026-08-17 |
-| Backend lint/tip/test (Faz 1.7 — borç temizliği sonrası)               | `uv run ruff check . && uv run mypy app && uv run pytest` | Temiz — 28 dosya mypy; **pytest 82/82, kapsam %94.94**                                                                                   | 2026-08-17 |
-| Katalog import'u (Faz 1.7)                                             | `node scripts/import-catalog.mjs`                         | `exercises` 10 → **1328**, `food_database` 10 → **591**                                                                                  | 2026-08-17 |
-| E2E testleri (Faz 1.7 — borç temizliği sonrası)                        | `npm run test:e2e`                                        | **42/42, üç ardışık koşuda** (44.8s / 40.3s / 40.5s)                                                                                     | 2026-08-17 |
-| Tip kontrolü (Faz 2 — koç-danışan çekirdek akışı sonrası)              | `npm run type-check`                                      | Temiz                                                                                                                                    | 2026-08-17 |
-| Lint (Faz 2 — koç-danışan çekirdek akışı sonrası)                      | `npm run lint`                                            | Temiz — 0 hata, 14 uyarı                                                                                                                 | 2026-08-17 |
-| Biçim (Faz 2 — koç-danışan çekirdek akışı sonrası)                     | `npm run format:check`                                    | Temiz                                                                                                                                    | 2026-08-17 |
-| Birim/bileşen testleri (Faz 2 — koç-danışan çekirdek akışı sonrası)    | `npm run test`                                            | **502/502 (42 dosya)** — faz başında 426                                                                                                 | 2026-08-17 |
-| Production build (Faz 2 — koç-danışan çekirdek akışı sonrası)          | `npm run build`                                           | Başarılı                                                                                                                                 | 2026-08-17 |
-| Veritabanı migration'ları (Faz 2 — koç-danışan çekirdek akışı sonrası) | `npx supabase db reset`                                   | 0 hata — 21 migration + seed                                                                                                             | 2026-08-17 |
-| RLS politika testleri (Faz 2 — koç-danışan çekirdek akışı sonrası)     | `npm run test:rls`                                        | **104/104** — faz başında 85                                                                                                             | 2026-08-17 |
-| Plan transform testleri (Faz 2 — koç-danışan çekirdek akışı sonrası)   | `npm run test:transform`                                  | 26/26                                                                                                                                    | 2026-08-17 |
-| CI ratchet (Faz 2 — koç-danışan çekirdek akışı sonrası)                | `npm run ratchet`                                         | **6/6 sayaç yeşil** — emoji 59→**0**, `font-black` 49→**25**, `bg-gradient-to-` 14→**12**, `rounded-3xl` 17→**15**, `8b5cf6`/ondalık 0/0 | 2026-08-17 |
-| Katalog (Faz 2 — koç-danışan çekirdek akışı sonrası, değişmedi)        | —                                                         | `exercises` 1328, `food_database` 591                                                                                                    | 2026-08-17 |
-| E2E testleri (Faz 2 — koç-danışan çekirdek akışı sonrası)              | `npm run test:e2e`                                        | **50/50, iki ardışık koşu** (43.9s / 43.4s) + **CI yapılandırmasıyla** (`CI=1`, workers=1, retries=2) **50/50** (56.6s)                  | 2026-08-17 |
+## § yönlendirme tablosu (eski referanslar)
 
-Kalan 12 lint uyarısı bilinçlidir: 8 adet `@next/next/no-img-element` (Supabase public
-URL'leri ve `ui-avatars.com` için `next/image` bilerek tercih edilmedi — harici/dinamik
-görseller), 4 adet `no-console` (`src/lib/logger.ts` tarayıcı adaptöründe — `pino`'nun tarayıcı
-bundle'ına girmemesi için kasıtlı `console` kullanımı).
+Bu dosyanın bölüm numaraları arşivlemeden sonra **yenidir**. `active_planprogram.md`,
+`docs/security/AUDIT.md` ve diğer belgelerdeki `docs/PROGRESS.md §N` referansları aşağıdaki
+dosyalarda çözülür; taşınan bölüm başlıkları arşivde **birebir** korunmuştur.
 
-### 1.1 RLS izolasyon doğrulaması (2026-08-16, manuel SQL testi)
+| Eski bölüm                                    | Nerede                                                                      |
+| --------------------------------------------- | --------------------------------------------------------------------------- |
+| §1 (mevcut durum, doğrulama)                  | Güncel hâli aşağıda §1; tarihsel satırlar ilgili fazın arşiv dosyasında     |
+| §1.1, §2, §3 (2026-08-16 turları)             | `archive/progress-2026-08-16-v1-yukseltme.md`                               |
+| §3 "Faz 1a — …"                               | `archive/progress-faz-1a.md`                                                |
+| §3 "Faz 1.5 — …"                              | `archive/progress-faz-1.5-guvenlik.md`                                      |
+| §3 "Faz 1.6 — …"                              | `archive/progress-faz-1.6-gorsel-kimlik.md`                                 |
+| §3 "Faz 1.7 — …"                              | `archive/progress-faz-1.7-borc-temizligi.md`                                |
+| §3 "Faz 2 — …"                                | `archive/progress-faz-2-cekirdek-akis.md`                                   |
+| §3 "Hosted senkronizasyonu", "Env koruması …" | `archive/progress-hosted-senkron-ve-env.md`                                 |
+| §4 (karar kaydı)                              | `archive/progress-kararlar-tablosu.md` (DONDURULMUŞ) — kanonik: `docs/adr/` |
+| §5 (açık ve bloke işler)                      | Açık olanlar aşağıda §3 borç tablosunda; kapananlar ilgili fazın arşivinde  |
+| §6, §6b, §8                                   | `archive/progress-yol-haritasi-arsivi.md`                                   |
+| §6a (Faz 1 çıkış kriterleri)                  | `archive/progress-faz-1a.md`                                                |
+| §7 (plan v1.1 revizyonu)                      | `archive/progress-2026-08-16-v1-yukseltme.md`                               |
+| §9 (oturum günlüğü)                           | `archive/progress-oturum-gunlugu.md`                                        |
+| §3 (bölüm adı verilmeden)                     | Referansın bağlamındaki faza ait `archive/progress-*.md` dosyası            |
 
-- Danışan kendi verisini görüyor (1 profil, kendi 6 form check'i), başka danışanın form check
-  ve günlük loglarını **göremiyor (0/0)**.
-- Koç tüm veriyi görüyor (3 profil, 12 form check, 28 log).
-- Danışanın kendi rolünü `admin` yapma denemesi engellendi
-  (`new row violates row-level security policy`).
-- `anon` rolü hiçbir şeye erişemiyor (`permission denied for table profiles`).
+Kaynaktan ölçüldü (2026-08-17): repoda `docs/PROGRESS.md §N` biçiminde **71** referans var
+(en yoğunu `active_planprogram.md`, 24 adet) ve §15 hariç hepsi yukarıdaki tabloyla çözülüyor.
+`docs/DISCOVERY.md:721`'deki "§15" referansı bölünmeden **önce de** var olmayan bir bölümü
+gösteriyordu; bu arşivlemenin yarattığı bir kırık değildir.
 
 ---
 
-## 2. Tamamlananlar (2026-08-16, "v1.0 production-ready yükseltmesi")
+## 1. Bugünkü durum (2026-08-17)
 
-Detaylar için bkz. `UPGRADE_NOTES.md` Bölüm 2 (§2.1–§2.8). Rakamlar gerçek dosya ağacından
-doğrulanmıştır.
+- **Faz durumu:** Faz 0 → Faz 2, hosted senkronizasyonu ve env koruması tamamlandı.
+  **Sıradaki iş: Faz 3 — Yemek Fotoğrafı Makro Tahmini** (bkz. §5).
+- **Yerel yığın:** `npx supabase start` ile ayakta; PostgreSQL **17.6**
+  (`public.ecr.aws/supabase/postgres:17.6.1.141`), 25 migration + seed, 14 tablo,
+  **14/14 RLS enabled + forced**.
+- **Hosted proje:** `nxftmxkpmuyeelrmwofv.supabase.co` — yerel zincirin birebir aynısı
+  (25 migration; tablo=14, force_rls=14, public politika=57, storage politika=12, fonksiyon=31).
+- **Env:** `.env.local` **yerel** yığını gösterir; hosted kimlikleri `.env.hosted.local`'dadır.
+  Hosted'a bilinçli erişim yalnızca `dev:hosted` / `build:hosted` / `start:hosted` ile ve
+  `ALLOW_HOSTED_TARGET=1` gerektirir; bayraksız her hosted koşusu fail-closed reddedilir.
+  **Gerçek production'da `ALLOW_HOSTED_TARGET=1` set edilmek zorundadır** (deploy sözleşmesi).
+- **Katalog:** yerel `exercises` **1328**, `food_database` **591**; hosted 1318 / 581
+  (fark `seed.sql`'in yalnızca yerelde koşan demo satırları — drift değil).
+- **Lint uyarıları bilinçlidir:** `@next/next/no-img-element` (harici/dinamik görsellerde
+  `next/image` bilerek tercih edilmedi — Supabase URL'leri ve `ui-avatars.com`) ve `no-console`
+  (`src/lib/logger.ts` tarayıcı adaptöründe, `pino` tarayıcı bundle'ına girmesin diye).
+  Son turda 14 uyarı; sayı turdan tura değişir, sıfırlanması hedeflenmiyor.
 
-### TypeScript migrasyonu (detay: UPGRADE_NOTES.md §2.1)
+### Servis sürümleri (yerel = hosted)
 
-- `tsconfig.json`: `strict`, `noUncheckedIndexedAccess`, `noImplicitOverride`,
-  `noUnusedLocals`/`noUnusedParameters`, `allowJs: false`.
-- `src/` altındaki tüm kaynak `.ts`/`.tsx`; eski `.js` dosyaları (`supabase.js`, `helpers.js`,
-  `ThemeProvider.js`, `clean.js`, `jsconfig.json`) kaldırıldı.
-- `src/types/database.ts` **elle yazıldı**, gerçek şemayla hiç diff'lenmedi (bkz. Bölüm 5).
+| Servis    | Önce (PG15) | Şimdi (PG17) | Hosted     |
+| --------- | ----------- | ------------ | ---------- |
+| Postgres  | 15.8.1.085  | 17.6.1.141   | 17.6.1.141 |
+| PostgREST | v16.1       | **v14.5**    | v14.5      |
+| GoTrue    | v2.195.0    | v2.195.0     | v2.195.0   |
+| Storage   | v1.69.0     | v1.69.0      | v1.69.0    |
 
-### Python servisleştirme (detay: UPGRADE_NOTES.md §2.2)
+### Son doğrulama koşusu (env koruması + yerel PG17 turu)
 
-- `ai_backend/app/` katmanlı yapı: `core/`, `routers/` (health, nutrition, recommendations,
-  workout), `services/`, `schemas/`, `data/` — doğrulandı, dosya sayıları eşleşiyor.
-- Yeni `/recommendations` deterministik öneri motoru; eski `/api/generate-ai-*` uçları
-  geriye uyumluluk için `Deprecated` işaretli korunuyor.
-- Araç zinciri: `uv` + `ruff` + `mypy --strict` + `pytest --cov-fail-under=70`.
+| Kontrol                                                          | Komut                                                                  | Durum                                                                                                                       | Tarih      |
+| ---------------------------------------------------------------- | ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| Hosted ön uçuş (PG sürümü + `supautils.policy_grants`)           | Dashboard SQL editörü, salt-okunur                                     | **PG 17.6**, `storage.objects` politika izin listesinde — ADR-0020 riski kanıtlandı                                         | 2026-08-17 |
+| Hosted migration push                                            | `supabase db push --include-all`                                       | **25/25 migration temiz**, sıfır `must be owner` hatası                                                                     | 2026-08-17 |
+| Hosted katalog import'u                                          | (hosted hedefine import)                                               | `exercises` **1318**, `food_database` **581** (yerelden 10'ar az — `seed.sql` demo satırları, drift değil)                  | 2026-08-17 |
+| Hosted şema parite doğrulaması (ADR-0020)                        | SQL `COUNT`/`pg_policies` sorguları                                    | `tablo=14 force_rls=14 public_pol=57 storage_pol=12 fonksiyon=31` — **yerel ile birebir**                                   | 2026-08-17 |
+| Yerel Postgres sürümü (`config.toml` `major_version` 15 → 17)    | `npx supabase status` / `select version()`                             | **PostgreSQL 17.6**, imaj `public.ecr.aws/supabase/postgres:17.6.1.141` — hosted ile birebir                                | 2026-08-17 |
+| Env koruması Katman 1 (`playwright.config.ts` config-time guard) | `playwright test --list` (desene uyan, var olmayan bir hosted URL ile) | Bayraksız: **hata, exit 1**, tarayıcı hiç açılmadı; `E2E_ALLOW_REMOTE_SUPABASE=1` ile: exit 0, "Total: 50 tests in 8 files" | 2026-08-17 |
+| Env koruması Katman 2 (`src/env.server.ts` fail-closed guard)    | `npm run build` + `next start` (`NODE_ENV=production`)                 | Bayraksız: `GET /api/health` **500** (middleware'den her istekte); `ALLOW_HOSTED_TARGET=1` ile aynı build: **200**          | 2026-08-17 |
+| Tip kontrolü (env koruması + yerel PG17 sonrası)                 | `npm run type-check`                                                   | Temiz                                                                                                                       | 2026-08-17 |
+| Lint (env koruması + yerel PG17 sonrası)                         | `npm run lint`                                                         | Temiz — 0 hata, 14 uyarı                                                                                                    | 2026-08-17 |
+| Biçim (env koruması + yerel PG17 sonrası)                        | `npm run format:check`                                                 | Temiz                                                                                                                       | 2026-08-17 |
+| Birim/bileşen testleri (env koruması + yerel PG17 sonrası)       | `npm run test`                                                         | **511/511 (43 dosya)** — yeni `tests/unit/env-hosted-guard.test.ts` (9 senaryo) dahil                                       | 2026-08-17 |
+| Production build (env koruması + yerel PG17 sonrası)             | `npm run build`                                                        | Başarılı                                                                                                                    | 2026-08-17 |
+| Veritabanı migration'ları (PG17 sonrası)                         | `npx supabase db reset`                                                | **25 migration, 0 hata**                                                                                                    | 2026-08-17 |
+| RLS politika testleri (PG17 sonrası)                             | `npm run test:rls`                                                     | **104/104**                                                                                                                 | 2026-08-17 |
+| Plan transform testleri (PG17 sonrası)                           | `npm run test:transform`                                               | 26/26                                                                                                                       | 2026-08-17 |
+| `db:types` diff (PG17 sonrası)                                   | `npm run db:types`                                                     | **Birebir aynı** (PG15 çıktısı kenara kopyalanıp diff'lendi — atlanmış kontrol değil)                                       | 2026-08-17 |
+| E2E testleri (PG17 sonrası)                                      | `npm run test:e2e`                                                     | **50/50** (49.6 sn)                                                                                                         | 2026-08-17 |
+| Katalog (PG17 sonrası, değişmedi)                                | —                                                                      | `exercises` 1328, `food_database` 591                                                                                       | 2026-08-17 |
+| RLS enabled+forced tablo sayımı (PG17 sonrası)                   | `pg_tables`/`pg_class` sorgusu                                         | **14/14 tablo** RLS enabled+forced                                                                                          | 2026-08-17 |
 
-### Supabase şema + RLS (detay: UPGRADE_NOTES.md §2.3)
-
-- 4 migration dosyası (`supabase/migrations/`), 9 tablo: `profiles`, `notifications`,
-  `form_checks`, `daily_logs`, `workout_logs`, `program_approvals`, `messages`, `exercises`,
-  `food_database`.
-- Tüm tablolarda RLS açık, `anon`'dan tüm yetkiler REVOKE edilmiş.
-- `is_admin()` / `profile_role()` `SECURITY DEFINER` (infinite recursion önleme,
-  bkz. `docs/ARCHITECTURE.md` §3); `increment_streak()` RPC imzası sabit.
-
-### Frontend mimarisi (detay: UPGRADE_NOTES.md §2.4)
-
-- TanStack Query merkezi veri katmanı (`src/lib/query/`), zod + react-hook-form doğrulama.
-- `src/lib/api/` tek tip HTTP client + `ApiError`; AI proxy route'ları
-  (`src/app/api/ai/{workout,nutrition,recommendations}/route.ts`) — tarayıcı FastAPI'ye asla
-  doğrudan istek atmaz.
-- Ortak UI bileşenleri: `Skeleton`, `ErrorBoundary`, `QueryState`, `EmptyState`.
-
-### Test altyapısı (detay: UPGRADE_NOTES.md §2.5)
-
-- Vitest + RTL: `tests/unit/` — 7 dosya kök seviyede + 9 bileşen testi = 16 dosya, 180 test.
-- pytest: `ai_backend/tests/` — 7 test dosyası + `conftest.py`.
-- Playwright: `tests/e2e/` artık dosya sisteminde mevcut (`auth.spec.ts`, `daily-log.spec.ts`,
-  `dashboard.spec.ts`, `fixtures.ts`, `README.md`) — `UPGRADE_NOTES.md` yazıldığı sırada bu
-  dizin eksikti, sonradan tamamlanmış. Hiç çalıştırılmadı (bkz. Bölüm 5).
-
-### DevOps / CI (detay: UPGRADE_NOTES.md §2.6)
-
-- Kök `Dockerfile` (Next.js standalone) ve `ai_backend/Dockerfile` (Python 3.12-slim,
-  non-root, `$PORT` destekli).
-- `docker-compose.yml`: `web` + `ai-backend` + opsiyonel minimal `supabase-db`.
-- `.github/workflows/ci.yml`: `frontend`, `backend`, `e2e` (yalnızca PR), `docker`,
-  `required-checks` job'ları. `e2e` job'u hiç koşmadı (bkz. Bölüm 5).
-
-### Güvenlik (detay: UPGRADE_NOTES.md §2.7)
-
-- İki katmanlı rate limiting: Next.js `middleware.ts` (genel + `/api/ai/*` için 20/dk) ve
-  FastAPI `slowapi`.
-- CORS allowlist (FastAPI `CORS_ORIGINS`), güvenlik başlıkları (CSP/HSTS/X-Frame-Options),
-  yapılandırılmış loglama (`pino`/`structlog`) + `X-Request-ID` korelasyonu.
-
-### Dokümantasyon (detay: UPGRADE_NOTES.md §2.8)
-
-- `README.md`, `docs/ARCHITECTURE.md` (6 ADR-lite kaydı), `docs/DEPLOYMENT.md`,
-  `CONTRIBUTING.md`, `CHANGELOG.md`, `ai_backend/README.md`, `supabase/README.md`,
-  `data/README.md`.
-
-### Bu turda düzeltilen kritik hatalar (en kritik 5, tam liste: UPGRADE_NOTES.md §3)
-
-1. Bildirimler var olmayan `target_student_id` sütununa yazılıp `student_id`'den okunuyordu —
-   bildirimler hiç görünmüyordu.
-2. Öğrenci programı onaya gönderdiğinde bildirim koça değil öğrencinin kendisine gidiyordu.
-3. Admin server action'ları çağıranın gerçekten admin olduğunu doğrulamıyordu (service-role
-   yetkisiyle herkes admin işlemi yapabilirdi).
-4. Tarayıcıdan doğrudan `http://localhost:8000` AI çağrısı; CORS `["*"]` + credentials —
-   production'da çalışmaz, güvensiz.
-5. `downloadCSV` iç içe nesneleri `[object Object]` yazıyordu — beslenme CSV çıktısı tamamen
-   kullanılamazdı.
+Tarihsel doğrulama satırları ilgili fazın arşiv dosyasındadır.
 
 ---
 
-## 3. Yükseltme sonrası düzeltme turu
-
-`npm run lint/test/build` zinciri yeşile gelene kadar yapılan düzeltmeler:
-
-- **1 TypeScript hatası:** `WorkoutTab.tsx`'te ölü koşul (`isWaitingMyApproval` zaten `student`
-  implike ediyordu; satır ~145/573'te tanım ve yorum mevcut, doğrulandı).
-- **12 ESLint hatası:** React 19 `react-hooks` kuralları — `set-state-in-effect` (6 dosya,
-  "prop değişince state ayarla" render-sırası kalıbına ve türetilmiş değerlere geçildi),
-  `purity` (`Date.now()` render'dan çıkarıldı), `refs` (dosya input'u `key` ile remount),
-  `no-html-link-for-pages` (`<a>` → `<Link>`).
-- **3 test hatası:** jsdom `Blob.text()`/`arrayBuffer()` sağlamıyor (FileReader'a geçildi);
-  `NotificationForm` test fixture'ı uuid olmayan id kullanıyordu (şema doğruydu, fixture
-  düzeltildi).
-- **Build hataları:** Next 16'da `eslint` config anahtarı kaldırıldı; `outputFileTracingRoot`/
-  `turbopack.root` sabitlendi (ev dizinindeki başıboş lockfile yüzünden workspace kökü yanlış
-  çıkarılıyordu); **`next-pwa` v5 webpack eklentisi Turbopack ile çakıştığı için build
-  `next build --webpack` ile yapılıyor** (`package.json` `build`/`dev` script'lerinde
-  doğrulandı: `next build --webpack` / `next dev --webpack`).
-
-### Sağlamlaştırma turu (2026-08-16, ikinci yarı)
-
-- `src/types/database.ts` şemadan yeniden üretildi. **Elle yazılmış 183 alanın tamamı gerçek
-  şemayla birebir eşleşti** — nullability, sayısal tipler, `Insert`/`Update` opsiyonellikleri
-  dahil. Tek satır kaynak kodu değişmedi. Kazanç: `Relationships` FK metadata'sı (iç içe
-  select'ler artık tip çıkarımı yapabiliyor) ve `profile_role` fonksiyonu.
-- `ai_backend` ilk kez gerçekten çalıştırıldı: `uv.lock` üretildi, Dockerfile'daki `--frozen`
-  fallback'i kaldırıldı, ruff/mypy strict temizlendi, 63 test %92 kapsamla geçti, Docker imajı
-  derlenip container içinde doğrulandı.
-- **Gerçek mantık hatası bulundu ve düzeltildi:** `detect_rest_days` düz substring eşleşmesi
-  yapıyordu; "Pazartesi" yazıldığında "Pazar" da eşleşiyordu (`pazar` alt dize). Kelime sınırı
-  regex'ine geçildi. Bu hata orijinal `main.py`'de de vardı.
-- **Dockerfile derleme hatası:** `pyproject.toml`'daki `readme = "README.md"` bildirimi ile
-  `.dockerignore`'un `*.md` kuralı çakışıyordu; imaj hiç derlenemiyordu. `README.md`
-  kopyalanacak şekilde düzeltildi.
-- **Mahremiyet düzeltmesi (PWA):** `next.config.mjs` `runtimeCaching` kuralı `profiles`
-  yanıtlarını (e-posta + beslenme/antrenman programları) cihazda 7 gün tutuyordu ve logout
-  temizliği yoktu. `profiles` önbellekten çıkarıldı (yalnızca `workout_logs` kaldı) ve
-  `useSignOut` artık `queryClient.clear()` + workbox cache temizliği yapıyor.
-- **Sır sızıntısı engellendi:** `npx supabase start` `supabase/.temp/start-secrets/` dizinini
-  üretiyor; `.gitignore`'da değildi (commit'e girecekti) ve ESLint'i 207 hatayla kırıyordu. Hem
-  `.gitignore`'a hem ESLint `globalIgnores`'a eklendi.
-- **Prettier hizalandı:** `.prettierrc` `semi: true` iken kod tabanının tamamı noktalı
-  virgülsüzdü; `semi: false` yapıldı ve tek seferlik format geçildi. `npm run format:check`
-  artık temiz (önceden 104 dosyada kırılıyordu).
-- **Build artefaktları:** `public/sw.js` ve `public/workbox-*.js` (next-pwa üretimi)
-  `.gitignore`'a eklendi.
-
-### E2E doğrulaması ve ortaya çıkardığı hatalar (2026-08-16, üçüncü oturum)
-
-E2E ilk kez koşturuldu ve **dört gerçek sorun** ortaya çıkardı:
-
-1. **Türkçe İ case-folding tuzağı (test tarafı).** `tests/e2e/fixtures.ts` içinde
-   `getByLabel(/şifre/i)` hiçbir zaman eşleşmiyordu; giriş sayfasındaki etiket `ŞİFRE` (U+0130
-   noktalı büyük İ) ve JavaScript'te `"ŞİFRE".toLowerCase()` sonucu `"şi̇fre"` üretiyor (i +
-   U+0307 birleşen nokta). ECMAScript `Canonicalize` İ↔i katlaması yapmaz. Birebir metin
-   eşleşmesine (`getByLabel('ŞİFRE')`) geçildi. 12 testin tamamı bu tek satırdan başarısız
-   oluyordu.
-2. **E-posta/şifre girişi tamamen kapalıydı (yapılandırma hatası).** `supabase/config.toml`'da
-   `[auth.email].enable_signup = false` idi; Supabase CLI kaynak kodunda
-   (`gotrue.service.ts`) bu anahtar `GOTRUE_EXTERNAL_EMAIL_ENABLED`'e eşleniyor — yani
-   **sağlayıcıyı** kapatıyor, kaydı değil. Kendi kendine kayıt zaten ayrı katmanda
-   `[auth].enable_signup = false` → `GOTRUE_DISABLE_SIGNUP=true` ile engelleniyordu. Düzeltme:
-   `[auth.email].enable_signup = true` (sağlayıcı açık), `[auth].enable_signup = false` (kayıt
-   kapalı) korundu. Ayrıca CLI'ın tanımadığı `enabled` anahtarı kaldırıldı. **Bu config
-   `supabase config push` ile barındırılan projeye gönderilseydi oradaki tüm girişleri
-   kırardı.**
-3. **CSP yerel Supabase'i blokluyordu (gerçek geliştirme hatası).** `next.config.mjs`'teki
-   `connect-src` yalnızca `https://*.supabase.co` ve `wss://*.supabase.co`'ya izin veriyordu;
-   `npx supabase start` ile gelen `http://127.0.0.1:54321` bu desene uymadığı için tarayıcı
-   tüm istekleri blokluyordu — yani yerel yığınla geliştirme yapmak imkânsızdı. Düzeltme: CSP
-   artık `NEXT_PUBLIC_SUPABASE_URL`'den origin türetip `connect-src` ve `img-src`'ye ekliyor
-   (`supabaseCspOrigins()`), wildcard'lar barındırılan projeler için korundu.
-4. **Kararsız (flaky) test.** `auth.spec.ts`'teki geri-tuşu senaryosu 5 koşunun 2'sinde
-   `page.goBack()` `about:blank`'e düştüğü için başarısız oluyordu. Güvenlik iddiası
-   korunarak ölçüm yöntemi doğrudan gezinmeye çevrildi (`page.goto('/')` sonrası `/login`'e
-   yönlenme beklentisi); geri tuşu kontrolü `goBack()` dönüş değerine göre koşullu hale
-   getirildi. 5 ardışık tam koşu + `--repeat-each=5` (25/25) ile kararlılık kanıtlandı.
-   Ayrıca `daily-log.spec.ts`'te Playwright strict mode ihlali vardı (`getByText('Pro: 180g')`
-   5 elemana eşleşiyordu, çünkü seed verisinde aynı makro değeri birden çok kayıtta geçiyor).
-   Doğrulama en yeni rapor kartına kapsandı.
-
-### Kritik kırık düzeltmeleri (dördüncü oturum)
-
-`docs/DISCOVERY.md` envanterinin ortaya çıkardığı üç kırık ve düzeltmeleri:
-
-1. **Danışan mesajlaşmayı hiç kullanamıyordu.** `profiles_select` politikası
-   `id = auth.uid() OR is_admin()` olduğu için danışan koçun profil satırını göremiyordu →
-   `useAdminId()` null → `MessagesTab`'da sohbet partneri boş. Düzeltme:
-   `supabase/migrations/20260816100000_fix_rls_visibility.sql` — politikaya `role = 'admin'`
-   koşulu eklendi (satırın kendi kolonu, alt sorgu değil; özyineleme yok).
-2. **Koç, onaya sunulan programdan haberdar olmuyordu.** `notifications_insert` WITH CHECK'i
-   danışanın koça bildirim yazmasını reddediyordu. Düzeltme: aynı migration —
-   `SECURITY DEFINER` `public.is_coach_profile(uuid)` yardımcısı eklendi ve politikaya
-   `OR public.is_coach_profile(student_id)` kondu.
-3. **`/api/ai/*` proxy uçlarında oturum kontrolü yoktu** (planın §5.3 ihlali). Giriş yapmamış
-   herkes AI backend'ini kullanabiliyordu. Düzeltme: `src/lib/api/ai.ts` istemci tarafında
-   `Authorization: Bearer <token>` gönderiyor, `src/lib/api/proxy.ts` sunucu tarafında
-   `getUser()` ile doğruluyor; kimliksiz istek upstream'e **hiç ulaşmıyor**.
-
-Ayrıca kaydedilenler:
-
-- **Bilinçli takas:** koçun `profiles` satırı artık tüm giriş yapmış kullanıcılara açık
-  (e-posta dahil). Tek koçlu modelde kabul edildi; koça özel hassas bir kolon eklenirse
-  kolon-sınırlı view'a geçilmeli. Migration başlığında ve `supabase/README.md`'de kayıtlı.
-- **`INSERT ... RETURNING` tuzağı:** `RETURNING` ek olarak SELECT görünürlüğü ister; danışan
-  koça yazdığı bildirimi geri okuyamaz. Çağıran kod (`useProgramApprovals.ts`) düz `.insert()`
-  yaptığı için sorun yok — `.select()` eklenirse kırılır. İki ajan bağımsız olarak keşfetti.
-
-### Regresyon korumaları
-
-Bu kırıkların testlerden kaçmış olması asıl sorundu. Eklenen korumalar:
-
-- `supabase/tests/rls.test.sql` — 19 senaryo, `BEGIN/ROLLBACK` ile veri değiştirmez,
-  başarısızlıkta `raise exception` + sıfırdan farklı çıkış kodu. **Testin gerçekten
-  kırılabildiği kanıtlandı** (kasten bozulan beklenti `EXIT_CODE=3` verdi). `npm run test:rls`.
-- `tests/e2e/messaging.spec.ts` — 2 senaryo, iki tarayıcı bağlamıyla danışan→koç→realtime
-  yanıt zinciri. Bu akış daha önce hiç test edilmiyordu.
-- `tests/unit/proxy-auth.test.ts` — 12 test; en kritik iddia: kimliksiz istekte `fetch`
-  **hiç çağrılmıyor**.
-- CI: RLS testleri `e2e` job'una eklendi (`supabase db reset` sonrası, build öncesi), container
-  adı için koruma adımı ile.
-
-### Faz 1a — çıkış kriterleri (2026-08-17, rol yeniden adlandırması)
-
-`active_planprogram.md` §3.1 (R4) rol adlandırma maddesinin ilk parçası bağımsız bir migration
-olarak yürütüldü: `supabase/migrations/20260817090000_rename_roles.sql`.
-
-**Kapsam:**
-
-- Enum: `user_role` değerleri `admin` → `coach`, `student` → `client` (`ALTER TYPE ... RENAME
-VALUE`).
-- Fonksiyon: `public.is_admin(uuid)` → `public.is_coach(uuid)` (imza korundu).
-- Kolonlar: 5 tabloda (`notifications`, `form_checks`, `daily_logs`, `workout_logs`,
-  `program_approvals`) `student_id` → `client_id`; bağımlı indeks/kısıt/FK adları da hizalandı.
-- Kod: `isAdmin()` → `isCoach()`, `useAdminId()` → `useCoachId()`, `AdminUserManagement.tsx` →
-  `CoachUserManagement.tsx`, `selectedStudentIds` → `selectedClientIds`, `createStudentSchema` →
-  `createClientSchema` (38 dosya).
-
-**`RENAME VALUE`'nun veriyi koruduğu doğrulandı:** `ALTER TYPE ... RENAME VALUE` etiketin
-`pg_enum` OID'ini korur; satır verisi ve politika ifadelerindeki enum sabitleri OID ile
-saklandığı için hem mevcut satırlar hem de RLS ifadeleri otomatik olarak yeni etiketi gösterir.
-`db reset` sonrası `profiles` tablosunda 1 coach + 2 client satır sayısıyla veri sağlam kaldı —
-veri kaybı olmadı.
-
-**Fonksiyon yeniden adlandırmanın politikaları bozmadığı (OID) doğrulandı:** `ALTER FUNCTION
-... RENAME TO` fonksiyonun OID'ini korur; RLS politikaları fonksiyona OID ile referans verdiği
-için `is_admin()` → `is_coach()` sonrası **34 politika** (public + storage.objects) hiçbiri
-düşmeden otomatik olarak yeni fonksiyon adına döndü (`pg_policies` çıktısı doğrulandı).
-
-**Kritik istisna — `increment_streak()` elle güncellendi:** plpgsql gövdesi `public.is_admin()`
-çağrısını **ad ile** çözer (OID ile değil). Adım 6'daki yeniden adlandırmadan sonra bu çağrı
-sessizce çalışma zamanında `function public.is_admin() does not exist` hatasıyla kırılacaktı —
-migration bu yüzden `increment_streak()`'i `CREATE OR REPLACE` ile ayrıca güncelledi (gövdesi
-`public.is_coach()` çağırır hale geldi, imza — `user_id` parametre adı dahil — değişmedi).
-
-**Bilinçli istisnalar:**
-
-- AI backend tel protokolünde `student_id` alanı korundu
-  (`ai_backend/app/schemas/recommendations.py` bu adı bekliyor) — ayrı bir işte hizalanacak.
-- Kullanıcıya görünen Türkçe arayüz metinleri değişmedi ("Öğrenci Paneli", "Yönetici Paneli",
-  "Öğrenci Portföyü", "Öğrenci Ara" vb.) — ürün dili ayrı bir iş.
-- Eski migration dosyaları (`20260816*`) hâlâ eski adları içeriyor; zaman sıralı uygulandığı
-  için doğru çalışıyor, sorun değil.
-
-**Doğrulama:** `db reset` sıfırdan, 19/19 RLS, 192/192 birim, 16/16 E2E, build başarılı (bkz.
-§1 tablosuna eklenen 2026-08-17 satırları).
-
-**ADR ayrıştırması:** Aynı oturumda `active_planprogram.md` §0.6 (R10) / AC-1.7 kapsamındaki
-ADR ayrıştırma işi de tamamlandı — `docs/ARCHITECTURE.md` §7'deki 6 gömülü "ADR-lite" kaydı
-`docs/adr/NNNN-<slug>.md` dosyalarına ayrıştırıldı ve rol yeniden adlandırma kararı yeni bir
-ADR (`0013-rollerin-coach-client-olarak-yeniden-adlandirilmasi.md`) olarak eklendi; bu da eski
-`0003-rol-enum-degerlerinin-korunmasi.md` kararının yerini aldı (`Durum: Yerini aldı: 0013`).
-`docs/adr/README.md` indeksi itibarıyla dizinde toplam **13 ADR dosyası** var (0001–0013).
-
-### Faz 1a — storage mahremiyeti (2026-08-17)
-
-`active_planprogram.md` §3.3 / I-4 çıkış kriteri `supabase/migrations/20260817100000_private_storage.sql`
-ile karşılandı.
-
-**Kapsam:**
-
-- `storage.buckets`: `avatars` ve `form-checks-media` artık `public = false` (önceden ikisi de
-  `true`).
-- Kolonlar tam URL değil YOL saklıyor: `form_checks.front_pose_url` → `front_pose_path`,
-  `form_checks.back_pose_url` → `back_pose_path`, `profiles.avatar_url` → `avatar_path`. Mevcut
-  satırlardaki tam public URL'ler aynı migration içinde regex ile yola dönüştürüldü
-  (storage dışı mutlak URL'ler — ör. `placehold.co` — bilinçli olarak dönüştürülmedi, bkz.
-  Bölüm 5).
-- `storage.objects` üzerindeki eski "herkese açık okuma" politikaları
-  (`avatars_public_read`, `form_checks_public_read`, `anon` dahil) kaldırıldı; yerine iki yeni
-  SELECT politikası geldi: `avatars_select_own_or_coach`,
-  `form_checks_select_own_or_coach` — ikisi de "sahip veya koç" (`public.is_coach()`), yalnız
-  `authenticated` rolüne.
-- Yeni `src/lib/storage.ts`: `SIGNED_URL_TTL_SECONDS = 3600` (I-4'ün "TTL ≤ 1 saat" şartı),
-  `SIGNED_URL_STALE_TIME_MS` = TTL'in yarısı (30 dk) — imzalı adres içeren TanStack Query
-  sorguları bu süreyle bayatlatılır ki önbellekteki adres süresi dolmadan tazelensin.
-  `createSignedUrl`/`createSignedUrls` (toplu, N+1 önler) hata durumunda **fırlatmaz**, `null`
-  döner; çağıran taraf placeholder gösterir.
-- Güncellenen hook'lar: `useFormChecks` artık `FormCheckWithUrls[]` döner (imzalı
-  `frontPoseUrl`/`backPoseUrl` alanları eklenmiş), `useProfile`/`useProfiles` artık
-  `ProfileWithAvatar[]`/`ProfileWithAvatar` döner (imzalı `avatarUrl`).
-  `src/components/AdminUserManagement.tsx` (→ `CoachUserManagement.tsx`, bkz. rol yeniden
-  adlandırma bölümü) bu imzalı adresleri kullanacak şekilde güncellendi.
-
-**Mahremiyet kanıtı (curl ile doğrulandı, AC-1.6/AC-2.3):**
-
-| Erişim yolu                                                     | Beklenen   | Gözlenen                             |
-| --------------------------------------------------------------- | ---------- | ------------------------------------ |
-| Kimliksiz `GET /storage/v1/object/public/<bucket>/<path>`       | Erişilemez | **400** `NoSuchBucket`               |
-| Anon key ile `GET /storage/v1/object/<bucket>/<path>` (imzasız) | Erişilemez | **400** `NoSuchKey`                  |
-| İmzalı adres (`createSignedUrl` çıktısı), sahibi veya koç       | Erişilir   | **200**                              |
-| Bozulmuş/geçersiz imza                                          | Erişilemez | **400**                              |
-| Başka bir danışanın dosyası için imza üretmeye çalışma          | Reddedilir | İmza üretilemiyor (RLS SELECT reddi) |
-| Koçun aynı dosya için imza üretmesi                             | İzinli     | İmza üretiliyor                      |
-
-### Faz 1a — AI tel protokolü (2026-08-17)
-
-`RecommendationRequest.student_id` alanı hem `ai_backend/app/schemas/recommendations.py`
-(Pydantic) hem TypeScript tarafında (`src/lib/api/types.ts` → `RecommendationInput.student_id`,
-`src/lib/validation/schemas.ts` → `recommendationSchema.student_id`) **bilinçli olarak
-değiştirilmedi**. Gerekçe: bu uç (`/api/ai/recommendations` → FastAPI `/recommendations`) kod
-tabanında hiçbir yerden çağrılmıyor (`useRecommendations` hook'u tanımlı ama hiçbir bileşen
-kullanmıyor); adı hizalamak izole, riski olmayan bir değişiklik ama bu turun kapsamı dışında
-bırakıldı — ayrı bir işte, gerçek bir tüketici eklendiğinde hizalanacak.
-
-### Faz 1.5 — güvenlik denetim turu (2026-08-17)
-
-`active_planprogram.md` §3a kapsamındaki Faz 1.5'in **denetim yarısı** tamamlandı; düzeltmeler
-henüz başlamadı.
-
-**Denetim sonucu:** Üç paralel denetim tamamlandı, üç rapor diskte:
-
-- `docs/security/findings-access-control.md` (631 satır) — erişim kontrolü / IDOR / RLS, 12
-  bulgu (AC-01…AC-12) + 26 test boşluğu (G-01…G-26).
-- `docs/security/findings-app-surface.md` (~48 KB) — uygulama yüzeyi, 22 bulgu (A-01…A-22).
-- `docs/security/tooling-baseline.md` — otomatik araç taraması, 5 bulgu (T-01…T-05).
-- `docs/security/AUDIT.md` — birleşik yönetici raporu (§1 özet, §2 39 bulguluk birleşik tablo,
-  §3 çakışma analizi, §4 yükseltme sonrası durum, §5 altı gruplu bağımlılık sıralı düzeltme
-  planı, §6 bulgu değil, §7 açık sorular).
-
-**Severity dağılımı:** Critical 0 · High 10 · Medium 12 · Low 17 · toplam 39. Critical bulgu
-üretilmemesinin nedeni: RLS satır izolasyonu ve Storage yol tabanlı sahiplik sınırları canlı SQL
-rol taklidi ve gerçek HTTP istekleriyle yapılan her denemede tuttu.
-
-**En ciddi dört bulgu (hepsi `open`):** AC-01 `program_approvals` onay kapısı INSERT ile
-atlatılıyor · AC-02 `handle_new_user()` rolü kullanıcı metadata'sından geliyor · A-01 giriş
-denemeleri hiçbir katmanda sınırlanmıyor · A-02/A-03 hız sınırlayıcı XFF ile atlanıyor ve
-deprecated FastAPI uçları API key guard'ından muaf.
-
-**Yöntem:** statik inceleme + canlı SQL rol taklidi (`set local role authenticated` +
-`set local request.jwt.claims`, tüm yazma testleri `ROLLBACK` içinde) + gerçek HTTP istekleri
-(GoTrue / PostgREST / Storage API / FastAPI) + `npm audit`, `pip-audit`, `semgrep`, `gitleaks`
-(çalışma ağacı + 34 commitlik geçmiş).
-
-**Bu turda uygulanan tek değişiklik — bağımlılık yükseltmesi:** `next` 16.2.10 → 16.3.1,
-`eslint-config-next` 16.2.10 → 16.3.1, `sharp` transitif 0.34.5 → 0.35.3 (`overrides` gerekmedi),
-`postcss` ve `nanoid` düzeldi. `next-pwa` kırılmadı, `next build --webpack` sıfır uyarıyla
-derledi. Doğrulama zinciri 12/12 yeşil: type-check temiz · lint 0 hata / 12 beklenen uyarı · 230
-birim · 50 RLS · 26 transform · build başarılı · 21 Playwright E2E · format temiz. `npm audit`
-18 → 14; kapanan T-01/T-02/T-03. Kalan 14'ün hiçbiri çalışma zamanına ulaşmıyor (7 test zinciri,
-7 `next-pwa@5.6.0` build eklentisi kökünden).
-
-**Durum ve sonraki adım:** Faz 1.5'in denetim yarısı bitti. **Düzeltmeler kullanıcı onayı
-bekliyor** — faz protokolü gereği önce rapor, sonra onay, sonra düzeltme; her düzeltme kendi
-regresyon testiyle. Düzeltme planı `docs/security/AUDIT.md` §5'te altı gruba ayrıldı: Grup 1
-kimlik ve yetki kapıları (M) · Grup 2 rate limiting ve kaba kuvvet (L) · Grup 3 sütun seviyesi
-sözleşmeler (M) · Grup 4 girdi doğrulama ve gövde sınırları (M) · Grup 5 yapılandırma
-sertleştirme ve savunma derinliği (L) · Grup 6 dokümantasyon ve CI tarama zinciri (M).
-
-**Açık kullanıcı kararları:** AC-12 hosted projede ayrı doğrulama · A-06 logout'un access
-token'ı iptal etmemesi (`jwt_expiry=3600`) · `next-pwa` legacy `--webpack` yolunun ne zaman terk
-edileceği.
-
-**Operasyonel notlar (gelecek oturumlar için):**
-
-- Harness alt-ajanların rapor `.md` dosyalarını `Write` ile yazmasını engelliyor
-  (`"Subagents should return findings as text, not write report files."`) — çözüm: `Edit` aracı
-  veya Bash heredoc.
-- Bash komutları ~8 KB üzerinde içerik ortasında kırpılıyor ve yanıltıcı `unexpected EOF` hatası
-  veriyor — uzun dosyalar 6 KB'ın altındaki parçalara bölünüp `>>` ile eklenmeli.
-
-**Plan dokümanı güncel değil:** `active_planprogram.md` §3a.3 Kova 1 madde 7,
-`supabase/tests/rls.test.sql`'in 35 senaryo içerdiğini söylüyor; dosya artık 50 senaryo içeriyor
-(bu turun doğrulama zincirindeki "50 RLS" sonucuyla uyumlu). `active_planprogram.md` bilerek
-değiştirilmedi; bu not onun yerine geçen güncel kayıttır.
-
-### Faz 1.5 — düzeltme turu, Grup 1–3 (2026-08-17)
-
-Kullanıcı `docs/security/AUDIT.md` §5'teki altı gruplu planın Grup 1 → 2 → 3'ünü onayladı; bu
-oturumda üçü de uygulandı ve regresyon kanıtıyla kapatıldı (tam detay: `docs/security/AUDIT.md`
-§4b). Kova 4, 5, 6 (girdi doğrulama/gövde sınırları, yapılandırma sertleştirme, dokümantasyon/CI
-tarama zinciri) **açık** kaldı.
-
-**Kapanan bulgular (19/39, önceki turdan T-01/T-02/T-03 ile birlikte toplam 22/39):**
-
-- **Grup 1 (kimlik ve yetki kapıları):** AC-01, AC-07, AC-02, A-03, A-04, A-12, A-13. Yeni
-  migration'lar `supabase/migrations/20260817160000_program_approval_guard.sql` (onay kapısı
-  BEFORE INSERT/UPDATE trigger'ı, `status`/`reviewed_by`/`reviewed_at` sunucudan) ve
-  `20260817160100_signup_role_hardening.sql` (`handle_new_user()` artık istemci metadata'sından
-  rol okumuyor); `ai_backend` legacy router'lara API key guard + rate limit; production'da
-  `AI_BACKEND_API_KEY` eksikse Next.js ve FastAPI ikisi de fail-fast; FastAPI `/docs` prod'da
-  kapalı.
-- **Grup 2 (rate limiting ve kaba kuvvet):** A-02, A-09, A-17, A-18, A-19 + bonus A-06 (kullanıcı
-  kararı, `jwt_expiry` 3600→900). `src/proxy.ts` artık `TRUSTED_PROXY_COUNT` tabanlı bir güven
-  modeliyle çalışıyor (varsayılan: hiçbir XFF başlığına güvenme); `src/lib/rate-limit.ts` taşmada
-  LRU tahliye kullanıyor (önceden tüm sayaçları sıfırlıyordu — bu, sınırlayıcının kendisini bir
-  DoS koluna çeviriyordu); FastAPI hız sınırı artık doğrulanmış kullanıcı bazında.
-  **A-01 (giriş denemesi sınırı) planlandığı gibi kapanmadı** — `[auth.rate_limit]`
-  yapılandırması doğru eklendi ve konteynerde ayarlandığı kanıtlandı, ama 180 ardışık yanlış
-  şifre denemesi hâlâ `429` üretmedi. Kök neden doğrulanmış bir upstream Supabase hatası
-  (`supabase/supabase#41947` — ayar `rate_limit_otp`'ye yazılıyor, şifre girişini korumuyor).
-  Koruma bunun yerine `src/app/api/auth/sign-in/route.ts` + `src/lib/api/auth-rate-limit.ts` ile
-  **uygulama katmanında** kuruldu (e-posta başına 10 deneme/15 dk). **`[auth.rate_limit]`'in
-  config.toml'da duruyor olması korunduğumuz anlamına gelmiyor — bu tuzağa düşülmemeli, bkz.
-  `docs/security/AUDIT.md` §4b/§7.**
-- **Grup 3 (sütun seviyesi sözleşmeler):** AC-04, AC-05, AC-08, AC-09, AC-10 — tek migration
-  `supabase/migrations/20260817160200_column_guards.sql`. Mesajlarda alıcı yalnızca
-  `read_at`/`is_read` değiştirebiliyor; danışan→koç bildirim içeriği bilinen şablona
-  bağlandı (RPC değil trigger — RPC'ye geçiş mevcut `notifications_insert` politikasını
-  kırardı); `profiles.email`/`current_streak`/`last_checkin_at` yeni `is_end_user_write()`
-  yardımcısıyla sunucu-sahipli hale geldi.
-
-**Kayıtlı borç:** AC-05'in danışan→koç bildirim şablon metni artık iki yerde yaşıyor (trigger +
-`src/hooks/useProgramApprovals.ts`). Biri diğerinden bağımsız değişirse program gönderimi
-`42501` ile kırılır (sessiz değil, RLS test paketi yakalıyor). Doğru çözüm — ikisini
-`SECURITY DEFINER` bir RPC'ye taşımak — uygulama kodunun da değiştirilebildiği bir sonraki turda
-yapılmalı. **ÇÖZÜLDÜ (2026-08-17, Faz 1.7):** `submit_program_for_approval(p_client_id,
-p_workout_data)` `SECURITY DEFINER` RPC'si `20260817180000_program_submission_rpc.sql` ile
-eklendi; onay satırı ve koç bildirimi tek işlemde yazılıyor, şablon metni yalnızca RPC
-gövdesinde yaşıyor. Bkz. §3 "Faz 1.7 — Borç Temizliği" madde 3.
-
-**Entegrasyon temizliği:** `.gitignore`'a `!.env.example` + `!**/.env.example` istisnası eklendi
-(A-22'yi fiilen kapatıyor, bkz. `AUDIT.md` §4b tutarsızlık notu); `useProgramApprovals.ts`'teki
-ölü `reviewed_by`/`reviewed_at`/`reviewerId` kodu temizlendi; `playwright.config.ts` ve
-`.github/workflows/ci.yml`'e A-12 sertleştirmesi nedeniyle gereken `AI_BACKEND_API_KEY` eklendi;
-`ai_backend/.env.example` yeni eklendi; `docker-compose.override.yml.example`'daki
-`uvicorn main:app` → `uvicorn app.main:app` hatası düzeltildi.
-
-**Doğrulama (10/10 yeşil):** type-check temiz · lint 0 hata/12 uyarı · vitest **264/264**
-(önceki tur: 230) · `db reset` 14 migration temiz · **test:rls 70/70** (önceki tur: 50) ·
-test:transform 26/26 · ruff+mypy temiz · **pytest 82/82, kapsam %94.94** (önceki tur: %92) ·
-build başarılı · **Playwright 21/21** (iki ardışık koşumda) · format:check temiz.
-
-**Kırmızı-yeşil kanıtları:** trigger düşürülünce AC-01/AC-07 senaryosu beklenen `42501` yerine
-hatasız geçti ("onay kapısı açık"); `handle_new_user` eski haline alınınca AC-02 istemci
-metadata'sıyla gerçekten koç oluşturulabildiğini gösterdi; A-03 guard'ı kaldırılınca 4 pytest
-`assert 200 == 401` ile kırıldı; A-02 sahte XFF ile `[200,200,200,200,200]` (bypass) → düzeltme
-sonrası `[200,200,200,429,429]`; A-01 uygulama katmanı kontrolü kapatılınca 10 test
-`expected 401 to be 429` ile kırıldı; `is_end_user_write()` sunucu bağlamı taklit edecek şekilde
-bozulunca G-16 beklenen `client` yerine `coach` döndü ("yetki yükseltme açık").
-
-**Durum:** Grup 1–3 tamamlandı. Grup 4 (girdi doğrulama/gövde sınırları), Grup 5 (yapılandırma
-sertleştirme/savunma derinliği), Grup 6 (dokümantasyon/CI tarama zinciri) açık — sıradaki iş.
-Açık kullanıcı kararları: AC-12 hosted projede ayrı doğrulama (değişmedi), `next-pwa` legacy
-`--webpack` yolu (değişmedi). A-06 bu turda çözüldü (`jwt_expiry=900`, kısmi — logout hâlâ
-token'ı sunucu tarafında iptal etmiyor).
-
-### Faz 1.5 — düzeltme turu, Grup 4–6 (2026-08-17)
-
-Aynı gün, aynı oturumda Grup 1–3'ün ardından ikinci bir tur: kullanıcı `docs/security/AUDIT.md`
-§5'teki planın Grup 4 → 5 → 6'sını onayladı; dört paralel ajanla (girdi doğrulama, DB
-yetki/RLS, loglama/gizlilik + yapılandırma, dokümantasyon/CI) uygulandı. Tam detay ve
-kırmızı-yeşil kanıtları: `docs/security/AUDIT.md` §4c.
-
-**Kapanan bulgular (16/39 bu turda, önceki turlarla birlikte toplam 36/39 kapandı — sayım
-`AUDIT.md` §2 tablosundan doğrulandı):** A-07, A-08, A-10 (kısmi), A-11, A-15, A-16, A-20, A-21,
-AC-03, AC-06, AC-11, T-04 (kısmi), T-05. (A-09, A-12, A-13, A-17, A-18, A-19, A-22 zaten önceki
-turlarda kapanmıştı; §2'de bu sayı 22 idi, bu turdan sonra 36.)
-
-- **Grup 4 (girdi doğrulama):** yeni `src/lib/upload-validation.ts` — MIME allowlist + magic-byte
-  tespiti; kabul/ret kararının **ve** storage yoluna giden uzantının kaynak otoritesi artık magic
-  byte, `file.type` yalnızca ön eleme (A-07, A-21). `FormCheckTab.tsx`/`profile/page.tsx` seçim
-  anında doğruluyor, Türkçe hata (A-20). `src/lib/api/proxy.ts` — `MAX_BODY_BYTES=64KB`, iki
-  katmanlı: `Content-Length` ön kontrolü + asıl savunma olarak `ReadableStream`'i chunk chunk
-  okuyup sınırda `reader.cancel()` (A-08). Testler: `tests/unit/upload-validation.test.ts` (21
-  senaryo), `tests/unit/proxy-body-size.test.ts` (1 MB gövdede yalnızca 9 chunk çekildiği
-  kanıtlanıyor, 128 değil).
-- **Grup 5 — DB (AC-03, AC-06):** yeni migration
-  `supabase/migrations/20260817170000_force_rls_and_grants.sql`. **AC-03'ün gerçek etkisi
-  raporda yazandan çok daha ciddi çıktı:** düzeltmeden önce kimliği doğrulanmış herhangi bir
-  danışan `truncate table public.profiles cascade` ile 11 tabloya cascade ederek tüm
-  veritabanını silebiliyordu (RLS TRUNCATE'i görmez — satır filtreler, TRUNCATE tablo bazlı bir
-  yetkidir). Kök neden de raporda yazandan farklı: mevcut GRANT'lardan değil, Supabase'in
-  platform varsayılan ACL'inden geliyordu — bu yüzden çözüm iki adımlı (`REVOKE` + `ALTER
-DEFAULT PRIVILEGES ... REVOKE`, hem `authenticated` hem `anon`). AC-06: 13/13 tabloda `FORCE
-ROW LEVEL SECURITY`; **dürüst kayıt — FORCE'un bugünkü etkisi sıfırdır** çünkü tablo sahibi
-  `postgres` zaten `BYPASSRLS`. RLS testleri 70 → 76.
-- **Grup 5 — loglama/gizlilik (A-10, A-11, A-16):** `src/lib/logger.ts` redact listesi 5 → 19
-  anahtar + tarayıcı adaptörüne yeni `maskForConsole()`. Üç güvenlik olayı artık
-  `logger.warn` ile korelasyon anahtarlı loglanıyor (`rate_limit_exceeded`,
-  `auth_login_failed`, `auth_login_rate_limited`), e-posta kısmi maskeli (`ku***@example.com`).
-  **A-10 kalan borç:** RLS reddi (`42501`) için `logSecurityEvent()` hazır ama çağrı noktası
-  kurulmadı. A-16: 503 mesajındaki "Python" ifşası jenerik Türkçe mesajla değiştirildi.
-- **Grup 5 — yapılandırma (AC-11, A-15, T-04):** sunucu env şeması yeni `src/env.server.ts`'e
-  (`import 'server-only'`) taşındı; kanıt — build sonrası `.next/static/` içinde
-  `SUPABASE_SERVICE_ROLE_KEY`/`TRUSTED_PROXY_COUNT`/`AI_BACKEND_API_KEY` eşleşmesi 4 → 0. CSP
-  `connect-src`/`img-src` wildcard'ları kaldırıldı, yalnızca yapılandırılan Supabase origin'i
-  kaldı (A-15). `next-pwa` `dependencies`→`devDependencies` (T-04 kısmi — `npm audit
---omit=dev` 7 high → 0; legacy `--webpack` pinlemesi hâlâ AÇIK, karıştırılmamalı).
-- **Grup 6 — dokümantasyon/CI (T-05):** yeni `docs/security/THREAT-MODEL.md` (STRIDE) ve kök
-  `SECURITY.md`; `.github/workflows/ci.yml`'e yeni `security` job'u (semgrep, gitleaks, npm
-  audit, pip-audit), `required-checks.needs`'e eklendi. Tuzak: çıplak `semgrep --error`
-  severity'den bağımsız her bulguda kırılıyordu (alakasız bir MEDIUM öneri CI'ı ilk koşuda
-  kırardı) — `--severity=ERROR` ile düzeltildi.
-
-**Kayıtlı yeni borçlar:** (a) RLS reddi (`42501`) hâlâ loglanmıyor, `logSecurityEvent()` hazır
-ama çağrı noktası yok; (b) sequence yetkileri (`authenticated=w`, `setval`) kapsam dışı kaldı;
-(c) `pg_default_acl`'deki `supabase_admin` kaydı değiştirilemiyor (42501, yetki yetersiz —
-pratik etkisi yok, 13/13 tablo `postgres` sahipli); (d) A-05/A-14 (httpOnly cookie + nonce CSP)
-kullanıcı kararıyla ayrı bir tura ertelendi; (e) `playwright.config.ts`'teki bir yorum hâlâ
-`src/env.ts` diyor, A-12 kontrolü artık `src/env.server.ts`'te.
-
-**GÜNCELLEME (2026-08-17, Faz 1.7):** (a) KISMEN ÇÖZÜLDÜ — `wrapSupabaseError()` +
-`queryClient.ts`'teki `QueryCache`/`MutationCache` `onError` kancası artık `42501`'i merkezî
-yakalıyor (`src/lib/query/security-event.ts`), ama yalnızca kullanıcının KENDİ tarayıcı
-konsoluna yazıyor; gerçek sunucu tarafı güvenlik kaydı hâlâ yok, borç olarak kalıyor. (b)
-ÇÖZÜLDÜ — `20260817180200_sequence_grants.sql`, `authenticated`/`anon`'dan sequence `UPDATE`
-kaldırıldı, `USAGE`+`SELECT` korundu. (c) hâlâ AÇIK, Faz 1.7'de de doğrulandı (`supabase_admin`
-sequence'ler için de kapatılamıyor, tablolardakiyle aynı sınır). (e) ÇÖZÜLDÜ —
-`playwright.config.ts` yorumu `src/env.server.ts`'e düzeltildi.
-
-**Doğrulama (entegrasyon, tam zincir yeşil):** type-check temiz · lint 0 hata/12 uyarı ·
-`npm run test` **308/308** (29 dosya, önceki tur 264) · `npm run build` başarılı ·
-`npx supabase db reset` sıfır hata (16 migration + seed) · `npm run test:rls` **76/76** (önceki
-tur 70) · `npm run test:transform` 26/26 · `uv run ruff check .`/`mypy app` temiz ·
-`uv run pytest` **82/82, kapsam %94.94** · `npm audit --audit-level=high --omit=dev` **0
-zafiyet** · `format:check` temiz (turun tek kırığı `THREAT-MODEL.md`, `prettier --write` ile
-düzeltildi) · **Playwright `npm run test:e2e` 42/42** (21 senaryo × 2 profil — chromium + Mobile
-Chrome, 43.2 sn, sıfır hata; önceki turun "21/21" kaydı tek profil sayımıydı).
-
-**Durum:** Faz 1.5 tamamlandı — A-05/A-14 (kullanıcı kararıyla ertelendi) ve AC-12 (hosted
-proje doğrulaması, açık soru) hariç. Sıradaki iş: Faz 1.6 (görsel kimlik) ve ardından Faz 2.
-
-### Faz 1.6 — Görsel Kimlik Oturumu, Katman A (2026-08-17)
-
-Kaynak kararlar ADR-0015/0016/0017/0018, plan `active_planprogram.md` §3b. İki commit
-halinde atıldı (`599974c` token sistemi, `167f65e` ratchet).
-
-**Token kaynağı:**
-
-- Yeni `src/design/tokens.ts` — düz TS objesi, light + dark iki set, 12 semantik anahtar
-  (`bg`, `surface`, `surfaceRaised`, `border`, `textPrimary`, `textSecondary`, `accent`,
-  `accentContrast`, `success`, `warning`, `danger`, `focusRing`), tüm değerler düz
-  `#RRGGBB`. Web'e özgü hiçbir değer yok — Faz 4.5'te Expo bu dosyayı aynen import edecek.
-- `tailwind.config.ts` token'ları CSS değişkenlerine bağlıyor; `brand-purple` ve
-  `brand-purpleHover` silindi (AC-1.6.2). CSS değişkenleri `tailwindcss/plugin`'in
-  `addBase`'i ile tokens.ts'ten TEK KAYNAKTAN üretiliyor (globals.css'e elle yazılsaydı
-  kaçınılmaz olarak kayardı).
-
-**Kritik teknik karar — opaklık değiştiricileri:** CSS değişkenleri ham RGB kanalı tutuyor
-(`--color-accent: 91 72 217`, `rgb()` sarmalayıcısı yok) ve config `rgb(var(--color-accent)
-/ <alpha-value>)` kalıbını kullanıyor. Düz hex yazılsaydı koddaki 32 opaklık değiştiricili
-kullanım (`bg-accent/10`, `border-accent/20` …) sessizce bozulurdu — hata vermez, sadece
-renk üretmezdi. Üretilen CSS'te `rgb(var(--color-accent)/.3)` doğrulandı.
-
-**Mekanik yeniden adlandırma:** 18 dosyada 140 `brand-purple` kullanımı `accent`'e çevrildi,
-opaklık değiştiricileri korunarak. Token commit'iyle aynı commit'te birleştirildi — ayrı
-atılsalardı aradaki commit'te 140 sınıf hiçbir CSS üretmez, uygulama görsel olarak kırık
-olurdu. Sıra tuzağı: `brand-purpleHover` önce ele alındı, yoksa `brand-purple` dönüşümü onun
-önekiyle eşleşip bozuk sınıf bırakırdı; tek kullanımı `hover:bg-accent/90` oldu.
-
-**Ham renk temizliği — grep'in yakalamadığı iki kaçak:** `globals.css`'te 4 adet
-`#8b5cf6`, `CoachUserManagement.tsx`'te 3 (Recharts), `StatsTab.tsx`'te 1 (Chart.js) token'a
-çekildi. Ancak iki yerde eski marka moru ondalık biçimde saklanmış hâlde bulundu ve
-`8b5cf6` grep'i bunları görmüyordu: `StatsTab.tsx` `rgba(139, 92, 246, 0.2)` ve
-`DashboardTabs.tsx` `shadow-[0_0_8px_rgba(139,92,246,0.8)]`. 139,92,246 ondalık olarak tam
-olarak `#8b5cf6`'dır; ikisi de elle bulundu. Bu keşif üzerine ratchet'a kalıcı bir ondalık
-sayaç eklendi. Grafik renkleri bilerek statik bırakıldı (tema duyarlılık Faz 4, AC-4.3).
-
-**Tipografi (AC-1.6.6):** `next/font` ile Archivo (600/700), Hanken Grotesk (400/500/600),
-IBM Plex Mono (500); hepsi `latin`+`latin-ext`, `display: swap`, self-host (12 woff2).
-`weight: 'variable'` kullanılmadı — değişken kesim 100–900'ün tamamını açar ve "900 sistemde
-hiç tanımlanmaz" kuralını delerdi. Kabul edilen bedel: Archivo'nun `wdth` genişlik ekseni
-kullanılamıyor, ADR-0015'in "hiyerarşi boyut + genişlik ile kurulur" cümlesindeki genişlik
-Katman B'de yalnızca boyutla telafi edilecek. Tabular figürler `.font-mono`'da varsayılan
-yapıldı (opt-in unutulabilir, ADR "şarttır" diyor).
-
-**Görünür yan etki (borç olarak kaydedildi):** yazı tipleri 700'de tavanlandığı için mevcut
-49 `font-black` (900) artık gerçek 900 kesimi bulamıyor; tarayıcı sentetik kalın üretiyor.
-ADR-0015 bunu bilerek istiyor; kullanımlar Faz 2 Katman B'de sökülecek.
-
-**Zeminler (AC-1.6.8):** `viewport.themeColor` çifti `#F4F4F1` / `#14161B`; koyu zemin
-`#0f0f12` → `#14161B`, `.dark .glass-panel` ile senkron.
-**Odak/seçim (AC-1.6.3):** `:focus-visible` ve `selection` token'dan besleniyor.
-
-**ADR-0015 revizyonu — Kehribar `#B45D00` → `#A65600`:** Kontrastlar hesaplandığında altı
-adlandırılmış hex'ten biri AA'yı geçmiyordu: Kehribar, Tebeşir üstünde **4.23:1** (eşik
-4.5). Yalnız zeminde değil, `surface` kademesinde de kalıyordu (4.46). Karar kullanıcı
-tarafından **Fable'a** danışılarak verildi. Dayanağı kod tabanındaki gerçek kullanım: uyarı
-rengi bu projede rozet/ikon değil, ezici çoğunlukla METİN olarak kullanılıyor
-(`WorkoutTab.tsx:519,529`, `DashboardTabs.tsx:141,148`, `NutritionTab.tsx:343`) ve çoğu
-`text-xs`/`text-sm` — yani 3:1 UI eşiğine sığınmak geçersiz. Ayrıca ADR-0015'in kurucu
-gerekçesi zaten "eski mor beyaz üstünde ~4.2:1 verdiği için kaydırıldı"; Kehribar'ı 4.23'te
-bırakmak aynı hata modunu kalıcılaştırırdı.
-`#A65600` sonuçları (iki ajan bağımsız hesapladı, birebir tuttu): bg **4.82** · surface
-**5.08** · surfaceRaised **5.31**. Ton 31° ve tam doygunluk korundu, yalnız parlaklık %35.3
-→ %32.5 düştü. `dark.warning` (`#F78000`) değişmedi. Reddedilen `#A85700` yalnızca 4.73 ile
-sınırda kalıyordu; `#A65600` Kapanış'ın 4.88'i ve Plaka Kırmızısı'nın 5.09'uyla aynı emniyet
-bandına oturuyor.
-Ayrıca ADR'deki tahmini Menevis oranları ("yaklaşık 6:1 / 6.5:1") ölçülen gerçek değerlerle
-(**5.65** / **7.56**) değiştirildi.
-
-**Kontrast testi neden axe değil:** axe-core'un `color-contrast` kuralı jsdom'da çalışmıyor
-(gerçek layout/boyama gerektirir, otomatik devre dışı kalır). Token seviyesinde hesaplanan
-kontrast hem daha güvenilir hem de kaynağın kendisini test ediyor. AC-1.6.5 bu şekilde
-karşılandı.
-
-**CI ratchet (AC-1.6.4):** `scripts/identity-ratchet.mjs` — bağımlılıksız Node ESM,
-`src/**/*.{ts,tsx,css}` tarar, baseline'lar koda gömülü (değişiklik code review'da görünsün
-diye). Kilitlenen tavanlar: `font-black` 49 · `bg-gradient-to-` 14 · `rounded-3xl` 17 ·
-`8b5cf6` 0 · `eski-marka-moru-ondalik` 0 · `emoji` 60.
-Emoji sayımı `Intl.Segmenter` ile grafem kümesine bölünüp `\p{Extended_Pictographic}` ile
-test ediliyor — naif aralık regex'i ZWJ birleşik emojileri (👨‍👩‍👧) birden çok sayar ve BMP
-sembollerini (☀ ⚠) kaçırır. Ölçüm 60 emoji / 15 dosya, ADR'nin "~60, 15 dosya" tahminiyle
-birebir. Kod yorumlarındaki emojiyi hariç tutmak için küçük bir sözcük çözümleyici kullanıldı
-— tam TS/TSX ayrıştırıcı değil, ADR-0018'in grep tabanlı yaklaşım için kabul ettiği takas.
-`allowJs: false` (ADR-0001) altında TypeScript `.mjs` kaynağından JSDoc okumadığı için elle
-yazılmış `scripts/identity-ratchet.d.mts` bildirim dosyası gerekti; `tsconfig.json`'a
-dokunulmadı. CI'da `frontend` job'una adım olarak eklendi.
-
-**Kırmızı-yeşil kanıtları:** fazladan bir `font-black` eklenince ratchet `50 / tavan 49` ile
-kırıldı ve suçlu dosyayı listeledi (çıkış kodu 1), geri alınınca yeşile döndü. Ondalık sayaç
-için aynı kanıt üretim fonksiyonları sentetik girdiyle çalıştırılarak alındı — script yalnızca
-`src/**` tarıyor ve o dizin ratchet ajanının kapsamı dışındaydı; ajan kapsamı ihlal etmek
-yerine bu uyarlamayı açıkça bildirdi.
-
-**Doğrulama (§1 tablosuna işlendi):** `npm run type-check` temiz · `npm run lint` 0 hata/12
-bilinen uyarı · `npm run test` **363/363** (31 dosya, faz başında 308) · `npm run build`
-başarılı, fontlar self-host edildi · `npm run test:e2e` **42/42** (21 senaryo × 2 profil) —
-ekran metnine dokunulmadığı için tek locator kırılmadı (AC-1.6.9) · `npm run ratchet` 6/6
-sayaç yeşil · `npm run format:check` temiz · AC-1.6.2 grep'leri: `brand-purple` 0 ·
-`8b5cf6` 0 · ondalık mor 0. Veritabanı ve backend bu fazda değişmedi; `db reset`/
-`test:rls`/`pytest` koşulmadı (gereksiz).
-
-**Kaydedilen borçlar (§5'e işlendi):**
-
-- `border` token'ı 1.52:1 (light) / 1.80:1 (dark) — dekoratif ayırıcı için yeterli, form
-  input sınırı gibi anlamlı UI sınırları için WCAG 1.4.11'in 3:1'ini geçmiyor. 12 token'lık
-  sözleşmede `border-strong` yok; ihtiyaç Katman B'de doğacak.
-- `globals.css`'te `::-webkit-scrollbar-thumb` hâlâ ham `#3f3f46` — token'a çekmek açık
-  temada scrollbar'ı belirgin biçimde açardı, bilinçli olarak sistemin dışında bırakıldı.
-- Revize edilen `warning` token'ı ekranlara henüz akmıyor — bileşenler hâlâ ham
-  `text-orange-*`/`amber-*` kullanıyor. Kontrast kazancı Katman B'de bu sınıflar
-  `text-warning`'e çevrilince gerçekleşecek.
-- AC-1.6.7 (`LoopRing`, `prefers-reduced-motion` altında bilgi kaybetmeme) tasarımı gereği
-  Faz 2'ye devredildi (ADR-0017).
-- Ratchet emoji sayacının sözcük çözümleyicisi tam ayrıştırıcı değil (regex literali içindeki
-  `/` teorik olarak durum takibini şaşırtabilir).
-
-**Durum:** Faz 1.6 tamamlandı (AC-1.6.7 hariç, Faz 2'ye devredildi). Sıradaki iş Faz 1.7 —
-Borç Temizliği (bkz. §6), ardından Faz 2.
-
-### Faz 1.7 — Borç Temizliği (2026-08-17)
-
-`docs/PROGRESS.md` §6 madde 9'daki kullanıcı onaylı kapsam beş paralel dilimle uygulandı:
-yetim storage dosyaları, `42501` güvenlik olay günlüğü, AC-05 bildirim şablon kuplajı, koçun
-avatarının danışana açılması, sequence yetkileri — ve buna ek olarak katalog import'u ile
-bayat kayıt temizliği.
-
-**1. Yetim storage dosyaları.** `src/lib/storage.ts`'e `removeStoredObject(bucket, path)`
-eklendi (fırlatmaz, `false` döner — `createSignedUrl`'ün mevcut sözleşmesiyle tutarlı).
-`useUploadAvatar` artık eski avatarı siliyor. **SIRA GARANTİSİ:** silme YALNIZCA
-`profiles.avatar_path` güncellemesi BAŞARILI olduktan sonra çalışıyor; güncelleme başarısız
-olursa silme HİÇ çalışmıyor — aksi halde kullanıcı hem eski hem yeni avatarını kaybederdi.
-Bunun için ayrı bir regresyon testi var. Silme başarısızlığı kullanıcıya hata GÖSTERMİYOR
-(yükleme zaten başarılı), yalnızca loglanıyor. NULL yol ve storage dışı mutlak URL
-(`placehold.co` gibi) için silme denenmiyor.
-DELETE politikasının gerçekten var olduğu kanıtlandı (varsayılmadı):
-`20260816090300_storage.sql` satır 91-99 `avatars_delete_own`. Form check tarafı incelendi:
-orada aynı borç YOK — her form check kendi dosyalarını tutuyor, üzerine yazma yok.
-
-**2. `42501` (RLS reddi) güvenlik olayı olarak loglanmıyordu.** Kök neden loglama eksikliği
-DEĞİLDİ: hook'lar `throw new Error(error.message)` yazıyordu ve düz `Error`'da `code` alanı
-olmadığı için PostgREST'in `42501` kodu ÇAĞRI NOKTASINDA atılıyordu. Yeni
-`src/lib/query/supabase-error.ts` (`SupabaseQueryError` + `wrapSupabaseError()`) kodu
-koruyor; çözüm merkezî — TanStack Query'nin `QueryCache`/`MutationCache` `onError` kancası
-(`src/lib/query/queryClient.ts`) tek noktadan yakalıyor, 20+ hook'a tekrarlayan `catch`
-eklenmedi. 9 hook dosyasında toplam ~32 çağrı noktası sarıldı. Storage ve GoTrue çağrıları
-bilerek SARILMADI (PostgREST değil, `42501` döndürmezler).
-**TARAYICI-SUNUCU TUZAĞI:** `src/lib/api/response.ts`'teki `logSecurityEvent()`
-KULLANILMADI — `next/server`'dan `NextResponse` import ediyor ve hook'lar `'use client'`;
-sunucu modülü tarayıcı paketine sızardı. Ayrı `src/lib/query/security-event.ts` yazıldı,
-`.next/static/` içinde sıfır eşleşme ile doğrulandı.
-**DÜRÜST SINIR (borç olarak kaydedildi, §5):** bu log yalnızca kullanıcının KENDİ konsoluna
-yazıyor — saldırgan kendi konsolunu görür, biz görmeyiz. Gerçek sunucu tarafı güvenlik
-kaydı için ayrı bir uç gerekir; kapsam dışı bırakıldı, tek değişim noktası
-`queryClient.ts`'teki `reportRlsDenialIfNeeded`.
-
-**3. AC-05 bildirim şablonu kuplajı çözüldü.** Yeni
-`supabase/migrations/20260817180000_program_submission_rpc.sql`:
-`submit_program_for_approval(p_client_id, p_workout_data)` `SECURITY DEFINER` RPC'si onay
-satırını ve koç bildirimini TEK İŞLEMDE yazıyor; şablon metni artık YALNIZCA RPC gövdesinde.
-`useProgramApprovals.ts`'teki `notifications` insert'i ve şablon metni tamamen kaldırıldı.
-**GERÇEK DAVRANIŞ HATASI DÜZELDİ:** eski akışta bildirim hedefi istemciden geliyordu ve koç
-bulunamazsa bildirim DANIŞANIN KENDİSİNE düşüyordu — koç programdan sessizce habersiz
-kalıyordu. Artık koç sunucuda çözülüyor.
-Onay kapısı ölçülerek doğrulandı (varsayılmadı): RPC `SECURITY DEFINER` olduğu için RLS
-politikaları devrede değil, bu yüzden sahiplik gövdede elle doğrulanıyor; ama onay kapısı
-bir TRIGGER'dır ve trigger'lar BYPASSRLS'ten etkilenmez. Senaryo 80 bunu canlı kanıtlıyor.
-`notifications_insert` politikasından `is_coach_profile(client_id)` dalı KALDIRILDI (grep ile
-doğrulandı: o dalı kullanan tek çağrı taşınan çağrıydı) — danışan artık `notifications`'a
-yalnızca kendi satırını yazabiliyor. `notifications_guard_content()` KORUNDU ama şablonu
-söküldü, rol tabanlı kurala dönüştürüldü ki biri politikaya dalı geri koyarsa delik
-SESSİZCE açılmasın.
-
-**4. Koçun avatarı danışana açıldı.** `20260817180100_avatar_visibility.sql`:
-`avatar_object_owner(text)` + politikaya `is_coach(avatar_object_owner(name))` dalı. Dosya
-adı ayrıştırmasıyla yetki vermek risklidir; dört güvence yazıldı: katı regex (kanonik 36
-karakterlik UUID, adda `/` yok), `::uuid` cast'i yalnızca regex'in doğruladığı dalda çalışır
-(politika içinde fırlayan hata `createSignedUrl`'i HERKES için kırardı), ayrıştırma
-başarısızsa NULL → `is_coach(NULL)` = false (belirsizlik daima redde düşer), ön ek
-sahtelenemez (`avatars_insert_own` adın `auth.uid()` ile başlamasını şart koşuyor).
-`form-checks-media` değişmedi. Danışanların BİRBİRİNİN avatarını göremediği testle
-kilitlendi.
-
-**5. Sequence yetkileri.** `20260817180200_sequence_grants.sql`: `authenticated`/`anon`
-için sequence UPDATE (`setval`) kaldırıldı, `USAGE`+`SELECT` KORUNDU (yoksa INSERT'ler
-kırılırdı). `alter default privileges` GEREKLİYDİ — ölçülen `pg_default_acl`
-`authenticated=w` içeriyordu, yani gelecekteki her sequence yetkiyi geri kazanırdı (AC-03
-turundaki tablo tuzağının aynısı).
-**Migration yazarken canlı bir Postgres tuzağı yakalandı:** `has_sequence_privilege()` ile
-`relkind='S'` filtresi aynı `WHERE`'de olunca planlayıcı fonksiyonu filtreden ÖNCE çalıştırdı
-ve `db reset` `"pg_toast_16488" is not a sequence (42809)` ile patladı; `as materialized` CTE
-çitiyle çözüldü. Kırmızı-yeşil koşusunun yan ürünü olarak bulgunun anlattığı DoS CANLI
-gerçekleşti: başarılı `setval` sayacı 1'e çekti ve sonraki INSERT `duplicate key` verdi.
-
-**6. Katalog import'u — borç kodda değil İŞLETİMDEYDİ.** `scripts/import-catalog.mjs` ve
-`clean-foods.mjs` zaten yazılmıştı ve olgundu (idempotent `onConflict: 'name'` upsert,
-dry-run, 500'lük batch, dosya içi tekilleştirme, mojibake onarımı); `package.json` script
-girdileri de vardı. Eksik olan tek şey HİÇ ÇALIŞTIRILMAMIŞ olmalarıydı. Kanonik dosya olarak
-`clean_exercises_v2.csv` (150 KB) seçildi, ham `exercises.csv` (8.7 MB) değil — ikisi de
-aynı 1324 satırı temsil ediyor ama ham dosya 95 sütunlu (6 dilde talimat alanları) ve
-şemadaki 6 sütuna eşlenmiyor.
-Sonuç: `exercises` 10 → **1328**, `food_database` 10 → **591**. İkinci koşuda sayılar
-değişmedi (idempotans kanıtı). Türkçe kodlama geri okumayla doğrulandı (`Tavuk Göğsü`,
-`Kırmızı Mercimek (pişmiş)`), bozuk kayıtlar onarıldı (`sled 45в° calf press` →
-`sled 45° calf press`). Script test edilebilir hale getirildi (saf fonksiyonlar export,
-`import.meta.url` guard) + `scripts/import-catalog.d.mts` + 33 birim testi.
-
-**7. Katalog import'u iki kusuru açığa çıkardı.** Bu tur "borcu kapatmak"la kalmadı,
-borcun GERÇEK ŞEKLİNİ ortaya çıkardı. İkisi de import'tan önce vardı ama 10 demo satırla
-görünmüyordu:
-
-- **Sessiz doğruluk hatası:** `supabase/config.toml` `max_rows = 1000`. `useExercises()`
-  1328 satır istiyordu → 328 egzersiz SESSİZCE kayboluyordu, hata da verilmiyordu.
-- **Performans:** `useCatalog.ts` sayfalamasız `select('*')` yapıyor ve `WorkoutTab.tsx:109`
-  / `NutritionTab.tsx:47` bunu mount anında çağırıyor. Giriş sonrası yükleme 30 sn'yi aştı ve
-  E2E KARARSIZLAŞTI — iki ardışık tam koşuda FARKLI testler düştü (`daily-log.spec.ts:48`,
-  `dashboard.spec.ts:22`), ikisinin kök nedeni aynıydı: `page.waitForURL` zaman aşımı.
-
-Kullanıcı kararı: ASGARİ düzeltme şimdi, tam çözüm Faz 2'ye. `useCatalog.ts`'e
-`fetchAllRows(fetchPage, context, pageSize=1000, maxPages=50)` eklendi; `.range()`
-döngüsüyle tüm satırlar geliyor, sonsuz döngü koruması var (50 sayfa aşılırsa `logger.warn`
-
-- kısmi sonuç). Gerçek PostgREST'e karşı kanıtlandı: exercises 2 istekte 1328 (0-999 +
-  1000-1327), food_database 1 istekte 591; tek geniş `range` ile eski davranış 1000'de kesiyor.
-  **Kolon projeksiyonu YAPILAMADI** — `exercises` tablosunun 7 kolonunun HEPSİ kullanılıyor
-  (`gif_url`/`image` canlı antrenmandaki GIF gösterimini besliyor, `WorkoutTab.tsx:356-359,
-413-432`), `food_database`'in 3 kolonunun hepsi kullanılıyor. Atılacak ağır alan yok.
-
-**8. Bayat kayıtlar ve mekanik borçlar.** `playwright.config.ts`'teki A-12 yorumu
-`src/env.ts` → `src/env.server.ts` olarak düzeltildi (kontrol Faz 1.5'te taşınmıştı).
-`docs/security/AUDIT.md`'de GERÇEK bir iç çelişki bulundu ve düzeltildi: §2'de A-12 hâlâ
-`src/env.ts` ile kapatılmış görünüyordu, oysa §4c aynı şemanın `src/env.server.ts`'e
-taşındığını anlatıyor. Dört bayat kayıt bağımsız doğrulandı (`src/middleware.ts` yok,
-`src/app/actions.ts` yok, AI tel protokolü zaten `client_id`, `npm audit --omit=dev` 0).
-`db:types` diff'i alındı: 29 satır, TAMAMEN EKLEME, hiç kayıp yok. Yeni tablo/kolon/enum
-yok; 4 yeni `Functions` girdisi — bu turun iki fonksiyonu + **Faz 1.5'ten kalan, elle
-yazılmış dosyada eksik olan `backfill_program_approval_review` ve `is_end_user_write` geri
-kazanıldı**. Üretilen sürüm benimsendi.
-Ölü `SubmitProgramForApprovalInput.coachId` alanı ve `WorkoutTab.tsx`'teki gönderimi
-kaldırıldı (`useCoachId()` hook'unun kendisi KORUNDU — `MessagesTab`/`useMessages`'ta canlı
-kullanımları var).
-
-**GÜNCELLEME — "Faz 1a — AI tel protokolü" kaydı (yukarıda, bu §3'te) BAYATTIR:** o paragraf
-`RecommendationRequest.student_id`'nin "bilinçli olarak değiştirilmediğini" söylüyor. Bu
-Faz 1.7 turunda kaynaktan doğrulandı ki bu artık DOĞRU DEĞİL —
-`ai_backend/app/schemas/recommendations.py:27` `client_id: str | None = None`,
-`src/lib/api/types.ts:66` `client_id?: string`, `src/lib/validation/schemas.ts:231`
-`client_id: uuidField.optional()` — üçü de zaten `client_id`, `student_id` DEĞİL. `git log`
-alan adının rol yeniden adlandırma commit'inde (`78e5d7b`, Faz 1a) zaten `client_id`'ye
-çevrildiğini gösteriyor; yukarıdaki kayıt o zamandan beri hiç güncellenmemiş bir belge
-hatası. Doğru durum: alan zaten hizalı, ek iş gerekmiyor. Bu not, o paragrafı SİLMEDEN
-düzeltir (bkz. dosya kuralları).
-
-**Doğrulama (main thread koştu, gerçek sayılar; §1 tablosuna işlendi):**
-
-- `npm run type-check` → temiz
-- `npm run lint` → 0 hata, 12 bilinen uyarı
-- `npm run test` → **426/426** (35 dosya) — faz başında 363
-- `npm run build` → başarılı
-- `npx supabase db reset` → 0 hata, 18 migration + seed
-- `npm run test:rls` → **85/85** — faz başında 76
-- `npm run test:transform` → 26/26
-- `npm run ratchet` → yeşil, emoji tavanı 60 → 59'a indirildi (`[OK] emoji: 59 / tavan 59`)
-- `npm run format:check` → temiz
-- `uv run ruff check .` / `uv run mypy app` / `uv run pytest` → temiz / 28 dosya /
-  **82/82, %94.94**
-- Katalog: `exercises` **1328**, `food_database` **591**
-- `npm run test:e2e` → **42/42, ÜÇ ARDIŞIK KOŞUDA** (44.8s / 40.3s / 40.5s). Kararsızlık
-  öncesi koşular 41/42 idi ve 54.8s/57.9s sürüyordu — düzeltme hem doğruluğu hem süreyi
-  iyileştirdi.
-
-**Kaydedilen borçlar (§5'e işlendi):**
-
-- Katalog hâlâ mount anında TOPTAN istemciye çekiliyor; sayfalama/sanallaştırma UI'da yok.
-  Sunucu taraflı arama + sayfalama Faz 2 egzersiz kütüphanesi işine bağlandı. Yük boyutu
-  değişmedi, yalnızca artık eksik değil.
-- `42501` logu yalnızca istemci konsoluna yazıyor; gerçek sunucu tarafı güvenlik kaydı yok.
-- Birikmiş ESKİ yetim storage dosyaları için toplu temizlik yapılmadı (toplu silme, ayrı
-  onay ister).
-- `useApproveProgram` (koç yolu) hâlâ 3 ayrı ATOMİK OLMAYAN çağrı yapıyor; aynı RPC muamelesi
-  için aday. Şablon kuplajı yok (koç serbest metin yazıyor).
-- `supabase_admin` varsayılan ACL boşluğu sequence'ler için de kapatılamıyor (tablolardakiyle
-  aynı, `must be member of role`); senaryo 84 dinamik okuduğu için istisna doğarsa test
-  kırılır.
-- RLS senaryo 83 `nextval` işlemsel olmadığı için her koşuda `exercises` id'lerinde 1 boşluk
-  bırakıyor (zararsız, dosyada belgelendi).
-- `exercises.csv` (8.7 MB ham) hâlâ repoda; `data/README.md` Git LFS öneriyor.
-
-**Durum:** Faz 1.7 tamamlandı. Sıradaki iş **Faz 2 — Koç-Danışan Çekirdek Akışı**. İlk
-mekanik işi emoji → Lucide dönüşümü ve E2E locator güncellemeleri aynı PR'da (ADR-0016);
-`LoopRing` ilk göründüğü ekranla birlikte yazılır (ADR-0017, AC-1.6.7 oraya devredildi);
-Katman B restilizasyonu (49 `font-black`, 17 `rounded-3xl`, 14 gradyan) bu fazda doğal
-olarak dönüşür (ADR-0018); katalog için sunucu taraflı arama + sayfalama da bu fazın işi.
-**Faz sırası notu:** yol haritasındaki kalan fazlar büyük ölçüde faz düzeyinde
-paralelleşmiyor — Faz 2 ve Faz 4 aynı dosyalara dokunuyor (`StatsTab.tsx`,
-`CoachUserManagement.tsx`), Faz 3'ün de bir UI kuyruğu var (`ai_suggested` → `confirmed`
-onay ekranı, makro dashboard). Gerçek paralellik ekseni faz-vs-faz değil, backend-vs-web:
-Faz 3'ün `ai_backend/**` yarısı Faz 2 ile çakışmadan yürüyebilir.
-
-### Faz 2 — Koç-Danışan Çekirdek Akışı (2026-08-17)
-
-Yedi dilim halinde yürütüldü. Sıralama kritikti: 2a tüm ekranlara dokunduğu için ATOMİK ve
-YALNIZ çalıştı; 2b şema temeli; 2c–2f özellik akışları paralel; ardından entegrasyon.
-
-**2a — mekanik süpürme (atomik).** ADR-0016 emoji→Lucide dönüşümünü, ürün dili düzeltmesini
-ve E2E locator güncellemelerini AYNI PR'a bağlamıştı: üçü de aynı locator yüzeyini kırıyor.
-
-- Emoji **59 → 0**, ratchet tavanı 0'da kilitlendi. 53 emoji 35 ikona; 6'sı düz metne indi
-  (2'si DB'ye yazılan bildirim metni, 2'si `<option>` içinde, 🧂 için lucide'de ikon yok,
-  🎉 kutlama anı ADR-0016'nın tek istisnası → `LoopRing`'e devredildi).
-- **`lucide-react` v1 eski takma adları kaldırmış**: `AlertTriangle`/`BarChart3`/
-  `CheckCircle` yok, yerlerine `TriangleAlert`/`ChartColumn`/`CircleCheck`. Her ad
-  kullanılmadan önce `lucide-react.d.ts`'e karşı doğrulandı.
-- **GREP TUZAĞI (kayda değer):** Git Bash'te `grep -i "öğrenci"` büyük `Ö`'yü SESSİZCE
-  kaçırıyor (çok baytlı büyük/küçük harf katlaması). İlk envanter eksik çıktı, açık
-  alternasyonla yeniden tarandı.
-- **GİZLİ İ TUZAĞI SÖKÜLDÜ:** `dashboard.spec.ts` sekme locator'larını `new RegExp(name,
-'i')` ile kuruyordu ve liste `İstatistikler` (U+0130) içeriyordu — tesadüfen çalışıyordu
-  ama bu, projeyi daha önce yakan kalıbın ta kendisiydi (bkz. §3 "E2E doğrulaması ve ortaya
-  çıkardığı hatalar", 2026-08-16 üçüncü oturum).
-- **GERÇEK ERİŞİLEBİLİRLİK HATASI:** `users/page.tsx` geri butonu metnini `sm` altında
-  gizliyor ama `aria-label`'ı yoktu — mobilde erişilebilir adı çıplak `←` idi. Hiçbir test
-  yakalamıyordu.
-
-**2b — şema tamamlama.** 5 migration.
-
-- **REALTIME'DA SIZINTI BULUNDU VE KAPATILDI.** Yayın zaten `messages`/`notifications`
-  içeriyordu ama davranışı hiç ölçülmemişti. Gerçek WebSocket ile üç aktör abone edildi:
-  INSERT → A ve koç alıyor (78/440 ms), B ALMIYOR. UPDATE → aynı. **DELETE → B (filtresiz
-  abone) A'NIN SİLME OLAYINI ALDI (92 ms).** Sebep: `replica identity = 'd'` altında eski
-  kayıt yalnızca birincil anahtarı taşır, RLS DEĞERLENDİRİLEMEZ. Çözüm `full`a geçmek değil
-  (planın istemediği bir yetenek için her UPDATE'in WAL maliyetini artırırdı); yayın
-  `insert, update` ile daraltıldı.
-- `workout_logs`: `set_number`, `plan_exercise_id` FK, `completed_at`. **`ON DELETE SET
-NULL`** seçildi çünkü `save_workout_plan()` plan satırlarını silip yeniden yazıyor —
-  CASCADE olsaydı koç her plan kaydettiğinde danışanın TÜM geçmiş logları silinirdi.
-  `completed_at` belirsizliği (plan hem "satır=set" hem "tüm setler girilince" diyor): ayrı
-  `workout_sessions` tablosu reddedildi, anlam oturum seviyesinde/kolon set satırında
-  denormalize damga; karar kayıpsız yükseltilebilir. RLS boşluğu kapatıldı:
-  `plan_exercise_id`'nin kime ait olduğu denetlenmiyordu.
-- `nutrition_plans.target_*` hedef makrolar (NULL = "hedef verilmedi", 0 bir hedeftir).
-- Yeni `nutrition_logs`. **ADR-0014 sapması tekrarlanmadı** — yeni yüzey olduğu için planın
-  §3.2 matrisi birebir uygulandı: koç SALT OKUR.
-- `messages.attachment_path` + yeni private bucket `message-attachments`. Mevcut bucket'lar
-  reddedildi: `avatars` politikası koçun dosyasını herkese açıyordu; `form-checks-media` ise
-  danışanın koçtan gelen eki görmesini engellerdi.
-  **KRİTİK YAN BULGU:** `messages_guard_columns()` sütunları AÇIKÇA sayıyor → yeni kolon
-  otomatik korunmuyordu; genişletilmeseydi alıcı gelen mesajın EKİNİ değiştirebilirdi
-  (AC-04 deliğinin aynısı, bkz. §3 "Faz 1.5 — düzeltme turu, Grup 1–3").
-- `is_read`/`read_at` tekilleştirildi: `read_at` kanonik, trigger normalleştirir (koşulsuz —
-  veri modeli kuralı), CHECK kanıtlar. Ölçüm: 68 satırda 0 tutarsızlık vardı ama bu
-  TESADÜFTÜ (seed türetiyordu), şema garantisine çevrildi.
-- Kırmızı-yeşil: 10 ayrı red koşusu. RLS senaryo sayısı bu dilimle **85 → 95**'e çıktı.
-
-**2c — antrenman akışı.**
-
-- **`LoopRing` yazıldı (ADR-0017) ve AC-1.6.7 KAPANDI.** Dolgu SVG sunum özniteliği olarak
-  yazılan `stroke-dashoffset`; dosyada tek bir `@keyframes`/`animation` yok, yani
-  `globals.css`'in `animation-duration: 0.01ms !important` kuralının donduracağı bir şey
-  yok. En sert test iddiası: **reduced-motion açıkken ve kapalıyken üretilen
-  `stroke-dashoffset` BİREBİR aynı string** — %70 dolu halka her iki halde de %70
-  gösteriyor. `LoopRing` tek anlam kuralını çalışma zamanında da kilitliyor: dekoratif
-  `purpose` ile çağrılırsa `throw` eder.
-- **`useWorkoutLogs` çağrılıyor ama HİÇBİR YERDE GÖSTERİLMİYORDU** — AC-2.1'in "koç logu
-  görür" adımı bu yüzden hiç kapanamıyordu. Oturumlara gruplu panel eklendi.
-- Gym modu ayrı bileşene çıkarıldı; `video_url` için allowlist'li embed (yalnız
-  YouTube/Vimeo; `javascript:`/`data:`/bilinmeyen host → düz bağlantı).
-- Faz 2a'nın işaretlediği iki kutlama noktası `LoopRing` ile tamamlandı.
-
-**2d — beslenme akışı.**
-
-- **ADR-0017 kesintisine uyuldu: makro dashboard HALKA DEĞİL YATAY BAR.** Halka yalnızca
-  döngü durumu kodlar; makro bir döngü değil BÜTÇEDİR. Regresyon testi halkanın çizim
-  mekanizmasını (`stroke-dashoffset`) arıyor — dekoratif `Target` ikonundaki `<circle>`'lara
-  yanlış pozitif vermeyecek şekilde düzeltildi.
-- Aşım: bar dolgusu [0,100]'e kırpılır ama gerçek sayılar gizlenmez (`danger` + "+X aşım");
-  %90'da erken `warning`.
-- **Gerçek hata bulundu:** hedef state'i `{} as NutritionTargets` ile kuruluyordu, ilk
-  render'da kutucuklarda literal `undefined` görünecekti.
-- `save_nutrition_plan()` RPC'sine dokunulmadı (hedef parametresi almıyor, genişletmek onu
-  yeniden yazmak olurdu) — hedefler ayrı tablo yazımıyla yönetiliyor.
-
-**2e — form check akışı.**
-
-- Danışan gönderimi (`capture="environment"` ile mobil kamera), koç bekleyenler kuyruğu
-  (`CoachUserManagement.tsx`'te — o ekran zaten koçun çapraz-danışan triyaj yüzeyi), toplu
-  imzalı adres (`createSignedUrls`, N+1 yok), geri bildirim → `reviewed`.
-- **MİMARİ ENGEL KEŞFEDİLDİ:** `messages_guard_columns()` `kind='system'` yazımını
-  PostgREST üzerinden kimlik doğrulamış HER çağırana kapatıyor — koç dahil. Yani sistem
-  mesajı kanalı hiçbir hook'tan yazılamıyordu. Kendi kapsamı dışında olduğu için belgelenip
-  bırakıldı, 2g ile kapatıldı (aşağıda).
-- AC-2.3 curl ile yeniden kanıtlandı: kimliksiz `400 NoSuchBucket`, imzalı adres `200`.
-
-**2f — mesajlaşma.**
-
-- **AC-2.2 ÖLÇÜLDÜ: 419 ms** (koç "Gönder"e bastığından danışanın sekmesinde göründüğü ana
-  kadar, iki gerçek tarayıcı bağlamıyla). 2 sn bütçesinin çok altında; sayı artık testin
-  kendisi tarafından loglanıyor.
-- "Görüntülendi" tespiti: `IntersectionObserver` + `document.visibilityState`. İki uç nokta
-  açıkça reddedildi ("mount = hepsi okundu" ve realtime payload'ında istemci tarafı
-  filtre).
-- Foto eki magic-byte ile doğrulanıyor, yol sözleşmesi DB CHECK'ine karşı test edildi.
-- `kind='system'` mesajlar ayrı stille render ediliyor (arayüz hazır).
-
-**2g — sistem mesajı RPC'si (2e'nin engelini kapatan ek iş).**
-`post_system_message(p_client_id, p_event_type, p_ref_id)` `SECURITY DEFINER`.
-**AC-05 dersi bir adım öteye taşındı: RPC HİÇ METİN PARAMETRESİ ALMIYOR.** Yalnızca olay
-türü + referans id; metin sunucuda zaten sunucu-doğrulamalı alanlardan üretiliyor. Yani koç,
-gerçekten olmamış bir şey için "sistem" mesajı uyduramıyor. Dört sahiplik kontrolü gövdede.
-Guard zayıflamadı: doğrudan `.insert()` ile `kind='system'` hem danışan (senaryo 61) hem
-KOÇ (yeni senaryo 98) için hâlâ reddediliyor. RLS senaryo sayısı bu dilimle **95 → 99**'a
-çıktı.
-
-**2h — versiyonlu plan yayınlama (§4.1 madde 2).**
-Ölçülen eski davranış: `save_workout_plan()` yeni `version` üretmiyor, eskiyi
-`is_active=false` yapmıyor, plan satırlarını SİLİP YENİDEN YAZIYORDU. Sonuç: `ON DELETE SET
-NULL` üzerinden **her plan kaydında danışanın geçmiş antrenman loglarının plan bağı
-kopuyordu** — §4.1'in "geçmiş loglar eski versiyona bağlı kalır" garantisi sağlanmıyordu.
-**COPY-ON-WRITE seçildi:** aktif planın satırlarına bağlı en az bir log VARSA kaydetme bir
-yayınlamadır (eski arşivlenir, satırları korunur, `version+1` ile yeni aktif plan); YOKSA
-plan hâlâ taslaktır ve satırları yerinde yazılır. Böylece `version` "koç kaç kez tıkladı"yı
-değil "danışan kaç plandan geçti"yi ölçer; çift tıklama kendiliğinden elenir.
-RPC imzası KORUNDU — ayrım parametreden değil VERİDEN türetildiği için `src/hooks/**` ve
-`src/components/**` hiç değişmedi.
-Beslenme tarafı bilerek değiştirilmedi: `nutrition_plan_meals`'e işaret eden HİÇBİR FK yok,
-aynı kod oraya kopyalansa ölü kod olurdu. Geri dönüş koşulu şema yorumuna yazıldı.
-En kritik kanıt senaryo 101: migration'sız hâlde "GECMIS LOGUN PLAN BAGI NULL A DUSTU — plan
-kaydetmek antrenman gecmisini KOPARIYOR" diye kırılıyor. RLS senaryo sayısı bu dilimle
-**99 → 104**'e çıktı — Faz 2'nin kapanış değeri.
-
-**2i — entegrasyon temizliği.** Dört dilim paylaşılan dosyalara dokunamadığı için bilinçli
-sapmalar bırakmıştı: sorgu anahtarları `src/lib/query/keys.ts`'e, `MESSAGE_ATTACHMENT_BUCKET`
-`src/lib/storage.ts`'e taşındı; barrel export'lar eklendi; ölü `coachId` kaldırıldı; kırık iki
-test düzeltildi (kök neden: `rpcMock`'a varsayılan çözümlenmiş değer verilmemişti).
-Invalidate zinciri kanıtlandı: `['workout-plan', id]` ön eki `['workout-plan', id,
-'exercises']` ile eşleştiği için gym modu hâlâ tazeleniyor — kırılsaydı sessizce bayat plan
-gösterirdi.
-Ratchet tavanları ölçülen değerlere indirildi: `font-black` 49→**25**, `bg-gradient-to-`
-14→**12**, `rounded-3xl` 17→**15** (Katman B, ADR-0018'in öngördüğü gibi ekranlar yeniden
-yazılırken DOĞAL olarak dönüştü).
-
-**2j — E2E test izolasyonu.** Faz 2 sonrası tam paket yerelde 6 düştü. Ürün hatası değildi.
-**Kök neden ilk teşhisten farklı çıktı:** sorun dosya içi paralellik değil,
-`projects: [chromium, 'Mobile Chrome']` — **her spec aynı anda İKİ kez koşuyor**, aynı
-hesaplara yazarak. Dosya içi hiçbir `describe.serial` bunu kapatamaz; danışan ayrıştırması
-da yetmez çünkü proje ikizi aynı danışanı seçer.
-Çözüm: kaynak bazlı, süreçler+projeler arası kilit (`tests/e2e/resource-lock.ts`). Kuyrukta
-geçen süre `testInfo.setTimeout` ile geri veriliyor, gövde bütçesi şişirilmedi.
-**İki ek gerçek hata bulundu:** (a) `numeric(6,2)` ondalık tuzağı — DB `274.00`, PostgREST
-JSON sayısı döndürüyor, JS sondaki sıfırı atıyor, DOM `274 kg` ama test `274.0 kg` arıyordu
-(~1/10 kararsızlık); iddia gevşetilmedi, test verisi düzeltildi. (b) 12 çekirdekte 6 worker
-× ikinci tarayıcı bağlamı → tek `next start`'a ~12 eş zamanlı bağlam; yerel worker tavanı 4
-yapıldı, config yorumunda bunun YALNIZCA yük için olduğu, veri çakışmasının kilitlerle
-çözüldüğü yazıldı. `retries` EKLENMEDİ — aksine 2c'nin koyduğu `retries: 2` KALDIRILDI.
-
-**Doğrulama (main thread bağımsız koştu, gerçek sayılar; §1 tablosuna işlendi):**
-
-- `npm run type-check` → temiz
-- `npm run test` → **502/502** (42 dosya) — faz başında 426
-- `npm run lint` → 0 hata, 14 uyarı
-- `npm run build` → başarılı
-- `npx supabase db reset` → 0 hata, 21 migration + seed
-- `npm run test:rls` → **104/104** — faz başında 85 (zincir: 2b 85→95, 2g 95→99, 2h 99→104,
-  bkz. aşağıdaki dilim anlatıları)
-- `npm run test:transform` → 26/26
-- `npm run ratchet` → 6 sayaç da yeşil (emoji 0/0, `font-black` 25/25, `bg-gradient-to-`
-  12/12, `rounded-3xl` 15/15, `8b5cf6` 0/0, ondalık 0/0)
-- `npm run format:check` → temiz
-- `npm run test:e2e` → **50/50, iki ardışık koşu** (43.9s / 43.4s) + **CI yapılandırmasıyla**
-  (`CI=1`, workers=1, retries=2) **50/50** (56.6s)
-- Katalog: `exercises` 1328, `food_database` 591 (değişmedi)
-
-**Kabul kriterleri:** AC-2.1 ✅ (uçtan uca akış Playwright'ta) · AC-2.2 ✅ (419 ms ölçüldü,
-bütçe 2 sn) · AC-2.3 ✅ (curl ile yeniden kanıtlandı) · AC-2.4 ✅ (`supabase.from(` yalnızca
-`src/hooks/**`) · **AC-1.6.7 ✅ — Faz 1.6'dan devredilmişti, `LoopRing` ile kapandı.**
-
-**Kaydedilen borçlar (§5'e işlendi):**
-
-- Yerel E2E veritabanı birikiyor ve hiç temizlenmiyor (`form_checks` 25, `workout_logs` 60,
-  `messages` 42, `daily_logs` 28). `FormCheckTab` her render'da SATIR BAŞINA bir imzalı URL
-  üretiyor — bu yük her koşuda büyüyor ve uzun vadede yeniden yük kaynaklı kararsızlık
-  üretecek. Temizlik script'i gerekiyor (destructive, açık onay ister). Sonraki iş kalemi.
-- E2E kilit ilanı zorunlu tutulmuyor: yeni bir test paylaşılan kayda yazıp `resource(...)`
-  ilan etmezse sessizce yarışa girer. Tek koruma README kuralı, otomatik denetim yok.
-- AC-2.2 payı ~2x (ölçümler 233-1005 ms, sınır 2000) ama yük duyarlı; DB birikimi büyürse
-  ilk burası sıkışır.
-- Arşiv plan versiyonları için GC yok; versiyon gezgini UI'ı yok (şema hazır, yüzey yok).
-- `video_url` hiçbir yerde doldurulmuyor — embed yolu yazıldı ve testli ama pratikte uykuda.
-- `message-attachments` için magic-byte doğrulaması storage tarafında yok (Faz 1.5 K3 borcu,
-  storage seviyesinde hâlâ kapanmadı — istemci tarafı doğrulama var, sunucu tarafı yok).
-- `useApproveProgram` (koç yolu) hâlâ 3 atomik olmayan çağrı yapıyor (Faz 1.7'den taşınan
-  borç, bu turda da kapsanmadı).
-- Koçun ara plan düzenlemeleri arşivlenmiyor (copy-on-write'ın bilinçli bedeli).
-
-**Durum:** Faz 2 tamamlandı. Sıradaki iş **Faz 3 — Yemek Fotoğrafı Makro Tahmini**
-(`active_planprogram.md` §5). Faz 3'ün `ai_backend/**` yarısı Faz 2'nin kalanıyla
-çakışmadan yürüyebilir ama bir UI kuyruğu var (`ai_suggested` → `confirmed` onay ekranı,
-makro dashboard entegrasyonu). `nutrition_logs` tablosu Faz 3 için ileriye uyumlu kuruldu:
-`status` kolonu eklendiğinde `default 'confirmed'` ile backfill GEREKTİRMEYECEK.
+## 2. Tamamlanan fazlar (anlatı arşivde)
+
+| Faz / tur                          | Sonuç                                                                          | Arşiv                                         |
+| ---------------------------------- | ------------------------------------------------------------------------------ | --------------------------------------------- |
+| v1.0 yükseltmesi + ilk 4 oturum    | TS strict, FastAPI, Supabase RLS, test/CI/Docker; E2E ilk koşu, 3 kritik kırık | `archive/progress-2026-08-16-v1-yukseltme.md` |
+| Faz 1a                             | Roller `coach`/`client`, ADR ayrıştırması, private storage + signed URL        | `archive/progress-faz-1a.md`                  |
+| Faz 1b                             | Planların normalize tablolara taşınması — **ayrı kapanış kaydı yazılmadı**     | `archive/progress-yol-haritasi-arsivi.md`     |
+| Faz 1.5                            | Güvenlik denetimi: 39 bulgu, 37'si kapandı (A-05/A-14 ertelendi)               | `archive/progress-faz-1.5-guvenlik.md`        |
+| Faz 1.6                            | Görsel kimlik Katman A: token, tipografi, CI ratchet                           | `archive/progress-faz-1.6-gorsel-kimlik.md`   |
+| Faz 1.7                            | Borç temizliği + katalog import'u (10 → 1328 / 591)                            | `archive/progress-faz-1.7-borc-temizligi.md`  |
+| Faz 2                              | Koç-danışan çekirdek akışı (2a–2j); AC-2.1–2.4 + AC-1.6.7                      | `archive/progress-faz-2-cekirdek-akis.md`     |
+| Hosted senkron + env koruması/PG17 | ADR-0020 push + parite; üç katmanlı env guard'ı, yerel PG 15 → 17              | `archive/progress-hosted-senkron-ve-env.md`   |
 
 ---
 
-## 4. Alınan kararlar (karar kaydı)
+## 3. Açık borçlar
 
-| Tarih      | Karar                                                               | Gerekçe                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | Durum                                                                                                                                                                                                                                   |
-| ---------- | ------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 2026-08-16 | Rol enum değerleri `admin`/`student` korundu                        | Mevcut veri bozulmasın; ürün dilinde admin=koç, student=danışan                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | Faz 1'de `coach`/`client`'a taşınacak                                                                                                                                                                                                   |
-| 2026-08-16 | **Tek koçlu model benimsendi**                                      | Kullanıcı kararı; `profiles.coach_id` ve çok-koç RLS katmanı gereksiz karmaşıklık                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | Plan v1.1'e işlenecek                                                                                                                                                                                                                   |
-| 2026-08-16 | AI çağrıları Next.js route handler proxy'sinden geçer               | API key istemciye sızmasın; CORS ve rate limit tek noktada                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | Uygulandı                                                                                                                                                                                                                               |
-| 2026-08-16 | PWA korundu, build `--webpack` ile yapılıyor                        | `next-pwa` webpack eklentisi; Turbopack'e geçiş PWA'yı feda etmek demek                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | Uygulandı                                                                                                                                                                                                                               |
-| 2026-08-16 | `Result<T>` yerine typed `ApiError` fırlatma sürdürülecek           | TanStack Query'nin hata makinesi queryFn'in fırlatmasına dayanır; `Result` sınırın ardında yine `throw`'a çevrilir                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | Plan v1.1'de §3.4 düzeltilecek                                                                                                                                                                                                          |
-| 2026-08-16 | Monorepo (pnpm+Turborepo) ve Expo mobil ertelendi                   | En yıkıcı adım, kullanıcı değeri üretmiyor; monorepo'nun tek gerekçesi mobil ve mobil Faz 5'e kadar zorunlu değil                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | Plan v1.1'de Faz 4 sonrasına taşınacak                                                                                                                                                                                                  |
-| 2026-08-16 | **Tek koçlu model**                                                 | Kullanıcı kararı; `profiles.coach_id` ve çok-koç RLS katmanı gereksiz karmaşıklık                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | Plan v1.1'e işlenecek                                                                                                                                                                                                                   |
-| 2026-08-16 | **Storage mahremiyet düzeltmesi Faz 1'e ertelendi**                 | Uygulama yayında değil. `form_checks.front_pose_url` tam public URL saklıyor; private bucket'a geçmek kolonun yol saklamasını + mevcut satırların dönüştürülmesini gerektiriyor. Planın Faz 1'i `form_checks` tablosunu zaten baştan yazıyor — aynı iş iki kez yapılmayacak                                                                                                                                                                                                                                                                                                                                                                                                   | **Faz 1 çıkış kriteri** (bkz. Bölüm 6a)                                                                                                                                                                                                 |
-| 2026-08-16 | Prettier `semi: false`                                              | Kod tabanının fiili stili; tersi yüzlerce dosyaya gereksiz noktalı virgül eklerdi                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | Uygulandı                                                                                                                                                                                                                               |
-| 2026-08-16 | **CSP, yapılandırılan Supabase adresinden türetiliyor**             | Sabit `*.supabase.co` deseni yerel yığını (`127.0.0.1:54321`) kapsamıyordu ve yerel geliştirmeyi imkânsız kılıyordu                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | Uygulandı                                                                                                                                                                                                                               |
-| 2026-08-16 | Koç profili tüm authenticated kullanıcılara görünür                 | Mesajlaşmanın çalışması için zorunlu; tek koçlu modelde kabul edilebilir takas                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | Uygulandı                                                                                                                                                                                                                               |
-| 2026-08-16 | AI proxy'leri Bearer token ile korunuyor                            | Plan §5.3; kimliksiz erişim kapatıldı                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | Uygulandı                                                                                                                                                                                                                               |
-| 2026-08-16 | RLS testleri SQL script olarak yazıldı (pgTAP değil)                | Ek bağımlılık gerektirmiyor, `psql` ile CI'da doğrudan koşuyor                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | Uygulandı                                                                                                                                                                                                                               |
-| 2026-08-17 | Roller `coach`/`client` olarak yeniden adlandırıldı                 | Ürün dili ile şema hizalandı; `RENAME VALUE` veri kaybı olmadan taşıdı                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | Uygulandı — ADR-0003'ün yerini alan `docs/adr/0013-rollerin-coach-client-olarak-yeniden-adlandirilmasi.md` yazıldı                                                                                                                      |
-| 2026-08-17 | Storage private + signed URL (TTL 1 saat)                           | I-4 değişmezi ihlal ediliyordu (public bucket + tam URL saklayan kolonlar); danışan vücut fotoğrafları URL'yi bilen herkese açıktı                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | Uygulandı — `supabase/migrations/20260817100000_private_storage.sql`, `src/lib/storage.ts`                                                                                                                                              |
-| 2026-08-17 | **Güvenlik sertleştirmesi ayrı bir faz olarak planlandı (Faz 1.5)** | `securityhardening_prompt.md` mevcut durumla uzlaştırılıp `active_planprogram.md` §3a'ya "Faz 1.5 — Güvenlik Denetimi ve Sertleştirme" olarak işlendi. **Neden Faz 1 ile Faz 2 arasına:** (a) RLS ve şema Faz 1'de yeniden yazılıyor — denetim daha erken yapılsaydı sonucu boşa giderdi; (b) Faz 2 bu temelin üstüne yeni saldırı yüzeyi (plan yayınlama, form check kuyruğu, realtime mesajlaşma) ekliyor, temel önce sağlamlaştırılmalı. Faz numaraları kaymasın diye bölüm `§3a` olarak eklendi (§6a/§6b konvansiyonu)                                                                                                                                                    | Planlandı — prompt maddelerinin 20'si "zaten kapalı" (kanıtlı), 9'u "geçersiz/uyarlandı", 17'si "açık" olarak sınıflandırıldı (`active_planprogram.md` §3a.3)                                                                           |
-| 2026-08-17 | AI tel protokolünde `student_id`'ye alias eklenmedi                 | `RecommendationRequest`/`recommendationSchema` hiçbir yerden çağrılmayan bir uca ait (`useRecommendations` tanımlı ama hiçbir bileşen kullanmıyor); riski olmayan ama gereksiz bir değişiklik, gerçek tüketici eklenince hizalanacak                                                                                                                                                                                                                                                                                                                                                                                                                                          | Ertelendi — bkz. §3 "Faz 1a — AI tel protokolü"                                                                                                                                                                                         |
-| 2026-08-17 | **Görsel kimlik: "Demir & Tebeşir" paleti, tema ve token mimarisi** | Kimlik bugüne kadar hiç karara bağlanmamış, varsayılanların toplamıydı: `#8b5cf6` birebir Tailwind `violet-500` ve beyaz üstünde ~4.2:1 ile WCAG AA'yı geçmiyor; `next/font` hiç kullanılmıyor. 6 adlandırılmış hex (Tebeşir `#F4F4F1`, Demir `#14161B`, Menevis `#5B48D9` / koyu `#A79BFF`, Kapanış `#0F7A4C`, Kehribar `#B45D00`, Plaka Kırmızısı `#C22F2F`); mor atılmadı, **kaydırıldı** (aynı ton ailesi, ~6:1). Kanonik referans **açık tema**; gym modu tema-bağımsız (her zaman Demir). Tek kaynak `src/design/tokens.ts` — Faz 4.5'te Expo'ya taşınan bu dosyadır, Tailwind sınıfları değil. Tipografi: Archivo / Hanken Grotesk / IBM Plex Mono, ağırlık tavanı 700 | Planlandı — ADR-0015; uygulama `active_planprogram.md` §3b (Faz 1.6)                                                                                                                                                                    |
-| 2026-08-17 | **Fonksiyonel emoji emekli edildi, `lucide-react`'e geçiliyor**     | ~60 emoji / 15 dosya fonksiyonel ikon rolünde. Emoji hiçbir platformda aynı render edilmiyor, `currentColor` ile token'lara uymuyor, ağırlık/hizalama kontrolü yok. Belirleyici gerekçe: `lucide-react-native` **aynı ikon adlarıyla** Expo'ya birebir taşınıyor. Tek istisna: kutlama anları emoji ile değil imza öğeyle (halka kapanır)                                                                                                                                                                                                                                                                                                                                     | Planlandı — ADR-0016; uygulama Faz 2'nin ilk mekanik işi, E2E locator güncellemeleriyle aynı PR'da                                                                                                                                      |
-| 2026-08-17 | **İmza öğe: halka, tek anlam kuralıyla**                            | Halka **yalnızca döngü/çevrim durumu** kodlar; dekorasyon (avatar çerçevesi, buton süsü) yasak. Üç görünme yeri: danışan panosu haftalık döngü halkası, gym modu dinlenme sayacı, koç triyaj kartı 4 yaylı rozet. **Bilinçli kesinti:** NutritionTab makroları halka OLMAZ (Apple Watch klişesi + makro bir döngü değil bütçedir) → yatay bar; plan §4.2 buna göre düzeltildi. **Kritik kısıt:** halka bilgi taşır — CSS animasyonuyla çizilirse `globals.css`'teki global `prefers-reduced-motion` kuralı onu dondurur ve **yanlış bilgi gösterir**; state kaynaklı `stroke-dashoffset` zorunlu                                                                              | **TAMAMLANDI (2026-08-17, Faz 2):** `LoopRing` yazıldı (gym modu dinlenme sayacı), AC-1.6.7 kapandı — reduced-motion açık/kapalı iki durumda üretilen `stroke-dashoffset` birebir aynı; bkz. §3 "Faz 2 — Koç-Danışan Çekirdek Akışı" 2c |
-| 2026-08-17 | **Kimlik geçişi iki katman + CI ratchet; büyük patlama yok**        | Katman A (Faz 1.6, tek oturum/tek PR): token + font + gömülü 8 hex + odak/seçim rengi; **ekran restilizasyonu kapsam dışı**. Katman B (Faz 2): 49 `font-black` / 17 `rounded-3xl` / 14 gradyan ekranlar yeniden yazılırken doğal dönüşür, ayrı "restyle PR"ı yok. Arada CI ratchet mevcut sayıları tavan olarak kilitler, tavan asla yükselmez                                                                                                                                                                                                                                                                                                                                | Planlandı — ADR-0018; `active_planprogram.md` §3b.4                                                                                                                                                                                     |
-| 2026-08-17 | **Laboratuvar (kan/hormon) yorumlama motoru plandan çıkarıldı**     | Değer zaten raporda basılı, severity formülü (§5.4) tıbbi kaynağı olmayan keyfi bir eşik, isim doğrulama/boru hattı sırasında iki tasarım kusuru pratikte çalışmazdı, bloklayıcı açık sorular (katalog lisansı, saklama süresi, açık rıza) çözülmemişti, kalibrasyon verisi yoktu                                                                                                                                                                                                                                                                                                                                                                                             | Reddedildi — ADR-0019; `docs/LAB-INSIGHTS-SPEC.md` tarihsel kayıt olarak korunuyor, plana hiç işlenmemişti                                                                                                                              |
+**Tek tablo, kalıcı ID.** Yalnızca **açık veya kısmen açık** maddeler burada durur; bir borç
+kapandığında satırı buradan silinir ve kapatan fazın arşiv dosyasına kapanış notuyla taşınır.
+Yeni borç, bir sonraki boş `B-xxx` numarasını alır (numaralar tekrar kullanılmaz). Her
+maddenin tam metni ve kanıtı `Kaynak` sütunundaki arşiv dosyasındadır.
 
----
+| ID    | Borç                                                                                                      | Kaynak                                                                    | Durum                                                                |
+| ----- | --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| B-001 | PWA `runtimeCaching` `workout_logs` yanıtlarını cihazda 7 gün tutuyor                                     | v1 yükseltmesi — `archive/progress-2026-08-16-v1-yukseltme.md`            | Kısmi — `profiles` cache'i kaldırıldı, logout temizliği eklendi      |
+| B-002 | `npm audit` dev ağacında zafiyet var; `npm audit fix --force` ÇALIŞTIRILMAMALI (Next 16'yı düşürür)       | v1 yükseltmesi — aynı dosya                                               | Açık — `--omit=dev` 0 zafiyet, kalan kök `next-pwa` build ağacı      |
+| B-003 | `src/middleware.ts` → Next 16 `proxy` konvansiyonuna göç                                                  | v1 yükseltmesi / Faz 1b devri — `archive/progress-yol-haritasi-arsivi.md` | Açık — şu an yalnızca deprecation uyarısı                            |
+| B-004 | Kullanıcıya görünen Türkçe arayüz metinlerinin ürün diliyle hizası tam doğrulanmadı                       | Faz 1a — `archive/progress-faz-1a.md`                                     | Açık — Faz 2a bir süpürme yaptı, kalan metinler sayılmadı            |
+| B-005 | Birikmiş eski yetim storage dosyaları için toplu temizlik yok; storage dışı mutlak URL'ler dönüştürülmedi | Faz 1.7 — `archive/progress-faz-1.7-borc-temizligi.md`                    | Kısmi — yeni yüklemede eski avatar siliniyor; toplu silme onay ister |
+| B-006 | Oturum token'ları `localStorage`'da, JS'ten okunabilir (A-05)                                             | Faz 1.5 — `docs/security/AUDIT.md` §7                                     | Açık — kullanıcı kararıyla ertelendi (`@supabase/ssr` cookie geçişi) |
+| B-007 | CSP `script-src 'unsafe-inline'` içeriyor (A-14)                                                          | Faz 1.5 — `docs/security/AUDIT.md` §7                                     | Açık — A-05 ile birlikte tek iş (nonce tabanlı CSP)                  |
+| B-008 | Yüklenen dosya inline servis ediliyor (`download`/`Content-Disposition` yok)                              | Faz 1.5 — `archive/progress-faz-1.5-guvenlik.md`                          | Açık                                                                 |
+| B-009 | `42501` (RLS reddi) yalnızca kullanıcının kendi tarayıcı konsoluna yazılıyor                              | Faz 1.5 + Faz 1.7 — `archive/progress-faz-1.7-borc-temizligi.md`          | Kısmi — merkezî yakalama var, sunucu tarafı güvenlik kaydı yok       |
+| B-010 | Plan tablolarında denetim izi yok (satırı kimin yazdığı tutulmuyor)                                       | Faz 1.5 — `archive/progress-faz-1.5-guvenlik.md`                          | Açık — ADR-0014'ün kabul edilen bedeli                               |
+| B-011 | Ekranlardaki `text-gray-400`/`text-gray-500` kullanımları `text-secondary`'ye çevrilmedi                  | Faz 1.6 — `archive/progress-faz-1.6-gorsel-kimlik.md`                     | Kısmi — token tanımlı ve AA doğrulamalı, ekranlar Katman B'de        |
+| B-012 | Katman B restilizasyonu tamamlanmadı (`font-black` 25, `rounded-3xl` 15, gradyan 12)                      | Faz 1.6 / Faz 2 — `archive/progress-faz-1.6-gorsel-kimlik.md`             | Açık — ratchet yalnızca kötüleşmeyi engelliyor                       |
+| B-013 | Chart.js eksen rengi ve `html2canvas` dışa aktarımı kimlik sisteminin dışında                             | Faz 1.6 — aynı dosya                                                      | Açık — kapanış Faz 4 grafik tekleştirme işi (AC-4.3)                 |
+| B-014 | `border` token'ı anlamlı UI sınırları için WCAG 1.4.11'i (3:1) geçmiyor                                   | Faz 1.6 — aynı dosya                                                      | Açık — `border-strong` ihtiyacı Katman B'de doğacak                  |
+| B-015 | `::-webkit-scrollbar-thumb` hâlâ ham `#3f3f46`                                                            | Faz 1.6 — aynı dosya                                                      | Açık — bilinçli olarak token sisteminin dışında                      |
+| B-016 | Revize `warning` token'ı ekranlara akmıyor (bileşenler `text-orange-*`/`amber-*`)                         | Faz 1.6 — aynı dosya                                                      | Açık — kontrast kazancı Katman B'de gerçekleşecek                    |
+| B-017 | Ratchet emoji sayacının sözcük çözümleyicisi tam ayrıştırıcı değil                                        | Faz 1.6 — aynı dosya                                                      | Açık — ADR-0018'in kabul ettiği takas                                |
+| B-018 | Katalog sayfalamasız `select('*')` ile mount anında toptan çekiliyor                                      | Faz 1.7 — `archive/progress-faz-1.7-borc-temizligi.md`                    | Açık — sunucu taraflı arama + sayfalama Faz 2'de yapılmadı           |
+| B-019 | `useApproveProgram` (koç onay yolu) hâlâ 3 atomik olmayan çağrı yapıyor                                   | Faz 1.7 + Faz 2 (mükerrer kayıt birleştirildi)                            | Açık — aynı RPC muamelesi için aday                                  |
+| B-020 | `pg_default_acl`'deki `supabase_admin` kaydı (tablo ve sequence) değiştirilemiyor                         | Faz 1.5 / Faz 1.7                                                         | Açık — pratik etkisi yok; RLS senaryo 73/84 izliyor                  |
+| B-021 | RLS senaryo 83 her koşuda `exercises` id'lerinde 1 boşluk bırakıyor                                       | Faz 1.7 — aynı dosya                                                      | Açık — zararsız, dosyada belgelendi                                  |
+| B-022 | `exercises.csv` (8.7 MB ham) hâlâ repoda; `data/README.md` Git LFS öneriyor                               | Faz 1.7 — aynı dosya                                                      | Açık — kanonik import kaynağı `clean_exercises_v2.csv`               |
+| B-023 | Yerel E2E veritabanı birikiyor, hiç temizlenmiyor; imzalı URL yükü her koşuda büyüyor                     | Faz 2 — `archive/progress-faz-2-cekirdek-akis.md`                         | Açık — temizlik script'i destructive, açık onay ister                |
+| B-024 | E2E kilit ilanı zorunlu değil (`resource(...)` ilan edilmezse sessiz yarış)                               | Faz 2 — aynı dosya                                                        | Açık — tek koruma README kuralı                                      |
+| B-025 | AC-2.2 payı ~2x ve yük duyarlı (ölçüm 233–1005 ms, sınır 2000 ms)                                         | Faz 2 — aynı dosya                                                        | Açık — B-023 büyürse ilk burası sıkışır                              |
+| B-026 | Arşiv plan versiyonları için GC yok; versiyon gezgini UI'ı yok                                            | Faz 2 — aynı dosya                                                        | Açık — şema hazır, yüzey yok                                         |
+| B-027 | `video_url` hiçbir yerde doldurulmuyor (allowlist'li embed yolu uykuda)                                   | Faz 2 — aynı dosya                                                        | Açık                                                                 |
+| B-028 | `message-attachments` için storage tarafında magic-byte doğrulaması yok                                   | Faz 2 — aynı dosya                                                        | Açık — istemci tarafı doğrulama var                                  |
+| B-029 | Koçun ara plan düzenlemeleri arşivlenmiyor                                                                | Faz 2 — aynı dosya                                                        | Açık — copy-on-write'ın bilinçli bedeli                              |
+| B-030 | Hosted yedeği tek kopya ve elle alınmış; düzenli yedekleme stratejisi yok                                 | Hosted senkron — `archive/progress-hosted-senkron-ve-env.md`              | Açık — gerçek danışan verisi oluşmadan çözülmeli                     |
+| B-031 | Tarayıcıdan doğrudan Supabase'e yazma yolunu yalnızca Katman 0+1 kapatıyor                                | Env koruması — aynı dosya                                                 | Açık — sunucu guard'ı bu yolu tasarım gereği kesemez                 |
+| B-032 | Guard regex'i `*.supabase.co`/`.com` ile sınırlı; custom domain'li proje takılmaz                         | Env koruması — aynı dosya                                                 | Açık — sessizce geçer                                                |
+| B-033 | `.env.hosted.local` diskte düz metin `service_role` anahtarı taşıyor                                      | Env koruması — aynı dosya                                                 | Açık — değişen tek şey varsayılan olarak yüklenmemesi                |
+| B-034 | PostgREST v14.5 eşleşmesi `.temp` manifestine bağlı; hosted yükseltilirse sessiz sürükleme                | Env koruması — aynı dosya                                                 | Açık — `supabase link` yeniden koşulmalı                             |
+| B-035 | Supabase CLI global PATH'te yok                                                                           | Ortam                                                                     | Açık — `supabase ...` yerine `npx supabase ...` kullanılmalı         |
 
-## 5. Açık ve bloke işler
-
-**ÇÖZÜLEN (önceki blokaj):**
-
-- `npx supabase start` çalışmıyordu (`failed to connect to the docker API at
-npipe:////./pipe/docker_engine`, Docker Desktop kapalıydı). **ÇÖZÜLDÜ (2026-08-16):**
-  Docker Desktop çalışıyor, yığın ayakta; migration doğrulaması ve RLS testi bu oturumda
-  tamamlandı.
-- E2E testleri (`npm run test:e2e`) hiç çalıştırılmamıştı. **ÇÖZÜLDÜ (2026-08-16, üçüncü
-  oturum):** ilk kez koşturuldu, dört gerçek sorun bulundu ve düzeltildi (bkz. Bölüm 3 "E2E
-  doğrulaması ve ortaya çıkardığı hatalar"); paket artık 28/28 yeşil.
-- Danışan mesajlaşmayı hiç kullanamıyordu (`useAdminId()` null döndürüyordu). **ÇÖZÜLDÜ
-  (2026-08-16, dördüncü oturum):** `profiles_select` politikasına `role = 'admin'` koşulu
-  eklendi (bkz. Bölüm 3 "Kritik kırık düzeltmeleri").
-- Koç, onaya sunulan programdan haberdar olmuyordu (`notifications_insert` WITH CHECK
-  reddediyordu). **ÇÖZÜLDÜ (2026-08-16, dördüncü oturum):** `public.is_coach_profile(uuid)`
-  yardımcısı eklendi, politika güncellendi.
-- `/api/ai/*` proxy uçlarında oturum kontrolü yoktu (planın §5.3 ihlali). **ÇÖZÜLDÜ
-  (2026-08-16, dördüncü oturum):** Bearer token ile sunucu tarafı doğrulama eklendi; kimliksiz
-  istek upstream'e hiç ulaşmıyor.
-
-**BLOKE:**
-
-- Supabase CLI global PATH'te yok; `supabase ...` yerine `npx supabase ...` kullanılmalı.
-
-Node.js, npm ve git artık PATH'te (bu oturum içinde kuruldu); önceki oturumlarda "bu ortamda
-doğrulanamayan şeyler" olarak işaretlenen adımlar artık doğrudan çalıştırılabiliyor — Docker
-haricindeki araç eksikliği kaynaklı belirsizlikler ortadan kalktı.
-
-**BİLİNEN KISIT (E2E ortam değişkenleri):** E2E testleri çalışırken uygulama sunucusu yerel
-Supabase'e yönlendirilmelidir. `.env.local` **barındırılan** projeyi gösterdiği için, testler
-koşulmadan önce build şu ortam değişkenleriyle alınmalıdır:
-
-```
-NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321
-NEXT_PUBLIC_SUPABASE_ANON_KEY=<npx supabase status ile alınan yerel anon key>
-```
-
-**Aksi halde testler barındırılan gerçek veritabanına bağlanır ve oraya veri yazar**
-(`daily-log` senaryosu kayıt oluşturuyor).
-
-**BEKLEYEN RİSKLER** (detay: `UPGRADE_NOTES.md` §7):
-
-| Risk                                                                                                                                                                     | Not                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `supabase/migrations/20260816090300_storage.sql` doğrudan `storage.objects` üzerine `CREATE POLICY` yazıyor                                                              | **Yerelde sorun yok** — 8 storage politikası `db reset` ile sorunsuz uygulandı (2026-08-16). Ancak barındırılan (hosted) projede `db push` sırasında rolün tablo sahibi olmaması nedeniyle `must be owner of table objects` hatasıyla hâlâ karşılaşılabilir.                                                                                                                                                                                                                                                                                                                                                                              |
-| Storage bucket'ları (`avatars`, `form-checks-media`) **public** (`public = true`, `getPublicUrl` ile servis ediliyor)                                                    | Danışan vücut fotoğrafları URL'yi bilen herkese açık. Private bucket + signed URL'e geçilmeli. Faz 1'e ertelendi (bkz. Bölüm 4 karar kaydı ve Bölüm 6a).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| `next.config.mjs` PWA `runtimeCaching`'i `/rest/v1/(workout_logs\|profiles)` yanıtlarını **7 gün** (`maxAgeSeconds: 60*60*24*7`) cihazda tutuyor, logout'ta temizlik yok | Beslenme/antrenman planları ve e-posta içeren veri paylaşılan cihazda mahremiyet sorunu.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| `ai_backend/uv.lock` üretilmedi (dosya yok, doğrulandı)                                                                                                                  | **ÇÖZÜLDÜ:** `ai_backend/uv.lock` artık mevcut ve commit'li.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| `src/types/database.ts` elle yazıldı                                                                                                                                     | `npm run db:types` ile üretilenle diff'lenmeli.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| `npm audit`: 18 zafiyet (3 orta, 13 yüksek, 2 kritik)                                                                                                                    | Büyük ölçüde `next-pwa` v5'in eski bağımlılık ağacından. `npm audit fix --force` ÇALIŞTIRILMAMALI (Next 16'yı düşürebilir).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| `src/middleware.ts` — Next 16 bu dosya adlandırmasını deprecate etti, `proxy` istiyor                                                                                    | Şu an yalnızca uyarı.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| CI'daki `e2e` job'u artık yerel Supabase yığınını kurup RLS testlerini koşuyor                                                                                           | `.github/workflows/ci.yml` `e2e` job'u güncellendi: `supabase start` adımı, yerel `NEXT_PUBLIC_SUPABASE_URL`/`NEXT_PUBLIC_SUPABASE_ANON_KEY`, ardından `npm run test:rls`. "CI'da e2e geçemez" riski **ÇÖZÜLDÜ**.                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| `data/` altındaki CSV'ler (8,7 MB `exercises.csv` dahil) hiçbir zaman veritabanına import edilmedi                                                                       | `exercises` ve `food_database` tablolarında yalnızca 10'ar demo satır var. Egzersiz kütüphanesi ve besin arama gerçek veriyle çalışmıyor. Faz 1'e taşındı. **ÇÖZÜLDÜ (2026-08-17, Faz 1.7):** `scripts/import-catalog.mjs`/`clean-foods.mjs` çalıştırıldı; `exercises` 10→1328, `food_database` 10→591, ikinci koşuda değişmedi (idempotans). Bkz. §3 "Faz 1.7 — Borç Temizliği" madde 6-7.                                                                                                                                                                                                                                               |
-| `src/app/actions.ts`'teki 4 server action hiçbir yerden çağrılmıyor (ölü kod)                                                                                            | Planın AC-2.4 grep kuralını da ihlal ediyorlar (`.from()` doğrudan çağrısı). Faz 1'de karara bağlanmalı: silinsin mi, kullanılsın mı. **ÇÖZÜLDÜ:** dosya silindi (Faz 1.5 dönemi, `active_planprogram.md` §3a.3 Kova 1 #15); Faz 1.7'de `ls src/app/actions.ts` ile yeniden doğrulandı (yok) ve `active_planprogram.md` AC-2.4'teki artık gereksiz beyaz liste istisnası kaldırıldı.                                                                                                                                                                                                                                                      |
-| AI backend tel protokolü rol adlandırmasıyla hizasız                                                                                                                     | Faz 1a `student_id` → `client_id` kolon yeniden adlandırmasını yaptı ama `ai_backend/app/schemas/recommendations.py` hâlâ `student_id` alanı bekliyor — bilinçli olarak ertelendi, ayrı bir işte hizalanacak (bkz. §3 "Faz 1a — çıkış kriterleri"). **GÜNCELLEME/BAYAT KAYIT (2026-08-17, Faz 1.7):** bu satırın kendisi artık yanlış — kaynaktan doğrulandı, alan zaten `client_id` (`ai_backend/app/schemas/recommendations.py:27`, `src/lib/api/types.ts:66`, `src/lib/validation/schemas.ts:231`); `git log` rol yeniden adlandırma commit'inde (`78e5d7b`) zaten hizalandığını gösteriyor. Ek iş gerekmiyor, yalnızca belge hataydı. |
-| Kullanıcıya görünen arayüz metinleri hâlâ eski ürün dilini kullanıyor                                                                                                    | Faz 1a yalnızca şema + kodu yeniden adlandırdı; Türkçe arayüz metinleri ("Öğrenci Paneli", "Yönetici Paneli", "Öğrenci Portföyü", "Öğrenci Ara" vb.) değişmedi — ürün dili güncellemesi ayrı bir iş.                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| Koçun avatarı danışana görünmüyor                                                                                                                                        | `storage.objects` SELECT politikası "sahip veya koç" — danışan koçun avatar dosyasının sahibi değil. Şu an arayüz koç avatarını danışana göstermediği için regresyon yok; sohbet başlığına eklenirse politikaya "veya hedef kullanıcı koçsa" dalı eklenmeli. **ÇÖZÜLDÜ (2026-08-17, Faz 1.7):** `20260817180100_avatar_visibility.sql` — `avatar_object_owner(text)` + politikaya `is_coach(avatar_object_owner(name))` dalı; danışanların birbirinin avatarını göremediği testle kilitlendi.                                                                                                                                             |
-| Yetim storage dosyaları temizlenmiyor                                                                                                                                    | Eski avatar dosyaları yeni bir avatar yüklendiğinde storage'dan silinmiyor; ayrıca storage dışı mutlak URL'ler (`placehold.co` gibi) migration'da dönüştürülmedi, UI bunlar için placeholder'a düşüyor. **KISMEN ÇÖZÜLDÜ (2026-08-17, Faz 1.7):** `removeStoredObject()` eklendi, `useUploadAvatar` artık eski avatarı `profiles.avatar_path` güncellemesi başarılı olduktan SONRA siliyor. Birikmiş ESKİ yetim dosyalar için toplu temizlik yapılmadı (ayrı onay ister); storage dışı mutlak URL'ler hâlâ dönüştürülmedi.                                                                                                                |
-
-**GÜVENLİK RİSKLERİ (Faz 1.5 kapsamına alındı — `active_planprogram.md` §3a.3 "Kova 3"):**
-Aşağıdakiler bu oturumda kaynaktan doğrulandı; hiçbiri düzeltilmedi, hepsi Faz 1.5'in iş
-kalemidir.
-
-| Risk                                                                               | Kanıt                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `FORCE ROW LEVEL SECURITY` hiçbir tabloda yok (yalnızca `ENABLE`)                  | **ÇÖZÜLDÜ (2026-08-17, Grup 4-6):** `supabase/migrations/20260817170000_force_rls_and_grants.sql` — 13/13 tabloda `FORCE`. Bugünkü etkisi hâlâ sıfır (`postgres` sahibi `BYPASSRLS`), bkz. `AUDIT.md` §4c.                                                                                                                                                                                                                                                         |
-| Erişim token'ı istemcide `localStorage`'da                                         | `src/lib/supabase/client.ts:20-22` — `persistSession: true`, özel `storage` verilmemiş (Supabase varsayılanı). XSS durumunda token çalınabilir; httpOnly cookie analizi yapılmadı. **AÇIK — kullanıcı kararıyla ertelendi (A-05), bkz. `AUDIT.md` §7.**                                                                                                                                                                                                            |
-| Auth uçlarında brute-force koruması yok                                            | **ÇÖZÜLDÜ (2026-08-17, Grup 2 — kısmen, uygulama katmanında):** `src/app/api/auth/sign-in/route.ts` + `src/lib/api/auth-rate-limit.ts`; `[auth.rate_limit]` config yolu upstream Supabase hatası nedeniyle işlevsiz kaldı, bkz. `AUDIT.md` §4b.                                                                                                                                                                                                                    |
-| Dosya yüklemede magic-byte doğrulaması yok                                         | **ÇÖZÜLDÜ (2026-08-17, Grup 4-6):** yeni `src/lib/upload-validation.ts` — magic-byte tespiti kabul/uzantı otoritesi.                                                                                                                                                                                                                                                                                                                                               |
-| Yüklenen dosya inline servis ediliyor                                              | `src/lib/storage.ts` imzalı adresi `download` / `Content-Disposition` olmadan üretiyor. **AÇIK.**                                                                                                                                                                                                                                                                                                                                                                  |
-| Güvenlik olay günlüğü yok                                                          | **ÇÖZÜLDÜ (2026-08-17, Grup 4-6 — kısmen):** `rate_limit_exceeded`/`auth_login_failed`/`auth_login_rate_limited` loglanıyor. RLS reddi (`42501`) için `logSecurityEvent()` hazır ama çağrı noktası yok — hâlâ borç. **GÜNCELLEME (2026-08-17, Faz 1.7 — kısmen ÇÖZÜLDÜ):** çağrı noktası artık var (`src/lib/query/security-event.ts`, `queryClient.ts` `onError` kancası), ama yalnızca istemci konsoluna yazıyor — gerçek sunucu tarafı güvenlik kaydı hâlâ yok. |
-| Loglarda PII / sağlık verisi maskelenmiyor                                         | **ÇÖZÜLDÜ (2026-08-17, Grup 4-6):** `src/lib/logger.ts` redact listesi 5→19 anahtar + tarayıcı `maskForConsole()`.                                                                                                                                                                                                                                                                                                                                                 |
-| SAST / secret tarama araç zinciri yok                                              | **ÇÖZÜLDÜ (2026-08-17, Grup 4-6):** `.github/workflows/ci.yml` yeni `security` job'u (semgrep, gitleaks, npm audit, pip-audit), `required-checks.needs`'e eklendi.                                                                                                                                                                                                                                                                                                 |
-| Git geçmişinde secret taraması hiç yapılmadı                                       | **ÇÖZÜLDÜ (2026-08-17, Grup 4-6):** gitleaks CI'a bağlandı — PR'da yeni commit, haftalık cron'da tam geçmiş.                                                                                                                                                                                                                                                                                                                                                       |
-| `ai_backend` kimlik doğrulaması fail-open                                          | **ÇÖZÜLDÜ (2026-08-17, Grup 1):** `ai_backend/app/core/config.py` `model_validator` ile prod'da fail-fast, bkz. `AUDIT.md` §4b.                                                                                                                                                                                                                                                                                                                                    |
-| Rate limiter `x-forwarded-for`'a doğrulamasız güveniyor, kullanıcı bazlı limit yok | **ÇÖZÜLDÜ (2026-08-17, Grup 2):** `src/proxy.ts` + `src/lib/api/client-ip.ts` — `TRUSTED_PROXY_COUNT` tabanlı güven modeli, bkz. `AUDIT.md` §4b.                                                                                                                                                                                                                                                                                                                   |
-| CSP `script-src 'unsafe-inline'` içeriyor                                          | `next.config.mjs:33-35` — nonce tabanlı CSP'ye geçiş ertelendi (§8). **AÇIK — kullanıcı kararıyla ertelendi (A-14), bkz. `AUDIT.md` §7.**                                                                                                                                                                                                                                                                                                                          |
-| `docs/security/` ve `SECURITY.md` yok                                              | **ÇÖZÜLDÜ (2026-08-17, Grup 4-6):** `docs/security/THREAT-MODEL.md` ve kök `SECURITY.md` eklendi.                                                                                                                                                                                                                                                                                                                                                                  |
-| Plan tablolarında denetim izi yok                                                  | ADR-0014'ün kabul edilen bedeli: satırı kimin yazdığı tutulmuyor (yalnızca `updated_at`), koç danışanın planı değiştirdiğini göremiyor. **AÇIK — bu turun kapsamı dışında.**                                                                                                                                                                                                                                                                                       |
-
-**GÖRSEL KİMLİK BORÇLARI (Faz 1.6 / Faz 2 kapsamına alındı — `active_planprogram.md` §3b):**
-Aşağıdakiler 2026-08-17'de kaynaktan ölçüldü; hiçbiri bu oturumda düzeltilmedi.
-
-| Kısıt / borç                                                                 | Kanıt ve kapanış yeri                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Mevcut marka moru `#8b5cf6` WCAG AA'yı geçmiyor                              | Birebir Tailwind `violet-500` (bir seçim değil, varsayılan); beyaz üstünde ~4.2:1 < 4.5:1. Aynı renk hem birincil aksiyon zemini hem `:focus-visible` outline'ı (`src/app/globals.css:62`). 3 dosyada 8 yerde ham hex: `globals.css` (4), `CoachUserManagement.tsx` (3), `StatsTab.tsx` (1). **ÇÖZÜLDÜ (2026-08-17, Faz 1.6):** `accent` token'ına taşındı — açık `#5B48D9` (ölçülen **5.65:1**, ADR'nin tahmini "~6:1" yerine), koyu `#A79BFF` (ölçülen **7.56:1**, tahmini "~6.5:1" yerine); `8b5cf6` grep'i sıfır.                                                                                             |
-| `text-gray-400` / `text-gray-500` kontrast borcu                             | `src/app/globals.css` sonundaki kontrast notu bunu zaten kayda geçirmiş: `.text-gray-400` beyaz kart üstünde AA'yı zor geçiyor/geçmiyor, `.text-gray-500` sınırda; `text-xs` ile birlikte riskli. Tek tek sınıf avlanmadı. **KISMEN ÇÖZÜLDÜ (2026-08-17, Faz 1.6):** semantik `text-secondary` token'ı `src/design/tokens.ts`'te tanımlı ve AA doğrulamalı; ancak ekranlardaki mevcut `text-gray-400`/`text-gray-500` kullanımları **henüz `text-secondary`'ye çevrilmedi** — ekran restilizasyonu Katman A'nın kapsamı dışında (ADR-0018). Gerçek kapanış Katman B, Faz 2.                                       |
-| Emoji sökümünün E2E locator maliyeti                                         | `tests/e2e/**` senaryoları birebir Türkçe metinlere bakıyor ve emoji, emoji taşıyan butonların **erişilebilir adının parçası**. ~60 emoji / 15 dosya. Aynı kırılma yüzeyi bekleyen ürün dili düzeltmesiyle ("Öğrenci Paneli" vb.) çakışıyor — ayrı yapılırsa aynı locator'lar iki kez kırılır. **Kapanış:** ADR-0016; Faz 2'nin ilk mekanik işi, locator güncellemesi aynı PR'da. Faz 1.6'nın CI ratchet'ı ölçümü **60 emoji / 15 dosya** olarak doğruladı ve tavan olarak kilitledi — sayı ADR'nin tahminiyle birebir.                                                                                           |
-| Koyu zemin `#0f0f12` üç yerde ayrı ayrı yazılı                               | `src/app/layout.tsx:23` (`viewport.themeColor`), `src/app/layout.tsx:32` (`dark:bg-[#0f0f12]`), `src/app/globals.css:30` (`.dark .glass-panel` rgba). Biri değişirse diğerleri sessizce kayar. **ÇÖZÜLDÜ (2026-08-17, Faz 1.6):** üçü de `#14161B`'ye taşındı ve `src/design/tokens.ts`'ten tek kaynaktan besleniyor.                                                                                                                                                                                                                                                                                             |
-| `next/font` hiç kullanılmıyor                                                | `src/app/layout.tsx` yalnızca `font-sans` diyor; yazı tipi ailesi hiç tanımlanmamış, tarayıcı/işletim sistemi varsayılanı render ediliyor. **ÇÖZÜLDÜ (2026-08-17, Faz 1.6):** `next/font` ile Archivo/Hanken Grotesk/IBM Plex Mono self-host edildi (12 woff2), `latin-ext` açık.                                                                                                                                                                                                                                                                                                                                 |
-| Ekranlar Faz 1.6 ile Faz 2 arasında **iki dil** taşıyacak                    | 49 `font-black`, 17 `rounded-3xl`, 14 `bg-gradient-to-*` Katman A'da dönüştürülmüyor. Bilinçli kabul edilen ara dönem (ADR-0018); CI ratchet yalnızca **kötüleşmeyi** engeller, iyileşmeyi zorlamaz — sayaçlar Faz 2 çıkışında hâlâ sıfırlanmamış olabilir. **DOĞRULANDI (2026-08-17, Faz 1.6):** üç sayaç öngörüldüğü gibi değişmeden ratchet tavanı oldu (`font-black` 49 · `rounded-3xl` 17 · `bg-gradient-to-` 14); ayrıca yazı tipi tavanı 700'e sabitlenince mevcut 49 `font-black` artık gerçek 900 kesimi bulamıyor, tarayıcı sentetik kalın üretiyor — yeni bir görünür yan etki, Katman B'de sökülecek. |
-| Chart.js eksen rengi ve `html2canvas` dışa aktarımı kimliğin dışında kalıyor | Grafik eksenlerinde ham `#888`; `html2canvas` PNG çıktısının CSS değişkenleriyle doğru render ettiği doğrulanmadı. Faz 1.6 kapsamına **alınmadı**. **Kapanış:** Faz 4 grafik tekleştirme işi (`active_planprogram.md` §6, AC-4.3)                                                                                                                                                                                                                                                                                                                                                                                 |
-
-**YENİ BORÇLAR (Faz 1.6'da kaynaktan tespit edildi, 2026-08-17):**
-
-| Borç                                                               | Not                                                                                                                                                                                                         |
-| ------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `border` token'ı anlamlı UI sınırları için WCAG 1.4.11'i geçmiyor  | 1.52:1 (light) / 1.80:1 (dark) — dekoratif ayırıcı için yeterli ama form input sınırı gibi kullanımlar için 3:1 eşiğinin altında. 12 token'lık sözleşmede `border-strong` yok; ihtiyaç Katman B'de doğacak. |
-| `::-webkit-scrollbar-thumb` hâlâ ham `#3f3f46`                     | `globals.css` — token'a çekmek açık temada scrollbar'ı belirgin biçimde açardı, bilinçli olarak sistemin dışında bırakıldı.                                                                                 |
-| Revize edilen `warning` token'ı ekranlara henüz akmıyor            | Bileşenler hâlâ ham `text-orange-*`/`amber-*` kullanıyor; kontrast kazancı (`#A65600`, AA) bu sınıflar `text-warning`'e çevrilince Katman B'de gerçekleşecek.                                               |
-| Ratchet emoji sayacının sözcük çözümleyicisi tam ayrıştırıcı değil | Regex literali içindeki `/` teorik olarak durum takibini şaşırtabilir; tam TS/TSX ayrıştırıcı değil, ADR-0018'in grep tabanlı yaklaşım için kabul ettiği takas.                                             |
-
-**YENİ BORÇLAR (Faz 1.7'de kaynaktan tespit edildi, 2026-08-17):**
-
-| Borç                                                                    | Not                                                                                                                                                                                                                                    |
-| ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Katalog `select('*')` ile sayfalamasız, toptan istemciye çekiliyor      | `useCatalog.ts` `fetchAllRows` sonsuz döngü koruması ekledi ama sayfalama/sanallaştırma UI'da yok; mount anında tüm `exercises`/`food_database` çekiliyor. Sunucu taraflı arama + sayfalama Faz 2 egzersiz kütüphanesi işine bağlandı. |
-| `42501` güvenlik olay günlüğü yalnızca istemci konsoluna yazıyor        | `src/lib/query/security-event.ts` merkezî yakalıyor ama sunucuya ulaşmıyor; saldırgan kendi konsolunu görür, biz görmeyiz. Gerçek sunucu tarafı güvenlik kaydı için ayrı bir uç gerekir, kapsam dışı bırakıldı.                        |
-| Birikmiş ESKİ yetim storage dosyaları için toplu temizlik yapılmadı     | `removeStoredObject()` yalnızca YENİ avatar yüklemelerinde eskiyi siliyor; migration öncesinden birikmiş yetim dosyalar duruyor. Toplu silme ayrı kullanıcı onayı ister (CLAUDE.md destructive command kuralı).                        |
-| `useApproveProgram` (koç yolu) hâlâ 3 ayrı ATOMİK OLMAYAN çağrı yapıyor | AC-05'in danışan→koç yönü RPC'ye taşındı (`submit_program_for_approval`) ama koçun onay yolu değişmedi; aynı RPC muamelesi için aday. Şablon kuplajı yok (koç serbest metin yazıyor), bu yüzden AC-05 kapsamına dahil edilmedi.        |
-| `supabase_admin` varsayılan ACL boşluğu sequence'ler için kapatılamıyor | AC-03 turundaki tablo tuzağının sequence eşdeğeri; `must be member of role` hatası. Pratik etki sınırlı (13/13 tablo `postgres` sahipli) ama senaryo 84 dinamik okuduğu için gelecekte istisna doğarsa test kırılır.                   |
-| RLS senaryo 83 her koşuda `exercises` id'lerinde 1 boşluk bırakıyor     | `nextval` işlemsel olmadığı için testin `ROLLBACK` ile geri aldığı denemeler sequence'i geri sarmıyor. Zararsız (yalnızca id boşluğu), dosyada belgelendi.                                                                             |
-| `exercises.csv` (8.7 MB ham) hâlâ repoda                                | Kanonik import kaynağı `clean_exercises_v2.csv` (150 KB) oldu; ham 95 sütunlu dosya artık import'ta kullanılmıyor ama repodan silinmedi. `data/README.md` Git LFS öneriyor (ertelenen iş, §8).                                         |
-
-**YENİ BORÇLAR (Faz 2'de kaynaktan tespit edildi, 2026-08-17):**
-
-| Borç                                                                    | Not                                                                                                                                                                                                                                                                                                                            |
-| ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Yerel E2E veritabanı birikiyor, hiç temizlenmiyor                       | `form_checks` 25, `workout_logs` 60, `messages` 42, `daily_logs` 28 (Faz 2 sonu ölçümü). `FormCheckTab` her render'da SATIR BAŞINA bir imzalı URL üretiyor — yük her koşuda büyüyor, uzun vadede yeniden yük kaynaklı kararsızlık üretecek. Temizlik script'i gerekiyor (destructive, açık onay ister). **Sonraki iş kalemi.** |
-| E2E kilit ilanı zorunlu tutulmuyor                                      | `tests/e2e/resource-lock.ts` yeni eklendi (bkz. §3 "Faz 2" 2j) ama bir test paylaşılan kayda yazıp `resource(...)` ilan etmezse sessizce yarışa girer. Tek koruma README kuralı, otomatik denetim yok.                                                                                                                         |
-| AC-2.2 payı ~2x, yük duyarlı                                            | Ölçümler 233-1005 ms aralığında, sınır 2000 ms. DB birikimi (yukarıdaki madde) büyürse bütçeyi ilk burası zorlayacak.                                                                                                                                                                                                          |
-| Arşiv plan versiyonları için GC yok, versiyon gezgini UI'ı yok          | 2h'nin copy-on-write kararının doğal sonucu: şema versiyonları saklıyor ama eskileri temizleyen iş yok, geçmiş versiyonları görüntüleyen bir yüzey de yok.                                                                                                                                                                     |
-| `video_url` hiçbir yerde doldurulmuyor                                  | Embed yolu (allowlist'li YouTube/Vimeo, 2c) yazıldı ve test edildi ama pratikte hiçbir plan satırı bu alanı doldurmuyor — kod uykuda.                                                                                                                                                                                          |
-| `message-attachments` için magic-byte doğrulaması storage tarafında yok | Faz 1.5'in K3 borcu bu bucket için hâlâ kapanmadı — istemci tarafı `upload-validation.ts` doğrulaması var, sunucu/storage tarafında yok.                                                                                                                                                                                       |
-| `useApproveProgram` (koç yolu) hâlâ 3 atomik olmayan çağrı yapıyor      | Faz 1.7'den taşınan borç; Faz 2'nin 2g/2h RPC'leri danışan→koç ve plan yayınlama yollarını kapattı ama koçun onay yolu bu turda da kapsanmadı.                                                                                                                                                                                 |
-| Koçun ara plan düzenlemeleri arşivlenmiyor                              | 2h'nin copy-on-write kararının bilinçli bedeli: yalnızca log'a bağlı aktif planlar arşivlenip yeni versiyona geçiyor, log'suz taslak düzenlemeleri yerinde üzerine yazılıyor — geçmişi yok.                                                                                                                                    |
+**Ertelenenler (borç değil, bilinçli v2 kuyruğu):** pnpm+Turborepo, Expo mobil, nonce tabanlı
+CSP, Redis/Upstash rate limiter, `next-pwa` → `@ducanh2912/next-pwa` veya Turbopack geçişi,
+`middleware` → `proxy` göçü, `exercises.csv` için Git LFS, `useCoachId()`'nin koç
+oturumlarında gereksiz çalışması, planların `jsonb` sütuna taşınması. Tam liste:
+`archive/progress-yol-haritasi-arsivi.md`.
 
 ---
 
-## 6. Sonraki adımlar (sıralı)
+## 4. Bağlayıcı sözleşmeler ve bilinen tuzaklar
 
-1. Docker Desktop'ı başlat → `npx supabase start` → `npx supabase db reset` (storage
-   migration hatasına hazırlıklı ol) → `npm run db:types` ile üretilen tipleri elle yazılanla
-   diff'le → `npm run type-check` tekrar yeşil.
-   **Kabul kriteri:** `db reset` hatasız tamamlanır (veya storage hatası anlaşılıp not
-   düşülür), `database.ts` diff'i sıfır veya bilinçli farklarla açıklanır.
-2. Mahremiyet turu: `form-checks-media` private + signed URL; PWA `profiles` cache'i kaldır
-   veya logout'ta temizle; `uv lock` üret ve Dockerfile fallback'ini kaldır.
-   **Kabul kriteri:** form check medyası public URL ile erişilemez (curl testiyle kanıtla,
-   bkz. `active_planprogram.md` AC-2.3); `uv.lock` commit'lenir.
-3. `ai_backend` doğrulaması: `uv sync`, `uv run ruff check .`, `uv run mypy app`,
-   `uv run pytest`.
-   **Kabul kriteri:** üçü de hatasız, kapsam ≥ %70.
-4. ~~E2E'yi bir kez yerel koştur (seed kullanıcıları: `coach@example.com` /
-   `client1@example.com`, şifre `Passw0rd!23`), CI beklentisiyle hizala.~~
-   **TAMAMLANDI (2026-08-16, üçüncü oturum):** `npm run test:e2e` yerelde 28/28 geçti (14
-   senaryo × chromium + Mobile Chrome). Dört gerçek sorun bulunup düzeltildi (bkz. Bölüm 3);
-   CI'daki `e2e` job'u için yerel Supabase kurulumu hâlâ eksik (bkz. Bölüm 5 risk tablosu).
-5. **(SIRADAKI İŞ)** `docs/DISCOVERY.md` yaz (mevcut durum envanteri) ve
-   **`active_planprogram.md` v1.1 revizyonunu** kullanıcı onayına sun.
-   **Kabul kriteri:** envanter + revizyon listesi (bkz. Bölüm 7) kullanıcıya sunulur, onay
-   alınmadan Faz 1'e geçilmez.
-6. Ardından: revize planın Faz 1'i (veri modeli + RLS) ile başla — mevcut tek-repo yapısında,
-   monorepo'suz.
-   **Kabul kriteri:** `active_planprogram.md` AC-1.1–AC-1.4 karşılanır.
-7. ~~**Faz 1b bittikten sonra, Faz 2'ye geçmeden: Faz 1.5 — Güvenlik Denetimi ve
-   Sertleştirme** (`active_planprogram.md` §3a). Önce `docs/security/AUDIT.md` bulgu raporu
-   yazılır ve **kullanıcı onayı alınır**, sonra düzeltmelere geçilir; her düzeltme bir
-   regresyon testiyle gelir.~~
-   **TAMAMLANDI (2026-08-17):** Denetim (39 bulgu) + düzeltme turu Grup 1–6'nın tamamı
-   uygulandı; **36/39 bulgu kapandı**. Kalan 3'ü bilinçli olarak açık: **A-05/A-14** (httpOnly
-   cookie + nonce CSP geçişi, kullanıcı kararıyla ayrı bir tura ertelendi) ve **AC-12** (hosted
-   proje doğrulaması, açık soru). Detay: `docs/security/AUDIT.md` §4b/§4c,
-   `docs/PROGRESS.md` §3 "Faz 1.5 — düzeltme turu, Grup 1–3" ve "Grup 4–6".
-8. ~~**Faz 1.6 — Görsel Kimlik Oturumu** (`active_planprogram.md` §3b). **Faz 1.5 ile paralel
-   yürütülebilir** — dosya bakımından çakışmıyorlar (Faz 1.5: `supabase/**`, `src/lib/**`,
-   `src/proxy.ts`, CI güvenlik adımları; Faz 1.6: `src/design/**`, `tailwind.config.ts`,
-   `src/app/globals.css`, `src/app/layout.tsx`). İkisi de **Faz 2'den önce** bitmelidir.
-   Kapsam yalnızca **Katman A**: `src/design/tokens.ts` (light/dark iki set) +
-   `tailwind.config.ts` bağlaması + `next/font` üç yazı tipi + gömülü 8 ham `#8b5cf6`'nın
-   token'a çekilmesi + `viewport.themeColor` + `:focus-visible`/`selection` token'a bağlanması
-   - CI ratchet script'i. **Ekran restilizasyonu ve emoji → Lucide dönüşümü KAPSAM DIŞI**
-     (Katman B, Faz 2 — ADR-0018). Timebox: tek oturum, tek PR.
-     **Kabul kriteri:** AC-1.6.1–AC-1.6.9 karşılanır (AC-1.6.7 `LoopRing` ile birlikte Faz 2'ye
-     devredilir). Kaynak kararlar: ADR-0015, ADR-0016, ADR-0017, ADR-0018.~~
-     **TAMAMLANDI (2026-08-17):** Katman A iki commit'te uygulandı (`599974c`, `167f65e`).
-     AC-1.6.1–AC-1.6.6, AC-1.6.8, AC-1.6.9 karşılandı; **AC-1.6.7 tasarımı gereği Faz 2'ye
-     devredildi** (`LoopRing` ile birlikte). Doğrulama: birim 363/363, E2E 42/42, ratchet 6/6,
-     build başarılı. Detay: `docs/PROGRESS.md` §3 "Faz 1.6 — Görsel Kimlik Oturumu, Katman A".
-9. ~~**Faz 1.7 — Borç Temizliği** (kullanıcı onaylı kapsam): bayat
-   kayıtların temizlenmesi · `playwright.config.ts` yorumu `src/env.server.ts`'e ·
-   `npm run db:types` diff'i · katalog import'u (`exercises` ve `food_database`
-   tablolarında yalnızca 10'ar demo satır var, `data/exercises.csv` 8.7 MB hiç yüklenmedi) ·
-   `42501` RLS reddi için `logSecurityEvent()` çağrı noktaları · AC-05 bildirim şablonunun
-   `SECURITY DEFINER` RPC'ye taşınması · yetim storage dosyaları ve koç avatarının danışana
-   görünmemesi · sequence yetkileri (`authenticated=w`).~~
-   **TAMAMLANDI (2026-08-17):** beş paralel dilimle uygulandı — yetim storage dosyaları
-   silme (sıra garantili), `42501` merkezî yakalama (yalnızca istemci konsolu, borç olarak
-   kaydedildi), AC-05 RPC'ye taşındı, koç avatarı danışana açıldı, sequence yetkileri
-   kapatıldı; ayrıca katalog gerçekten import edildi (`exercises` 1328, `food_database` 591)
-   ve bunun ortaya çıkardığı iki gerçek kusur (sessiz `max_rows=1000` kesilmesi, E2E'yi
-   kararsızlaştıran sayfalamasız `select('*')`) asgari düzeltmeyle kapatıldı. Detay: `docs/
-PROGRESS.md` §3 "Faz 1.7 — Borç Temizliği".
-10. ~~Faz 2 (koç-danışan çekirdek akışı) — güvenlik temeli sağlamlaştırıldıktan **ve** kimlik
-    sistemi kurulduktan **ve** borç temizliği tamamlandıktan sonra. Faz 2'nin ilk mekanik işi
-    emoji → Lucide dönüşümüdür ve E2E locator güncellemeleriyle aynı PR'da yapılır
-    (ADR-0016); `LoopRing` ilk göründüğü ekranla (gym modu dinlenme sayacı) birlikte yazılır
-    (ADR-0017); Katman B restilizasyonu (ADR-0018) ve katalog için sunucu taraflı arama +
-    sayfalama da bu fazın işi.~~
-    **TAMAMLANDI (2026-08-17):** yedi dilim (2a–2j) ile uygulandı; AC-2.1–AC-2.4 ve
-    Faz 1.6'dan devredilen AC-1.6.7 (`LoopRing`) karşılandı. Katalog için sunucu taraflı
-    arama + sayfalama bu turda **yapılmadı** — ilgili borç (`useCatalog.ts` `select('*')`
-    sayfalamasız) §5'te açık kalmaya devam ediyor. Doğrulama: birim 502/502, RLS 104/104,
-    E2E 50/50 (iki koşu + CI yapılandırması), ratchet 6/6. Detay: `docs/PROGRESS.md` §3
-    "Faz 2 — Koç-Danışan Çekirdek Akışı".
-11. **(SIRADAKI İŞ)** Faz 3 — Yemek Fotoğrafı Makro Tahmini (`active_planprogram.md` §5).
-    `ai_backend/**` yarısı Faz 2'nin kalanıyla çakışmadan yürüyebilir; bir UI kuyruğu var
-    (`ai_suggested` → `confirmed` onay ekranı, makro dashboard entegrasyonu). `nutrition_logs`
-    tablosu Faz 3 için ileriye uyumlu kuruldu: `status` kolonu eklendiğinde
-    `default 'confirmed'` ile backfill gerektirmeyecek.
-    **Faz sırası notu:** kalan fazlar büyük ölçüde faz düzeyinde paralelleşmiyor — Faz 2 ve
-    Faz 4 aynı dosyalara dokunuyor (`StatsTab.tsx`, `CoachUserManagement.tsx`), Faz 3'ün de
-    bir UI kuyruğu var. Gerçek paralellik ekseni faz-vs-faz değil, backend-vs-web: Faz 3'ün
-    `ai_backend/**` yarısı Faz 2 ile çakışmadan yürüyebilir.
+**Kararlar:** kanonik kayıt `docs/adr/` altındadır — indeks
+[`docs/adr/README.md`](adr/README.md) (ADR-0001…ADR-0020). Bu dosyada karar kaydı tutulmaz.
+ADR'si olmayan ama hâlâ bağlayıcı üç sözleşme:
 
-**Not:** Mevcut RLS politikalarını cilalamaya vakit harcanmamalı; Faz 1 şemayı yeniden
-yazacak ve 35 politikanın çoğu değişecek. `db reset`'in amacı "production kalitesi" değil,
-"SQL gerçek Postgres'te çalışıyor mu".
+- Prettier `semi: false` — kod tabanı noktalı virgülsüz.
+- CSP `connect-src`/`img-src` **yalnızca** `NEXT_PUBLIC_SUPABASE_URL`'den türetilen somut
+  origin'i içerir; wildcard yok.
+- RLS testleri düz SQL script'tir (pgTAP değil): `npm run test:rls`.
+
+**Tuzaklar** (hepsi bu projede en az bir kez gerçekten yakıldı):
+
+- **Hosted'a yazma riski:** env override'sız bir E2E/build koşusu hosted projeye **gerçek veri
+  yazar** (`daily-log` senaryosu kayıt oluşturur). Bugün üç katman koruyor ama tarayıcıdan
+  giden yazmalar için tek güvence `.env.local`'ın yerel kalması (B-031).
+- **`--linked` bayrağı hosted'ı hedefler:** `supabase db dump --linked`, `supabase db push` ve
+  benzeri komutlar yerel yığına değil **barındırılan projeye** gider. Yerel iş için
+  `npx supabase db reset` / `npx supabase status` kullan.
+- **`db:seed` / `db reset` / toplu silme** CLAUDE.md gereği o çağrıya özel açık kullanıcı
+  onayı ister — script'in repoda var olması onu çalıştırma onayı değildir.
+- **Türkçe İ:** JS'te `"ŞİFRE".toLowerCase()` `şi̇fre` üretir; `/…/i` regex'i `İ` ile
+  eşleşmez — E2E locator'larında birebir metin kullan. Git Bash'te `grep -i "öğrenci"` büyük
+  `Ö`'yü sessizce kaçırır; açık alternasyonla tara.
+- **E2E paralelliği:** `chromium` + `Mobile Chrome` projeleri her spec'i **aynı anda iki kez**
+  koşar. Paylaşılan kayda yazan her test `tests/e2e/resource-lock.ts` ile `resource(...)` ilan
+  etmelidir (B-024).
+- **jsdom:** `Blob.text()` / `Blob.arrayBuffer()` yok — `FileReader` fallback'i kullan.
+- **`[auth.rate_limit]` korumuyor:** `supabase/config.toml`'daki bölüm upstream hatası
+  ([supabase/supabase#41947](https://github.com/supabase/supabase/issues/41947)) nedeniyle
+  `/token?grant_type=password`'ü korumaz; kasıtlı olarak repoda bırakıldı. Fiili koruma
+  uygulama katmanında (`src/app/api/auth/sign-in/route.ts` + `src/lib/api/auth-rate-limit.ts`).
+- **Build `next build --webpack` ile alınır** (`next-pwa` v5 Turbopack ile çakışıyor —
+  ADR-0006/0012); `--webpack` pinlemesinin ne zaman terk edileceği hâlâ açık soru (T-04).
+- **Bash aracı ~8 KB üzerinde içeriği ortadan kırpar** ve yanıltıcı `unexpected EOF` verir —
+  uzun içerik 6 KB altı parçalara bölünüp `>>` ile eklenmelidir. Alt ajanların rapor `.md`
+  dosyalarını `Write` ile yazması engellenebiliyor; `Edit` veya heredoc kullanılmalı.
 
 ---
 
-## 6a. Faz 1 çıkış kriterleri (unutulmaması gereken devir borçları)
+## 5. Sıradaki iş
 
-Bu bölüm, ertelenen işlerin kaybolmaması için sözleşme niteliğindedir. Faz 1 "bitti"
-sayılabilmesi için aşağıdaki maddelerin tamamı karşılanmalıdır:
+**Faz 3 — Yemek Fotoğrafı Makro Tahmini** (`active_planprogram.md` §5). `ai_backend/**` yarısı
+Faz 2'nin kalanıyla çakışmadan yürüyebilir; bir UI kuyruğu var (`ai_suggested` → `confirmed`
+onay ekranı, makro dashboard entegrasyonu). `nutrition_logs` tablosu ileriye uyumlu kuruldu:
+`status` kolonu eklendiğinde `default 'confirmed'` ile backfill gerektirmeyecek.
 
-1. ~~**Hiçbir storage bucket'ı public kalmayacak.** `avatars` ve `form-checks-media` private
-   yapılacak, erişim signed URL (TTL ≤ 1 saat) ile olacak~~ — `active_planprogram.md` I-4
-   değişmezi bunu zaten şart koşuyor.
-   **TAMAMLANDI (2026-08-17, Faz 1a):** `supabase/migrations/20260817100000_private_storage.sql`
-   ile ikisi de `public = false` yapıldı; okuma `src/lib/storage.ts`'teki
-   `createSignedUrl`/`createSignedUrls` ile TTL 3600 sn imzalı adresle yapılıyor; bkz. §3
-   "Faz 1a — storage mahremiyeti".
-2. ~~**`form_checks.front_pose_url`/`back_pose_url` kolonları tam URL değil, bucket içi YOL
-   saklayacak.** Mevcut satırlar için veri dönüşümü yazılacak.~~ İstemci okuma anında signed URL
-   üretecek (`src/hooks/useFormChecks.ts` ve `src/components/AdminUserManagement.tsx`
-   güncellenecek).
-   **TAMAMLANDI (2026-08-17, Faz 1a):** Kolonlar `front_pose_path`/`back_pose_path` olarak
-   yeniden adlandırıldı, mevcut tam public URL'ler aynı migration'da yola dönüştürüldü;
-   `useFormChecks` artık imzalı adresli `FormCheckWithUrls[]` döner.
-3. ~~**`avatars` için aynısı** — `profiles.avatar_url` yol saklayacak (`src/hooks/useProfile.ts`).~~
-   **TAMAMLANDI (2026-08-17, Faz 1a):** `avatar_url` → `avatar_path` yeniden adlandırıldı;
-   `useProfile`/`useProfiles` artık imzalı adresli `ProfileWithAvatar` döner.
-4. ~~Rol enum'u `admin`/`student` → `coach`/`client`~~ (tek koçlu model; `coach_id` YOK).
-   **TAMAMLANDI (2026-08-17, Faz 1a):** `supabase/migrations/20260817090000_rename_roles.sql`
-   ile uygulandı; bkz. §3 "Faz 1a — çıkış kriterleri".
+**Faz sırası notu:** kalan fazlar faz düzeyinde paralelleşmiyor — Faz 2 ve Faz 4 aynı dosyalara
+dokunuyor (`StatsTab.tsx`, `CoachUserManagement.tsx`), Faz 3'ün de bir UI kuyruğu var. Gerçek
+paralellik ekseni faz-vs-faz değil, backend-vs-web.
 
-**Ayrıca tamamlandı (Faz 1a kapsamında, bu listenin parçası olmasa da ilişkili):** ADR
-ayrıştırması (`active_planprogram.md` §0.6/AC-1.7) — bkz. §3 "Faz 1a — çıkış kriterleri".
-
-**Faz 1b'ye devreden (bu listede kalan, henüz karşılanmamış maddeler):**
-
-- Planlar `profiles` içindeki JSON string'lerden normalize tablolara taşınacak; veri
-  migrasyonu yazılacak (bkz. `active_planprogram.md` §3.5, ve aşağıda §6b "Sıradaki iş — Faz
-  1b").
-- `src/middleware.ts` → Next 16 `proxy` konvansiyonuna göç — Faz 1b'nin kapsamında değil, ayrı
-  bir bakım işi olarak açık kalıyor.
-
-**ÖNEMLİ NOT:** Uygulama yayında olmasa da `.env.local` **barındırılan** bir Supabase
-projesini gösteriyor (`nxftmxkpmuyeelrmwofv.supabase.co`). Migration'lar yalnızca YEREL yığına
-uygulandı. Barındırılan projede gerçek danışan verisi/fotoğrafı varsa, oradaki bucket'lar hâlâ
-public olabilir ve Faz 1'de bu projeye geçiş yapılırken veri dönüşümü planlanmalıdır.
+Faz dışı, sıraya girmiş iş kalemleri: E2E veritabanı temizlik script'i (B-023, destructive —
+onay ister) · katalog için sunucu taraflı arama + sayfalama (B-018) · A-05/A-14 cookie + nonce
+CSP geçişi (B-006, B-007) · düzenli hosted yedekleme stratejisi (B-030).
 
 ---
 
-## 6b. Sıradaki iş — Faz 1b
+## 6. Son oturumlar
 
-Faz 1a (rol yeniden adlandırma, ADR ayrıştırması, storage mahremiyeti, AI tel protokolü kararı)
-tamamlandı. `active_planprogram.md` §3'ün geri kalanı — asıl şema yeniden yazımı ve veri
-migrasyonu — Faz 1b olarak devam edecek:
+| Tarih                                  | İş                                                                                  |
+| -------------------------------------- | ----------------------------------------------------------------------------------- |
+| 2026-08-17 (Faz 2)                     | Koç-danışan çekirdek akışı, on dilim; vitest 502/502, RLS 104/104, E2E 50/50        |
+| 2026-08-17 (hosted senkronizasyonu)    | ADR-0020 uygulandı; hosted sıfırlanıp 25 migration push edildi, parite doğrulandı   |
+| 2026-08-17 (env koruması + yerel PG17) | Üç katmanlı env guard'ı + yerel Postgres 17; vitest 511/511, RLS 104/104, E2E 50/50 |
 
-- **Normalize plan tabloları:** `profiles.workout_plan`/`nutrition_plan` (JSON string, `text`
-  kolon) → `workout_plans` + `workout_plan_exercises`, `nutrition_plans` +
-  `nutrition_plan_meals` (bkz. plan §3.1, §3.5). Versiyonlama (`version`, `is_active`) ve veri
-  migrasyonu (mevcut JSON string'lerin satırlara ayrıştırılması, ayrıştırılamayan içeriğin ham
-  `notes` alanında korunması) dahil.
-- **`conversations` tablosu:** şu an yok; `messages` düz `sender_id`/`receiver_id` ile çalışıyor.
-  Her (koç, danışan) çifti için tek konuşma üretilecek, `messages.conversation_id` eklenecek,
-  `is_read` → `read_at` dönüşümü kararlaştırılacak (bkz. plan §3.5).
-- **`progress_entries` / `progress_photos`:** kilo/ölçü girişi ve açı etiketli ilerleme
-  fotoğrafları için ayrı tablolar; şu an kilo yalnızca `form_checks.current_weight` içinde.
-- **`coach_notes`:** koç → danışan serbest not tablosu; şu an yok.
-- **`form_checks.status`/`coach_feedback`/`reviewed_at`:** şu an yok; dönüşüm kuralı plan
-  §3.5'te tanımlı (`coach_feedback` doluysa `reviewed`, boşsa `pending`).
-- Her yapısal migration'ın yanında veri migrasyonu yazılacak; eski kolonlar aynı migration'da
-  DROP edilmeyecek (bir faz boyunca `DEPRECATED` yorumuyla salt-okunur yan yana yaşayacak, bkz.
-  plan §3.5 kuralları).
-
----
-
-## 7. Plan v1.1 revizyon listesi
-
-`active_planprogram.md`'de değiştirilmesi kararlaştırılan maddeler:
-
-- Faz 0 ikiye bölünsün: monorepo + Expo, Faz 4 sonrasına ertelensin. TypeScript migrasyonu
-  maddesi zaten tamamlandı, silinsin.
-- §3.4'teki `Result<T>` sözleşmesi, typed `ApiError` fırlatma ile değiştirilsin (TanStack
-  Query uyumu).
-- §3.1 `profiles.coach_id` ve §3.2'deki çok-koç RLS matrisi **tek koçlu modele**
-  sadeleştirilsin (kullanıcı kararı).
-- Rol adlandırması (`coach`/`client`) Faz 1'in şema yeniden yazımına bağlansın, ayrı iş
-  olarak yapılmasın.
-- Faz 1'e **veri migrasyonu** bölümü eklensin: `profiles.workout_plan`/`nutrition_plan` JSON
-  string'lerinin normalize tablolara, mevcut `messages` satırlarının `conversations` modeline
-  taşınması; eski tabloların drop mu edileceği yan yana mı yaşayacağı.
-- Plan Next.js 15 diyor, repo 16'da (`package.json` → `"next": "16.2.10"`) — teknoloji
-  tablosu güncellensin.
-- Planın şeması mevcut 9 tabloyla uzlaştırılsın (planda `conversations`, versiyonlu
-  `workout_plans`, `progress_entries` var; repoda yok. Repoda `form_checks` var ama `status`
-  kolonu yok — doğrulandı, `ARCHITECTURE.md` ER diyagramında `status` alanı görünmüyor).
-
----
-
-## 8. Ertelenenler (v2 / sonraki fazlar)
-
-pnpm+Turborepo, Expo mobil, nonce tabanlı CSP, Redis/Upstash rate limiter, `next-pwa` →
-`@ducanh2912/next-pwa` veya Turbopack'e geçiş, `middleware` → `proxy` göçü, `exercises.csv`
-için Git LFS, `useAdminId()`'nin koç oturumlarında gereksiz çalışması, planların `jsonb`
-sütuna taşınması.
-
----
-
-## 9. Oturum günlüğü
-
-| Tarih                                | Oturum özeti                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | Sonuç                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 2026-08-16                           | v1.0 production-ready yükseltmesi (TS migrasyonu, FastAPI servisleştirme, Supabase RLS, test/CI/Docker altyapısı, dokümantasyon) + lint/test/build zincirinin yeşile alınması                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | lint 0 hata, 180/180 test, build başarılı. DB/E2E doğrulaması Docker eksikliği nedeniyle bekliyor.                                                                                                                                                                                                                                                                                                                         |
-| 2026-08-16                           | `docs/PROGRESS.md` oluşturuldu (oturumlar arası süreklilik için); `supabase/config.toml`'daki `[inbucket]` → `[local_smtp]` deprecation uyarısı düzeltildi                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | `PROGRESS.md` ilk sürümü yazıldı; `config.toml` düzeltmesi tek bölüm adı değişikliği, anahtarlar korundu.                                                                                                                                                                                                                                                                                                                  |
-| 2026-08-16 (ikinci oturum)           | Sağlamlaştırma turu: DB/RLS doğrulaması, tip üretimi, ai_backend ilk çalıştırma, PWA mahremiyet düzeltmesi, Prettier hizalama, gitignore artıkları                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | Tüm kapılar yeşil (lint/type/format/test/build + ruff/mypy/pytest/docker). Storage düzeltmesi Faz 1'e ertelendi. E2E koşuluyor.                                                                                                                                                                                                                                                                                            |
-| 2026-08-16 (üçüncü oturum)           | E2E doğrulaması: Playwright ilk kez koşturuldu; Türkçe İ locator tuzağı, kapalı e-posta sağlayıcısı, CSP'nin yerel Supabase'i bloklaması ve iki kararsız/hatalı test düzeltildi                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | 28/28 E2E geçti (chromium + Mobile Chrome). Sağlamlaştırma turu kapandı.                                                                                                                                                                                                                                                                                                                                                   |
-| 2026-08-16 (dördüncü oturum)         | Keşif envanteri (`docs/DISCOVERY.md`), plan v1.1 revizyonu, üç kritik kırığın düzeltilmesi ve regresyon korumalarının eklenmesi                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | 192 birim + 16×2 E2E + 19 RLS senaryosu geçiyor. Faz 1'e hazır.                                                                                                                                                                                                                                                                                                                                                            |
-| 2026-08-17                           | Faz 1a: rol yeniden adlandırma (`admin`/`student` → `coach`/`client`) + ADR ayrıştırması                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | `db reset` sıfırdan, 19/19 RLS, 192/192 birim, 16/16 E2E, build başarılı; 13 ADR (`0013` `0003`'ün yerini aldı); AI backend `student_id` ve Türkçe arayüz metinleri bilinçli ertelendi.                                                                                                                                                                                                                                    |
-| 2026-08-17                           | Faz 1a tamamlandı: rol yeniden adlandırma, ADR ayrıştırması, storage mahremiyeti, AI tel protokolü                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | 203 birim + 19 RLS + 16 E2E, db reset temiz                                                                                                                                                                                                                                                                                                                                                                                |
-| 2026-08-17                           | Faz 1.5 güvenlik denetim turu: üç paralel denetim (erişim kontrolü/IDOR/RLS, uygulama yüzeyi, araç zinciri) tamamlandı, `docs/security/AUDIT.md` birleşik raporu yazıldı; turun tek kod değişikliği bağımlılık yükseltmesiydi (`next` 16.2.10 → 16.3.1)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | 39 bulgu (Critical 0 · High 10 · Medium 12 · Low 17); doğrulama zinciri 12/12 yeşil, `npm audit` 18 → 14. Düzeltmeler kullanıcı onayı bekliyor, henüz uygulanmadı.                                                                                                                                                                                                                                                         |
-| 2026-08-17 (düzeltme turu)           | Faz 1.5 düzeltme turu: kullanıcı onaylı Grup 1 (kimlik/yetki kapıları), Grup 2 (rate limiting/kaba kuvvet), Grup 3 (sütun seviyesi sözleşmeler) uygulandı — 3 yeni migration, `ai_backend` guard/fail-fast sertleştirmesi, `src/proxy.ts` XFF güven modeli, A-01 için uygulama katmanı giriş denemesi sınırlayıcısı (upstream Supabase hatası nedeniyle `[auth.rate_limit]` yolu işe yaramadı)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | 19 bulgu kapandı (toplam 22/39 `fixed`); doğrulama 10/10 yeşil — vitest 264/264, test:rls 70/70, pytest 82/82 (%94.94), Playwright 21/21. Grup 4/5/6 açık; AC-05 şablon kuplajı borç olarak kaydedildi.                                                                                                                                                                                                                    |
-| 2026-08-17 (düzeltme turu, Grup 4–6) | Faz 1.5'in ikinci ve son düzeltme turu: kullanıcı onaylı Grup 4 (girdi doğrulama/gövde sınırları), Grup 5 (DB yetki/RLS, loglama/gizlilik, yapılandırma sertleştirme — A-05/A-14 hariç), Grup 6 (dokümantasyon/CI tarama zinciri) dört paralel ajanla uygulandı — yeni `src/lib/upload-validation.ts`, `supabase/migrations/20260817170000_force_rls_and_grants.sql` (AC-03'ün severity'si yeniden değerlendirildi — canlı kanıt tam veritabanı silmeyi gösterdi), `src/env.server.ts` ayrıştırması, `docs/security/THREAT-MODEL.md` + `SECURITY.md`, CI `security` job'u                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | 16 bulgu daha kapandı (toplam **36/39 kapandı** — sayım `AUDIT.md` §2'den doğrulandı); doğrulama tam zincir yeşil — vitest 308/308, test:rls 76/76, pytest 82/82 (%94.94), `npm audit --omit=dev` 0 zafiyet, Playwright 42/42 (21×2 profil). Kalan açık: A-05/A-14 (kullanıcı kararıyla ertelendi), AC-12 (hosted proje doğrulaması). Faz 1.5 tamamlandı.                                                                  |
-| 2026-08-17 (Faz 1.6)                 | Faz 1.6 — Görsel Kimlik Oturumu, Katman A: `src/design/tokens.ts` (light/dark, 12 semantik anahtar) + `tailwind.config.ts` bağlaması (RGB kanal + `<alpha-value>` kalıbı, opaklık değiştiricileri korundu), 140 `brand-purple` kullanımı `accent`'e çevrildi, `next/font` ile üç yazı tipi self-host edildi, gömülü `#8b5cf6` (8 yer) + grep'in kaçırdığı 2 ondalık kullanım token'a çekildi, ADR-0015'in Kehribar hex'i `#B45D00` → `#A65600` revize edildi (AA), `scripts/identity-ratchet.mjs` CI'a eklendi (6 sayaç)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | AC-1.6.1–AC-1.6.6/1.6.8/1.6.9 karşılandı, AC-1.6.7 Faz 2'ye devredildi; doğrulama tam zincir yeşil — vitest 363/363, Playwright 42/42 (21×2 profil), ratchet 6/6, build başarılı. Faz 1.6 tamamlandı; sıradaki iş Faz 1.7 (borç temizliği).                                                                                                                                                                                |
-| 2026-08-17 (Faz 1.7)                 | Faz 1.7 — Borç Temizliği (kullanıcı onaylı kapsam), beş paralel dilim: yetim storage dosyaları silme (`removeStoredObject`, sıra garantili), `42501` RLS reddinin merkezî yakalanması (`wrapSupabaseError`/`queryClient` `onError`, yalnızca istemci konsolu — borç olarak kaydedildi), AC-05 bildirim şablonunun `submit_program_for_approval` `SECURITY DEFINER` RPC'sine taşınması (gerçek davranış hatası düzeltti: koç bulunamazsa bildirim danışana düşüyordu), koç avatarının danışana açılması (`avatar_object_owner` + dört güvence), sequence yetkilerinin kapatılması (`alter default privileges`, canlı bir Postgres tuzağı — planlayıcı `has_sequence_privilege()`'ı filtreden önce çalıştırıyordu — bulunup düzeltildi). Ayrıca: katalog gerçekten import edildi (`exercises`/`food_database` 10 demo satırdan 1328/591'e), bunun ortaya çıkardığı iki gerçek kusur (sessiz `max_rows=1000` kesilmesi, E2E'yi kararsızlaştıran sayfalamasız `select('*')`) asgari düzeltmeyle kapatıldı; bayat kayıt taraması AI tel protokolünün zaten `client_id` olduğunu (belge hatası) ve `AUDIT.md`'deki bir iç çelişkiyi ortaya çıkardı; ratchet emoji tavanı 60 → 59 indirildi | Doğrulama tam zincir yeşil — vitest **426/426** (35 dosya), test:rls **85/85**, test:transform 26/26, pytest 82/82 (%94.94), `npm run ratchet` `[OK] emoji: 59/59`, Playwright **42/42 üç ardışık koşuda**, build başarılı, db reset 18 migration temiz. Faz 1.7 tamamlandı; sıradaki iş Faz 2.                                                                                                                            |
-| 2026-08-17 (Faz 2)                   | Faz 2 — Koç-Danışan Çekirdek Akışı, yedi dilim (2a atomik mekanik süpürme: emoji→Lucide 59→0 + ürün dili + E2E locator; 2b şema: realtime sızıntısı bulunup kapatıldı (`insert,update`'e daraltıldı), `workout_logs`/`nutrition_plans.target_*`/`nutrition_logs`/`messages.attachment_path`; 2c antrenman: `LoopRing` yazıldı, AC-1.6.7 kapandı; 2d beslenme: makro dashboard yatay bar (ADR-0017); 2e form check: koç kuyruğu + mimari engel keşfi; 2f mesajlaşma: AC-2.2 419 ms ölçüldü; 2g `post_system_message` RPC'si 2e'nin engelini kapattı; 2h versiyonlu plan yayınlama copy-on-write ile düzeltildi — eski `save_workout_plan()` her kayıtta geçmiş logların plan bağını koparıyordu; 2i entegrasyon temizliği + ratchet tavanları indirildi; 2j E2E izolasyonu — kök neden dosya içi paralellik değil `chromium`+`Mobile Chrome` projelerinin aynı hesaba çift yazması, kaynak kilidi eklendi)                                                                                                                                                                                                                                                                            | Doğrulama tam zincir yeşil — vitest **502/502** (42 dosya), test:rls **104/104**, test:transform 26/26, ratchet 6/6 (emoji tavanı 0, `font-black` 25, `bg-gradient-to-` 12, `rounded-3xl` 15), build başarılı, db reset 21 migration temiz, Playwright **50/50 iki ardışık koşu + CI yapılandırmasıyla 50/50**. AC-2.1–AC-2.4 ve AC-1.6.7 karşılandı. Faz 2 tamamlandı; sıradaki iş Faz 3 (yemek fotoğrafı makro tahmini). |
+Tam oturum günlüğü (ve yeni oturum satırlarının ekleneceği yer):
+`archive/progress-oturum-gunlugu.md`.

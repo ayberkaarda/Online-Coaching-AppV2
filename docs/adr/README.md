@@ -72,3 +72,4 @@ ama karar metni silinmez — tarihsel bağlam korunur.
 | [0017](0017-imza-oge-halka.md)                                      | İmza öğe: Halka, tek anlam kuralıyla                                     | Kabul edildi (uygulama Faz 2'de)    | 2026-08-17 |
 | [0018](0018-kimlik-gecisi-iki-katman-ve-ci-ratchet.md)              | Kimlik geçişinin iki katmana bölünmesi ve CI ratchet'i                   | Kabul edildi                        | 2026-08-17 |
 | [0019](0019-laboratuvar-yorumlama-motoru-kapsam-disi.md)            | Laboratuvar yorumlama motorunun kapsam dışı bırakılması                  | Reddedildi                          | 2026-08-17 |
+| [0020](0020-hosted-senkronizasyon-stratejisi.md)                    | Barındırılan Supabase projesinin temiz baseline ile senkronlanması       | Önerildi                            | 2026-08-17 |

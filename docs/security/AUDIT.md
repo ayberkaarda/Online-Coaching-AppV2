@@ -18,11 +18,11 @@ onayıyla düzeltme planının **Grup 1–3'ü** (§5) uygulandı — kimlik ve 
 limiting/kaba kuvvet, sütun seviyesi sözleşmeler (bkz. §4b, "Faz 1.5 düzeltme turu"). Aynı gün
 ikinci bir turda **Grup 4–6** de uygulandı — girdi doğrulama/gövde sınırları, yapılandırma
 sertleştirme (AC-05/A-14 hariç, kullanıcı kararıyla ertelendi), dokümantasyon/CI tarama zinciri
-(bkz. §4c, "Faz 1.5 düzeltme turu (Grup 4–6)"). **36/39 bulgu kapandı** (`fixed`/`fixed (kısmi)`/`closed`, bkz. §2 tablosu — sayım §4c'de satır
-satır doğrulandı); kalan 3'ü **açık**: A-05 (oturum token'ları `localStorage`'da), A-14 (CSP
+(bkz. §4c, "Faz 1.5 düzeltme turu (Grup 4–6)"). **37/39 bulgu kapandı** (`fixed`/`fixed (kısmi)`/`closed`,
+bkz. §2 tablosu); kalan 2'si **açık**: A-05 (oturum token'ları `localStorage`'da), A-14 (CSP
 `unsafe-inline`) — ikisi de `@supabase/ssr` cookie+nonce geçişi bekliyor, kullanıcı kararıyla
-ayrı bir tura ertelendi — ve AC-12 (hosted proje doğrulaması, açık soru, bkz. §7). Her bulgunun
-güncel durumu §2'deki `Durum` sütununda işaretlidir.
+ayrı bir tura ertelendi. **AC-12 (hosted proje doğrulaması) 2026-08-17'de ayrı bir turda
+kapandı** — bkz. §7. Her bulgunun güncel durumu §2'deki `Durum` sütununda işaretlidir.
 
 Bu belge bir yönlendirme belgesidir; kanıt tekrarlanmaz. Detay için kaynak raporlara
 `docs/security/findings-*.md §x.y` biçiminde referans verilir.
@@ -104,7 +104,7 @@ severity içinde kaynak rapor sırasıyla (AC → A → T) ve ID numarasıyla.
 | AC-09 | Low      | RLS/Yetki        | Danışan `profiles.email`'i `auth.users`'tan desenkronize edebiliyor     | findings-access-control.md | **fixed** — `20260817160200_column_guards.sql` (`is_end_user_write()`)                                                  |
 | AC-10 | Low      | RLS/Yetki        | Danışan kendi bildiriminin metnini değiştirebiliyor                     | findings-access-control.md | **fixed** — `20260817160200_column_guards.sql` (`notifications` UPDATE yalnızca `is_read`)                              |
 | AC-11 | Low      | Yapılandırma     | Sunucu env değişkeni adları istemci paketinde                           | findings-access-control.md | **fixed** — `src/env.server.ts` (yeni); kanıt: build sonrası `.next/static/` 4→0 eşleşme                                |
-| AC-12 | Low      | Yapılandırma     | Denetim yerel yığında yapıldı; hosted proje ayrı doğrulanmalı           | findings-access-control.md | open                                                                                                                    |
+| AC-12 | Low      | Yapılandırma     | Denetim yerel yığında yapıldı; hosted proje ayrı doğrulanmalı           | findings-access-control.md | **closed (2026-08-17)** — bkz. §7, `docs/adr/0020-hosted-senkronizasyon-stratejisi.md`                                  |
 | A-14  | Low      | Yapılandırma     | CSP `script-src 'unsafe-inline'` içeriyor                               | findings-app-surface.md    | open — ertelendi, kullanıcı kararı (A-05 ile birlikte, bkz. §7)                                                         |
 | A-15  | Low      | Yapılandırma     | `connect-src` içinde `https://*.supabase.co` wildcard'ı                 | findings-app-surface.md    | **fixed** — `next.config.mjs` (yalnızca yapılandırılan origin)                                                          |
 | A-16  | Low      | Loglama/Gizlilik | Hata mesajı iç mimariyi ifşa ediyor                                     | findings-app-surface.md    | **fixed** — jenerik mesaj, teknik detay yalnızca logda                                                                  |
@@ -611,11 +611,26 @@ requirements>` adımları eklensin; high+ bulguda job kırılsın.
 
 ## 7. Açık sorular / kullanıcı kararı gerektirenler
 
-- **AC-12** — denetim yerel yığında yapıldı, `.env.local` uzak projeye
-  (`nxftmxkpmuyeelrmwofv.supabase.co`) bakıyor. Yapılandırmaya bağlı bulgular — özellikle AC-02 ve
-  `[auth.rate_limit]` (A-01) — hosted projede ayrıca doğrulanmalı; bu doğrulama Faz 1.5'in
-  kapsamı dışında tutuldu (`active_planprogram.md` §3a.1). **Hâlâ açık** — Grup 1–3 turu da yerel
-  yığında yapıldı, hosted proje doğrulaması yapılmadı.
+- **AC-12 — kapandı (2026-08-17, hosted senkronizasyon turu).** Denetim yerel yığında
+  yapılmıştı, `.env.local` uzak projeye (`nxftmxkpmuyeelrmwofv.supabase.co`) bakıyordu ve
+  yapılandırmaya bağlı bulguların hosted projede ayrıca doğrulanması gerekiyordu. Bu artık
+  yapıldı: `docs/adr/0020-hosted-senkronizasyon-stratejisi.md` kapsamında hosted şeması
+  sıfırlanıp yerel zincirin **birebir aynısı** (25 migration) hosted'a uygulandı ve parite
+  ölçüldü (tablo=14, `FORCE RLS`=14, public politika=57, storage politika=12, fonksiyon=31 —
+  yerel ile birebir). Artık hosted, denetimin kapsadığı yerel yığından **ayrı bir yapılandırma
+  gerçeği değil**, onun bir kopyası.
+  **Bu doğrulama turu kapsam dışı bir kritik bulgu da ortaya çıkardı:** sıfırlama öncesi
+  hosted'da `anon` rolüne `profiles` üzerinde `GRANT ALL` verilmiş ve `profiles`/27 diğer
+  tabloda koşulsuz (`USING (true)`, çoğunda `WITH CHECK` yok) politikalar duruyordu — anon
+  anahtarını bilen biri kendi rolünü değiştirip yetki yükseltebilirdi. Bu bulgu bu denetimin
+  (Faz 1.5) kapsamı **dışındaydı** — Faz 1.5 yalnızca yerel yığında yapılmıştı ve yerel yığında
+  bu eski/elle yapılmış politikalar hiç var olmadı. Hosted'ın kendi eski/elle yönetilmiş
+  geçmişinden kaynaklanıyordu, tam olarak AC-12'nin "hosted proje ayrıca doğrulanmalı" uyarısının
+  işaret ettiği riskin gerçekleşmiş hâliydi. Temiz baseline'ın uygulanmasıyla (25 migration'ın
+  hiçbiri koşulsuz `USING (true)` politikası veya `anon`'a `GRANT ALL` içermiyor) açık otomatik
+  olarak kapandı; ayrıca `anon` rolünün bugün `profiles` üzerinde hiçbir yetkisi kalmadığı
+  ölçümle doğrulandı. Detay: `docs/adr/0020-hosted-senkronizasyon-stratejisi.md` §4,
+  `docs/PROGRESS.md` §3.
 - **A-06 / Logout — çözüldü (2026-08-17, kullanıcı kararı).** Access token'ı veri düzleminde iptal
   etmiyordu (`jwt_expiry=3600`). Karar: süre `supabase/config.toml`'da `jwt_expiry=900`'e
   düşürüldü. **Bu bir kısmi düzeltmedir** — logout hâlâ access token'ı sunucu tarafında iptal
