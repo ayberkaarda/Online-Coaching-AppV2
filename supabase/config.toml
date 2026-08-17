@@ -22,8 +22,12 @@ max_rows = 1000
 port = 54322
 # Migration diff'i için kullanılan gölge veritabanı portu
 shadow_port = 54320
-# Supabase projesindeki Postgres ana sürümü ile aynı olmalı
-major_version = 15
+# Supabase projesindeki Postgres ana sürümü ile aynı olmalı.
+# Barındırılan proje PG 17.6 çalıştırıyor (`select version()` ile ölçüldü); bu değer
+# 15 iken kural İHLAL EDİLİYORDU. 17'ye alındı: CLI yerelde
+# `public.ecr.aws/supabase/postgres:17.6.1.141` imajını kullanıyor, yani yerel ile
+# barındırılan ortam artık aynı ana sürümde (17.6).
+major_version = 17
 
 [db.pooler]
 enabled = false

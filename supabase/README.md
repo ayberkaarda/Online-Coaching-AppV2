@@ -63,6 +63,39 @@ politikaları bozulmadı). Bu fonksiyon **`SECURITY DEFINER`**'dır: `profiles`
 
 ## 2. Migration'ları Uygulama
 
+### Postgres sürüm eşitliği (yerel = barındırılan)
+
+Yerel yığın ile barındırılan proje **aynı Postgres ana sürümünde** olmalıdır; aksi halde
+yerelde geçen bir migration/test barındırılan ortamda kırılabilir. Şu an ikisi de **PG 17.6**:
+
+```bash
+# Yerel sürümü doğrula
+docker exec -i supabase_db_my-coaching-app psql -U postgres -d postgres -tAc "select version();"
+# -> PostgreSQL 17.6 ... ; imaj: public.ecr.aws/supabase/postgres:17.6.1.141
+```
+
+Sürüm `config.toml` içindeki `[db].major_version` ile belirlenir. Barındırılan proje
+yükseltilirse bu değer de güncellenmeli, ardından `supabase stop --no-backup` +
+`supabase start` ile yerel yığın yeniden kurulmalıdır (veri silinir — yalnızca yerel).
+
+> **Yan etki (önemli):** proje `supabase link` ile bağlıyken CLI, barındırılan projenin gerçek
+> servis sürümlerini `supabase/.temp/` altına önbelleğe alır (`postgres-version`, `rest-version`,
+> `gotrue-version`, `storage-version`). `major_version` barındırılan sürümle **eşleştiğinde** CLI
+> bu önbelleği uygular ve yerel yığın barındırılan ortamın **birebir aynı imajlarını** çalıştırır:
+>
+> | Servis    | İmaj                    |
+> | --------- | ----------------------- |
+> | Postgres  | `postgres:17.6.1.141`   |
+> | PostgREST | `postgrest:v14.5`       |
+> | GoTrue    | `gotrue:v2.195.0`       |
+> | Storage   | `storage-api:v1.69.0`   |
+>
+> `major_version = 15` iken bu eşleşme kurulmuyordu (CLI kendi varsayılanlarına düşüyor:
+> `postgres:15.8.1.085`, `postgrest:v16.1`). Yani 17'ye geçişin asıl kazancı yalnızca Postgres
+> değil, **tüm servis katmanında yerel/uzak sürüm eşitliğidir**. Bu önbellek yereldir; `start`
+> sırasında barındırılan projeye istek atılmaz. Sürüm değişiminden sonra RLS ve E2E testlerini
+> mutlaka yeniden koşturun.
+
 ### Yerel (Docker) yığın
 
 ```bash
@@ -226,6 +259,19 @@ Her iki bucket da **PRIVATE**'tır (`20260817100000_private_storage.sql`).
 > (avatars için **kök dizine**, form-check için `poses/` altına) yazıyor. Yaygın
 > "ilk klasör = kullanıcı id" kalıbı bu projede çalışmaz; sahiplik **dosya adı ön ekinden**
 > doğrulanır. Yükleme yolunu değiştirirseniz `20260816090300_storage.sql` de güncellenmelidir.
+
+> **Yeni bucket eklerken — `storage.objects` politikaları barındırılan projede de güvenlidir.**
+> Migration'lar `postgres` rolüyle koşar ve o rol `storage.objects`'in sahibi **değildir**, ama
+> Supabase'in Postgres imajı `supautils.policy_grants` ile bu role `storage.objects`,
+> `storage.buckets` (ve birkaç `auth.*` tablosu) üzerinde **politika yönetimini açıkça
+> bağışlar** — `/etc/postgresql-custom/supautils.conf`. Dolayısıyla `create policy` /
+> `drop policy` ve `storage.buckets` üzerindeki DML doğrudan migration'da yazılabilir; sarmalayıcı,
+> `set role` veya `security definer` hilesi gerekmez (hepsi denendi, hiçbiri çalışmıyor —
+> bkz. `docs/adr/0020-hosted-senkronizasyon-stratejisi.md`).
+>
+> Buna **karşılık** `alter table storage.objects enable/force row level security` sahiplik ister
+> ve `must be owner of table objects` ile düşer — RLS zaten Supabase tarafından etkin olduğu için
+> bu deyime hiç ihtiyaç yoktur, migration'a **yazmayın**.
 
 ### RPC
 
