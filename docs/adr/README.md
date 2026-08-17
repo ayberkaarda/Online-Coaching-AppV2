@@ -28,12 +28,18 @@ alınabilir kararlar (bir değişken adı, bir CSS sınıfı) ADR gerektirmez.
 
 ## Durum değerleri
 
-| Durum               | Anlamı                                                                                     |
-| ------------------- | ------------------------------------------------------------------------------------------ |
-| `Önerildi`          | Karar taslak halinde, henüz uygulanmadı/onaylanmadı.                                       |
-| `Kabul edildi`      | Karar onaylandı ve (aksi belirtilmedikçe) uygulandı; kod tabanının şu anki gerçeği budur.  |
-| `Reddedildi`        | Değerlendirildi ama benimsenmedi; gerekçesi kayıt altında tutulur, tekrar sorulmasın diye. |
-| `Yerini aldı: NNNN` | Daha sonraki bir ADR bu kararı geçersiz kıldı/değiştirdi; `NNNN` o yeni ADR'nin numarası.  |
+| Durum               | Anlamı                                                                                                            |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `Önerildi`          | Karar taslak halinde, henüz uygulanmadı/onaylanmadı.                                                              |
+| `Kabul edildi`      | Karar onaylandı ve (aksi belirtilmedikçe) uygulandı; kod tabanının şu anki gerçeği budur.                         |
+| `Reddedildi`        | Değerlendirildi ama benimsenmedi; gerekçesi kayıt altında tutulur, tekrar sorulmasın diye.                        |
+| `Ertelendi`         | Karar verilmedi, iş belirli bir tetikleyiciye kadar rafa alındı; ADR geri dönüş koşulunu ve merdivenini tanımlar. |
+| `Yerini aldı: NNNN` | Daha sonraki bir ADR bu kararı geçersiz kıldı/değiştirdi; `NNNN` o yeni ADR'nin numarası.                         |
+
+`Reddedildi` ile `Ertelendi` farkı: reddedilen karar "tekrar sorulmasın" der ve gerekçesi
+kapanıştır; ertelenen karar "şu koşulda tekrar sor" der ve ADR'sinde tetikleyici + geri dönüş
+merdiveni bulunur. Bir işin tasarımında kusur veya bloklayıcı varsa reddedilir; yalnızca
+değeri kanıtlanmamışsa ertelenir.
 
 Bir ADR'nin durumu değiştiğinde dosyanın kendisi **düzenlenir** (durum satırı güncellenir),
 ama karar metni silinmez — tarihsel bağlam korunur.
@@ -73,3 +79,4 @@ ama karar metni silinmez — tarihsel bağlam korunur.
 | [0018](0018-kimlik-gecisi-iki-katman-ve-ci-ratchet.md)              | Kimlik geçişinin iki katmana bölünmesi ve CI ratchet'i                   | Kabul edildi                        | 2026-08-17 |
 | [0019](0019-laboratuvar-yorumlama-motoru-kapsam-disi.md)            | Laboratuvar yorumlama motorunun kapsam dışı bırakılması                  | Reddedildi                          | 2026-08-17 |
 | [0020](0020-hosted-senkronizasyon-stratejisi.md)                    | Barındırılan Supabase projesinin temiz baseline ile senkronlanması       | Önerildi                            | 2026-08-17 |
+| [0021](0021-yemek-fotografi-makro-tahmininin-ertelenmesi.md)        | Yemek fotoğrafı makro tahmininin (Faz 3) ertelenmesi                     | Ertelendi                           | 2026-08-17 |

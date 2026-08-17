@@ -47,7 +47,8 @@ gösteriyordu; bu arşivlemenin yarattığı bir kırık değildir.
 ## 1. Bugünkü durum (2026-08-17)
 
 - **Faz durumu:** Faz 0 → Faz 2, hosted senkronizasyonu ve env koruması tamamlandı.
-  **Sıradaki iş: Faz 3 — Yemek Fotoğrafı Makro Tahmini** (bkz. §5).
+  Faz 3 (Yemek Fotoğrafı Makro Tahmini) **ertelendi** (ADR-0021, `active_planprogram.md`
+  §5). **Sıradaki iş: Faz 4 — İlerleme Takibi** (bkz. §5).
 - **Yerel yığın:** `npx supabase start` ile ayakta; PostgreSQL **17.6**
   (`public.ecr.aws/supabase/postgres:17.6.1.141`), 25 migration + seed, 14 tablo,
   **14/14 RLS enabled + forced**.
@@ -172,7 +173,7 @@ oturumlarında gereksiz çalışması, planların `jsonb` sütuna taşınması. 
 ## 4. Bağlayıcı sözleşmeler ve bilinen tuzaklar
 
 **Kararlar:** kanonik kayıt `docs/adr/` altındadır — indeks
-[`docs/adr/README.md`](adr/README.md) (ADR-0001…ADR-0020). Bu dosyada karar kaydı tutulmaz.
+[`docs/adr/README.md`](adr/README.md) (ADR-0001…ADR-0021). Bu dosyada karar kaydı tutulmaz.
 ADR'si olmayan ama hâlâ bağlayıcı üç sözleşme:
 
 - Prettier `semi: false` — kod tabanı noktalı virgülsüz.
@@ -211,14 +212,13 @@ ADR'si olmayan ama hâlâ bağlayıcı üç sözleşme:
 
 ## 5. Sıradaki iş
 
-**Faz 3 — Yemek Fotoğrafı Makro Tahmini** (`active_planprogram.md` §5). `ai_backend/**` yarısı
-Faz 2'nin kalanıyla çakışmadan yürüyebilir; bir UI kuyruğu var (`ai_suggested` → `confirmed`
-onay ekranı, makro dashboard entegrasyonu). `nutrition_logs` tablosu ileriye uyumlu kuruldu:
-`status` kolonu eklendiğinde `default 'confirmed'` ile backfill gerektirmeyecek.
+**Faz 4 — İlerleme Takibi** (`active_planprogram.md` §6). Faz 3 — Yemek Fotoğrafı Makro
+Tahmini — **ertelendi** (ADR-0021, `active_planprogram.md` §5); V0 (LLM'siz foto ekleme)
+dahil şimdilik yapılmıyor.
 
 **Faz sırası notu:** kalan fazlar faz düzeyinde paralelleşmiyor — Faz 2 ve Faz 4 aynı dosyalara
-dokunuyor (`StatsTab.tsx`, `CoachUserManagement.tsx`), Faz 3'ün de bir UI kuyruğu var. Gerçek
-paralellik ekseni faz-vs-faz değil, backend-vs-web.
+dokunuyor (`StatsTab.tsx`, `CoachUserManagement.tsx`). Gerçek paralellik ekseni faz-vs-faz
+değil, backend-vs-web.
 
 Faz dışı, sıraya girmiş iş kalemleri: E2E veritabanı temizlik script'i (B-023, destructive —
 onay ister) · katalog için sunucu taraflı arama + sayfalama (B-018) · A-05/A-14 cookie + nonce

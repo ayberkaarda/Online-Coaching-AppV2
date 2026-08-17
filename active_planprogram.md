@@ -163,10 +163,11 @@ NNNN-<slug>.md` dosyalarına ayrıştırıldı (AC-1.7) ve `ARCHITECTURE.md` §7
 
 Koç-öğrenci (coach/client) modelli fitness koçluk platformu. Referans özellik
 seti: antrenman planı atama ve loglama, beslenme planı + AI destekli yemek
-fotoğrafı makro tahmini, ilerleme takibi (kilo/ölçü/foto), form check
-(video/foto + koç geri bildirimi), gerçek zamanlı mesajlaşma, sağlık verisi
-senkronizasyonu (HealthKit / Health Connect), uyku takibi, 0-100 recovery
-skoru, hatırlatma push bildirimleri, aktivite geçmişi.
+fotoğrafı makro tahmini **(ertelendi, ADR-0021 — bkz. §5)**, ilerleme takibi
+(kilo/ölçü/foto), form check (video/foto + koç geri bildirimi), gerçek
+zamanlı mesajlaşma, sağlık verisi senkronizasyonu (HealthKit / Health
+Connect), uyku takibi, 0-100 recovery skoru, hatırlatma push bildirimleri,
+aktivite geçmişi.
 
 ### 1.2 Hedef topoloji
 
@@ -204,19 +205,19 @@ ile yürür; `apps/web` yolu Faz 4.5'ten sonra geçerlidir.
 
 ### 1.3 Teknoloji kararları (sabitlenmiş)
 
-| Alan             | Karar                                                  | Not                                                                                                                                     |
-| ---------------- | ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
-| Monorepo         | pnpm workspaces + Turborepo                            | **Faz 4.5'te devreye girer (§7)**; o zamana kadar tek repo + npm                                                                        |
-| Web              | Next.js 16 (App Router) + React 19 + TypeScript strict | mevcut durum (`next@16.2.10`, `react@19.2.4`)                                                                                           |
-| Build motoru     | webpack — `next build --webpack`                       | `next-pwa` bir webpack eklentisi; Turbopack'e geçiş PWA'yı bırakmayı gerektirir. `@ducanh2912/next-pwa` de webpack tabanlı, çözüm değil |
-| Mobil            | Expo SDK (managed) + Expo Router + TypeScript          | Faz 4.5; EAS build hedefli                                                                                                              |
-| Veri erişimi     | TanStack Query + merkezi veri katmanı                  | bugün `src/hooks` + `src/lib/api`; Faz 4.5'te `@repo/api-client`. Sözleşme ve cache key: §3.4                                           |
-| Form             | react-hook-form + zod                                  | ortak şemalar bugün `src/lib/validation/schemas.ts`; Faz 4.5'te `packages/types/schemas`                                                |
-| Grafik           | web: recharts · mobil: victory-native                  | web'de ayrıca `chart.js` + `react-chartjs-2` kullanılıyor (StatsTab) — **Faz 4'te tek kütüphaneye indirilecek**                         |
-| AI backend       | FastAPI + Pydantic v2 + uv                             | ruff + mypy strict                                                                                                                      |
-| Vision sağlayıcı | Anthropic Messages API (görsel girişli)                | `VISION_PROVIDER` env ile soyutlanır, adapter pattern                                                                                   |
-| Push             | Expo Push + `device_push_tokens`                       | web push kapsam dışı (v2)                                                                                                               |
-| Zamanlama        | Supabase Edge Functions + pg_cron                      | §10                                                                                                                                     |
+| Alan             | Karar                                                  | Not                                                                                                                                       |
+| ---------------- | ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| Monorepo         | pnpm workspaces + Turborepo                            | **Faz 4.5'te devreye girer (§7)**; o zamana kadar tek repo + npm                                                                          |
+| Web              | Next.js 16 (App Router) + React 19 + TypeScript strict | mevcut durum (`next@16.2.10`, `react@19.2.4`)                                                                                             |
+| Build motoru     | webpack — `next build --webpack`                       | `next-pwa` bir webpack eklentisi; Turbopack'e geçiş PWA'yı bırakmayı gerektirir. `@ducanh2912/next-pwa` de webpack tabanlı, çözüm değil   |
+| Mobil            | Expo SDK (managed) + Expo Router + TypeScript          | Faz 4.5; EAS build hedefli                                                                                                                |
+| Veri erişimi     | TanStack Query + merkezi veri katmanı                  | bugün `src/hooks` + `src/lib/api`; Faz 4.5'te `@repo/api-client`. Sözleşme ve cache key: §3.4                                             |
+| Form             | react-hook-form + zod                                  | ortak şemalar bugün `src/lib/validation/schemas.ts`; Faz 4.5'te `packages/types/schemas`                                                  |
+| Grafik           | web: recharts · mobil: victory-native                  | web'de ayrıca `chart.js` + `react-chartjs-2` kullanılıyor (StatsTab) — **Faz 4'te tek kütüphaneye indirilecek**                           |
+| AI backend       | FastAPI + Pydantic v2 + uv                             | ruff + mypy strict                                                                                                                        |
+| Vision sağlayıcı | Anthropic Messages API (görsel girişli)                | **Ertelendi (ADR-0021, Faz 3) — uygulanmadı.** `VISION_PROVIDER` env ile soyutlanır, adapter pattern kararı geri dönüş için geçerli kalır |
+| Push             | Expo Push + `device_push_tokens`                       | web push kapsam dışı (v2)                                                                                                                 |
+| Zamanlama        | Supabase Edge Functions + pg_cron                      | §10                                                                                                                                       |
 
 ---
 
@@ -263,23 +264,23 @@ yapısında yürütülür.
 Tablolar (tam kolon listesini sen tasarla, aşağıdaki zorunlu alanlar ve
 kısıtlarla):
 
-| Tablo                                      | Zorunlu unsurlar                                                                                                                                                                |
-| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `profiles`                                 | `role user_role NOT NULL` (`coach`,`client`). **Tek koçlu model: `coach_id` YOK** — koç-danışan eşleştirmesi tutulmaz (bkz. §3.2)                                               |
-| `workout_plans` / `workout_plan_exercises` | plan versiyonlama: `version int`, `is_active bool`; egzersiz: `video_url`, `target_sets/reps/weight`, `position int`                                                            |
-| `workout_logs` / `workout_log_sets`        | set: `actual_reps`, `actual_weight_kg numeric(5,2)`, `rpe numeric(3,1) CHECK (rpe BETWEEN 1 AND 10)`                                                                            |
-| `nutrition_plans` / `nutrition_plan_meals` | hedefler: `kcal int`, `protein_g/carb_g/fat_g int`, CHECK ≥ 0                                                                                                                   |
-| `nutrition_logs`                           | `photo_path`, `ai_estimate jsonb`, `user_override jsonb`, `status` (`ai_suggested`,`confirmed`)                                                                                 |
-| `progress_entries`                         | `weight_kg numeric(5,2)`, `measurements jsonb`, UNIQUE(user_id, entry_date)                                                                                                     |
-| `progress_photos`                          | `angle` enum (`front`,`side`,`back`), private bucket path                                                                                                                       |
-| `form_checks`                              | `status` enum (`pending`,`reviewed`), `coach_feedback text`, `reviewed_at`                                                                                                      |
-| `conversations` / `messages`               | UNIQUE(coach_id, client_id); `read_at timestamptz`; sistem mesajı için `kind` enum (`user`,`system`)                                                                            |
-| `coach_notes`                              | koç → öğrenci serbest not                                                                                                                                                       |
-| `health_metrics`                           | `metric_date date`, `steps int`, `active_kcal int`, `avg_hr int`, `distance_m int`, `source` enum (`healthkit`,`health_connect`,`manual`), UNIQUE(user_id, metric_date, source) |
-| `sleep_sessions`                           | `start_at/end_at timestamptz`, `stages jsonb` (`{deep,rem,light,awake}` dakika), `source`                                                                                       |
-| `recovery_scores`                          | `score int CHECK (score BETWEEN 0 AND 100)`, `components jsonb`, `advice_key text`, UNIQUE(user_id, score_date)                                                                 |
-| `reminders`                                | `kind` (`workout`,`meal`), `time_local time`, `days_of_week int[]`, `timezone text`                                                                                             |
-| `device_push_tokens`                       | UNIQUE(user_id, token), `platform` enum (`ios`,`android`)                                                                                                                       |
+| Tablo                                      | Zorunlu unsurlar                                                                                                                                                                                                    |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `profiles`                                 | `role user_role NOT NULL` (`coach`,`client`). **Tek koçlu model: `coach_id` YOK** — koç-danışan eşleştirmesi tutulmaz (bkz. §3.2)                                                                                   |
+| `workout_plans` / `workout_plan_exercises` | plan versiyonlama: `version int`, `is_active bool`; egzersiz: `video_url`, `target_sets/reps/weight`, `position int`                                                                                                |
+| `workout_logs` / `workout_log_sets`        | set: `actual_reps`, `actual_weight_kg numeric(5,2)`, `rpe numeric(3,1) CHECK (rpe BETWEEN 1 AND 10)`                                                                                                                |
+| `nutrition_plans` / `nutrition_plan_meals` | hedefler: `kcal int`, `protein_g/carb_g/fat_g int`, CHECK ≥ 0                                                                                                                                                       |
+| `nutrition_logs`                           | `photo_path`, `ai_estimate jsonb`, `user_override jsonb`, `status` (`ai_suggested`,`confirmed`) — **Ertelendi (ADR-0021, Faz 3): bu dört alan hiç eklenmedi**, bkz. `20260817190100_nutrition_targets_and_logs.sql` |
+| `progress_entries`                         | `weight_kg numeric(5,2)`, `measurements jsonb`, UNIQUE(user_id, entry_date)                                                                                                                                         |
+| `progress_photos`                          | `angle` enum (`front`,`side`,`back`), private bucket path                                                                                                                                                           |
+| `form_checks`                              | `status` enum (`pending`,`reviewed`), `coach_feedback text`, `reviewed_at`                                                                                                                                          |
+| `conversations` / `messages`               | UNIQUE(coach_id, client_id); `read_at timestamptz`; sistem mesajı için `kind` enum (`user`,`system`)                                                                                                                |
+| `coach_notes`                              | koç → öğrenci serbest not                                                                                                                                                                                           |
+| `health_metrics`                           | `metric_date date`, `steps int`, `active_kcal int`, `avg_hr int`, `distance_m int`, `source` enum (`healthkit`,`health_connect`,`manual`), UNIQUE(user_id, metric_date, source)                                     |
+| `sleep_sessions`                           | `start_at/end_at timestamptz`, `stages jsonb` (`{deep,rem,light,awake}` dakika), `source`                                                                                                                           |
+| `recovery_scores`                          | `score int CHECK (score BETWEEN 0 AND 100)`, `components jsonb`, `advice_key text`, UNIQUE(user_id, score_date)                                                                                                     |
+| `reminders`                                | `kind` (`workout`,`meal`), `time_local time`, `days_of_week int[]`, `timezone text`                                                                                                                                 |
+| `device_push_tokens`                       | UNIQUE(user_id, token), `platform` enum (`ios`,`android`)                                                                                                                                                           |
 
 **İndeksler:** her FK'ye indeks; zaman serisi tablolarında
 `(user_id, <date> DESC)` composite indeks; `messages(conversation_id,
@@ -362,7 +363,8 @@ DEFINER` olması şart, kolaylık değil. Bir politika kendi tablosuna düz bir
 
 ### 3.3 Storage
 
-Bucket'lar: `meal-photos`, `progress-photos`, `form-checks` — hepsi private.
+Bucket'lar: `meal-photos` (**Ertelendi, ADR-0021, Faz 3 — hiç yaratılmadı**),
+`progress-photos`, `form-checks` — hepsi private.
 Path sözleşmesi: `<user_id>/<uuid>.<ext>`. Storage RLS: yükleme yalnızca kendi
 prefix'ine; okuma kendi prefix'i + koç için tüm prefix'ler (tek koçlu model).
 Maks. dosya boyutu: foto 10 MB, video 100 MB; MIME whitelist.
@@ -586,7 +588,7 @@ işlenir.
 | 4   | "Dikey yetki: `conversations`, `coach_notes`, sistem mesajı" (§3)                                   | **Kısmen yok.** `conversations` tablosu eklenmiyor (tek koçlu model; `messages` `conversation_key` yaklaşımıyla yürüyor — `20260817140000`), `coach_notes` Faz 1b'de ertelendi, `kind='system'` sistem mesajı Faz 2'de geliyor. Bu üç yüzeyin dikey yetki denetimi **Faz 2'nin çıkışına** bağlanır                                                |
 | 5   | "Plan atama gibi koça özel yazma işlemlerini client yapabiliyorsa kapat" (§3)                       | **Uyarlanır.** Danışanın kendi planına yazabilmesi bilinçli sapmadır (ADR-0014, `supabase/README.md`); IDOR bulgusu değildir. Kalan gerçek eksik denetim izidir (bkz. Kova 3 #16)                                                                                                                                                                 |
 | 6   | `pnpm audit` (§1, §9.4)                                                                             | Proje **npm** kullanıyor → `npm audit`. Turbo/pnpm'e geçiş Faz 4.5'te                                                                                                                                                                                                                                                                             |
-| 7   | "meal-photo endpoint", prompt injection, SSRF (§5)                                                  | Uç **henüz yok** — Faz 3'te geliyor (§5). Prompt injection, katı Pydantic parse ve SSRF maddeleri bu fazda **tasarım kısıtı** olarak yazılır, uygulama denetimi Faz 3'ün çıkış kriterine bağlanır                                                                                                                                                 |
+| 7   | "meal-photo endpoint", prompt injection, SSRF (§5)                                                  | **Ertelendi, ADR-0021.** Uç hiç yaratılmadı (Faz 3 ertelendi) → bu maddeye bağlı denetim borcu **düşer**, kapatılacak bir şey yok çünkü açılan bir şey de yok. Faz 3 dönerse bu maddeler yeni uygulamanın çıkış kriteriyle birlikte geri gelir (ADR-0021)                                                                                         |
 | 8   | "Logout push token'ı geçersiz kılıyor mu?" (§2)                                                     | `device_push_tokens` **Faz 7**'de geliyor (§10). Bu fazda yalnızca oturum sonlandırma denetlenir (`useSession.ts:93-99` — `signOut` + `queryClient.clear()` + workbox cache temizliği)                                                                                                                                                            |
 | 9   | `docs/security/rls-tests` ayrı dizini (§9.3)                                                        | **Uyarlanır:** RLS testleri zaten `supabase/tests/rls.test.sql` (35 senaryo) ve `npm run test:rls` ile CI'da. İkinci bir dizin açılmaz; `AUDIT.md` bu dosyaya link verir                                                                                                                                                                          |
 
@@ -692,7 +694,8 @@ katmanına kaydı.
 - Üçüncü şahıs sistemlere tarama/istek (Supabase altyapısı, Anthropic API dahil).
 - Gerçek kullanıcı verisiyle test.
 - Canlı/barındırılan ortamda değişiklik uygulama (yalnızca rapor — K7).
-- Faz 3 (meal-photo: prompt injection, SSRF, günlük analiz limiti) ve Faz 7
+- Faz 3 (meal-photo: prompt injection, SSRF, günlük analiz limiti — **Ertelendi,
+  ADR-0021; uç hiç yaratılmadı, bu maddeye bağlı denetim borcu düşer**) ve Faz 7
   (push token iptali) yüzeylerinin **uygulama** denetimi — bu fazda yalnızca
   tasarım kısıtı olarak yazılır.
 - Nonce tabanlı CSP'nin **uygulanması** zorunlu değildir; değerlendirilir ve
@@ -885,6 +888,17 @@ yapılandırmasıyla). Tam detay, dilim bazlı bulgular ve kaydedilen borçlar:
 ---
 
 ## 5. Faz 3 — Yemek Fotoğrafı Makro Tahmini
+
+> **DURUM (2026-08-17): ERTELENDİ — uygulanmadı.**
+> Bu faz `docs/adr/0021-yemek-fotografi-makro-tahmininin-ertelenmesi.md` kararıyla
+> ertelendi (Reddedildi değil — ADR-0019 ölçütleriyle karşılaştırıldığında Faz 3, motoru
+> düşüren dört ölçütten geçiyor). Aşağıdaki spesifikasyonun **hiçbir kısmı hayata
+> geçirilmedi** — ne migration, ne servis, ne uç, ne test yazıldı;
+> `nutrition_logs`'un Faz 2b'de bilinçli dar tutulan şeması bu yüzden hâlâ geçerli
+> (bkz. §3.1). Faz numaraları **kaymadı**: Faz 4–10 aynı numarayla devam ediyor, bu faz
+> "Ertelendi" işaretli bir boşluk olarak duruyor. Belge **tarihsel kayıt/gelecekteki
+> uygulama başlangıç noktası** olarak korunuyor; ADR-0021'deki geri dönüş merdivenine
+> (V0/V1 kademeleri) bakın. Aşağıdaki içerik bu not dışında **değiştirilmedi**.
 
 ### 5.1 ai_backend yapısı
 
@@ -1091,7 +1105,8 @@ duplicate göstermez).
 ## 13. Faz 10 — Kalite Altyapısı
 
 - **Test piramidi:** api-client unit (Vitest) · web component (Vitest+RTL) ·
-  web E2E (Playwright: login→plan→log→chat, form check, meal photo mock'lu) ·
+  web E2E (Playwright: login→plan→log→chat, form check, ~~meal photo mock'lu~~
+  **Ertelendi, ADR-0021 — Faz 3 uygulanana kadar bu kalem yok**) ·
   mobil (Jest+RNTL kritik ekranlar) · ai_backend (pytest, coverage ≥ %80
   services/) · RLS (SQL testleri, CI'da).
 - **CI (GitHub Actions):** PR'da turbo affected lint+type+test+build; ai_backend
