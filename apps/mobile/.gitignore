@@ -1,0 +1,14 @@
+# Expo'nun ürettiği yerel artefaktlar (Faz 4.5 commit 6). Kök .gitignore zaten
+# node_modules/ ve *.tsbuildinfo'yu kapsıyor; burada YALNIZCA mobile'a özgü olanlar var.
+.expo/
+dist/
+web-build/
+
+# `expo start`/`expo export` tarafından üretilir, elle düzenlenmez.
+expo-env.d.ts
+
+# Prebuild çıktısı (CNG): native projeler kaynakta tutulmaz.
+/ios
+/android
+
+*.log

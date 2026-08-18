@@ -1,0 +1,23 @@
+{
+  // İki taban birleştirilir (TS 5+ çoklu `extends`, SON yazan kazanır):
+  //   1. `expo/tsconfig.base` — Expo/React Native'e özgü zorunlu ayarlar (jsx, module,
+  //      moduleResolution, RN tipleri).
+  //   2. `@repo/config/tsconfig/base.json` — workspace'in ortak KATI derleyici tabanı
+  //      (ADR-0023 madde 1); `strict`, `noUncheckedIndexedAccess`, `noUnusedLocals` vb.
+  // `lib` ve `jsx` burada AÇIKÇA geri yazılır: repo tabanı DOM'suz `lib: ["ES2022"]`
+  // tanımlar ve `jsx` alanını hiç bilmez — ikisi de Expo'nun değerlerini ezerdi.
+  //
+  // `experiments.typedRoutes` BİLEREK KAPALI: üreteceği `.expo/types/router.d.ts` yalnızca
+  // `expo start`/`expo export` koştuktan sonra var olur; `type-check` bu üretilmiş artefakta
+  // bağımlı hale gelseydi temiz bir checkout'ta (ve commit 7'de CI'da) kırılırdı.
+  "extends": ["expo/tsconfig.base", "@repo/config/tsconfig/base.json"],
+  "compilerOptions": {
+    "lib": ["ES2022", "DOM"],
+    "jsx": "react-jsx",
+    "paths": {
+      "@/*": ["./*"]
+    }
+  },
+  "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts"],
+  "exclude": ["node_modules", "dist", ".expo"]
+}

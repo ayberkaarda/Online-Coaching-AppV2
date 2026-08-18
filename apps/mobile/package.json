@@ -1,0 +1,50 @@
+{
+  "name": "mobile",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Expo (SDK 57) mobil istemci iskeleti — expo-router ile 5 placeholder sekme + placeholder auth ekranı (ADR-0023 madde 10, Faz 4.5 commit 6). Veri katmanı (@repo/api-client, Supabase, SecureStore) BİLEREK yok: api-client hook'ları web'e özgü `sonner` import ediyor, Metro grafiğine DOM toast kütüphanesi girmesin diye mobil veri katmanı ayrı bir dilime bırakıldı.",
+  "main": "expo-router/entry",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "export": "expo export",
+    "lint": "eslint .",
+    "type-check": "tsc --noEmit"
+  },
+  "expo": {
+    "install": {
+      "exclude": [
+        "react",
+        "react-dom"
+      ]
+    }
+  },
+  "dependencies": {
+    "@repo/logger": "workspace:*",
+    "@repo/types": "workspace:*",
+    "expo": "~57.0.14",
+    "expo-constants": "~57.0.12",
+    "expo-linking": "~57.0.6",
+    "expo-router": "~57.0.14",
+    "expo-splash-screen": "~57.0.7",
+    "expo-status-bar": "~57.0.1",
+    "expo-system-ui": "~57.0.2",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "react-native": "0.86.2",
+    "react-native-gesture-handler": "~2.32.0",
+    "react-native-reanimated": "4.5.1",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-screens": "~4.26.0",
+    "react-native-web": "~0.21.0",
+    "react-native-worklets": "0.10.1"
+  },
+  "devDependencies": {
+    "@repo/config": "workspace:*",
+    "@typescript-eslint/parser": "^8.62.1",
+    "@types/react": "~19.2.2",
+    "eslint": "^9",
+    "typescript": "~6.0.3"
+  }
+}

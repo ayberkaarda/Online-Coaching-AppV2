@@ -14,3 +14,8 @@ packages/types/src/database.ts
 # pnpm tarafından üretilir; biçimi kilidin kendi formatı belirler. Prettier bunu yeniden
 # biçimlendirirse `--frozen-lockfile` doğrulaması gereksiz yere kırılgan hale gelir.
 pnpm-lock.yaml
+
+# Expo (apps/mobile) tarafından üretilir; kaynak değildir (Faz 4.5 commit 6).
+apps/mobile/.expo/
+apps/mobile/dist/
+apps/mobile/expo-env.d.ts

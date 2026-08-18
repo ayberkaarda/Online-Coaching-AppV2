@@ -1,0 +1,22 @@
+{
+  "expo": {
+    "name": "Koçluk",
+    "slug": "my-coaching-app",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "scheme": "mycoaching",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.mycoachingapp.mobile"
+    },
+    "android": {
+      "package": "com.mycoachingapp.mobile"
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static"
+    },
+    "plugins": ["expo-router"]
+  }
+}

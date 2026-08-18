@@ -206,3 +206,14 @@ Faz 4.5 uygulama turunda (bu ADR'nin kapsamı dışında, ileride):
 - `packages/types/**`, `packages/api-client/**`, `packages/config/**` (yeni)
 - `apps/mobile/**` (yeni, Expo iskeleti)
 - `.github/workflows/ci.yml`, `Dockerfile`, `docker-compose.yml`
+
+## Uygulama notu — commit 6 (2026-08-18)
+
+- **Navigasyon kararı: `expo-router`.** ADR yazılırken bu seçim yapılmamıştı. Gerekçe:
+  expo-router zaten `@react-navigation`'ın üzerine kurulu (ayrı bir seçim değil, bir katman),
+  SDK 57 şablonunun varsayılanı (`main` girişi `expo-router/entry`), ve **her ekran otomatik
+  bir URL alıyor** — Faz 7'nin push derin bağlantısı için elle `linking` tablosu tutulmasını
+  gereksiz kılıyor. App Router simetrisi gerçek ama ikincil bir kazanım.
+- **AC-4.5.6 sapması:** planın 7 commit'lik bölümlemesinde bu AC'nin karşılığı yok; Faz 4.5
+  içinde kapanamıyor, mobil veri katmanı turuna taşınıyor (bkz. PROGRESS §3 B-052).
+- **AC-4.5.3** cihazsız kanıtla değil, kullanıcının Expo Go smoke'uyla kapanacak.

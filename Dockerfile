@@ -31,7 +31,15 @@ RUN npm i -g pnpm@10.34.5
 # yeni bir glob eklenmesi gerekir.
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 COPY --parents apps/*/package.json packages/*/package.json ./
-RUN pnpm install --frozen-lockfile
+# Kurulum kapsamı `web...` seçicisiyle daraltılır (Faz 4.5 commit 6): yukarıdaki
+# `apps/*/package.json` globu `apps/mobile`'ın manifest'ini de imaja çeker ve FİLTRESİZ bir
+# install TÜM React Native ağacını (expo, react-native, reanimated...) web imajına kurardı.
+# `web...` = "web + web'in bağımlı olduğu workspace paketleri". `--frozen-lockfile`
+# disiplini bozulmaz: manifest imajda kalır, pnpm workspace'i kilide karşı DOĞRULAR,
+# yalnızca indirilen/bağlanan paket kümesi daralır. Bu yüzden `apps/mobile/package.json`
+# .dockerignore'a EKLENMEZ — kilitte importer'ı varken manifest'i eksik olsaydı frozen
+# install düşerdi.
+RUN pnpm install --frozen-lockfile --filter web...
 
 # ---- builder: build the Next.js standalone output ----
 FROM base AS builder
