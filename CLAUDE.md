@@ -42,6 +42,7 @@ Sub-agent'lar ana modeli otomatik devralmaz. Her Agent çağrısında `model` pa
 - Hata bulunursa veya düzeltme gerekiyorsa YENİ bir sub-agent AÇMA. Bağlamı korumak için **AYNI** aktif agent'a düzeltme talimatlarıyla `SendMessage` gönder.
 - Sonnet aynı görevde iki kez başarısız olursa, o parçayı hata bağlamıyla birlikte taze bir `model: "opus-4.8"` agent'a eskale et. Opus 4.8 da başarısız olursa, main thread (Opus 5) parçayı kendi üstlenir.
 - **Rule:** Sub-agent'lar asla Git komutu çalıştıramaz. Versiyon kontrolü kesinlikle main thread görevidir.
+- **Rule:** Push sonrası `gh run list -L1` / `gh run watch <run-id> --exit-status` ile koşum sonucu görülmeden görev "tamamlandı" ilan edilemez.
 
 ## 6. Destructive Command Safety
 

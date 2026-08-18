@@ -20,7 +20,17 @@ permissions:
 
 env:
   # Build-time için sahte NEXT_PUBLIC_* değerleri (gerçek sır değil).
-  NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+  # NEXT_PUBLIC_SUPABASE_URL BİLEREK hosted-DIŞI bir değer: `*.supabase.co` deseni
+  # `apps/web/src/env.server.ts`'teki fail-closed Katman 2 guard'ını tetikler ve
+  # `vi.unstubAllEnvs()` çağıran 7 test dosyası (env-hosted-guard, env, env-production,
+  # auth-sign-in-rate-limit, security-events, proxy-rate-limit, csp-nonce) test sonunda
+  # ambient `process.env`'e döner — CI'ın ambient'ı bu değişkenle DOLU olduğundan guard
+  # 26 kez "BARINDIRILAN (uzak) proje" diye fırlatıp bu testleri kırıyordu (yerelde ambient
+  # boş olduğu için aynı guard `if (!url) return` ile sessizce geçiyordu, kırık yalnızca
+  # CI'da görünüyordu). Guard KENDİSİ CI'da da canlı kalmaya devam ediyor — gerçek bir
+  # hosted hedef (`*.supabase.co`/`.com`) verilirse hâlâ fırlatır; bu bilinçli bir
+  # düzeltme, guard'a tanınmış bir muafiyet DEĞİL.
+  NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
   NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key
   NEXT_PUBLIC_APP_URL: http://localhost:3000
 
@@ -107,7 +117,13 @@ jobs:
     name: E2E (Playwright)
     needs: [frontend]
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
+    # PR-only bir E2E kapısı bu repoda doğrudan-main-push akışında TANIM GEREĞİ ölü koddu:
+    # bu repo 22/22 push ile ilerliyor, hiçbir PR koşumu yok — yani e2e hiç çalışmamıştı
+    # (ölçüldü). `!= 'schedule'` push VE pull_request'te koşturur, yalnızca haftalık
+    # gitleaks-tam-geçmiş cron'unu (bkz. üstteki `on.schedule`) dışlar — o job zaten yalnız
+    # güvenlik taraması için var, E2E'ye ihtiyacı yok. Üst üste push'larda E2E'nin
+    # birikmesi `concurrency: cancel-in-progress: true` (yukarıda) ile zaten kesiliyor.
+    if: github.event_name != 'schedule'
     timeout-minutes: 20
     # NOT: playwright.config.ts'deki webServer bloğu `pnpm run build && pnpm run
     # start` çalıştırıyor ve CI'da (process.env.CI true olduğu için)
@@ -304,10 +320,14 @@ jobs:
       # pnpm, setup-node'dan ÖNCE (bkz. `frontend` job'undaki aynı notu).
       - uses: pnpm/action-setup@v4
 
+      # NOT: `cache: 'pnpm'` BİLEREK verilmiyor. Bu job hiçbir adımda `pnpm install`
+      # koşmuyor (`pnpm audit --prod` yalnızca `pnpm-lock.yaml`'ı okur, kurulum yapmaz);
+      # dolayısıyla pnpm store hiç oluşmuyor. `cache: 'pnpm'` verilince setup-node yine de
+      # `Post Run` adımında store'u kaydetmeye çalışıp "Path Validation Error: Path(s)
+      # specified in the action for caching do(es) not exist" ile job'u kırıyordu (ölçüldü).
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'pnpm'
 
       - name: Install uv
         uses: astral-sh/setup-uv@v5
