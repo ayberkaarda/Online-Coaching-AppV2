@@ -17,7 +17,7 @@ import {
   rowsToWorkoutPlan,
   type NutritionPlanMealRow,
   type WorkoutPlanExerciseRow,
-} from '@/hooks/usePlans'
+} from '@repo/api-client/hooks/usePlans'
 import {
   DAY_NAMES,
   EMPTY_NUTRITION_PLAN,

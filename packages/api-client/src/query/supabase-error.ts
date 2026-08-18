@@ -1,9 +1,9 @@
 // Supabase/PostgREST sorgu hatalarını `.code` alanını KORUYARAK fırlatmak için yardımcı.
 //
-// SORUN (A-10 kalanı, bkz. docs/security/AUDIT.md §4c "Kayıtlı borçlar"): `src/hooks/**`
+// SORUN (A-10 kalanı, bkz. docs/security/AUDIT.md §4c "Kayıtlı borçlar"): `packages/api-client/src/hooks/**`
 // içindeki her çağrı noktası bugüne kadar `throw new Error(error.message)` yazıyordu — bu, düz
 // bir `Error` ürettiği için Supabase'in PostgREST hata nesnesindeki `.code` alanını (RLS reddinde
-// `42501`) SESSİZCE ATIYORDU. `src/lib/query/queryClient.ts` içindeki merkezi
+// `42501`) SESSİZCE ATIYORDU. `@repo/api-client/query/queryClient` içindeki merkezi
 // `QueryCache`/`MutationCache` `onError` kancası `42501`'i tespit edebilsin diye, hook'lar artık
 // `throw new Error(error.message)` yerine `throw wrapSupabaseError(error, { table, op })`
 // kullanır. `.message` BİREBİR AYNI kalır (bkz. constructor) — bu yüzden mevcut `toast.error`

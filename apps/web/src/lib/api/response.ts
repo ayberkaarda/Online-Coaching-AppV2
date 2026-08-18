@@ -3,8 +3,8 @@
 // `errorResponse` daha önce `src/lib/api/proxy.ts` içinde yaşıyordu; A-01 (giriş kaba kuvvet
 // koruması) ile ikinci bir çağıran (`/api/auth/sign-in`) eklendiğinde buraya taşındı, böylece
 // auth route'u AI proxy modülünün tamamını içe aktarmak zorunda kalmaz. Gövde biçimi
-// (`ApiErrorBody`, bkz. `./types.ts`) ve davranış DEĞİŞMEDİ; `proxy.ts` geriye dönük uyumluluk
-// için aynı adı yeniden dışa aktarır.
+// (`ApiErrorBody`, bkz. `@repo/api-client/api/types`) ve davranış DEĞİŞMEDİ; `proxy.ts`
+// geriye dönük uyumluluk için aynı adı yeniden dışa aktarır.
 
 import { NextResponse } from 'next/server'
 
@@ -51,9 +51,9 @@ export function errorResponse(
  * içindeki IP/e-posta maskeleme örnekleri).
  *
  * NOT (A-10 kalanının kapanışı): Supabase/PostgREST `42501` (RLS reddi) hatasının çağrı noktası
- * artık `src/hooks/**`'te KURULDU, ama BU FONKSİYON ÜZERİNDEN DEĞİL —
- * `src/lib/query/queryClient.ts`'teki merkezi `QueryCache`/`MutationCache` `onError` kancası
- * `src/lib/query/security-event.ts`'teki tarayıcı-güvenli bir eşdeğeri (`logClientSecurityEvent`)
+ * artık `packages/api-client/src/hooks/**`'te KURULDU, ama BU FONKSİYON ÜZERİNDEN DEĞİL —
+ * ``@repo/api-client/query/queryClient``'teki merkezi `QueryCache`/`MutationCache` `onError` kancası
+ * ``@repo/api-client/query/security-event``'teki tarayıcı-güvenli bir eşdeğeri (`logClientSecurityEvent`)
  * kullanır. Sebep: bu dosya `next/server`'dan `NextResponse` içe aktarıyor — tarayıcı paketine
  * (hook'lar `'use client'` ağacındadır) dahil edilmeye çalışılırsa build'i kırma riski taşır.
  * Bu fonksiyon (`logSecurityEvent`) yalnızca SUNUCU tarafı çağıranlar için kullanılmaya devam

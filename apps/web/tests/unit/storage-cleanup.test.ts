@@ -2,49 +2,24 @@
 //
 // Kapsam: docs/PROGRESS.md §5 "Yetim storage dosyaları temizlenmiyor". Kullanıcı yeni
 // avatar yüklediğinde eski dosya bucket'ta kalıyordu; bu test dosyası hem yeni
-// `removeStoredObject` yardımcısını (src/lib/storage.ts) hem de `useUploadAvatar`
-// mutasyonunun (src/hooks/useProfile.ts) doğru SIRADA çalıştığını doğrular.
+// `removeStoredObject` yardımcısını (`@repo/api-client/storage`) hem de `useUploadAvatar`
+// mutasyonunun (`@repo/api-client/hooks/useProfile`) doğru SIRADA çalıştığını doğrular.
 //
 // VERİ KAYBI REGRESYONU (en kritik senaryo): `profiles.avatar_path` güncellemesi
 // BAŞARISIZ olursa eski dosya SİLİNMEMELİDİR — aksi hâlde kullanıcı hem eski hem
 // yeni avatarını kaybeder.
 
-import { createElement } from 'react'
-import type { ReactNode } from 'react'
-
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-// `vi.mock` fabrikaları dosyanın en üstüne hoist edilir; mock'lar bu yüzden
-// `vi.hoisted` ile tanımlanmalı, aksi hâlde "cannot access before initialization".
-const { removeMock, uploadMock, singleMock, selectEqSingleMock, updateEqMock, fromMock } =
-  vi.hoisted(() => {
-    const remove = vi.fn()
-    const upload = vi.fn()
-    const single = vi.fn()
-    const selectEqSingle = vi.fn()
-    const updateEq = vi.fn()
-    return {
-      removeMock: remove,
-      uploadMock: upload,
-      singleMock: single,
-      selectEqSingleMock: selectEqSingle,
-      updateEqMock: updateEq,
-      fromMock: vi.fn(),
-    }
-  })
-
-vi.mock('@/lib/supabase/client', () => ({
-  supabase: {
-    storage: {
-      from: vi.fn(() => ({ upload: uploadMock, remove: removeMock })),
-    },
-    from: fromMock,
-  },
-}))
-
-vi.mock('@/lib/logger', () => ({
+// Faz 4.5 commit 5 (ADR-0024): Supabase istemcisi artık modül singleton'ı DEĞİL, enjekte
+// edilen bir nesne. `vi.mock('@/lib/supabase/client', ...)` + `vi.hoisted` bloğu bu yüzden
+// KALKTI — mock'lar sıradan `const` olarak kurulup `createHookWrapper` ile enjekte ediliyor.
+// `importOriginal` spread'i ZORUNLU: `apps/web/src/lib/logger.ts` (ErrorBoundary üzerinden
+// bileşen ağacına giriyor) bu paketten `createConsoleLogger`/`maskForConsole`/`REDACT_PATHS`
+// import ediyor — yalnızca `logger` döndüren bir mock o modülü yüklenemez hâle getirirdi.
+vi.mock('@repo/logger', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@repo/logger')>()),
   logger: { warn: vi.fn(), error: vi.fn(), info: vi.fn(), debug: vi.fn() },
 }))
 
@@ -55,13 +30,27 @@ vi.mock('sonner', () => ({
 // Gerçek magic-byte doğrulaması bu testin kapsamı dışında (tests/unit/upload-validation.test.ts
 // zaten kapsıyor); burada sabit bir sonuç dönülür ki senaryolar yalnızca temizlik mantığına
 // odaklansın.
-vi.mock('@/lib/upload-validation', () => ({
+vi.mock('@repo/api-client/upload-validation', () => ({
   assertValidImageFile: vi.fn().mockResolvedValue({ mime: 'image/png', extension: 'png' }),
 }))
 
-import { logger } from '@/lib/logger'
-import { useUploadAvatar } from '@/hooks/useProfile'
-import { AVATAR_BUCKET, removeStoredObject } from '@/lib/storage'
+import { logger } from '@repo/logger'
+import { useUploadAvatar } from '@repo/api-client/hooks/useProfile'
+import { AVATAR_BUCKET, removeStoredObject } from '@repo/api-client/storage'
+
+import { asSupabaseClient, createHookWrapper } from './test-utils'
+
+const removeMock = vi.fn()
+const uploadMock = vi.fn()
+const singleMock = vi.fn()
+const selectEqSingleMock = vi.fn()
+const updateEqMock = vi.fn()
+const fromMock = vi.fn()
+
+const supabase = asSupabaseClient({
+  storage: { from: vi.fn(() => ({ upload: uploadMock, remove: removeMock })) },
+  from: fromMock,
+})
 
 const USER_ID = '11111111-1111-4111-8111-111111111111'
 
@@ -90,12 +79,7 @@ function wireProfilesTable() {
 }
 
 function createWrapper() {
-  const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
-  })
-  return function Wrapper({ children }: { children: ReactNode }) {
-    return createElement(QueryClientProvider, { client: queryClient }, children)
-  }
+  return createHookWrapper({ supabaseClient: supabase }).Wrapper
 }
 
 beforeEach(() => {
@@ -108,36 +92,36 @@ beforeEach(() => {
 describe('removeStoredObject', () => {
   it('geçerli bir bucket yolunda remove() çağırır ve true döner', async () => {
     removeMock.mockResolvedValue({ error: null })
-    await expect(removeStoredObject(AVATAR_BUCKET, 'uid-old.png')).resolves.toBe(true)
+    await expect(removeStoredObject(supabase, AVATAR_BUCKET, 'uid-old.png')).resolves.toBe(true)
     expect(removeMock).toHaveBeenCalledWith(['uid-old.png'])
   })
 
   it('null/boş yolda istek atmadan false döner', async () => {
-    await expect(removeStoredObject(AVATAR_BUCKET, null)).resolves.toBe(false)
-    await expect(removeStoredObject(AVATAR_BUCKET, undefined)).resolves.toBe(false)
-    await expect(removeStoredObject(AVATAR_BUCKET, '   ')).resolves.toBe(false)
+    await expect(removeStoredObject(supabase, AVATAR_BUCKET, null)).resolves.toBe(false)
+    await expect(removeStoredObject(supabase, AVATAR_BUCKET, undefined)).resolves.toBe(false)
+    await expect(removeStoredObject(supabase, AVATAR_BUCKET, '   ')).resolves.toBe(false)
     expect(removeMock).not.toHaveBeenCalled()
   })
 
   it('storage dışı mutlak URL için istek atmadan false döner', async () => {
-    await expect(removeStoredObject(AVATAR_BUCKET, 'https://placehold.co/200x200')).resolves.toBe(
-      false
-    )
     await expect(
-      removeStoredObject(AVATAR_BUCKET, 'http://example.com/eski-avatar.png')
+      removeStoredObject(supabase, AVATAR_BUCKET, 'https://placehold.co/200x200')
+    ).resolves.toBe(false)
+    await expect(
+      removeStoredObject(supabase, AVATAR_BUCKET, 'http://example.com/eski-avatar.png')
     ).resolves.toBe(false)
     expect(removeMock).not.toHaveBeenCalled()
   })
 
   it('silme hata dönerse fırlatmaz, false döner ve loglar', async () => {
     removeMock.mockResolvedValue({ error: { message: 'permission denied' } })
-    await expect(removeStoredObject(AVATAR_BUCKET, 'uid-old.png')).resolves.toBe(false)
+    await expect(removeStoredObject(supabase, AVATAR_BUCKET, 'uid-old.png')).resolves.toBe(false)
     expect(logger.warn).toHaveBeenCalled()
   })
 
   it('istek fırlatırsa (ağ hatası) yakalar, false döner', async () => {
     removeMock.mockRejectedValue(new Error('network down'))
-    await expect(removeStoredObject(AVATAR_BUCKET, 'uid-old.png')).resolves.toBe(false)
+    await expect(removeStoredObject(supabase, AVATAR_BUCKET, 'uid-old.png')).resolves.toBe(false)
     expect(logger.warn).toHaveBeenCalled()
   })
 })

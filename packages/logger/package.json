@@ -1,0 +1,12 @@
+{
+  "name": "@repo/logger",
+  "version": "0.0.0",
+  "private": true,
+  "description": "apps/web, apps/mobile ve @repo/api-client arasında paylaşılan, PLATFORMDAN BAĞIMSIZ logger çekirdeği: Logger arayüzü, REDACT_PATHS maskeleme listesi ve console adaptörü (ADR-0024 Ek-2, Faz 4.5 commit 5). pino dallanması BİLEREK burada DEĞİL, apps/web/src/lib/logger.ts'te kalır — Metro (React Native) pino'nun Node bağımlılıklarını çözemez. Build adımı YOK: TS kaynağı doğrudan yayınlanır (bkz. apps/web/next.config.mjs transpilePackages).",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "devDependencies": {
+    "@repo/config": "workspace:*"
+  }
+}

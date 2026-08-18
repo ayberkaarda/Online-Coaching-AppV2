@@ -13,7 +13,7 @@
 
 import { describe, expect, it } from 'vitest'
 
-import { resolveConversationClientId } from '@/hooks/useMessages'
+import { resolveConversationClientId } from '@repo/api-client/hooks/useMessages'
 
 const COACH = '11111111-1111-1111-1111-111111111111'
 const CLIENT_A = '22222222-2222-2222-2222-222222222222'

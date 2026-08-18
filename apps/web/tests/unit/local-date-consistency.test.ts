@@ -38,23 +38,21 @@ import { render, renderHook, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { fromMock, uploadMock } = vi.hoisted(() => ({
-  fromMock: vi.fn(),
-  uploadMock: vi.fn(),
-}))
-
-vi.mock('@/lib/supabase/client', () => ({
-  supabase: {
-    from: fromMock,
-    storage: { from: vi.fn(() => ({ upload: uploadMock })) },
-  },
-}))
+// Faz 4.5 commit 5 (ADR-0024): Supabase istemcisi artık modül singleton'ı DEĞİL — hook'lar
+// onu `<SupabaseClientProvider>`'dan alıyor. Bu yüzden `vi.mock('@/lib/supabase/client', ...)`
+// KALKTI; sahte istemci sıradan bir nesne olarak kurulup sarmalayıcıyla enjekte ediliyor.
+const fromMock = vi.fn()
+const uploadMock = vi.fn()
 
 vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }))
 
-vi.mock('@/lib/logger', () => ({
+// `importOriginal` spread'i ZORUNLU: `apps/web/src/lib/logger.ts` (ErrorBoundary üzerinden
+// bileşen ağacına giriyor) bu paketten `createConsoleLogger`/`maskForConsole`/`REDACT_PATHS`
+// import ediyor — yalnızca `logger` döndüren bir mock o modülü yüklenemez hâle getirirdi.
+vi.mock('@repo/logger', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@repo/logger')>()),
   logger: { warn: vi.fn(), error: vi.fn(), info: vi.fn(), debug: vi.fn() },
 }))
 
@@ -62,8 +60,8 @@ vi.mock('@/lib/logger', () => ({
 // hook katmanı ("hook tarihi payload'a koyuyor mu?") barrel'i ATLAYARAK
 // doğrudan modülden import edilir — iki ayrı modül specifier'ı, iki ayrı kayıt
 // (bkz. tests/unit/nutrition-logs.test.ts, aynı desen).
-vi.mock('@/hooks', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@/hooks')>()
+vi.mock('@repo/api-client', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@repo/api-client')>()
   return {
     ...actual,
     useFoods: vi.fn(),
@@ -106,16 +104,24 @@ import {
   useSetNutritionTargets,
   useUploadProgressPhoto,
   useUpsertProgressEntry,
-} from '@/hooks'
-import { useCreateDailyLog as useCreateDailyLogDirect } from '@/hooks/useDailyLogs'
+} from '@repo/api-client'
+import { useCreateDailyLog as useCreateDailyLogDirect } from '@repo/api-client/hooks/useDailyLogs'
 import {
   sumNutritionLogsForDate,
   useCreateNutritionLog as useCreateNutritionLogDirect,
   type NutritionLog,
-} from '@/hooks/useNutritionLogs'
-import { useUpsertProgressEntry as useUpsertProgressEntryDirect } from '@/hooks/useProgressEntries'
-import { useUploadProgressPhoto as useUploadProgressPhotoDirect } from '@/hooks/useProgressPhotos'
-import { todayIsoDate } from '@/lib/date'
+} from '@repo/api-client/hooks/useNutritionLogs'
+import { useUpsertProgressEntry as useUpsertProgressEntryDirect } from '@repo/api-client/hooks/useProgressEntries'
+import { useUploadProgressPhoto as useUploadProgressPhotoDirect } from '@repo/api-client/hooks/useProgressPhotos'
+import { SupabaseClientProvider } from '@repo/api-client/context'
+
+import { asSupabaseClient } from './test-utils'
+
+const supabase = asSupabaseClient({
+  from: fromMock,
+  storage: { from: vi.fn(() => ({ upload: uploadMock })) },
+})
+import { todayIsoDate } from '@repo/api-client/date'
 
 // ---------------------------------------------------------------------------
 // Gece yarısı penceresi — hatanın BİREBİR senaryosu
@@ -172,7 +178,11 @@ function createWrapper() {
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   })
   return function Wrapper({ children }: { children: ReactNode }) {
-    return createElement(QueryClientProvider, { client: queryClient }, children)
+    return createElement(
+      SupabaseClientProvider,
+      { client: supabase },
+      createElement(QueryClientProvider, { client: queryClient }, children)
+    )
   }
 }
 

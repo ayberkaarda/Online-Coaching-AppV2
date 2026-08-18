@@ -1,5 +1,5 @@
 // Faz 4d — açı etiketli ilerleme fotoğrafları + önce/sonra karşılaştırma
-// (src/hooks/useProgressPhotos.ts, src/components/progress/ProgressPhotos.tsx,
+// (packages/api-client/src/hooks/useProgressPhotos.ts, src/components/progress/ProgressPhotos.tsx,
 // src/components/progress/BeforeAfterSlider.tsx).
 //
 // Kapsam (bkz. görev talimatı "TESTLER"):
@@ -18,23 +18,17 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { fireEvent, render, renderHook, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-// `vi.mock` fabrikaları dosyanın en üstüne hoist edilir; mock'lar bu yüzden
-// `vi.hoisted` ile tanımlanmalı (bkz. tests/unit/form-check-queue.test.tsx aynı desen).
-const { fromMock, uploadMock } = vi.hoisted(() => ({
-  fromMock: vi.fn(),
-  uploadMock: vi.fn(),
-}))
+// Faz 4.5 commit 5 (ADR-0024): Supabase istemcisi artık modül singleton'ı DEĞİL — hook'lar
+// onu `<SupabaseClientProvider>`'dan alıyor. Bu yüzden `vi.mock('@/lib/supabase/client', ...)`
+// KALKTI; sahte istemci sıradan bir nesne olarak kurulup sarmalayıcıyla enjekte ediliyor.
+const fromMock = vi.fn()
+const uploadMock = vi.fn()
 
-vi.mock('@/lib/supabase/client', () => ({
-  supabase: {
-    from: fromMock,
-    storage: {
-      from: vi.fn(() => ({ upload: uploadMock })),
-    },
-  },
-}))
-
-vi.mock('@/lib/logger', () => ({
+// `importOriginal` spread'i ZORUNLU: `apps/web/src/lib/logger.ts` (ErrorBoundary üzerinden
+// bileşen ağacına giriyor) bu paketten `createConsoleLogger`/`maskForConsole`/`REDACT_PATHS`
+// import ediyor — yalnızca `logger` döndüren bir mock o modülü yüklenemez hâle getirirdi.
+vi.mock('@repo/logger', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@repo/logger')>()),
   logger: { warn: vi.fn(), error: vi.fn(), info: vi.fn(), debug: vi.fn() },
 }))
 
@@ -46,23 +40,31 @@ vi.mock('sonner', () => ({
 // hangi yolların imzalandığını ve dönen adresleri kontrol eder.
 const createSignedUrlsMock = vi.fn()
 const removeStoredObjectMock = vi.fn()
-vi.mock('@/lib/storage', () => ({
+vi.mock('@repo/api-client/storage', () => ({
   PROGRESS_PHOTOS_BUCKET: 'progress-photos',
   SIGNED_URL_STALE_TIME_MS: 1_800_000,
   createSignedUrls: (...args: unknown[]) => createSignedUrlsMock(...args),
   removeStoredObject: (...args: unknown[]) => removeStoredObjectMock(...args),
 }))
 
-// Yükleme doğrulaması ('@/lib/upload-validation') KASITLI OLARAK mock'lanmaz — bu dosyanın
+// Yükleme doğrulaması ('@repo/api-client/upload-validation') KASITLI OLARAK mock'lanmaz — bu dosyanın
 // asıl testi budur: gerçek magic-byte kontrolü reddediyor mu?
 
 import { ProgressPhotos } from '@/components/progress/ProgressPhotos'
 import { BeforeAfterSlider } from '@/components/progress/BeforeAfterSlider'
+import { SupabaseClientProvider } from '@repo/api-client/context'
 import {
   useDeleteProgressPhoto,
   useProgressPhotos,
   useUploadProgressPhoto,
-} from '@/hooks/useProgressPhotos'
+} from '@repo/api-client/hooks/useProgressPhotos'
+
+import { asSupabaseClient } from './test-utils'
+
+const supabase = asSupabaseClient({
+  from: fromMock,
+  storage: { from: vi.fn(() => ({ upload: uploadMock })) },
+})
 
 const CLIENT_ID = '22222222-2222-4222-8222-222222222222'
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -92,7 +94,11 @@ function createWrapper() {
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   })
   return function Wrapper({ children }: { children: ReactNode }) {
-    return createElement(QueryClientProvider, { client: queryClient }, children)
+    return createElement(
+      SupabaseClientProvider,
+      { client: supabase },
+      createElement(QueryClientProvider, { client: queryClient }, children)
+    )
   }
 }
 
@@ -221,7 +227,7 @@ describe('useDeleteProgressPhoto — satır + best-effort dosya temizliği', () 
 
     expect(deleteMock).toHaveBeenCalledTimes(1)
     expect(eqMock).toHaveBeenCalledWith('id', 'photo-1')
-    expect(removeStoredObjectMock).toHaveBeenCalledWith('progress-photos', photoPath)
+    expect(removeStoredObjectMock).toHaveBeenCalledWith(supabase, 'progress-photos', photoPath)
   })
 })
 
@@ -300,9 +306,13 @@ function renderProgressPhotos(props: { readOnly: boolean }) {
   })
   return render(
     createElement(
-      QueryClientProvider,
-      { client: queryClient },
-      createElement(ProgressPhotos, { clientId: CLIENT_ID, readOnly: props.readOnly })
+      SupabaseClientProvider,
+      { client: supabase },
+      createElement(
+        QueryClientProvider,
+        { client: queryClient },
+        createElement(ProgressPhotos, { clientId: CLIENT_ID, readOnly: props.readOnly })
+      )
     )
   )
 }

@@ -47,32 +47,35 @@ vi.mock('sonner', () => ({
 }))
 
 // C bölümü için: hook'un Supabase istemcisiyle ne yaptığını ölçüyoruz.
-const { getSessionMock, setSessionMock, onAuthStateChangeMock, apiFetchMock } = vi.hoisted(() => ({
-  getSessionMock: vi.fn(),
-  setSessionMock: vi.fn(),
-  onAuthStateChangeMock: vi.fn(),
-  apiFetchMock: vi.fn(),
-}))
+//
+// Faz 4.5 commit 5 (ADR-0024): `useSignIn` istemciyi artık modül singleton'ından DEĞİL
+// `<SupabaseClientProvider>`'dan alıyor — sahte istemci `vi.mock` yerine düz bir nesne olarak
+// kurulup `createWrapper()` ile enjekte ediliyor. `apiFetch` mock'u ise hâlâ modül seviyesinde.
+const getSessionMock = vi.fn()
+const setSessionMock = vi.fn()
+const onAuthStateChangeMock = vi.fn()
+const { apiFetchMock } = vi.hoisted(() => ({ apiFetchMock: vi.fn() }))
 
-vi.mock('@/lib/supabase/client', () => ({
-  supabase: {
-    auth: {
-      getSession: getSessionMock,
-      setSession: setSessionMock,
-      onAuthStateChange: onAuthStateChangeMock,
-    },
-  },
-}))
-
-vi.mock('@/lib/api/client', () => ({
+vi.mock('@repo/api-client/api/client', () => ({
   apiFetch: apiFetchMock,
   ApiError: class ApiError extends Error {},
 }))
 
 import { POST } from '@/app/api/auth/sign-in/route'
 import { resetServerEnvCache } from '@/env.server'
-import { useSignIn } from '@/hooks/useSession'
+import { SupabaseClientProvider } from '@repo/api-client/context'
+import { useSignIn } from '@repo/api-client/hooks/useSession'
 import { resetRateLimit } from '@/lib/rate-limit'
+
+import { asSupabaseClient } from './test-utils'
+
+const supabase = asSupabaseClient({
+  auth: {
+    getSession: getSessionMock,
+    setSession: setSessionMock,
+    onAuthStateChange: onAuthStateChangeMock,
+  },
+})
 
 // ---------------------------------------------------------------------------
 // Yardımcılar
@@ -253,7 +256,11 @@ function createWrapper() {
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   })
   return function Wrapper({ children }: { children: ReactNode }) {
-    return createElement(QueryClientProvider, { client: queryClient }, children)
+    return createElement(
+      SupabaseClientProvider,
+      { client: supabase },
+      createElement(QueryClientProvider, { client: queryClient }, children)
+    )
   }
 }
 

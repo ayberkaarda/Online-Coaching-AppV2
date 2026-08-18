@@ -71,14 +71,13 @@ export function createBrowserSupabaseClient(): SupabaseClient<Database> {
   return browserClient
 }
 
-/** Geriye dönük uyumlu kısayol: `import { supabase } from '@/lib/supabase'`. */
-export const supabase: SupabaseClient<Database> = createBrowserSupabaseClient()
-
-/**
- * Supabase `{ data, error }` sonucunu açar; hata varsa fırlatır.
- * Query/Mutation hook'larında hata durumlarının sessizce yutulmasını engeller.
- */
-export function unwrap<T>(result: { data: T; error: { message: string } | null }): T {
-  if (result.error) throw new Error(result.error.message)
-  return result.data
-}
+// Faz 4.5 commit 5 (ADR-0024): modül seviyesindeki
+// `export const supabase = createBrowserSupabaseClient()` kısayolu KALDIRILDI. Veri katmanının
+// tamamı (`@repo/api-client`) istemciyi artık `<SupabaseClientProvider>` üzerinden alıyor;
+// singleton'ı ayrıca dışa açık tutmak, paketin kaçındığı erişim yolunu `apps/web` tarafında
+// yeniden üretirdi (iki farklı yoldan gelen aynı istemci = ileride sessizce ayrışabilen iki
+// yol). Fabrika HÂLÂ modül seviyesinde tekilleştirilmiş bir örnek döndürüyor (yukarıdaki
+// `browserClient`), tek çağıran `src/app/providers.tsx`.
+//
+// `unwrap<T>()` yardımcısı da buradan çıkarıldı: istemciye hiç bağlı olmadığı için
+// `@repo/api-client`'a (src/unwrap.ts) taşındı — ADR-0024 "Sonuçlar" bölümü.

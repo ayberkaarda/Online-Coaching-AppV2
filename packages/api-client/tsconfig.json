@@ -1,0 +1,19 @@
+{
+  // Paylaşılan katı derleyici tabanı @repo/config'ten gelir (ADR-0023 madde 1). `next.json`
+  // seçildi: bu paket React hook'ları (JSX içeren `context.tsx` dahil) ve `File`/`fetch` gibi
+  // DOM API'lerine dokunan doğrulama kodu içeriyor. Next'e özgü olan tek şey `plugins` alanı;
+  // paketin kendisi Next.js'e bağımlı DEĞİLDİR (bkz. package.json dependencies).
+  //
+  // NOT: Bu config bugün hiçbir script tarafından ÇALIŞTIRILMIYOR — paket başına
+  // `type-check`/vitest bölünmesi Faz 4.5 commit 7'ye ertelendi (ADR-0023 madde 4). Paket
+  // kaynağı bugün `apps/web`'in `tsc --noEmit` çalıştırmasıyla, tüketici tarafından
+  // derlenerek denetleniyor.
+  "extends": "@repo/config/tsconfig/next.json",
+  "compilerOptions": {
+    // Paket standalone derlendiğinde `vitest/globals` / `@testing-library/jest-dom` tipleri
+    // burada çözülemez (onlar apps/web'in devDependency'si); yalnızca React tipleri gerekir.
+    "types": []
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx"],
+  "exclude": ["node_modules"]
+}

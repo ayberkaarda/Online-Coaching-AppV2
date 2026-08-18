@@ -25,9 +25,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 
-import { queryKeys } from '@/lib/query/keys'
-import { wrapSupabaseError } from '@/lib/query/supabase-error'
-import { supabase } from '@/lib/supabase/client'
+import { queryKeys } from '../query/keys'
+import { wrapSupabaseError } from '../query/supabase-error'
+import { useSupabaseClient } from '../context'
 import {
   DAY_NAMES,
   EMPTY_WORKOUT_PLAN,
@@ -52,7 +52,7 @@ export interface WorkoutPlanExerciseRow {
  *   '\n' ile birleştirilmesidir. Eksik günler boş string olur; bilinmeyen gün
  *   adları (şema CHECK'i sayesinde normalde oluşamaz) sessizce yok sayılır.
  *
- * Saf fonksiyondur — hook'tan bağımsız test edilebilir (tests/unit/plans.test.ts).
+ * Saf fonksiyondur — hook'tan bağımsız test edilebilir (apps/web/tests/unit/plans.test.ts).
  */
 export function rowsToWorkoutPlan(
   rows: readonly WorkoutPlanExerciseRow[] | null | undefined
@@ -93,6 +93,7 @@ export function planToRpcPayload(plan: WorkoutPlan): Json {
 }
 
 export function useWorkoutPlan(clientId?: string) {
+  const supabase = useSupabaseClient()
   return useQuery({
     queryKey: queryKeys.workoutPlan(clientId),
     enabled: Boolean(clientId),
@@ -142,7 +143,7 @@ function emptyNutritionPlan(): NutritionPlan {
  * Eksik günler `{ items: '', total: 0 }` olur; bilinmeyen gün adları (şema CHECK'i
  * sayesinde normalde oluşamaz) sessizce yok sayılır.
  *
- * Saf fonksiyondur — hook'tan bağımsız test edilebilir (tests/unit/plans.test.ts).
+ * Saf fonksiyondur — hook'tan bağımsız test edilebilir (apps/web/tests/unit/plans.test.ts).
  */
 export function rowsToNutritionPlan(
   rows: readonly NutritionPlanMealRow[] | null | undefined
@@ -186,6 +187,7 @@ export function nutritionPlanToRpcPayload(plan: NutritionPlan): Json {
 }
 
 export function useNutritionPlan(clientId?: string) {
+  const supabase = useSupabaseClient()
   return useQuery({
     queryKey: queryKeys.nutritionPlan(clientId),
     enabled: Boolean(clientId),
@@ -209,6 +211,7 @@ export interface SaveWorkoutPlanInput {
 }
 
 export function useSaveWorkoutPlan() {
+  const supabase = useSupabaseClient()
   const queryClient = useQueryClient()
 
   return useMutation({
@@ -247,6 +250,7 @@ export interface SaveNutritionPlanInput {
 }
 
 export function useSaveNutritionPlan() {
+  const supabase = useSupabaseClient()
   const queryClient = useQueryClient()
 
   return useMutation({

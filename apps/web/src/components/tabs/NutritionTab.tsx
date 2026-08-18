@@ -34,8 +34,8 @@ import {
   type NutritionLog,
   type NutritionTargets,
   type NutritionTotals,
-} from '@/hooks'
-import { todayIsoDate } from '@/lib/date'
+} from '@repo/api-client'
+import { todayIsoDate } from '@repo/api-client/date'
 import { DAYS, downloadCSV, formatDateTR } from '@/lib/utils'
 import { aiDietSchema, type AiDietInput } from '@repo/types/schemas'
 import {
@@ -468,7 +468,7 @@ function ClientMealSection({ clientId, logs, foodDB }: ClientMealSectionProps): 
         // aynı `todayIsoDate()` değeriyle filtreler. Alan boş bırakılıp DB'nin
         // UTC `current_date` varsayılanına düşülseydi, UTC+3'te gece
         // 00:00–03:00 arasında eklenen öğün "dün"e yazılır ve toplamda hiç
-        // görünmezdi (bkz. src/lib/date.ts).
+        // görünmezdi (bkz. `@repo/api-client/date`).
         log_date: todayIsoDate(),
       },
       {

@@ -32,14 +32,15 @@
 // kaynağı RLS'tir (42501). Arayüzün koça yazma eylemini hiç SUNMAMASI
 // `StatsTab.tsx`'in görevidir (`NutritionTab` ile aynı desen).
 
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 
-import { todayIsoDate } from '@/lib/date'
-import { queryKeyRoots, queryKeys } from '@/lib/query/keys'
-import { wrapSupabaseError } from '@/lib/query/supabase-error'
-import { supabase } from '@/lib/supabase/client'
-import type { Tables } from '@repo/types'
+import { todayIsoDate } from '../date'
+import { queryKeyRoots, queryKeys } from '../query/keys'
+import { wrapSupabaseError } from '../query/supabase-error'
+import { useSupabaseClient } from '../context'
+import type { Database, Tables } from '@repo/types'
 
 export type ProgressEntry = Tables<'progress_entries'>
 
@@ -163,7 +164,7 @@ export interface BuildTrendSeriesOptions {
  * #     (`StatsTab.tsx`; recharts varsayılanı zaten `false`, ama       #
  * #     AÇIKÇA yazılır ki bir yükseltmede sessizce dönmesin).          #
  * #                                                                    #
- * # `tests/unit/progress-trend.test.tsx` ikisini de kilitler.          #
+ * # `apps/web/tests/unit/progress-trend.test.tsx` ikisini de kilitler.          #
  * ####################################################################
  *
  * Aralık dışındaki satırlar (sunucu filtresi kaçırırsa) burada da elenir:
@@ -302,7 +303,11 @@ export function validateProgressEntry(values: ProgressEntryValues): string | nul
  * yasaklanamaz — `current_date` IMMUTABLE değildir, bkz. migration) seriyi
  * KAYDIRMAMALI, aralığın dışında kalmalıdır.
  */
-function progressEntriesQueryOptions(clientId: string | undefined, rangeDays: TrendRangeDays) {
+function progressEntriesQueryOptions(
+  client: SupabaseClient<Database>,
+  clientId: string | undefined,
+  rangeDays: TrendRangeDays
+) {
   return {
     queryKey: queryKeys.progressEntries(clientId, rangeDays),
     enabled: Boolean(clientId),
@@ -310,7 +315,7 @@ function progressEntriesQueryOptions(clientId: string | undefined, rangeDays: Tr
       const end = todayIsoDate()
       const start = addDaysIso(end, -(rangeDays - 1))
 
-      const { data, error } = await supabase
+      const { data, error } = await client
         .from('progress_entries')
         .select('*')
         .eq('client_id', clientId ?? '')
@@ -328,7 +333,8 @@ export function useProgressEntries(
   clientId?: string,
   rangeDays: TrendRangeDays = DEFAULT_TREND_RANGE_DAYS
 ) {
-  return useQuery(progressEntriesQueryOptions(clientId, rangeDays))
+  const supabase = useSupabaseClient()
+  return useQuery(progressEntriesQueryOptions(supabase, clientId, rangeDays))
 }
 
 /**
@@ -343,8 +349,9 @@ export function useProgressTrend(
   clientId?: string,
   rangeDays: TrendRangeDays = DEFAULT_TREND_RANGE_DAYS
 ) {
+  const supabase = useSupabaseClient()
   return useQuery({
-    ...progressEntriesQueryOptions(clientId, rangeDays),
+    ...progressEntriesQueryOptions(supabase, clientId, rangeDays),
     select: (entries: ProgressEntry[]): ProgressTrend => buildTrendSeries(entries, { rangeDays }),
   })
 }
@@ -357,7 +364,7 @@ export interface UpsertProgressEntryInput extends ProgressEntryValues {
   clientId: string
   /**
    * `YYYY-MM-DD` — ölçümün ait olduğu YEREL gün. Arayüz varsayılanı
-   * `todayIsoDate()`tir (src/lib/date.ts), ama kullanıcı geçmiş bir gün de
+   * `todayIsoDate()`tir (`@repo/api-client/date`), ama kullanıcı geçmiş bir gün de
    * seçebilir (StatsTab tarih kutusu).
    *
    * ZORUNLU (opsiyonel DEĞİL): opsiyonelken çağıran boş bırakırsa satır
@@ -386,6 +393,7 @@ export interface UpsertProgressEntryInput extends ProgressEntryValues {
  * kullanıcı sildiğini sandığı ölçüyü grafikte görmeye devam ederdi.
  */
 export function useUpsertProgressEntry() {
+  const supabase = useSupabaseClient()
   const queryClient = useQueryClient()
 
   return useMutation({

@@ -10,7 +10,7 @@
 // konuşmanın kendi callback'i tetiklendiğinde yalnızca O KONUŞMANIN react-query
 // önbelleği güncellenir — başka bir açık konuşmanın önbelleği DOKUNULMAZ kalır.
 //
-// `src/hooks/useMessages.ts`'teki yorum bilerek şunu söylüyor: "İSTEMCİ TARAFI
+// `@repo/api-client/hooks/useMessages`'teki yorum bilerek şunu söylüyor: "İSTEMCİ TARAFI
 // KONUŞMA FİLTRESİ KALDIRILDI — satırın bu konuşmaya ait olduğunu sunucu garanti
 // ediyor." Yani istemcide ikinci bir savunma katmanı YOKTUR; izolasyonun tek
 // kanıtı, her konuşmanın kendi (kanal, filtre, önbellek anahtarı) üçlüsüne sahip
@@ -22,13 +22,17 @@ import { createElement } from 'react'
 import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { SupabaseClientProvider } from '@repo/api-client/context'
+
 vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() },
   Toaster: () => null,
 }))
 
-// `vi.mock` fabrikaları dosyanın en üstüne hoist edilir (bkz. tests/unit/storage.test.ts
-// aynı deseni kullanıyor) — mock durumu bu yüzden `vi.hoisted` içinde tutulur.
+// Faz 4.5 commit 5 (ADR-0024): Supabase istemcisi artık `vi.mock('@/lib/supabase/client')`
+// ile DEĞİL, `<SupabaseClientProvider>` üzerinden enjekte ediliyor. Mock durumu yine de tek
+// bir nesnede toplanıyor; `vi.hoisted` teknik olarak artık şart değil ama dosyanın kurulum
+// bloğunu tek yerde tutuyor.
 const { channelMock, removeChannelMock, fromMock, channelRegistry } = vi.hoisted(() => {
   interface HandlerEntry {
     filter?: string
@@ -99,20 +103,21 @@ const { channelMock, removeChannelMock, fromMock, channelRegistry } = vi.hoisted
   }
 })
 
-vi.mock('@/lib/supabase/client', () => ({
-  supabase: {
-    channel: channelMock,
-    removeChannel: removeChannelMock,
-    from: fromMock,
-  },
-}))
-
 import { QueryClient } from '@tanstack/react-query'
 
-import { queryKeys } from '@/lib/query/keys'
+import { queryKeys } from '@repo/api-client/query/keys'
 import type { Message } from '@repo/types'
 
-import { useMessages } from '@/hooks/useMessages'
+import { useMessages } from '@repo/api-client/hooks/useMessages'
+
+import { asSupabaseClient } from './test-utils'
+
+/** Enjekte edilen sahte istemci — TEK örnek, testler boyunca referansı değişmez. */
+const supabase = asSupabaseClient({
+  channel: channelMock,
+  removeChannel: removeChannelMock,
+  from: fromMock,
+})
 
 const COACH_ID = '11111111-1111-1111-1111-111111111111'
 const CLIENT_A = '22222222-2222-2222-2222-222222222222'
@@ -148,7 +153,11 @@ describe('useMessages realtime aboneliği — konuşma bazında izolasyon', () =
   })
 
   function wrapper({ children }: { children: ReactNode }) {
-    return createElement(QueryClientProvider, { client: queryClient }, children)
+    return createElement(
+      SupabaseClientProvider,
+      { client: supabase },
+      createElement(QueryClientProvider, { client: queryClient }, children)
+    )
   }
 
   it('her konuşma KENDİ kanalına ve `client_id=eq.<clientId>` filtresine abone olur', async () => {
@@ -171,6 +180,25 @@ describe('useMessages realtime aboneliği — konuşma bazında izolasyon', () =
     expect(channelA?.handlers.get('INSERT')?.filter).not.toBe(
       channelB?.handlers.get('INSERT')?.filter
     )
+  })
+
+  // ADR-0024 "Riskler": context'ten gelen istemcinin REFERANS KARARLILIĞI realtime için
+  // kritik. Sağlayıcı her render'da yeni bir istemci verseydi `useEffect` bağımlılık dizisi
+  // (`[supabase, ...]`) her render'da değişir, kanal sökülüp yeniden kurulurdu. Bu test o
+  // regresyonu doğrudan ölçer: 5 yeniden render sonrası `channel(...)` HÂLÂ tek çağrıdır ve
+  // `removeChannel` hiç çağrılmamıştır.
+  it('yeniden render kanalı YENİDEN KURMAZ — enjekte edilen istemcinin referansı kararlıdır', async () => {
+    const { rerender } = renderHook(() => useMessages(CLIENT_A, COACH_ID), { wrapper })
+
+    await waitFor(() => {
+      expect(channelRegistry.has(`messages:client:${CLIENT_A}`)).toBe(true)
+    })
+    expect(channelMock).toHaveBeenCalledTimes(1)
+
+    for (let i = 0; i < 5; i += 1) rerender()
+
+    expect(channelMock).toHaveBeenCalledTimes(1)
+    expect(removeChannelMock).not.toHaveBeenCalled()
   })
 
   it('UPDATE olayı için de aynı konuşma filtresine abone olunur (okundu bilgisinin canlı düşmesi için)', async () => {

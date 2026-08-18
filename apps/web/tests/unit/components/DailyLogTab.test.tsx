@@ -2,15 +2,15 @@ import { render } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import DailyLogTab from '@/components/tabs/DailyLogTab'
-import { useCreateDailyLog, useDailyLogs } from '@/hooks'
-import { todayIsoDate } from '@/lib/date'
+import { useCreateDailyLog, useDailyLogs } from '@repo/api-client'
+import { todayIsoDate } from '@repo/api-client/date'
 import { getMacroPercentage } from '@/lib/utils'
 import type { DailyLog } from '@repo/types'
 
 import { screen, userEvent, waitFor } from '../test-utils'
 
-vi.mock('@/hooks', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@/hooks')>()
+vi.mock('@repo/api-client', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@repo/api-client')>()
   return { ...actual, useDailyLogs: vi.fn(), useCreateDailyLog: vi.fn() }
 })
 

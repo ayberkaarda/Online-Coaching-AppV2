@@ -1,4 +1,5 @@
-// Tüm veri hook'larının tek giriş noktası: `import { useProfile } from '@/hooks'`.
+// Tüm veri hook'larının tek giriş noktası: `import { useProfile } from '@repo/api-client'`.
+// (Doğrudan modül erişimi de mümkün: `@repo/api-client/hooks/useProfile`.)
 
 export * from './useSession'
 export * from './useProfile'

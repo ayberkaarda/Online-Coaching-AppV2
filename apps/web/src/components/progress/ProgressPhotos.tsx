@@ -28,9 +28,9 @@ import {
   useUploadProgressPhoto,
   type ProgressPhotoAngle,
   type ProgressPhotoWithUrl,
-} from '@/hooks'
-import { todayIsoDate } from '@/lib/date'
-import { ALLOWED_IMAGE_MIME, validateImageFile } from '@/lib/upload-validation'
+} from '@repo/api-client'
+import { todayIsoDate } from '@repo/api-client/date'
+import { ALLOWED_IMAGE_MIME, validateImageFile } from '@repo/api-client/upload-validation'
 import { formatDateTR } from '@/lib/utils'
 
 import { BeforeAfterSlider } from './BeforeAfterSlider'
@@ -104,7 +104,7 @@ export function ProgressPhotos({ clientId, readOnly }: ProgressPhotosProps): JSX
     // `takenOn` AÇIKÇA gönderilir: kullanıcının YEREL günü. DB'nin UTC
     // `current_date` varsayılanına düşülseydi, UTC+3'te gece 00:00–03:00
     // arasında yüklenen fotoğraf "dün" etiketiyle listelenirdi
-    // (bkz. src/lib/date.ts). Tarih SEÇTİRMEK ayrı bir özelliktir.
+    // (bkz. `@repo/api-client/date`). Tarih SEÇTİRMEK ayrı bir özelliktir.
     await uploadPhoto.mutateAsync({ clientId, angle, file, takenOn: todayIsoDate() })
     setFile(null)
     setFileError(null)

@@ -12,7 +12,7 @@
 // Kaynaklar (metinler birebir buradan alındı, tahmin yürütülmedi):
 //   src/components/tabs/WorkoutTab.tsx
 //   src/components/workout/GymMode.tsx
-//   src/hooks/useWorkoutLogs.ts (toast metinleri)
+//   packages/api-client/src/hooks/useWorkoutLogs.ts (toast metinleri)
 
 import { type Page } from '@playwright/test'
 

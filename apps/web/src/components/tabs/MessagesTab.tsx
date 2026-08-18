@@ -1,9 +1,9 @@
 'use client'
 
 // Koç <-> danışan birebir sohbeti. Geçmiş, realtime abonelik, presence, okundu
-// tespiti ve optimistic gönderim tamamen `@/hooks` içindeki hook'lar tarafından
+// tespiti ve optimistic gönderim tamamen `@repo/api-client` içindeki hook'lar tarafından
 // yönetilir. Bu bileşen yalnızca sunum + kullanıcı etkileşimidir (AC-2.4:
-// doğrudan Supabase sorgu çağrısı bu dosyada YOKTUR — hepsi `@/hooks/useMessages`
+// doğrudan Supabase sorgu çağrısı bu dosyada YOKTUR — hepsi `@repo/api-client/hooks/useMessages`
 // içinde).
 
 import { Check, CheckCheck, ImageOff, Info, Paperclip, X } from 'lucide-react'
@@ -21,8 +21,8 @@ import {
   usePresence,
   useSendMessage,
   useUnreadCount,
-} from '@/hooks'
-import { UploadValidationError, assertValidImageFile } from '@/lib/upload-validation'
+} from '@repo/api-client'
+import { UploadValidationError, assertValidImageFile } from '@repo/api-client/upload-validation'
 import type { Message, UserRole } from '@repo/types'
 
 export interface MessagesTabProps {
@@ -186,7 +186,7 @@ export default function MessagesTab({
 
   // ---------------------------------------------------------------------------
   // Ek seçimi: gönderim ANINA kadar beklemek yerine seçim anında doğrulanır
-  // (magic-byte dahil — bkz. src/lib/upload-validation.ts) ki kullanıcı
+  // (magic-byte dahil — bkz. `@repo/api-client/upload-validation`) ki kullanıcı
   // geçersiz bir dosyayı yazıp "Gönder"e bastıktan SONRA değil, hemen öğrensin.
   // ---------------------------------------------------------------------------
   useEffect(() => {

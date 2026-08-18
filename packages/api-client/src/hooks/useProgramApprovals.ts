@@ -5,10 +5,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 
-import { planToRpcPayload } from '@/hooks/usePlans'
-import { queryKeyRoots, queryKeys } from '@/lib/query/keys'
-import { wrapSupabaseError } from '@/lib/query/supabase-error'
-import { supabase } from '@/lib/supabase/client'
+import { planToRpcPayload } from './usePlans'
+import { queryKeyRoots, queryKeys } from '../query/keys'
+import { wrapSupabaseError } from '../query/supabase-error'
+import { useSupabaseClient } from '../context'
 import type { Json, ProgramApproval, WorkoutPlan } from '@repo/types'
 
 /** WorkoutPlan bir arayüz/mapped tip olduğu için Json'a açıkça daraltılır. */
@@ -17,6 +17,7 @@ function planToJson(plan: WorkoutPlan): Json {
 }
 
 export function usePendingApprovals(clientId?: string) {
+  const supabase = useSupabaseClient()
   return useQuery({
     queryKey: queryKeys.programApprovals(clientId),
     enabled: Boolean(clientId),
@@ -39,6 +40,7 @@ export interface SubmitProgramForApprovalInput {
 }
 
 export function useSubmitProgramForApproval() {
+  const supabase = useSupabaseClient()
   const queryClient = useQueryClient()
 
   return useMutation({
@@ -85,6 +87,7 @@ export interface ApproveProgramInput {
 }
 
 export function useApproveProgram() {
+  const supabase = useSupabaseClient()
   const queryClient = useQueryClient()
 
   return useMutation({

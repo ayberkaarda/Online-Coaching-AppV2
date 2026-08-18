@@ -2,13 +2,13 @@ import { render } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { DashboardTabs } from '@/components/DashboardTabs'
-import { useNotifications, useProfile } from '@/hooks'
+import { useNotifications, useProfile } from '@repo/api-client'
 import type { Notification, Profile } from '@repo/types'
 
 import { fireEvent, screen } from '../test-utils'
 
-vi.mock('@/hooks', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@/hooks')>()
+vi.mock('@repo/api-client', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@repo/api-client')>()
   return { ...actual, useProfile: vi.fn(), useNotifications: vi.fn() }
 })
 

@@ -9,13 +9,13 @@
 //      (tek anlam kuralı), makro bir bütçedir.
 //
 // `MacroDashboard` saf props alan bir bileşendir (targets/totals) — hiçbir
-// hook'a bağlı değildir, bu yüzden burada `@/hooks` mock'lamaya GEREK YOKTUR.
+// hook'a bağlı değildir, bu yüzden burada `@repo/api-client` mock'lamaya GEREK YOKTUR.
 
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 
 import { computeMacroBudget, MacroDashboard } from '@/components/tabs/NutritionTab'
-import type { NutritionTargets, NutritionTotals } from '@/hooks'
+import type { NutritionTargets, NutritionTotals } from '@repo/api-client'
 
 const EMPTY_TARGETS: NutritionTargets = {
   kcal: null,

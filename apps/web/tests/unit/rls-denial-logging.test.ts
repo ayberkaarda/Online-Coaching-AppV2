@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // A-10 kalanı (bkz. docs/security/AUDIT.md §4c "Kayıtlı borçlar"): RLS reddi (`42501`) hiçbir
-// yerde loglanmıyordu. Bu dosya `src/lib/query/queryClient.ts`'teki merkezi
+// yerde loglanmıyordu. Bu dosya `@repo/api-client/query/queryClient`'teki merkezi
 // `QueryCache`/`MutationCache` `onError` kancasının:
 //   1) `42501` kodlu bir `SupabaseQueryError`'da GERÇEKTEN `event: 'rls_denied'` logladığını,
 //   2) `42501` OLMAYAN hatalarda (23505 unique violation, düz ağ hatası, hatta mesaj metninde
@@ -12,7 +12,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 //
 // `vi.mock` hoisting nedeniyle importlardan ÖNCE tanımlanmalı (bkz. security-events.test.ts /
 // logger-redact.test.ts'teki aynı desen).
-vi.mock('@/lib/logger', () => {
+// Faz 4.5 commit 5 (ADR-0024 Ek-2): `security-event.ts` pakete taşındı ve artık
+// `@repo/logger`'ı import ediyor; mock hedefi de oraya taşındı.
+vi.mock('@repo/logger', async (importOriginal) => {
   const sharedLogger = {
     trace: vi.fn(),
     debug: vi.fn(),
@@ -22,15 +24,17 @@ vi.mock('@/lib/logger', () => {
     fatal: vi.fn(),
     child: vi.fn((): typeof sharedLogger => sharedLogger),
   }
-  return { logger: sharedLogger }
+  // Paketin geri kalanı (createConsoleLogger/maskForConsole/REDACT_PATHS) korunur; yalnızca
+  // hazır `logger` örneği değiştirilir — aksi hâlde `apps/web/src/lib/logger.ts` yüklenemez.
+  return { ...(await importOriginal<typeof import('@repo/logger')>()), logger: sharedLogger }
 })
 
 import type { Session } from '@supabase/supabase-js'
 
-import { queryKeys } from '@/lib/query/keys'
-import { logger } from '@/lib/logger'
-import { makeQueryClient } from '@/lib/query/queryClient'
-import { SupabaseQueryError, wrapSupabaseError } from '@/lib/query/supabase-error'
+import { queryKeys } from '@repo/api-client/query/keys'
+import { makeQueryClient } from '@repo/api-client/query/queryClient'
+import { SupabaseQueryError, wrapSupabaseError } from '@repo/api-client/query/supabase-error'
+import { logger } from '@repo/logger'
 
 const warnMock = vi.mocked(logger.warn)
 

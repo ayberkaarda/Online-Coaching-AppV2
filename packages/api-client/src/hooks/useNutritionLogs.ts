@@ -24,16 +24,16 @@
 // yönetilir; ikisi de aynı `nutrition_plans` SATIRINI paylaşır ama FARKLI
 // KOLONLARA dokunur, dolayısıyla çakışma yoktur.
 //
-// Sorgu anahtarları `src/lib/query/keys.ts`'teki `queryKeys.nutritionTargets`/
+// Sorgu anahtarları ``@repo/api-client/query/keys``'teki `queryKeys.nutritionTargets`/
 // `queryKeys.nutritionLogs` fabrikalarından gelir; `nutritionPlan` (öğün
 // ŞABLONU) ile FARKLI köklerdir, birbirlerini süpürmezler.
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 
-import { queryKeys } from '@/lib/query/keys'
-import { wrapSupabaseError } from '@/lib/query/supabase-error'
-import { supabase } from '@/lib/supabase/client'
+import { queryKeys } from '../query/keys'
+import { wrapSupabaseError } from '../query/supabase-error'
+import { useSupabaseClient } from '../context'
 import type { Tables } from '@repo/types'
 
 export type NutritionLog = Tables<'nutrition_logs'>
@@ -70,6 +70,7 @@ const EMPTY_TARGETS: NutritionTargets = {
  * durumudur, ikisi de dashboard'da aynı şekilde ele alınır.
  */
 export function useNutritionTargets(clientId?: string) {
+  const supabase = useSupabaseClient()
   return useQuery({
     queryKey: queryKeys.nutritionTargets(clientId),
     enabled: Boolean(clientId),
@@ -113,6 +114,7 @@ export interface SetNutritionTargetsInput {
  *     (kendi "aktif plan var mı" kontrolü aynı sorguyla çalışır).
  */
 export function useSetNutritionTargets() {
+  const supabase = useSupabaseClient()
   const queryClient = useQueryClient()
 
   return useMutation({
@@ -178,6 +180,7 @@ export function useSetNutritionTargets() {
  * `log_date`'e göre gruplanır (bkz. `sumNutritionLogsForDate`).
  */
 export function useNutritionLogs(clientId?: string) {
+  const supabase = useSupabaseClient()
   return useQuery({
     queryKey: queryKeys.nutritionLogs(clientId),
     enabled: Boolean(clientId),
@@ -202,7 +205,7 @@ export interface CreateNutritionLogInput {
   carb_g: number | null
   fat_g: number | null
   /**
-   * `YYYY-MM-DD` — kullanıcının YEREL günü (`todayIsoDate()`, src/lib/date.ts).
+   * `YYYY-MM-DD` — kullanıcının YEREL günü (`todayIsoDate()`, `@repo/api-client/date`).
    *
    * ZORUNLU (opsiyonel DEĞİL) ve bu BİLİNÇLİDİR: alan opsiyonelken çağıran onu
    * göndermeyi unutabiliyordu ve satır veritabanının `default current_date`
@@ -216,6 +219,7 @@ export interface CreateNutritionLogInput {
 }
 
 export function useCreateNutritionLog() {
+  const supabase = useSupabaseClient()
   const queryClient = useQueryClient()
 
   return useMutation({
@@ -254,6 +258,7 @@ export interface DeleteNutritionLogInput {
 }
 
 export function useDeleteNutritionLog() {
+  const supabase = useSupabaseClient()
   const queryClient = useQueryClient()
 
   return useMutation({
@@ -272,13 +277,13 @@ export function useDeleteNutritionLog() {
 }
 
 // ---------------------------------------------------------------------------
-// Saf yardımcılar — hook'tan bağımsız test edilebilir (tests/unit/nutrition-logs.test.ts)
+// Saf yardımcılar — hook'tan bağımsız test edilebilir (apps/web/tests/unit/nutrition-logs.test.ts)
 //
-// `todayIsoDate` ARTIK BURADA DEĞİL: `src/lib/date.ts`e taşındı. Dört yazma
+// `todayIsoDate` ARTIK BURADA DEĞİL: ``@repo/api-client/date``e taşındı. Dört yazma
 // yolu (nutrition_logs, daily_logs, progress_entries, progress_photos) ve
 // okuma filtreleri onu kullanıyor; "yerel gün" kavramının beslenme diliminde
 // yaşaması `useProgressEntries.ts -> useNutritionLogs.ts` gibi ters
-// bağımlılıklar üretiyordu (bkz. src/lib/date.ts dosya başı notu).
+// bağımlılıklar üretiyordu (bkz. `@repo/api-client/date` dosya başı notu).
 // ---------------------------------------------------------------------------
 
 export interface NutritionTotals {

@@ -3,22 +3,22 @@
 // Profil okuma/güncelleme ve avatar yükleme hook'ları.
 //
 // MAHREMİYET: `avatars` bucket'ı PRIVATE'tır. `profiles.avatar_path` tam URL değil
-// YOL saklar; okuma anında süreli imzalı adres üretilir (bkz. src/lib/storage.ts).
+// YOL saklar; okuma anında süreli imzalı adres üretilir (bkz. `@repo/api-client/storage`).
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 
-import { queryKeyRoots, queryKeys } from '@/lib/query/keys'
-import { wrapSupabaseError } from '@/lib/query/supabase-error'
+import { queryKeyRoots, queryKeys } from '../query/keys'
+import { wrapSupabaseError } from '../query/supabase-error'
 import {
   AVATAR_BUCKET,
   SIGNED_URL_STALE_TIME_MS,
   createSignedUrl,
   createSignedUrls,
   removeStoredObject,
-} from '@/lib/storage'
-import { supabase } from '@/lib/supabase/client'
-import { assertValidImageFile } from '@/lib/upload-validation'
+} from '../storage'
+import { useSupabaseClient } from '../context'
+import { assertValidImageFile } from '../upload-validation'
 import type { Profile } from '@repo/types'
 
 /** Profil satırı + avatar için üretilmiş imzalı adres. */
@@ -29,6 +29,7 @@ export interface ProfileWithAvatar extends Profile {
 
 /** Tek bir kullanıcının profili. */
 export function useProfile(userId?: string) {
+  const supabase = useSupabaseClient()
   return useQuery({
     queryKey: queryKeys.profile(userId),
     enabled: Boolean(userId),
@@ -42,13 +43,17 @@ export function useProfile(userId?: string) {
         .single()
       if (error) throw wrapSupabaseError(error, { table: 'profiles', op: 'select' })
 
-      return { ...data, avatarSignedUrl: await createSignedUrl(AVATAR_BUCKET, data.avatar_path) }
+      return {
+        ...data,
+        avatarSignedUrl: await createSignedUrl(supabase, AVATAR_BUCKET, data.avatar_path),
+      }
     },
   })
 }
 
 /** Tüm profiller (koç paneli için), en yeniden eskiye. */
 export function useProfiles() {
+  const supabase = useSupabaseClient()
   return useQuery({
     queryKey: queryKeys.profiles(),
     staleTime: SIGNED_URL_STALE_TIME_MS,
@@ -61,6 +66,7 @@ export function useProfiles() {
 
       // Tüm avatarlar TEK istekte imzalanır (profil başına ayrı istek yok).
       const signed = await createSignedUrls(
+        supabase,
         AVATAR_BUCKET,
         data.map((row) => row.avatar_path)
       )
@@ -94,6 +100,7 @@ export interface UploadAvatarInput {
  * @returns Bucket içindeki yeni yol (dosya adı).
  */
 export function useUploadAvatar() {
+  const supabase = useSupabaseClient()
   const queryClient = useQueryClient()
 
   return useMutation({
@@ -131,7 +138,7 @@ export function useUploadAvatar() {
       // atmaz; kendi dosyasının üstüne yazma gibi bir edge-case'te de (aynı yol)
       // silme denenmez.
       if (previousPath && previousPath !== fileName) {
-        await removeStoredObject(AVATAR_BUCKET, previousPath)
+        await removeStoredObject(supabase, AVATAR_BUCKET, previousPath)
       }
 
       return fileName

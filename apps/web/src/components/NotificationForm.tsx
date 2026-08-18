@@ -8,7 +8,7 @@ import { Megaphone } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import type { JSX } from 'react'
 
-import { useSendNotification } from '@/hooks'
+import { useSendNotification } from '@repo/api-client'
 import { notificationSchema, type NotificationInput } from '@repo/types/schemas'
 import type { Profile } from '@repo/types'
 

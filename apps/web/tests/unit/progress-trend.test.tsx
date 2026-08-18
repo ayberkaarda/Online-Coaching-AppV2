@@ -41,20 +41,20 @@ vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
 
 vi.mock('@/components/progress/ProgressPhotos', () => ({ ProgressPhotos: () => null }))
 
-vi.mock('@/hooks', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@/hooks')>()
+vi.mock('@repo/api-client', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@repo/api-client')>()
   return { ...actual, useProgressTrend: vi.fn(), useUpsertProgressEntry: vi.fn() }
 })
 
 import StatsTab from '@/components/tabs/StatsTab'
-import { useProgressTrend, useUpsertProgressEntry } from '@/hooks'
+import { useProgressTrend, useUpsertProgressEntry } from '@repo/api-client'
 import {
   addDaysIso,
   buildTrendSeries,
   summarizeMetric,
   type ProgressEntry,
   type ProgressTrend,
-} from '@/hooks/useProgressEntries'
+} from '@repo/api-client/hooks/useProgressEntries'
 
 const TODAY = '2026-08-17'
 

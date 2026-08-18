@@ -8,14 +8,14 @@
 // üretimi burada, DB'ye hiç gitmeden, saf bir fonksiyon olarak doğrulanır.
 //
 // İkinci konu: `useSendMessage` yüklemeden ÖNCE `assertValidImageFile` çağırır
-// (bkz. src/hooks/useMessages.ts). Kaynak otorite bildirilen `file.type` değil
-// magic-byte'tır (A-07/A-21, src/lib/upload-validation.ts); burada gerçek
+// (bkz. packages/api-client/src/hooks/useMessages.ts). Kaynak otorite bildirilen `file.type` değil
+// magic-byte'tır (A-07/A-21, `@repo/api-client/upload-validation`); burada gerçek
 // imzalarla (JPEG/PNG) ve sahte bir imzayla bu sözleşme doğrudan test edilir.
 
 import { describe, expect, it } from 'vitest'
 
-import { buildMessageAttachmentPath } from '@/hooks/useMessages'
-import { UploadValidationError, assertValidImageFile } from '@/lib/upload-validation'
+import { buildMessageAttachmentPath } from '@repo/api-client/hooks/useMessages'
+import { UploadValidationError, assertValidImageFile } from '@repo/api-client/upload-validation'
 
 const CLIENT_ID = '22222222-2222-2222-2222-222222222222'
 const OTHER_CLIENT_ID = '33333333-3333-3333-3333-333333333333'

@@ -14,7 +14,7 @@ import {
   useProfiles,
   useSession,
   useSignOut,
-} from '@/hooks'
+} from '@repo/api-client'
 import { DashboardTabs } from '@/components/DashboardTabs'
 import { NotificationForm } from '@/components/NotificationForm'
 import { ThemeToggle } from '@/components/ThemeToggle'

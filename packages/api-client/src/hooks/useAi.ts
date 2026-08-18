@@ -5,8 +5,9 @@
 import { useMutation } from '@tanstack/react-query'
 import { toast } from 'sonner'
 
-import { generateDietPlan, generateWorkoutPlan, getRecommendations } from '@/lib/api/ai'
-import { ApiError } from '@/lib/api/client'
+import { generateDietPlan, generateWorkoutPlan, getRecommendations } from '../api/ai'
+import { ApiError } from '../api/client'
+import { useSupabaseClient } from '../context'
 import type {
   DietGenerateInput,
   DietGenerateResult,
@@ -14,7 +15,7 @@ import type {
   RecommendationResult,
   WorkoutGenerateInput,
   WorkoutGenerateResult,
-} from '@/lib/api/types'
+} from '../api/types'
 
 function toUserMessage(error: unknown): string {
   if (ApiError.isApiError(error)) return error.message
@@ -23,8 +24,10 @@ function toUserMessage(error: unknown): string {
 }
 
 export function useGenerateWorkout() {
+  const supabase = useSupabaseClient()
+
   return useMutation<WorkoutGenerateResult, Error, WorkoutGenerateInput>({
-    mutationFn: (input) => generateWorkoutPlan(input),
+    mutationFn: (input) => generateWorkoutPlan(supabase, input),
     onSuccess: () => {
       toast.success('Yapay zeka antrenman programını oluşturdu.')
     },
@@ -35,8 +38,10 @@ export function useGenerateWorkout() {
 }
 
 export function useGenerateDiet() {
+  const supabase = useSupabaseClient()
+
   return useMutation<DietGenerateResult, Error, DietGenerateInput>({
-    mutationFn: (input) => generateDietPlan(input),
+    mutationFn: (input) => generateDietPlan(supabase, input),
     onSuccess: () => {
       toast.success('Yapay zeka beslenme programını oluşturdu.')
     },
@@ -47,8 +52,10 @@ export function useGenerateDiet() {
 }
 
 export function useRecommendations() {
+  const supabase = useSupabaseClient()
+
   return useMutation<RecommendationResult, Error, RecommendationInput>({
-    mutationFn: (input) => getRecommendations(input),
+    mutationFn: (input) => getRecommendations(supabase, input),
     onSuccess: () => {
       toast.success('Öneriler güncellendi.')
     },

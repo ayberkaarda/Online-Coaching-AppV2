@@ -1,4 +1,4 @@
-// `fetchAllRows` (src/hooks/useCatalog.ts) birim testleri.
+// `fetchAllRows` (@repo/api-client/hooks/useCatalog) birim testleri.
 //
 // SORUN: PostgREST `max_rows = 1000` (supabase/config.toml) tek istekte en fazla 1000
 // satır döner — hata FIRLATMADAN sessizce keser. Katalog importu `exercises`'ı 1328,
@@ -9,11 +9,21 @@
 
 import { describe, expect, it, vi } from 'vitest'
 
-import { CATALOG_MAX_PAGES, CATALOG_PAGE_SIZE, fetchAllRows } from '@/hooks/useCatalog'
-import { logger } from '@/lib/logger'
-import { SupabaseQueryError } from '@/lib/query/supabase-error'
+import {
+  CATALOG_MAX_PAGES,
+  CATALOG_PAGE_SIZE,
+  fetchAllRows,
+} from '@repo/api-client/hooks/useCatalog'
+import { SupabaseQueryError } from '@repo/api-client/query/supabase-error'
+import { logger } from '@repo/logger'
 
-vi.mock('@/lib/logger', () => ({
+// Faz 4.5 commit 5 (ADR-0024 Ek-2): modül artık `@repo/logger`'ı import ediyor, mock hedefi de
+// oraya taşındı — `apps/web/src/lib/logger.ts` yalnızca pino dalını tutuyor.
+// `importOriginal` spread'i ZORUNLU: `apps/web/src/lib/logger.ts` (ErrorBoundary üzerinden
+// bileşen ağacına giriyor) bu paketten `createConsoleLogger`/`maskForConsole`/`REDACT_PATHS`
+// import ediyor — yalnızca `logger` döndüren bir mock o modülü yüklenemez hâle getirirdi.
+vi.mock('@repo/logger', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@repo/logger')>()),
   logger: { warn: vi.fn(), error: vi.fn(), info: vi.fn(), debug: vi.fn() },
 }))
 

@@ -1,4 +1,4 @@
-// Faz 2e — koç form check kuyruğu (src/hooks/useFormChecks.ts: usePendingFormChecks,
+// Faz 2e — koç form check kuyruğu (@repo/api-client/hooks/useFormChecks: usePendingFormChecks,
 // useReviewFormCheck) + danışan gönderim sözleşmesi (useSubmitFormCheck).
 //
 // Üç senaryo (bkz. görev talimatı):
@@ -18,25 +18,18 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-// `vi.mock` fabrikaları dosyanın en üstüne hoist edilir; mock'lar bu yüzden
-// `vi.hoisted` ile tanımlanmalı, aksi hâlde "cannot access before initialization".
-const { fromMock, rpcMock, uploadMock } = vi.hoisted(() => ({
-  fromMock: vi.fn(),
-  rpcMock: vi.fn(),
-  uploadMock: vi.fn(),
-}))
+// Faz 4.5 commit 5 (ADR-0024): Supabase istemcisi artık modül singleton'ı DEĞİL — hook'lar
+// onu `<SupabaseClientProvider>`'dan alıyor. Bu yüzden `vi.mock('@/lib/supabase/client', ...)`
+// KALKTI; sahte istemci sıradan bir nesne olarak kurulup sarmalayıcıyla enjekte ediliyor.
+const fromMock = vi.fn()
+const rpcMock = vi.fn()
+const uploadMock = vi.fn()
 
-vi.mock('@/lib/supabase/client', () => ({
-  supabase: {
-    from: fromMock,
-    rpc: rpcMock,
-    storage: {
-      from: vi.fn(() => ({ upload: uploadMock })),
-    },
-  },
-}))
-
-vi.mock('@/lib/logger', () => ({
+// `importOriginal` spread'i ZORUNLU: `apps/web/src/lib/logger.ts` (ErrorBoundary üzerinden
+// bileşen ağacına giriyor) bu paketten `createConsoleLogger`/`maskForConsole`/`REDACT_PATHS`
+// import ediyor — yalnızca `logger` döndüren bir mock o modülü yüklenemez hâle getirirdi.
+vi.mock('@repo/logger', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@repo/logger')>()),
   logger: { warn: vi.fn(), error: vi.fn(), info: vi.fn(), debug: vi.fn() },
 }))
 
@@ -46,21 +39,34 @@ vi.mock('sonner', () => ({
 
 // Gerçek magic-byte doğrulaması bu testin kapsamı dışında
 // (tests/unit/upload-validation.test.ts zaten kapsıyor); sabit bir sonuç dönülür.
-vi.mock('@/lib/upload-validation', () => ({
+vi.mock('@repo/api-client/upload-validation', () => ({
   assertValidImageFile: vi.fn().mockResolvedValue({ mime: 'image/png', extension: 'png' }),
 }))
 
 // `createSignedUrls` gerçek storage isteği atmaz; hangi yolların imzalandığını
 // ve dönen adresleri testin kendisi kontrol eder.
 const createSignedUrlsMock = vi.fn()
-vi.mock('@/lib/storage', () => ({
+vi.mock('@repo/api-client/storage', () => ({
   FORM_CHECK_BUCKET: 'form-checks-media',
   SIGNED_URL_STALE_TIME_MS: 1_800_000,
   createSignedUrls: (...args: unknown[]) => createSignedUrlsMock(...args),
 }))
 
-import { logger } from '@/lib/logger'
-import { usePendingFormChecks, useReviewFormCheck, useSubmitFormCheck } from '@/hooks/useFormChecks'
+import { SupabaseClientProvider } from '@repo/api-client/context'
+import {
+  usePendingFormChecks,
+  useReviewFormCheck,
+  useSubmitFormCheck,
+} from '@repo/api-client/hooks/useFormChecks'
+import { logger } from '@repo/logger'
+
+import { asSupabaseClient } from './test-utils'
+
+const supabase = asSupabaseClient({
+  from: fromMock,
+  rpc: rpcMock,
+  storage: { from: vi.fn(() => ({ upload: uploadMock })) },
+})
 
 const COACH_ID = 'coach-11111111-1111-4111-8111-111111111111'
 const CLIENT_ID = 'client-2222222-2222-4222-8222-222222222222'
@@ -70,7 +76,11 @@ function createWrapper() {
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   })
   return function Wrapper({ children }: { children: ReactNode }) {
-    return createElement(QueryClientProvider, { client: queryClient }, children)
+    return createElement(
+      SupabaseClientProvider,
+      { client: supabase },
+      createElement(QueryClientProvider, { client: queryClient }, children)
+    )
   }
 }
 
@@ -132,7 +142,7 @@ describe('usePendingFormChecks — koç kuyruğu', () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
     expect(result.current.data).toEqual([])
-    expect(createSignedUrlsMock).toHaveBeenCalledWith('form-checks-media', [])
+    expect(createSignedUrlsMock).toHaveBeenCalledWith(supabase, 'form-checks-media', [])
   })
 })
 

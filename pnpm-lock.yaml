@@ -31,6 +31,12 @@ importers:
       '@hookform/resolvers':
         specifier: ^3.10.0
         version: 3.10.0(react-hook-form@7.85.0(react@19.2.4))
+      '@repo/api-client':
+        specifier: workspace:*
+        version: link:../../packages/api-client
+      '@repo/logger':
+        specifier: workspace:*
+        version: link:../../packages/logger
       '@repo/types':
         specifier: workspace:*
         version: link:../../packages/types
@@ -150,7 +156,41 @@ importers:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@22.20.1)(jsdom@25.0.1)(terser@5.48.0)
 
+  packages/api-client:
+    dependencies:
+      '@repo/logger':
+        specifier: workspace:*
+        version: link:../logger
+      '@repo/types':
+        specifier: workspace:*
+        version: link:../types
+      '@supabase/supabase-js':
+        specifier: ^2.110.0
+        version: 2.112.3
+      '@tanstack/react-query':
+        specifier: ^5.62.11
+        version: 5.101.4(react@19.2.4)
+      react:
+        specifier: 19.2.4
+        version: 19.2.4
+      sonner:
+        specifier: ^1.7.2
+        version: 1.7.4(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+    devDependencies:
+      '@repo/config':
+        specifier: workspace:*
+        version: link:../config
+      '@types/react':
+        specifier: ^19.0.7
+        version: 19.2.18
+
   packages/config: {}
+
+  packages/logger:
+    devDependencies:
+      '@repo/config':
+        specifier: workspace:*
+        version: link:../config
 
   packages/types:
     dependencies:

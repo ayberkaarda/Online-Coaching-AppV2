@@ -49,8 +49,8 @@ vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
 // Veri hook'larının HEPSİ mock'lanır (ağ yok); `TREND_RANGE_DAYS`,
 // `DEFAULT_TREND_RANGE_DAYS` ve `summarizeMetric` GERÇEK kalır — bileşenin
 // aralık listesi ve özeti hakkındaki iddialar gerçek sözleşmeye kurulsun.
-vi.mock('@/hooks', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@/hooks')>()
+vi.mock('@repo/api-client', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@repo/api-client')>()
   return {
     ...actual,
     useDailyLogs: vi.fn(),
@@ -74,13 +74,13 @@ import {
   useReviewFormCheck,
   useSendNotification,
   useSession,
-} from '@/hooks'
+} from '@repo/api-client'
 import {
   buildTrendSeries,
   type ProgressEntry,
   type ProgressTrend,
-} from '@/hooks/useProgressEntries'
-import type { ProfileWithAvatar } from '@/hooks/useProfile'
+} from '@repo/api-client/hooks/useProgressEntries'
+import type { ProfileWithAvatar } from '@repo/api-client/hooks/useProfile'
 
 const TODAY = '2026-08-17'
 const CLIENT_ID = 'client-1'

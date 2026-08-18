@@ -7,10 +7,10 @@ import {
   assertValidImageFile,
   detectImageMime,
   validateImageFile,
-} from '@/lib/upload-validation'
+} from '@repo/api-client/upload-validation'
 
 // Gerçek magic-byte imzaları. `padding` yalnızca dosyayı gerçekçi bir uzunluğa taşır; imza
-// kararı yalnızca ilk baytlara bakar (bkz. src/lib/upload-validation.ts detectImageMime).
+// kararı yalnızca ilk baytlara bakar (bkz. `@repo/api-client/upload-validation` detectImageMime).
 const JPEG_BYTES = new Uint8Array([
   0xff,
   0xd8,

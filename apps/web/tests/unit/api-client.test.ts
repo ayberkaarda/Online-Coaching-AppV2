@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { ApiError, apiFetch } from '@/lib/api/client'
+import { ApiError, apiFetch } from '@repo/api-client/api/client'
 
 /** Basit bir `Response` benzeri nesne kurar (yalnızca client.ts'in kullandığı yüzey). */
 function makeResponse(opts: {

@@ -66,8 +66,8 @@ import {
   type ProgressMetricKey,
   type ProgressMetricMeta,
   type TrendRangeDays,
-} from '@/hooks'
-import { todayIsoDate } from '@/lib/date'
+} from '@repo/api-client'
+import { todayIsoDate } from '@repo/api-client/date'
 import { formatDateTR } from '@/lib/utils'
 import type { UserRole } from '@repo/types'
 

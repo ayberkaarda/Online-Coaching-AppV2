@@ -2,7 +2,7 @@ import { render } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { QueryState } from '@/components/ui/QueryState'
-import { ApiError } from '@/lib/api/client'
+import { ApiError } from '@repo/api-client/api/client'
 
 import { fireEvent, screen } from '../test-utils'
 

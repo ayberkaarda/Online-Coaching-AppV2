@@ -3,7 +3,7 @@
 // ###########################################################################
 // # NEDEN AYRI BİR DOSYA (ve neden `useNutritionLogs.ts` DEĞİL)              #
 // #                                                                          #
-// # `todayIsoDate` eskiden `src/hooks/useNutritionLogs.ts` içinde yaşıyordu   #
+// # `todayIsoDate` eskiden `hooks/useNutritionLogs.ts` içinde yaşıyordu   #
 // # ve `useProgressEntries.ts` onu ORADAN import ediyordu — yani "ilerleme    #
 // # ölçümü" dilimi "beslenme" dilimine bağımlıydı. Bu ters bağımlılık üçüncü  #
 // # bir yazma yolu (ilerleme fotoğrafı, günlük log) eklendiğinde her seferinde#
@@ -18,7 +18,7 @@
 // # (Türkiye) için yerel 00:00–03:00 arası UTC'de HÂLÂ ÖNCEKİ GÜNDÜR; gece    #
 // # 01:00'de eklenen bir öğün "dün"e yazılır, dashboard "bugün"ü filtreler ve #
 // # kayıt hiç görünmez. Ölçülmüş gerçek hatadır — bkz.                        #
-// # tests/unit/local-date-consistency.test.ts.                                #
+// # apps/web/tests/unit/local-date-consistency.test.ts.                                #
 // ###########################################################################
 
 /**

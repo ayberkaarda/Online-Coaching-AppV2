@@ -10,8 +10,8 @@ import type { JSX } from 'react'
 import { toast } from 'sonner'
 
 import { QueryState, SkeletonCard } from '@/components/ui'
-import { useCreateDailyLog, useDailyLogs } from '@/hooks'
-import { todayIsoDate } from '@/lib/date'
+import { useCreateDailyLog, useDailyLogs } from '@repo/api-client'
+import { todayIsoDate } from '@repo/api-client/date'
 import { downloadCSV, formatDateTR, getMacroPercentage } from '@/lib/utils'
 import { dailyLogSchema, type DailyLogInput } from '@repo/types/schemas'
 import type { UserRole } from '@repo/types'
@@ -55,7 +55,7 @@ export default function DailyLogTab({
       macros: { protein: values.protein, carb: values.carb, fat: values.fat },
       // Kullanıcının YEREL günü, AÇIKÇA gönderilir — DB'nin UTC `current_date`
       // varsayılanına düşülseydi gece 00:00–03:00 arasında (UTC+3) gönderilen
-      // rapor DÜNÜN kaydını ezerdi (bkz. src/lib/date.ts).
+      // rapor DÜNÜN kaydını ezerdi (bkz. `@repo/api-client/date`).
       log_date: todayIsoDate(),
     })
     reset()

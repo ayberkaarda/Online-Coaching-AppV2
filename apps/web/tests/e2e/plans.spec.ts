@@ -12,7 +12,7 @@
 //   src/components/tabs/WorkoutTab.tsx
 //   src/components/tabs/NutritionTab.tsx
 //   src/components/DashboardTabs.tsx
-//   src/hooks/usePlans.ts, src/hooks/useProgramApprovals.ts
+//   packages/api-client/src/hooks/usePlans.ts, packages/api-client/src/hooks/useProgramApprovals.ts
 //
 // TÜRKÇE İ/ı TUZAĞI (bkz. tests/e2e/README.md): İ (U+0130) veya ı (U+0131) içeren
 // metinlerde `/i` bayraklı regex KULLANILMAZ. Aşağıdaki tüm locator'larda ya

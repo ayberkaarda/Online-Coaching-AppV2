@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation'
 import type { JSX } from 'react'
 import { useForm } from 'react-hook-form'
 
-import { useSignIn } from '@/hooks'
+import { useSignIn } from '@repo/api-client'
 import { loginSchema, type LoginInput } from '@repo/types/schemas'
 
 export default function LoginPage(): JSX.Element {

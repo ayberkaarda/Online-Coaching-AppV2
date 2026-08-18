@@ -10,7 +10,7 @@
 //      HİÇ GİTMEDEN reddedilir (`progress_entries_not_empty_chk` = 23514 ve
 //      aralık CHECK'lerinin arayüz karşılığı).
 //   C) Hata sarmalaması — `wrapSupabaseError(error, { table, op })` sözleşmesi
-//      korunur: merkezî 42501 yakalama (src/lib/query/queryClient.ts) buna bağlı.
+//      korunur: merkezî 42501 yakalama (`@repo/api-client/query/queryClient`) buna bağlı.
 //   D) Arayüz — danışan "sadece not" gönderemez (buton mutasyonu ÇAĞIRMAZ) ve
 //      koç görünümünde giriş formu HİÇ render edilmez (§6 salt-okunur).
 
@@ -30,9 +30,9 @@ const { fromMock, upsertMock, insertMock } = vi.hoisted(() => ({
   insertMock: vi.fn(),
 }))
 
-vi.mock('@/lib/supabase/client', () => ({
-  supabase: { from: fromMock },
-}))
+// Faz 4.5 commit 5 (ADR-0024): Supabase istemcisi artık modül singleton'ı DEĞİL — hook'lar
+// onu `<SupabaseClientProvider>`'dan alıyor. Bu yüzden `vi.mock('@/lib/supabase/client', ...)`
+// KALKTI; sahte istemci sıradan bir nesne olarak kurulup sarmalayıcıyla enjekte ediliyor.
 
 vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
@@ -44,30 +44,39 @@ vi.mock('@/components/progress/ProgressPhotos', () => ({
   ProgressPhotos: () => null,
 }))
 
-vi.mock('@/hooks', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@/hooks')>()
+vi.mock('@repo/api-client', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@repo/api-client')>()
   return { ...actual, useProgressTrend: vi.fn(), useUpsertProgressEntry: vi.fn() }
 })
 
 import { toast } from 'sonner'
 
 import StatsTab from '@/components/tabs/StatsTab'
-import { useProgressTrend, useUpsertProgressEntry } from '@/hooks'
+import { useProgressTrend, useUpsertProgressEntry } from '@repo/api-client'
 import {
   buildTrendSeries,
   hasAnyMeasurement,
   useUpsertProgressEntry as useUpsertProgressEntryDirect,
   validateProgressEntry,
   type ProgressEntryValues,
-} from '@/hooks/useProgressEntries'
-import { SupabaseQueryError } from '@/lib/query/supabase-error'
+} from '@repo/api-client/hooks/useProgressEntries'
+import { SupabaseQueryError } from '@repo/api-client/query/supabase-error'
+import { SupabaseClientProvider } from '@repo/api-client/context'
+
+import { asSupabaseClient } from './test-utils'
+
+const supabase = asSupabaseClient({ from: fromMock })
 
 function createWrapper() {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   })
   return function Wrapper({ children }: { children: ReactNode }) {
-    return createElement(QueryClientProvider, { client: queryClient }, children)
+    return createElement(
+      SupabaseClientProvider,
+      { client: supabase },
+      createElement(QueryClientProvider, { client: queryClient }, children)
+    )
   }
 }
 

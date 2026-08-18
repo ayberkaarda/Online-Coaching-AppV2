@@ -6,18 +6,19 @@
 //
 // MAHREMİYET: Bucket PRIVATE'tır. Veritabanı kolonları (`front_pose_path`,
 // `back_pose_path`) tam URL değil YOL saklar; okuma anında süreli imzalı adres
-// üretilir (bkz. src/lib/storage.ts).
+// üretilir (bkz. `@repo/api-client/storage`).
 
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 
-import { logger } from '@/lib/logger'
-import { queryKeyRoots, queryKeys } from '@/lib/query/keys'
-import { wrapSupabaseError } from '@/lib/query/supabase-error'
-import { FORM_CHECK_BUCKET, SIGNED_URL_STALE_TIME_MS, createSignedUrls } from '@/lib/storage'
-import { supabase } from '@/lib/supabase/client'
-import { assertValidImageFile } from '@/lib/upload-validation'
-import type { FormCheck } from '@repo/types'
+import { logger } from '@repo/logger'
+import { queryKeyRoots, queryKeys } from '../query/keys'
+import { wrapSupabaseError } from '../query/supabase-error'
+import { FORM_CHECK_BUCKET, SIGNED_URL_STALE_TIME_MS, createSignedUrls } from '../storage'
+import { useSupabaseClient } from '../context'
+import { assertValidImageFile } from '../upload-validation'
+import type { Database, FormCheck } from '@repo/types'
 
 /**
  * Form check satırı + poz fotoğrafları için üretilmiş imzalı adresler.
@@ -38,7 +39,7 @@ export interface FormCheckWithUrls extends FormCheck {
 /**
  * Koç kuyruğu (`status = 'pending'`) için ayrı bir sorgu anahtarı.
  *
- * NOT (dosya sahipliği kısıtı): anahtarlar normalde YALNIZCA `src/lib/query/keys.ts`
+ * NOT (dosya sahipliği kısıtı): anahtarlar normalde YALNIZCA ``@repo/api-client/query/keys``
  * içindeki merkezi fabrikadan üretilir (§3.4). Faz 2'nin dört paralel dilimi
  * `src/lib/**`'i PAYLAŞIYOR ve bu dilimin sahiplik listesi o dosyaya dokunmayı
  * yasaklıyor; bu yüzden anahtar burada, `queryKeyRoots.formChecks` ÖN EKİYLE
@@ -49,6 +50,7 @@ export interface FormCheckWithUrls extends FormCheck {
 const PENDING_FORM_CHECKS_KEY = [...queryKeyRoots.formChecks, 'pending'] as const
 
 export function useFormChecks(clientId?: string) {
+  const supabase = useSupabaseClient()
   return useQuery({
     queryKey: queryKeys.formChecks(clientId),
     enabled: Boolean(clientId),
@@ -64,6 +66,7 @@ export function useFormChecks(clientId?: string) {
 
       // Tüm yollar TEK istekte imzalanır (fotoğraf başına ayrı istek yok).
       const signed = await createSignedUrls(
+        supabase,
         FORM_CHECK_BUCKET,
         data.flatMap((row) => [row.front_pose_path, row.back_pose_path])
       )
@@ -85,13 +88,22 @@ export interface SubmitFormCheckInput {
   notes?: string
 }
 
-/** Pozu yükler ve bucket İÇİNDEKİ YOLU döner (tam URL değil — kolonlar yol saklar). */
-async function uploadPose(clientId: string, file: File): Promise<string> {
+/**
+ * Pozu yükler ve bucket İÇİNDEKİ YOLU döner (tam URL değil — kolonlar yol saklar).
+ *
+ * Hook DEĞİLDİR, dolayısıyla `useSupabaseClient()` çağıramaz; istemci ADR-0024 Ek-1'deki
+ * `storage.ts` deseniyle AÇIK İLK PARAMETRE olarak geçer (çağıran hook onu context'ten alır).
+ */
+async function uploadPose(
+  client: SupabaseClient<Database>,
+  clientId: string,
+  file: File
+): Promise<string> {
   // Uzantı dosya adından DEĞİL, magic-byte ile tespit edilen gerçek içerikten türetilir (A-21).
   const { mime, extension } = await assertValidImageFile(file)
   const path = `poses/${clientId}-${crypto.randomUUID()}.${extension}`
 
-  const { error } = await supabase.storage
+  const { error } = await client.storage
     .from(FORM_CHECK_BUCKET)
     .upload(path, file, { contentType: mime })
   if (error) throw new Error(error.message)
@@ -100,6 +112,7 @@ async function uploadPose(clientId: string, file: File): Promise<string> {
 }
 
 export function useSubmitFormCheck() {
+  const supabase = useSupabaseClient()
   const queryClient = useQueryClient()
 
   return useMutation({
@@ -110,8 +123,8 @@ export function useSubmitFormCheck() {
       backFile,
       notes,
     }: SubmitFormCheckInput): Promise<FormCheck> => {
-      const frontPath = await uploadPose(clientId, frontFile)
-      const backPath = backFile ? await uploadPose(clientId, backFile) : null
+      const frontPath = await uploadPose(supabase, clientId, frontFile)
+      const backPath = backFile ? await uploadPose(supabase, clientId, backFile) : null
 
       // İNCELEME ALANLARI BİLEREK GÖNDERİLMEZ (status / coach_feedback /
       // reviewed_at / reviewed_by): `status` kolon varsayılanıyla 'pending'
@@ -160,6 +173,7 @@ export function useSubmitFormCheck() {
  * (durum farketmeksizin) döner; bu ise TÜM danışanların yalnızca bekleyenlerini.
  */
 export function usePendingFormChecks() {
+  const supabase = useSupabaseClient()
   return useQuery({
     queryKey: PENDING_FORM_CHECKS_KEY,
     staleTime: SIGNED_URL_STALE_TIME_MS,
@@ -173,6 +187,7 @@ export function usePendingFormChecks() {
 
       // Tüm yollar TEK istekte imzalanır (danışan başına ayrı istek yok — N+1 önlenir).
       const signed = await createSignedUrls(
+        supabase,
         FORM_CHECK_BUCKET,
         data.flatMap((row) => [row.front_pose_path, row.back_pose_path])
       )
@@ -210,22 +225,25 @@ export function usePendingFormChecks() {
  *    (`is_coach()`) serbest bırakır (bkz. 20260817180000 §3), yani bu RPC'nin
  *    kapsamı DIŞINDADIR ve değişmedi.
  */
-async function publishFormCheckReviewedEvent({
-  formCheckId,
-  clientId,
-  feedback,
-}: {
-  formCheckId: string
-  clientId: string
-  feedback: string
-}): Promise<void> {
+async function publishFormCheckReviewedEvent(
+  client: SupabaseClient<Database>,
+  {
+    formCheckId,
+    clientId,
+    feedback,
+  }: {
+    formCheckId: string
+    clientId: string
+    feedback: string
+  }
+): Promise<void> {
   const trimmed = feedback.trim()
   const text =
     trimmed.length > 0
       ? `Koçunuz form check'inize geri bildirim yazdı: "${trimmed}"`
       : 'Koçunuz form check’inizi inceledi.'
 
-  const { error: messageError } = await supabase.rpc('post_system_message', {
+  const { error: messageError } = await client.rpc('post_system_message', {
     p_client_id: clientId,
     p_event_type: 'form_check_reviewed',
     p_ref_id: formCheckId,
@@ -242,7 +260,7 @@ async function publishFormCheckReviewedEvent({
     toast.error('Danışana sistem mesajı gönderilemedi (geri bildirim yine de kaydedildi).')
   }
 
-  const { error: notificationError } = await supabase.from('notifications').insert({
+  const { error: notificationError } = await client.from('notifications').insert({
     client_id: clientId,
     title: 'Form Check İncelendi',
     message: text,
@@ -276,6 +294,7 @@ export interface ReviewFormCheckInput {
  * gitmedi) doğru öğrenir.
  */
 export function useReviewFormCheck() {
+  const supabase = useSupabaseClient()
   const queryClient = useQueryClient()
 
   return useMutation({
@@ -292,7 +311,11 @@ export function useReviewFormCheck() {
         .single()
       if (error) throw wrapSupabaseError(error, { table: 'form_checks', op: 'update' })
 
-      await publishFormCheckReviewedEvent({ formCheckId, clientId, feedback: coachFeedback })
+      await publishFormCheckReviewedEvent(supabase, {
+        formCheckId,
+        clientId,
+        feedback: coachFeedback,
+      })
 
       return data
     },
@@ -309,6 +332,7 @@ export function useReviewFormCheck() {
 
 /** Danışan id'si -> son form check tarihi (ISO). Koç panelinde takip için. */
 export function useLastCheckins() {
+  const supabase = useSupabaseClient()
   return useQuery({
     queryKey: queryKeys.lastCheckins(),
     queryFn: async (): Promise<Record<string, string>> => {

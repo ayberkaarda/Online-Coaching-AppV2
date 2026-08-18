@@ -14,15 +14,17 @@
 //   satırlarını okur — ayrıştırıcı TEK ve SQL'dedir (`explode_plan_day`,
 //   20260817110000), istemcide ikinci bir ayrıştırıcı YOKTUR.
 //
-// AC-2.4: `supabase.from(` yalnızca `src/hooks/**` içinde geçebilir; bu dosya
-// o kuralın içindedir, bileşenler bu hook üzerinden okur.
+// AC-2.4 / AC-4.5.5: `supabase.from(` yalnızca `packages/api-client` içinde geçebilir
+// (Faz 4.5 commit 5 öncesi kural `packages/api-client/src/hooks/**` diyordu); bu dosya o kuralın içindedir,
+// bileşenler bu hook üzerinden okur.
 
 import { useQuery } from '@tanstack/react-query'
 
-import { queryKeys } from '@/lib/query/keys'
-import { wrapSupabaseError } from '@/lib/query/supabase-error'
-import { supabase } from '@/lib/supabase/client'
 import type { DayName } from '@repo/types'
+
+import { useSupabaseClient } from '../context'
+import { queryKeys } from '../query/keys'
+import { wrapSupabaseError } from '../query/supabase-error'
 
 /** `workout_plan_exercises` satırının gym modu için gereken alanları. */
 export interface PlanExerciseRow {
@@ -93,9 +95,10 @@ export function totalPlannedSets(exercises: readonly { sets: number }[]): number
  * ANAHTAR: `[...queryKeys.workoutPlan(clientId), 'exercises']` — bilinçli olarak
  * `workoutPlan` anahtarının ALTINDA. `useSaveWorkoutPlan` ön ek (prefix)
  * invalidate ettiği için koç planı kaydettiğinde bu sorgu da otomatik tazelenir;
- * `src/lib/query/keys.ts` dosyasına dokunmadan tutarlılık sağlanır.
+ * ``@repo/api-client/query/keys`` dosyasına dokunmadan tutarlılık sağlanır.
  */
 export function useWorkoutPlanExercises(clientId?: string) {
+  const supabase = useSupabaseClient()
   return useQuery({
     queryKey: [...queryKeys.workoutPlan(clientId), 'exercises'] as const,
     enabled: Boolean(clientId),

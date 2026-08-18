@@ -17,9 +17,9 @@ import {
   useUpdatePassword,
   useUploadAvatar,
   useWorkoutPlan,
-} from '@/hooks'
+} from '@repo/api-client'
 import { QueryState, SkeletonCard, SkeletonText } from '@/components/ui'
-import { ALLOWED_IMAGE_MIME, validateImageFile } from '@/lib/upload-validation'
+import { ALLOWED_IMAGE_MIME, validateImageFile } from '@repo/api-client/upload-validation'
 import { passwordChangeSchema, type PasswordChangeInput } from '@repo/types/schemas'
 import {
   DAY_NAMES,

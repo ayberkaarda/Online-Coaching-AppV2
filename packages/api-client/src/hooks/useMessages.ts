@@ -2,17 +2,17 @@
 
 // Koç <-> danışan birebir sohbeti: geçmiş, realtime dinleme, presence ve optimistic gönderim.
 
-import type { RealtimePresenceState } from '@supabase/supabase-js'
+import type { RealtimePresenceState, SupabaseClient } from '@supabase/supabase-js'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
 
-import { queryKeyRoots, queryKeys } from '@/lib/query/keys'
-import { wrapSupabaseError } from '@/lib/query/supabase-error'
-import { MESSAGE_ATTACHMENT_BUCKET, SIGNED_URL_STALE_TIME_MS, createSignedUrl } from '@/lib/storage'
-import { supabase } from '@/lib/supabase/client'
-import { assertValidImageFile } from '@/lib/upload-validation'
-import type { Message } from '@repo/types'
+import { queryKeyRoots, queryKeys } from '../query/keys'
+import { wrapSupabaseError } from '../query/supabase-error'
+import { MESSAGE_ATTACHMENT_BUCKET, SIGNED_URL_STALE_TIME_MS, createSignedUrl } from '../storage'
+import { useSupabaseClient } from '../context'
+import { assertValidImageFile } from '../upload-validation'
+import type { Database, Message } from '@repo/types'
 
 import { useSession } from './useSession'
 
@@ -21,7 +21,7 @@ import { useSession } from './useSession'
  * `<conversation_client_id>/<uploader_uid>-<uuid>.<ext>`. Kısıt ayrıca ilk segmentin
  * satırın `client_id`'sine EŞİT olmasını şart koşar — bu yüzden `conversationClientId`
  * çağıran tarafça `resolveConversationClientId` ile önceden doğrulanmış olmalıdır.
- * Saf fonksiyondur (tests/unit/message-attachment.test.ts).
+ * Saf fonksiyondur (apps/web/tests/unit/message-attachment.test.ts).
  */
 export function buildMessageAttachmentPath(
   conversationClientId: string,
@@ -45,9 +45,13 @@ function isMessageRow(value: unknown): value is Message {
   return typeof row.id === 'string' && typeof row.sender_id === 'string'
 }
 
-/** `useCoachId` ve `useSendMessage` aynı önbellek girdisini paylaşsın diye ayrıldı. */
-async function fetchCoachId(): Promise<string | null> {
-  const { data, error } = await supabase
+/**
+ * `useCoachId` ve `useSendMessage` aynı önbellek girdisini paylaşsın diye ayrıldı.
+ *
+ * Hook DEĞİLDİR: istemci ADR-0024 Ek-1 deseniyle açık ilk parametre olarak geçer.
+ */
+async function fetchCoachId(client: SupabaseClient<Database>): Promise<string | null> {
+  const { data, error } = await client
     .from('profiles')
     .select('id')
     .eq('role', 'coach')
@@ -65,7 +69,7 @@ async function fetchCoachId(): Promise<string | null> {
  * tarafı konuşmayı tek başına tanımlar. Realtime aboneliği ve okunmamış sayacı
  * bu anahtara dayanır.
  *
- * Saf fonksiyondur (tests/unit/message-conversation.test.ts). Anahtar
+ * Saf fonksiyondur (apps/web/tests/unit/message-conversation.test.ts). Anahtar
  * çözülemiyorsa `undefined` döner — çağıran taraf "abone olma / gönderme"
  * kararını buna göre verir, TAHMİN YÜRÜTÜLMEZ.
  */
@@ -88,6 +92,7 @@ export function resolveConversationClientId(
  * Anahtar yön bağımsızdır: (a,b) ve (b,a) aynı önbelleği kullanır.
  */
 export function useMessages(currentUserId?: string, partnerId?: string) {
+  const supabase = useSupabaseClient()
   const queryClient = useQueryClient()
   const { data: coachId } = useCoachId()
   const clientId = resolveConversationClientId(currentUserId, partnerId, coachId)
@@ -173,7 +178,7 @@ export function useMessages(currentUserId?: string, partnerId?: string) {
     return () => {
       void supabase.removeChannel(channel)
     }
-  }, [currentUserId, partnerId, clientId, queryClient])
+  }, [supabase, currentUserId, partnerId, clientId, queryClient])
 
   return useQuery({
     queryKey: queryKeys.messages(currentUserId, partnerId),
@@ -218,6 +223,7 @@ interface SendMessageContext {
 }
 
 export function useSendMessage() {
+  const supabase = useSupabaseClient()
   const queryClient = useQueryClient()
 
   return useMutation<Message, Error, SendMessageInput, SendMessageContext>({
@@ -232,7 +238,7 @@ export function useSendMessage() {
           receiverId,
           await queryClient.ensureQueryData({
             queryKey: queryKeys.coachId(),
-            queryFn: fetchCoachId,
+            queryFn: () => fetchCoachId(supabase),
             staleTime: COACH_ID_STALE_TIME_MS,
           })
         )
@@ -245,7 +251,7 @@ export function useSendMessage() {
       // bkz. useFormChecks.ts uploadPose): yol DB satırından ÖNCE var olmalı ki
       // gönderim anında `createSignedUrl` hemen çalışsın. Doğrulama SIRASI
       // otoritedir: boyut/MIME allowlist önce, sonra magic-byte (A-07/A-20/A-21,
-      // bkz. src/lib/upload-validation.ts). Geçersiz dosya burada fırlar,
+      // bkz. `@repo/api-client/upload-validation`). Geçersiz dosya burada fırlar,
       // hiçbir insert denenmez.
       let attachmentPath: string | null = null
       if (file) {
@@ -333,6 +339,7 @@ export function useSendMessage() {
  * sözleşmesi (read_at + RLS) test edilebilir ve doğrulanmış olsun.
  */
 export function useMarkConversationRead(clientId?: string) {
+  const supabase = useSupabaseClient()
   const queryClient = useQueryClient()
   const { data: session } = useSession()
   const viewerId = session?.user.id
@@ -374,6 +381,7 @@ export function useMarkConversationRead(clientId?: string) {
  * `useMarkConversationRead` gibi bu hook'un da Faz 1b'de çağıranı yoktur.
  */
 export function useUnreadCount(clientId?: string) {
+  const supabase = useSupabaseClient()
   const { data: session } = useSession()
   const viewerId = session?.user.id
 
@@ -395,6 +403,7 @@ export function useUnreadCount(clientId?: string) {
 
 /** Global presence kanalı: karşı tarafın çevrimiçi olup olmadığını bildirir. */
 export function usePresence(currentUserId?: string) {
+  const supabase = useSupabaseClient()
   const [onlineIds, setOnlineIds] = useState<string[]>([])
 
   useEffect(() => {
@@ -428,7 +437,7 @@ export function usePresence(currentUserId?: string) {
     return () => {
       void supabase.removeChannel(channel)
     }
-  }, [currentUserId])
+  }, [supabase, currentUserId])
 
   // currentUserId yokken kimse çevrimiçi sayılmaz: kanal hiç kurulmadığından onlineIds
   // bayat/eski kullanıcı verisi taşıyor olsa bile bu dal onu görünmez kılar.
@@ -442,10 +451,11 @@ export function usePresence(currentUserId?: string) {
 
 /** Danışanın sohbet edeceği koçun (role = 'coach') id'si. */
 export function useCoachId() {
+  const supabase = useSupabaseClient()
   return useQuery({
     queryKey: queryKeys.coachId(),
     staleTime: COACH_ID_STALE_TIME_MS,
-    queryFn: fetchCoachId,
+    queryFn: () => fetchCoachId(supabase),
   })
 }
 
@@ -453,14 +463,15 @@ export function useCoachId() {
  * Bir mesaj ekinin (`attachment_path`) imzalı görüntüleme adresi.
  *
  * `message-attachments` PRIVATE'tır (I-4); `getPublicUrl` KULLANILMAZ.
- * `src/lib/storage.ts::createSignedUrl` ile aynı TTL/staleTime sözleşmesini
+ * `@repo/api-client/storage::createSignedUrl` ile aynı TTL/staleTime sözleşmesini
  * paylaşır — adres, süresi dolmadan (TTL/2) önbellekte bayatlar.
  */
 export function useMessageAttachmentUrl(path: string | null | undefined) {
+  const supabase = useSupabaseClient()
   return useQuery({
     queryKey: queryKeys.messageAttachmentUrl(path),
     enabled: Boolean(path),
     staleTime: SIGNED_URL_STALE_TIME_MS,
-    queryFn: () => createSignedUrl(MESSAGE_ATTACHMENT_BUCKET, path),
+    queryFn: () => createSignedUrl(supabase, MESSAGE_ATTACHMENT_BUCKET, path),
   })
 }

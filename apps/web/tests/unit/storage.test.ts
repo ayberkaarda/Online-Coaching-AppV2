@@ -1,28 +1,24 @@
-// src/lib/storage.ts — imzalı adres üretimi.
+// @repo/api-client/storage — imzalı adres üretimi.
 //
 // Bu modülün SÖZLEŞMESİ: asla fırlatmaz. Private bucket'ta eksik/silinmiş dosya ya
 // da yetki hatası bir liste sorgusunu düşürmemeli; `null` dönüp UI placeholder
 // göstermeli. Testler tam olarak bunu ve N+1 istek atılmadığını doğrular.
+//
+// Faz 4.5 commit 5 (ADR-0024 Ek-1): modül artık Supabase istemcisini modül seviyesinden
+// DEĞİL, AÇIK İLK PARAMETRE olarak alıyor. Bu yüzden eski `vi.mock('@/lib/supabase/client')`
+// bloğu TAMAMEN KALKTI — test sahte istemciyi doğrudan geçiriyor. Logger mock'u ise
+// `@repo/logger`'a taşındı (modül artık oradan import ediyor).
 
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-// `vi.mock` fabrikaları dosyanın en üstüne hoist edilir; mock'lar bu yüzden
-// `vi.hoisted` ile tanımlanmalı, aksi hâlde "cannot access before initialization".
-const { createSignedUrlMock, createSignedUrlsMock, fromMock } = vi.hoisted(() => {
-  const createSignedUrl = vi.fn()
-  const createSignedUrls = vi.fn()
-  return {
-    createSignedUrlMock: createSignedUrl,
-    createSignedUrlsMock: createSignedUrls,
-    fromMock: vi.fn(() => ({ createSignedUrl, createSignedUrls })),
-  }
-})
+import type { Database } from '@repo/types'
 
-vi.mock('@/lib/supabase/client', () => ({
-  supabase: { storage: { from: fromMock } },
-}))
-
-vi.mock('@/lib/logger', () => ({
+// `importOriginal` spread'i ZORUNLU: `apps/web/src/lib/logger.ts` (ErrorBoundary üzerinden
+// bileşen ağacına giriyor) bu paketten `createConsoleLogger`/`maskForConsole`/`REDACT_PATHS`
+// import ediyor — yalnızca `logger` döndüren bir mock o modülü yüklenemez hâle getirirdi.
+vi.mock('@repo/logger', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@repo/logger')>()),
   logger: { warn: vi.fn(), error: vi.fn(), info: vi.fn(), debug: vi.fn() },
 }))
 
@@ -33,7 +29,17 @@ import {
   SIGNED_URL_TTL_SECONDS,
   createSignedUrl,
   createSignedUrls,
-} from '@/lib/storage'
+} from '@repo/api-client/storage'
+
+const createSignedUrlMock = vi.fn()
+const createSignedUrlsMock = vi.fn()
+const fromMock = vi.fn(() => ({
+  createSignedUrl: createSignedUrlMock,
+  createSignedUrls: createSignedUrlsMock,
+}))
+
+/** Enjekte edilen sahte istemci — gerçek `@supabase/ssr` istemcisi hiç kurulmaz. */
+const client = { storage: { from: fromMock } } as unknown as SupabaseClient<Database>
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -58,26 +64,28 @@ describe('createSignedUrl', () => {
   it('yolu TTL ile imzalar ve adresi döner', async () => {
     createSignedUrlMock.mockResolvedValue({ data: { signedUrl: 'https://x/signed' }, error: null })
 
-    await expect(createSignedUrl(AVATAR_BUCKET, 'uid-1.jpg')).resolves.toBe('https://x/signed')
+    await expect(createSignedUrl(client, AVATAR_BUCKET, 'uid-1.jpg')).resolves.toBe(
+      'https://x/signed'
+    )
     expect(fromMock).toHaveBeenCalledWith(AVATAR_BUCKET)
     expect(createSignedUrlMock).toHaveBeenCalledWith('uid-1.jpg', SIGNED_URL_TTL_SECONDS)
   })
 
   it('boş/null yolda istek atmadan null döner', async () => {
-    await expect(createSignedUrl(AVATAR_BUCKET, null)).resolves.toBeNull()
-    await expect(createSignedUrl(AVATAR_BUCKET, undefined)).resolves.toBeNull()
-    await expect(createSignedUrl(AVATAR_BUCKET, '   ')).resolves.toBeNull()
+    await expect(createSignedUrl(client, AVATAR_BUCKET, null)).resolves.toBeNull()
+    await expect(createSignedUrl(client, AVATAR_BUCKET, undefined)).resolves.toBeNull()
+    await expect(createSignedUrl(client, AVATAR_BUCKET, '   ')).resolves.toBeNull()
     expect(createSignedUrlMock).not.toHaveBeenCalled()
   })
 
   it('dosya yoksa fırlatmaz, null döner', async () => {
     createSignedUrlMock.mockResolvedValue({ data: null, error: { message: 'Object not found' } })
-    await expect(createSignedUrl(FORM_CHECK_BUCKET, 'poses/yok.jpg')).resolves.toBeNull()
+    await expect(createSignedUrl(client, FORM_CHECK_BUCKET, 'poses/yok.jpg')).resolves.toBeNull()
   })
 
   it('ağ hatası fırlatsa bile null döner', async () => {
     createSignedUrlMock.mockRejectedValue(new Error('network down'))
-    await expect(createSignedUrl(FORM_CHECK_BUCKET, 'poses/a.jpg')).resolves.toBeNull()
+    await expect(createSignedUrl(client, FORM_CHECK_BUCKET, 'poses/a.jpg')).resolves.toBeNull()
   })
 })
 
@@ -91,7 +99,7 @@ describe('createSignedUrls', () => {
       error: null,
     })
 
-    const map = await createSignedUrls(FORM_CHECK_BUCKET, [
+    const map = await createSignedUrls(client, FORM_CHECK_BUCKET, [
       'poses/a.jpg',
       null,
       'poses/b.jpg',
@@ -110,7 +118,7 @@ describe('createSignedUrls', () => {
   })
 
   it('yol listesi boşsa istek atmaz', async () => {
-    const map = await createSignedUrls(FORM_CHECK_BUCKET, [null, undefined, ''])
+    const map = await createSignedUrls(client, FORM_CHECK_BUCKET, [null, undefined, ''])
     expect(createSignedUrlsMock).not.toHaveBeenCalled()
     expect(map.size).toBe(0)
   })
@@ -124,16 +132,19 @@ describe('createSignedUrls', () => {
       error: null,
     })
 
-    const map = await createSignedUrls(FORM_CHECK_BUCKET, ['poses/a.jpg', 'poses/silinmis.jpg'])
+    const map = await createSignedUrls(client, FORM_CHECK_BUCKET, [
+      'poses/a.jpg',
+      'poses/silinmis.jpg',
+    ])
     expect(map.get('poses/a.jpg')).toBe('https://x/a')
     expect(map.has('poses/silinmis.jpg')).toBe(false)
   })
 
   it('istek tamamen başarısız olursa fırlatmaz, boş harita döner', async () => {
     createSignedUrlsMock.mockResolvedValue({ data: null, error: { message: 'forbidden' } })
-    await expect(createSignedUrls(AVATAR_BUCKET, ['a.jpg'])).resolves.toEqual(new Map())
+    await expect(createSignedUrls(client, AVATAR_BUCKET, ['a.jpg'])).resolves.toEqual(new Map())
 
     createSignedUrlsMock.mockRejectedValue(new Error('network down'))
-    await expect(createSignedUrls(AVATAR_BUCKET, ['a.jpg'])).resolves.toEqual(new Map())
+    await expect(createSignedUrls(client, AVATAR_BUCKET, ['a.jpg'])).resolves.toEqual(new Map())
   })
 })

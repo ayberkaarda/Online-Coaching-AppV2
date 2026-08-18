@@ -67,8 +67,8 @@ import {
   useSendNotification,
   useSession,
   type TrendRangeDays,
-} from '@/hooks'
-import type { ProfileWithAvatar } from '@/hooks/useProfile'
+} from '@repo/api-client'
+import type { ProfileWithAvatar } from '@repo/api-client/hooks/useProfile'
 import { daysSince, formatDateTR, formatDateTimeTR } from '@/lib/utils'
 
 export interface CoachUserManagementProps {

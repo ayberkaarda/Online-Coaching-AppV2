@@ -12,12 +12,12 @@ import {
   buildWorkoutLogRows,
   groupLogsIntoSessions,
   isSessionComplete,
-} from '@/hooks/useWorkoutLogs'
+} from '@repo/api-client/hooks/useWorkoutLogs'
 import {
   rowsToSessionExercises,
   totalPlannedSets,
   type PlanExerciseRow,
-} from '@/hooks/useWorkoutSession'
+} from '@repo/api-client/hooks/useWorkoutSession'
 import type { WorkoutLog } from '@repo/types'
 
 const CLIENT = '11111111-1111-1111-1111-111111111111'

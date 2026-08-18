@@ -151,9 +151,17 @@ zamanında (`next/server` mobilde çözülmez) veya çalışma zamanında kırı
 - `src/lib/api/proxy.ts`, `auth-rate-limit.ts`, `client-ip.ts`, `response.ts` (yukarıdaki bulgu)
 - `src/app/**` (page/route/layout dosyaları — §1.1), `src/components/**` (20 dosya),
   `src/design/**` (`tokens.ts`, tailwind bu dosyayı import ediyor)
-- `src/lib/rate-limit.ts`, `src/lib/date.ts`, `src/lib/utils.ts`, `src/lib/upload-validation.ts`
-  — hiçbiri şu an `packages/*` hedefli değil; taşınmaları plan metninde yok, bu turda
-  **taşınmayacak** varsayılıyor.
+- `src/lib/rate-limit.ts`, `src/lib/utils.ts` — `packages/*` hedefli değil; taşınmaları plan
+  metninde yok, **taşınmayacak** varsayımı korunuyor.
+- `src/lib/date.ts`, `src/lib/upload-validation.ts` — **GÜNCELLEME (Faz 4.5 commit 5 sonucu,
+  2026-08-18):** bu envanter bu iki dosyayı da yukarıdaki gibi "taşınmayacak" varsaymıştı —
+  bu **yanlıştı**, envanterin kaçırdığı bir kalemdi. Taşınan 5 hook (§2/§3'teki 16 dosyanın
+  içinde) bu iki dosyaya bağımlı çıktı; bir paket bir uygulamaya bağımlı olamayacağı için ikisi
+  de `@repo/api-client/date` ve `@repo/api-client/upload-validation` olarak `packages/api-client`'a
+  taşındı, `apps/web` aynı yerden import ediyor. Bu envanterin §3 taraması yalnızca doğrudan
+  `packages/*` hedefi belirtilmiş dosyaları listelediği için hook'ların transitif
+  bağımlılıklarını izlememişti — kaçırma buradan geldi. Ayrıntı:
+  `docs/adr/0024-api-client-supabase-enjeksiyonu.md` "Uygulama sonucu" bölümü, madde 2.
 - `src/lib/logger.ts` — **GÜNCELLEME (ADR-0024 eki, 2026-08-18):** bu satır önceden dosyanın
   tamamının `apps/web`'de kalacağını varsayıyordu; ölçüldükten sonra bu **kısmen düzeltildi**.
   Dosya **bölünüyor**: platformdan bağımsız çekirdek (`Logger` arayüzü, `REDACT_PATHS`,

@@ -5,9 +5,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 
-import { queryKeyRoots, queryKeys, type NotificationQueryOptions } from '@/lib/query/keys'
-import { wrapSupabaseError } from '@/lib/query/supabase-error'
-import { supabase } from '@/lib/supabase/client'
+import { queryKeyRoots, queryKeys, type NotificationQueryOptions } from '../query/keys'
+import { wrapSupabaseError } from '../query/supabase-error'
+import { useSupabaseClient } from '../context'
 import type { Notification, TablesInsert } from '@repo/types'
 
 export type { NotificationQueryOptions }
@@ -18,6 +18,7 @@ export type { NotificationQueryOptions }
  * @param opts.sinceDays  Son N günlük kayıtlar.
  */
 export function useNotifications(userId?: string, opts?: NotificationQueryOptions) {
+  const supabase = useSupabaseClient()
   return useQuery({
     queryKey: queryKeys.notifications(userId, opts),
     enabled: Boolean(userId),
@@ -47,6 +48,7 @@ export interface MarkNotificationReadInput {
 }
 
 export function useMarkNotificationRead() {
+  const supabase = useSupabaseClient()
   const queryClient = useQueryClient()
 
   return useMutation({
@@ -71,6 +73,7 @@ export interface SendNotificationInput {
 }
 
 export function useSendNotification() {
+  const supabase = useSupabaseClient()
   const queryClient = useQueryClient()
 
   return useMutation({

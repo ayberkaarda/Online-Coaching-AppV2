@@ -8,10 +8,10 @@ import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tan
 import { useEffect } from 'react'
 import { toast } from 'sonner'
 
-import { apiFetch } from '@/lib/api/client'
-import { logger } from '@/lib/logger'
-import { queryKeyRoots, queryKeys } from '@/lib/query/keys'
-import { supabase } from '@/lib/supabase/client'
+import { apiFetch } from '../api/client'
+import { logger } from '@repo/logger'
+import { queryKeyRoots, queryKeys } from '../query/keys'
+import { useSupabaseClient } from '../context'
 
 /**
  * Service worker'ın (`next-pwa`/workbox) tuttuğu çevrimdışı önbellekleri temizler.
@@ -34,6 +34,7 @@ async function clearOfflineCaches(): Promise<void> {
 
 /** Aktif Supabase oturumu. Oturum değiştiğinde önbellek otomatik tazelenir. */
 export function useSession(): UseQueryResult<Session | null, Error> {
+  const supabase = useSupabaseClient()
   const queryClient = useQueryClient()
 
   useEffect(() => {
@@ -47,7 +48,7 @@ export function useSession(): UseQueryResult<Session | null, Error> {
     return () => {
       subscription.unsubscribe()
     }
-  }, [queryClient])
+  }, [supabase, queryClient])
 
   return useQuery({
     queryKey: queryKeys.session(),
@@ -77,6 +78,7 @@ interface SignInResponse {
 }
 
 export function useSignIn() {
+  const supabase = useSupabaseClient()
   const queryClient = useQueryClient()
 
   return useMutation({
@@ -121,6 +123,7 @@ export function useSignIn() {
 }
 
 export function useSignOut() {
+  const supabase = useSupabaseClient()
   const queryClient = useQueryClient()
 
   return useMutation({
@@ -145,6 +148,7 @@ export function useSignOut() {
 }
 
 export function useUpdatePassword() {
+  const supabase = useSupabaseClient()
   return useMutation({
     mutationFn: async (password: string): Promise<void> => {
       const { error } = await supabase.auth.updateUser({ password })

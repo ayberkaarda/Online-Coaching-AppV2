@@ -2,6 +2,7 @@
 
 // Uygulama genelindeki istemci sağlayıcıları: React Query, tema, bildirim (toast) ve hata sınırı.
 
+import { SupabaseClientProvider } from '@repo/api-client/context'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { ThemeProvider } from 'next-themes'
 import dynamic from 'next/dynamic'
@@ -9,8 +10,10 @@ import { useState } from 'react'
 import type { JSX, ReactNode } from 'react'
 import { Toaster } from 'sonner'
 
+import { getQueryClient } from '@repo/api-client/query/queryClient'
+
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
-import { getQueryClient } from '@/lib/query/queryClient'
+import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 
 // Devtools yalnızca geliştirme ortamında render edilir; ayrı chunk olduğu için
 // production paketine yüklenmez.
@@ -40,14 +43,27 @@ export function Providers({
 }): JSX.Element {
   // useState ile sabitlenir: Fast Refresh sırasında önbellek sıfırlanmasın.
   const [queryClient] = useState(getQueryClient)
+  // Faz 4.5 commit 5 (ADR-0024): `@repo/api-client` Supabase istemcisini modül seviyesinde
+  // import ETMEZ, buradan enjeksiyonla alır. Web'in cookie tabanlı deposu böylece pakete
+  // (ve ileride apps/mobile'a) sızmaz.
+  //
+  // REFERANS KARARLILIĞI — `useState` fabrikası ZORUNLU: `useMessages`/`usePresence`
+  // `supabase.channel(...)` aboneliğini `useEffect` içinde kuruyor ve istemci bağımlılık
+  // dizisinde. Her render'da yeni bir istemci verilseydi realtime kanalı her render'da
+  // sökülüp yeniden kurulurdu. `createBrowserSupabaseClient()` ayrıca modül seviyesinde de
+  // tekilleştirilmiş bir örnek döndürür (bkz. `@/lib/supabase/client`), yani koruma iki
+  // katmanlı. Kanıt: `tests/unit/supabase-client-context.test.tsx`.
+  const [supabaseClient] = useState(createBrowserSupabaseClient)
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <ThemeProvider attribute="class" defaultTheme="system" enableSystem nonce={nonce}>
-        <ErrorBoundary>{children}</ErrorBoundary>
-        <Toaster richColors closeButton position="top-right" />
-        {process.env.NODE_ENV === 'development' && <ReactQueryDevtools initialIsOpen={false} />}
-      </ThemeProvider>
-    </QueryClientProvider>
+    <SupabaseClientProvider client={supabaseClient}>
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem nonce={nonce}>
+          <ErrorBoundary>{children}</ErrorBoundary>
+          <Toaster richColors closeButton position="top-right" />
+          {process.env.NODE_ENV === 'development' && <ReactQueryDevtools initialIsOpen={false} />}
+        </ThemeProvider>
+      </QueryClientProvider>
+    </SupabaseClientProvider>
   )
 }

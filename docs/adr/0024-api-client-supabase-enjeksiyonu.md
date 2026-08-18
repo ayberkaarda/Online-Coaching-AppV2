@@ -412,3 +412,37 @@ gibi bir context enjeksiyonuna ihtiyaçları yok, davranış platform başına d
 - `apps/web/src/lib/query/queryClient.ts`, `security-event.ts`, `supabase-error.ts` →
   `packages/api-client` (logger importu `@repo/logger`'a döner)
 - `apps/web/tests/unit/storage.test.ts`, `storage-cleanup.test.ts` (Ek-1 test etkisi)
+
+## Uygulama sonucu (Faz 4.5 commit 5, 2026-08-18)
+
+Yukarıdaki "Uygulama sözleşmesi" eki commit 5 başlamadan **önce** yazıldı ve iki eksik kalemi
+(storage.ts, logger.ts) fiyatlandırdı. Uygulama sırasında sözleşmede **öngörülmemiş** dört karar
+noktası daha çıktı; dördü de uygulandı. Bu bölüm yalnızca bir ek, yukarıdaki "Karar" ve
+"Uygulama sözleşmesi" bölümlerinin yerini almaz.
+
+1. **`src/lib/api/ai.ts` de hook değildi** ve modül seviyesinde singleton kullanıyordu. Ek-1'in
+   `storage.ts` için kurduğu aynı desen burada da uygulandı: `generateWorkoutPlan`,
+   `generateDietPlan` ve `getRecommendations` fonksiyonlarının üçüne de `client:
+SupabaseClient<Database>` açık ilk parametre olarak eklendi; `useAi.ts` istemciyi
+   `useSupabaseClient()`'tan alıp bu üç fonksiyona iletiyor.
+2. **`src/lib/date.ts` ve `src/lib/upload-validation.ts` da taşınmak zorunda kaldı.** Taşınan 5
+   hook bu iki dosyaya bağımlıydı ve bir paket bir uygulamaya bağımlı olamaz (aynı Karar
+   bölümünün "Reddedilen alternatifler"inde belirtilen yön kuralı). İkisi de
+   `@repo/api-client/date` ve `@repo/api-client/upload-validation` olarak dışa açıldı;
+   `apps/web` bileşenleri aynı yerden import ediyor, kod çoğaltması yok. `docs/discovery/
+faz-4.5-tasima-envanteri.md`'nin §3 "Kaynak → hedef haritası"sı bu iki dosyayı
+   "taşınmayacak" varsaymıştı — o varsayım yanlıştı, envanter düzeltildi.
+3. **`export const supabase` singleton'ı kaldırıldı** (`apps/web/src/lib/supabase/client.ts`).
+   Taşıma tamamlandıktan sonra bu singleton'ın tüketicisi sıfırdı; bırakmak, ADR'nin Karar
+   bölümünün kaçındığı doğrudan modül-seviyesi erişim yolunu web tarafında yeniden üretirdi.
+   `createBrowserSupabaseClient()` fonksiyonu modül-tekil (module-singleton çağrı deseni)
+   kalmaya devam ediyor, tek çağıranı `providers.tsx`. Tüketicisi kalmayan `unwrap<T>()`
+   yardımcı fonksiyonu da (bkz. Sonuçlar/Olumsuz bölümündeki uyarı) `packages/api-client`'a
+   context'ten bağımsız, düz bir yardımcı olarak taşındı.
+4. **`SupabaseClientProvider`'ın `children` prop'u opsiyonel yazıldı.** `React.createElement(
+Provider, props, ...children)` aşırı yüklemesi `children` zorunlu tutulduğunda eşleşmiyor ve
+   `.ts` uzantılı (JSX olmayan) test dosyaları sarmalayıcıyı `react/no-children-prop` lint
+   hatası almadan kuramıyordu (ölçüldü: 8 hata). Çalışma zamanı davranışı değişmedi — `children`
+   hâlâ fiilen her zaman geçiriliyor, yalnızca tip imzası gevşetildi. `context.tsx` ayrıca JSX
+   yerine `createElement` kullanıyor; commit 6'da (`apps/mobile`) Metro'nun JSX derleme
+   yapılandırmasına bir bağımlılık doğmasın diye bilinçli bir tercih.

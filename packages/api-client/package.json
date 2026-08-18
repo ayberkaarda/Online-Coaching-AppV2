@@ -1,0 +1,35 @@
+{
+  "name": "@repo/api-client",
+  "version": "0.0.0",
+  "private": true,
+  "description": "apps/web (ve gelecekte apps/mobile) arasında paylaşılan veri katmanı: TanStack Query hook'ları, Supabase sorgu/storage yardımcıları, AI proxy istemcisi ve query key fabrikaları (ADR-0023 madde 1/8, ADR-0024, Faz 4.5 commit 5). Supabase istemcisi MODÜL SEVİYESİNDE import EDİLMEZ — `SupabaseClientProvider` ile dışarıdan enjekte edilir; böylece web'in cookie deposu mobile sızmaz. Build adımı YOK: TS kaynağı doğrudan yayınlanır, tüketen taraf transpile eder (bkz. apps/web/next.config.mjs transpilePackages).",
+  "exports": {
+    ".": "./src/index.ts",
+    "./context": "./src/context.tsx",
+    "./storage": "./src/storage.ts",
+    "./date": "./src/date.ts",
+    "./upload-validation": "./src/upload-validation.ts",
+    "./api": "./src/api/index.ts",
+    "./api/client": "./src/api/client.ts",
+    "./api/types": "./src/api/types.ts",
+    "./api/ai": "./src/api/ai.ts",
+    "./query/keys": "./src/query/keys.ts",
+    "./query/queryClient": "./src/query/queryClient.ts",
+    "./query/security-event": "./src/query/security-event.ts",
+    "./query/supabase-error": "./src/query/supabase-error.ts",
+    "./hooks": "./src/hooks/index.ts",
+    "./hooks/*": "./src/hooks/*.ts"
+  },
+  "dependencies": {
+    "@repo/logger": "workspace:*",
+    "@repo/types": "workspace:*",
+    "@supabase/supabase-js": "^2.110.0",
+    "@tanstack/react-query": "^5.62.11",
+    "react": "19.2.4",
+    "sonner": "^1.7.2"
+  },
+  "devDependencies": {
+    "@repo/config": "workspace:*",
+    "@types/react": "^19.0.7"
+  }
+}

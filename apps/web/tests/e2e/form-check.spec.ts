@@ -12,7 +12,7 @@
 // Kaynaklar (metinler birebir buradan alındı, tahmin yürütülmedi):
 //   src/components/tabs/FormCheckTab.tsx
 //   src/components/CoachUserManagement.tsx
-//   src/hooks/useFormChecks.ts (toast metinleri)
+//   packages/api-client/src/hooks/useFormChecks.ts (toast metinleri)
 
 import { type Page } from '@playwright/test'
 

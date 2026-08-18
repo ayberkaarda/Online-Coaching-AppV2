@@ -9,9 +9,17 @@
 // HATA POLİTİKASI: Bu modül ASLA fırlatmaz. Silinmiş/eksik bir dosya ya da yetki
 // hatası yüzünden liste sorgusu patlamamalı; `null` dönülür ve çağıran taraf
 // placeholder gösterir.
+//
+// SUPABASE İSTEMCİSİ (ADR-0024 Ek-1): aşağıdaki üç fonksiyon React HOOK'U DEĞİLDİR, bu yüzden
+// `useSupabaseClient()` çağıramazlar (hook kuralları izin vermez). İstemci AÇIK İLK PARAMETRE
+// olarak geçer; çağıran dört hook (`useFormChecks`, `useMessages`, `useProfile`,
+// `useProgressPhotos`) onu context'ten alıp iletir. Modül seviyesi bir setter BİLEREK
+// reddedildi — ADR'nin kaçındığı singleton desenini birebir yeniden üretirdi.
 
-import { logger } from '@/lib/logger'
-import { supabase } from '@/lib/supabase/client'
+import type { SupabaseClient } from '@supabase/supabase-js'
+
+import { logger } from '@repo/logger'
+import type { Database } from '@repo/types'
 
 export const AVATAR_BUCKET = 'avatars'
 export const FORM_CHECK_BUCKET = 'form-checks-media'
@@ -59,6 +67,7 @@ function isStoragePath(path: string): boolean {
  * @returns İmzalı adres, ya da yol boşsa / dosya yoksa / yetki yoksa `null`.
  */
 export async function createSignedUrl(
+  client: SupabaseClient<Database>,
   bucket: string,
   path: string | null | undefined
 ): Promise<string | null> {
@@ -66,7 +75,7 @@ export async function createSignedUrl(
   if (!normalized) return null
 
   try {
-    const { data, error } = await supabase.storage
+    const { data, error } = await client.storage
       .from(bucket)
       .createSignedUrl(normalized, SIGNED_URL_TTL_SECONDS)
 
@@ -99,6 +108,7 @@ export async function createSignedUrl(
  * @returns Silme başarılıysa `true`, aksi hâlde `false`.
  */
 export async function removeStoredObject(
+  client: SupabaseClient<Database>,
   bucket: string,
   path: string | null | undefined
 ): Promise<boolean> {
@@ -106,7 +116,7 @@ export async function removeStoredObject(
   if (!normalized || !isStoragePath(normalized)) return false
 
   try {
-    const { error } = await supabase.storage.from(bucket).remove([normalized])
+    const { error } = await client.storage.from(bucket).remove([normalized])
 
     if (error) {
       logger.warn({ bucket, path: normalized, err: error.message }, 'Depolanan nesne silinemedi')
@@ -131,6 +141,7 @@ export async function removeStoredObject(
  *          böylece çağıran taraf `map.get(path) ?? null` ile placeholder'a düşer.
  */
 export async function createSignedUrls(
+  client: SupabaseClient<Database>,
   bucket: string,
   paths: readonly (string | null | undefined)[]
 ): Promise<Map<string, string>> {
@@ -141,7 +152,7 @@ export async function createSignedUrls(
   if (unique.length === 0) return result
 
   try {
-    const { data, error } = await supabase.storage
+    const { data, error } = await client.storage
       .from(bucket)
       .createSignedUrls(unique, SIGNED_URL_TTL_SECONDS)
 

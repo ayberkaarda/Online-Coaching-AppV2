@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation'
 import type { JSX } from 'react'
 import { useEffect } from 'react'
 
-import { useProfile, useProfiles, useSession } from '@/hooks'
+import { useProfile, useProfiles, useSession } from '@repo/api-client'
 import { QueryState, SkeletonCard } from '@/components/ui'
 import { CoachUserManagement } from '@/components/CoachUserManagement'
 import { ThemeToggle } from '@/components/ThemeToggle'

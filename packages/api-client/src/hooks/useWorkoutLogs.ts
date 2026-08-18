@@ -15,12 +15,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 
-import { queryKeys } from '@/lib/query/keys'
-import { wrapSupabaseError } from '@/lib/query/supabase-error'
-import { supabase } from '@/lib/supabase/client'
+import { queryKeys } from '../query/keys'
+import { wrapSupabaseError } from '../query/supabase-error'
+import { useSupabaseClient } from '../context'
 import type { TablesInsert, WorkoutLog } from '@repo/types'
 
 export function useWorkoutLogs(clientId?: string) {
+  const supabase = useSupabaseClient()
   return useQuery({
     queryKey: queryKeys.workoutLogs(clientId),
     enabled: Boolean(clientId),
@@ -45,6 +46,7 @@ export interface CreateWorkoutLogInput {
 }
 
 export function useCreateWorkoutLog() {
+  const supabase = useSupabaseClient()
   const queryClient = useQueryClient()
 
   return useMutation({
@@ -109,7 +111,7 @@ export interface CreateWorkoutLogsInput {
 
 /**
  * Set girdilerini `workout_logs` satırlarına çevirir. SAF fonksiyon —
- * `tests/unit/workout-sets.test.ts` bunu doğrudan çağırır.
+ * `apps/web/tests/unit/workout-sets.test.ts` bunu doğrudan çağırır.
  *
  * KRİTİK İNVARYANT: `completedAt` ne verilirse verilsin, üretilen satırların
  * TAMAMI aynı `completed_at` değerini taşır (hepsi damgalı ya da hepsi NULL).
@@ -200,6 +202,7 @@ export function groupLogsIntoSessions(logs: readonly WorkoutLog[] | null | undef
 
 /** Toplu set kaydı — tek sorguda insert eder. */
 export function useCreateWorkoutLogs() {
+  const supabase = useSupabaseClient()
   const queryClient = useQueryClient()
 
   return useMutation({

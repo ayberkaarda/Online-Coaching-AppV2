@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { queryKeyRoots, queryKeys } from '@/lib/query/keys'
+import { queryKeyRoots, queryKeys } from '@repo/api-client/query/keys'
 
 describe('queryKeys fabrika fonksiyonları', () => {
   it('aynı argümanlarla iki çağrı deterministik (eşit) anahtar üretir', () => {

@@ -43,7 +43,7 @@ const REJECTION_MESSAGES: Record<UploadRejectionCode, string> = {
 }
 
 /**
- * jsdom ortamında `Blob.arrayBuffer()` bulunmayabilir (bkz. tests/unit/utils.test.ts,
+ * jsdom ortamında `Blob.arrayBuffer()` bulunmayabilir (bkz. apps/web/tests/unit/utils.test.ts,
  * docs/PROGRESS.md); bu yüzden önce native metot denenir, yoksa `FileReader`'a düşülür.
  */
 async function readBytes(blob: Blob): Promise<Uint8Array> {

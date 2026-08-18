@@ -2,13 +2,13 @@ import { render } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { NotificationForm } from '@/components/NotificationForm'
-import { useSendNotification } from '@/hooks'
+import { useSendNotification } from '@repo/api-client'
 import type { Profile } from '@repo/types'
 
 import { screen, userEvent, waitFor } from '../test-utils'
 
-vi.mock('@/hooks', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@/hooks')>()
+vi.mock('@repo/api-client', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@repo/api-client')>()
   return { ...actual, useSendNotification: vi.fn() }
 })
 

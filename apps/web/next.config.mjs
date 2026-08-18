@@ -98,11 +98,15 @@ const nextConfig = {
   // Faz 4.5'ten beri bu kök `apps/web` değil MONOREPO KÖKÜ (yukarıdaki `workspaceRoot`).
   outputFileTracingRoot: workspaceRoot,
   turbopack: { root: workspaceRoot },
-  // Faz 4.5 commit 4 (ADR-0023 madde 1): @repo/types build adımı OLMAYAN bir workspace
-  // paketidir — ham .ts kaynağını yayınlar ve içinde ÇALIŞMA ZAMANI kodu (zod şemaları,
-  // database.ts Constants) taşır. Next node_modules altındaki kodu varsayılan olarak
-  // derlemez; paket burada listelenerek TS/JSX derlemesine dahil edilir.
-  transpilePackages: ['@repo/types'],
+  // Faz 4.5 commit 4-5 (ADR-0023 madde 1, ADR-0024): @repo/* paketlerinin HİÇBİRİNİN build
+  // adımı YOKTUR — hepsi ham .ts/.tsx kaynağını yayınlar ve içlerinde ÇALIŞMA ZAMANI kodu
+  // taşırlar (@repo/types: zod şemaları + database.ts Constants; @repo/api-client: TanStack
+  // Query hook'ları, `'use client'` direktifleri, React context; @repo/logger: konsol
+  // adaptörü). Next node_modules altındaki kodu varsayılan olarak derlemez; paketler burada
+  // listelenerek TS/JSX derlemesine dahil edilir. Listeye eklenmeyen bir paket ham TS
+  // sözdizimiyle bundle'a girer ve build "Unexpected token" ile düşer (ÖLÇÜLDÜ: commit 4'te
+  // @repo/types için).
+  transpilePackages: ['@repo/types', '@repo/api-client', '@repo/logger'],
   async headers() {
     return [
       {

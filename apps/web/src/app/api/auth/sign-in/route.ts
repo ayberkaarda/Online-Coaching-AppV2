@@ -1,6 +1,6 @@
 // A-01 (güvenlik denetimi — HIGH): sunucu tarafı giriş ucu + kaba kuvvet koruması.
 //
-// ÖNCESİ: `src/hooks/useSession.ts` doğrudan tarayıcıdan `supabase.auth.signInWithPassword`
+// ÖNCESİ: `packages/api-client/src/hooks/useSession.ts` doğrudan tarayıcıdan `supabase.auth.signInWithPassword`
 // çağırıyordu, yani her giriş denemesi GoTrue'ya doğrudan gidiyordu ve uygulamanın araya
 // girebileceği hiçbir nokta yoktu.
 //

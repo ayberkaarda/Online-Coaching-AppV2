@@ -20,7 +20,7 @@ import { useRef, useState } from 'react'
 import type { JSX, KeyboardEvent } from 'react'
 import { toast } from 'sonner'
 
-import { useNotifications, useProfile } from '@/hooks'
+import { useNotifications, useProfile } from '@repo/api-client'
 import type { Profile, UserRole } from '@repo/types'
 
 import AnnouncementsTab from './tabs/AnnouncementsTab'

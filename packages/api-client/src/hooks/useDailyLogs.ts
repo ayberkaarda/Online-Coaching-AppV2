@@ -6,12 +6,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 
-import { queryKeys } from '@/lib/query/keys'
-import { wrapSupabaseError } from '@/lib/query/supabase-error'
-import { supabase } from '@/lib/supabase/client'
+import { queryKeys } from '../query/keys'
+import { wrapSupabaseError } from '../query/supabase-error'
+import { useSupabaseClient } from '../context'
 import { parseMacros, type DailyLog, type Macros } from '@repo/types'
 
 export function useDailyLogs(clientId?: string) {
+  const supabase = useSupabaseClient()
   return useQuery({
     queryKey: queryKeys.dailyLogs(clientId),
     enabled: Boolean(clientId),
@@ -34,7 +35,7 @@ export interface CreateDailyLogInput {
   sodium_mg: number | null
   macros: Macros
   /**
-   * `YYYY-MM-DD` — kullanıcının YEREL günü (`todayIsoDate()`, src/lib/date.ts).
+   * `YYYY-MM-DD` — kullanıcının YEREL günü (`todayIsoDate()`, `@repo/api-client/date`).
    *
    * ZORUNLU (opsiyonel DEĞİL): alan opsiyonelken çağıran göndermediğinde satır
    * veritabanının `default current_date` değerini (UTC) alıyordu. UTC+3'te
@@ -52,6 +53,7 @@ export interface CreateDailyLogInput {
  * güvenlik ağıdır, bu yolun kullandığı değer DEĞİLDİR.
  */
 export function useCreateDailyLog() {
+  const supabase = useSupabaseClient()
   const queryClient = useQueryClient()
 
   return useMutation({

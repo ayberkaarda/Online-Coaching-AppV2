@@ -55,7 +55,7 @@ const panelOf = (page: Page) => page.getByRole('tabpanel')
  *
  * MUTLAK DEĞİL, FARK (delta) ÖLÇÜLÜR — bkz. tests/e2e/README.md ve
  * `supabase/tests/rls.test.sql` senaryo 12/77 (aynı desen): `sumNutritionLogsForDate`
- * (src/hooks/useNutritionLogs.ts) BUGÜNÜN nutrition_logs satırlarının TAMAMINI
+ * (packages/api-client/src/hooks/useNutritionLogs.ts) BUGÜNÜN nutrition_logs satırlarının TAMAMINI
  * toplar, yani önceki (başarısız/yarım kalmış) koşulardan kalan satırlar da
  * toplama girer — "henüz öğün girilmedi -> 0 kcal" varsayımı ÖLÇÜLEREK kırıldı
  * (kalıntı: 2 satır/800 kcal, test 400 kcal bekliyordu, bkz. git geçmişi).
@@ -89,7 +89,7 @@ test.describe('Beslenme Akışı (§4.2)', () => {
   // Hata ÜRÜN KODUNDA düzeltildi: dört yazma yolu da (nutrition_logs,
   // daily_logs, progress_entries, progress_photos) tarihi İSTEMCİDEN, yerel
   // gün olarak AÇIKÇA gönderir ve tarih alanları tiplerde ZORUNLUDUR
-  // (src/lib/date.ts + tests/unit/local-date-consistency.test.ts). Yazma ve
+  // (`@repo/api-client/date` + tests/unit/local-date-consistency.test.ts). Yazma ve
   // okuma artık AYNI kaynağı kullandığı için senaryo tarayıcının saat
   // diliminden BAĞIMSIZDIR; sabitlemeye gerek yoktur ve sabitlemek, aynı
   // hatanın geri gelmesini bu testten SAKLARDI.

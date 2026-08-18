@@ -1,0 +1,11 @@
+{
+  // Paylaşılan katı derleyici tabanı @repo/config'ten gelir (ADR-0023 madde 1). `base.json`
+  // DOM'suzdur; bu paket yalnızca `console`'a dokunduğu için `lib`'e DOM eklenir — React
+  // Native de dahil her JS ortamında `console` vardır, gerçek bir DOM bağımlılığı yoktur.
+  "extends": "@repo/config/tsconfig/base.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "DOM"]
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules"]
+}

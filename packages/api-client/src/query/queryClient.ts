@@ -4,16 +4,16 @@
 import { MutationCache, QueryCache, QueryClient } from '@tanstack/react-query'
 import type { Session } from '@supabase/supabase-js'
 
-import { ApiError } from '@/lib/api/client'
-import { queryKeys } from '@/lib/query/keys'
-import { logClientSecurityEvent } from '@/lib/query/security-event'
-import { SupabaseQueryError } from '@/lib/query/supabase-error'
+import { ApiError } from '../api/client'
+import { queryKeys } from './keys'
+import { logClientSecurityEvent } from './security-event'
+import { SupabaseQueryError } from './supabase-error'
 
 // ---------------------------------------------------------------------------
 // A-10 kalanı (bkz. docs/security/AUDIT.md §4c): RLS reddi (`42501`) merkezi loglaması.
 // ---------------------------------------------------------------------------
 //
-// MERKEZİ ÇÖZÜM SEÇİLDİ: `src/hooks/**` altındaki ~26 sorgu/mutasyon çağrı noktasının her birine
+// MERKEZİ ÇÖZÜM SEÇİLDİ: `packages/api-client/src/hooks/**` altındaki ~26 sorgu/mutasyon çağrı noktasının her birine
 // tekrarlayan bir `catch (err) { if (err.code === '42501') logSecurityEvent(...) }` bloğu
 // eklemek yerine, TanStack Query'nin `QueryCache`/`MutationCache` `onError` kancaları TEK
 // noktadan kullanılıyor — her sorgu/mutasyon hatası buradan geçer. Hook'ların tek değişikliği
@@ -21,7 +21,7 @@ import { SupabaseQueryError } from '@/lib/query/supabase-error'
 // kullanmaları (bkz. `./supabase-error.ts`) — bu, düz `Error`'ın attığı `.code` alanını taşır;
 // `.message` birebir aynı kaldığı için mevcut `toast.error` metinleri DEĞİŞMEZ.
 //
-// Tarayıcı-sunucu tuzağı için `./security-event.ts`'e bakın: `src/lib/api/response.ts`'teki
+// Tarayıcı-sunucu tuzağı için `./security-event.ts`'e bakın: `apps/web/src/lib/api/response.ts`'teki
 // `logSecurityEvent()` burada KASITLI OLARAK kullanılmıyor (o modül `next/server` içe aktarıyor).
 function reportRlsDenialIfNeeded(error: unknown, client: QueryClient): void {
   if (!(error instanceof SupabaseQueryError) || error.code !== '42501') return

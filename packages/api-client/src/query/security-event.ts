@@ -2,11 +2,11 @@
 // loglayıcı.
 //
 // TARAYICI-SUNUCU TUZAĞI (A-10 kalanı, bkz. docs/security/AUDIT.md §4c "Kayıtlı borçlar" ve
-// `src/lib/api/response.ts`'teki `logSecurityEvent()` yorumu): o fonksiyon KASITLI OLARAK burada
+// `apps/web/src/lib/api/response.ts`'teki `logSecurityEvent()` yorumu): o fonksiyon KASITLI OLARAK burada
 // kullanılmıyor, çünkü `response.ts` `next/server`'dan `NextResponse` içe aktarıyor —
 // bu modül tarayıcı paketine (bu dosyanın çağrıldığı `queryClient.ts` `'use client'` ağacının
 // parçasıdır) dahil edilmeye çalışılırsa sunucuya özel API'ler yüzünden build'i kırma riski
-// taşır. Bu yüzden burada `@/lib/logger`'ı DOĞRUDAN kullanan, `next/server` bağımlılığı
+// taşır. Bu yüzden burada `@repo/logger`'ı DOĞRUDAN kullanan, `next/server` bağımlılığı
 // TAŞIMAYAN, kasıtlı olarak küçük ve bağımsız bir eşdeğer tutuluyor.
 //
 // GERÇEK KAZANCIN SINIRI (bilerek kabul edildi — bkz. bu turun ajan raporu için
@@ -17,7 +17,7 @@
 // kendi konsolunu paylaşırsa teşhis edilebilir, (c) ileride gerçek bir sunucu ucu
 // (`/api/security-event` + auth + rate limit) eklenirse TEK çağrı noktası (`queryClient.ts`
 // içindeki `reportRlsDenialIfNeeded`) güncellenir, hook'lara dokunulmaz.
-import { logger } from '@/lib/logger'
+import { logger } from '@repo/logger'
 
 /**
  * Güvenlik olayını tarayıcı konsoluna (`console.warn`) `event` alanıyla loglar.

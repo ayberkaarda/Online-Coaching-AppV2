@@ -21,6 +21,8 @@
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
+    "@repo/api-client": "workspace:*",
+    "@repo/logger": "workspace:*",
     "@repo/types": "workspace:*",
     "@supabase/ssr": "^0.12.4",
     "@supabase/supabase-js": "^2.110.0",

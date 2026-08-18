@@ -5,12 +5,12 @@
 // MAHREMİYET: `progress-photos` bucket'ı PRIVATE'tır
 // (bkz. supabase/migrations/20260817220000_progress_tracking.sql). Veritabanı
 // kolonu (`photo_path`) tam URL değil YOL saklar; okuma anında süreli imzalı
-// adres üretilir (bkz. src/lib/storage.ts) — `getPublicUrl` KULLANILMAZ.
+// adres üretilir (bkz. `@repo/api-client/storage`) — `getPublicUrl` KULLANILMAZ.
 //
 // YOL SÖZLEŞMESİ (migration §3, `progress_photos_path_chk`): tam olarak
 // `<client_id>/<uuid>.<ext>` — tek seviye klasör = sahip. Bu şart şemada
 // CHECK ile de zorlanır; yanlış kurulmuş bir yol INSERT'te `23514` ile
-// reddedilir (bkz. bu dosyanın testleri, tests/unit/progress-photos.test.tsx).
+// reddedilir (bkz. bu dosyanın testleri, apps/web/tests/unit/progress-photos.test.tsx).
 //
 // KOÇ SALT OKUR: RLS INSERT/UPDATE/DELETE'i yalnızca `client_id = auth.uid()`e
 // açar (migration §5). `useUploadProgressPhoto`/`useDeleteProgressPhoto`
@@ -21,11 +21,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 
-import { queryKeys } from '@/lib/query/keys'
-import { wrapSupabaseError } from '@/lib/query/supabase-error'
-import { SIGNED_URL_STALE_TIME_MS, createSignedUrls, removeStoredObject } from '@/lib/storage'
-import { supabase } from '@/lib/supabase/client'
-import { assertValidImageFile } from '@/lib/upload-validation'
+import { queryKeys } from '../query/keys'
+import { wrapSupabaseError } from '../query/supabase-error'
+import { SIGNED_URL_STALE_TIME_MS, createSignedUrls, removeStoredObject } from '../storage'
+import { useSupabaseClient } from '../context'
+import { assertValidImageFile } from '../upload-validation'
 import type { Enums, Tables } from '@repo/types'
 
 export const PROGRESS_PHOTOS_BUCKET = 'progress-photos'
@@ -59,6 +59,7 @@ export interface ProgressPhotoWithUrl extends ProgressPhotoRow {
  * başında (dolayısıyla açı bazlı gruplamada İLK eleman) olmasını garanti eder.
  */
 export function useProgressPhotos(clientId?: string) {
+  const supabase = useSupabaseClient()
   return useQuery({
     queryKey: queryKeys.progressPhotos(clientId),
     enabled: Boolean(clientId),
@@ -75,6 +76,7 @@ export function useProgressPhotos(clientId?: string) {
 
       // Tüm yollar TEK istekte imzalanır (fotoğraf başına ayrı istek yok — N+1 önlenir).
       const signed = await createSignedUrls(
+        supabase,
         PROGRESS_PHOTOS_BUCKET,
         data.map((row) => row.photo_path)
       )
@@ -90,7 +92,7 @@ export interface UploadProgressPhotoInput {
   file: File
   /**
    * Çekim günü (`YYYY-MM-DD`) — kullanıcının YEREL günü (`todayIsoDate()`,
-   * src/lib/date.ts).
+   * `@repo/api-client/date`).
    *
    * ZORUNLU (opsiyonel DEĞİL): opsiyonelken çağıran göndermediğinde satır
    * veritabanının `default current_date` (UTC) değerini alıyordu. Galeri,
@@ -104,6 +106,7 @@ export interface UploadProgressPhotoInput {
 }
 
 export function useUploadProgressPhoto() {
+  const supabase = useSupabaseClient()
   const queryClient = useQueryClient()
 
   return useMutation({
@@ -114,7 +117,7 @@ export function useUploadProgressPhoto() {
       takenOn,
     }: UploadProgressPhotoInput): Promise<ProgressPhotoRow> => {
       // Uzantı dosya adından DEĞİL, magic-byte ile tespit edilen gerçek içerikten
-      // türetilir (A-21) — bkz. src/lib/upload-validation.ts.
+      // türetilir (A-21) — bkz. `@repo/api-client/upload-validation`.
       const { mime, extension } = await assertValidImageFile(file)
 
       // YOL SÖZLEŞMESİ (progress_photos_path_chk ile BİREBİR): <client_id>/<uuid>.<ext>.
@@ -169,6 +172,7 @@ export interface DeleteProgressPhotoInput {
  * BAŞARILI sayılır — `removeStoredObject` asla fırlatmaz, yalnızca loglar.
  */
 export function useDeleteProgressPhoto() {
+  const supabase = useSupabaseClient()
   const queryClient = useQueryClient()
 
   return useMutation({
@@ -176,7 +180,7 @@ export function useDeleteProgressPhoto() {
       const { error } = await supabase.from('progress_photos').delete().eq('id', photoId)
       if (error) throw wrapSupabaseError(error, { table: 'progress_photos', op: 'delete' })
 
-      await removeStoredObject(PROGRESS_PHOTOS_BUCKET, photoPath)
+      await removeStoredObject(supabase, PROGRESS_PHOTOS_BUCKET, photoPath)
     },
     onSuccess: (_void, { clientId }) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.progressPhotos(clientId) })

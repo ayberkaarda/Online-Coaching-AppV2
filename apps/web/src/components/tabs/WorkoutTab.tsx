@@ -8,7 +8,7 @@
 //   * Danışan: günün antrenmanı, video embed, SET BAZLI log girişi.
 //   * Tamamlama: tüm planlı setler girildiğinde oturumun TÜM satırlarına AYNI
 //     `completed_at` damgası yazılır (denormalize oturum damgası — bkz.
-//     `src/hooks/useWorkoutLogs.ts` ve supabase/README.md §4h).
+//     `packages/api-client/src/hooks/useWorkoutLogs.ts` ve supabase/README.md §4h).
 //
 // KİMLİK (ADR-0018 Katman B): bu ekran esaslı biçimde elden geçirildiği için
 // dokunulan her yerde eski dil dönüştürüldü — 900 ağırlık sınıfı yerine
@@ -51,14 +51,14 @@ import {
   useWorkoutLogs,
   useWorkoutPlan,
   type WorkoutSetInput,
-} from '@/hooks'
+} from '@repo/api-client'
 import {
   rowsToSessionExercises,
   totalPlannedSets,
   useWorkoutPlanExercises,
   type SessionExercise,
-} from '@/hooks/useWorkoutSession'
-import type { SplitType } from '@/lib/api/types'
+} from '@repo/api-client/hooks/useWorkoutSession'
+import type { SplitType } from '@repo/api-client/api/types'
 import { DAYS, getTodayName } from '@/lib/utils'
 import {
   DAY_NAMES,

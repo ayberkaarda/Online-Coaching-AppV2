@@ -19,10 +19,10 @@
 
 import { useQuery } from '@tanstack/react-query'
 
-import { logger } from '@/lib/logger'
-import { queryKeys } from '@/lib/query/keys'
-import { wrapSupabaseError } from '@/lib/query/supabase-error'
-import { supabase } from '@/lib/supabase/client'
+import { logger } from '@repo/logger'
+import { queryKeys } from '../query/keys'
+import { wrapSupabaseError } from '../query/supabase-error'
+import { useSupabaseClient } from '../context'
 import type { Exercise, FoodItem } from '@repo/types'
 
 const CATALOG_STALE_TIME = 30 * 60_000
@@ -84,6 +84,7 @@ export async function fetchAllRows<T>(
 }
 
 export function useExercises() {
+  const supabase = useSupabaseClient()
   return useQuery({
     queryKey: queryKeys.exercises(),
     staleTime: CATALOG_STALE_TIME,
@@ -97,6 +98,7 @@ export function useExercises() {
 }
 
 export function useFoods() {
+  const supabase = useSupabaseClient()
   return useQuery({
     queryKey: queryKeys.foods(),
     staleTime: CATALOG_STALE_TIME,

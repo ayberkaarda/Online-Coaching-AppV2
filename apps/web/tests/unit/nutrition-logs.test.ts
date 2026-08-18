@@ -29,21 +29,21 @@ const { insertMock, insertSelectSingleMock, deleteEqMock, fromMock } = vi.hoiste
   }
 })
 
-vi.mock('@/lib/supabase/client', () => ({
-  supabase: { from: fromMock },
-}))
+// Faz 4.5 commit 5 (ADR-0024): Supabase istemcisi artık modül singleton'ı DEĞİL — hook'lar
+// onu `<SupabaseClientProvider>`'dan alıyor. Bu yüzden `vi.mock('@/lib/supabase/client', ...)`
+// KALKTI; sahte istemci sıradan bir nesne olarak kurulup sarmalayıcıyla enjekte ediliyor.
 
 vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }))
 
-// `@/hooks` (barrel) burada TAMAMEN mock'lanır: `NutritionTab`'in kullandığı 9
+// `@repo/api-client` (barrel) burada TAMAMEN mock'lanır: `NutritionTab`'in kullandığı 9
 // hook'un hepsi Bölüm C'de kontrol edilir ki bileşen testi gerçek Supabase
-// çağrısı YAPMASIN. Bu, Bölüm A/B'nin `@/hooks/useNutritionLogs`'tan
+// çağrısı YAPMASIN. Bu, Bölüm A/B'nin `@repo/api-client/hooks/useNutritionLogs`'tan
 // (barrel'i ATLAYARAK) yaptığı DOĞRUDAN importla ÇAKIŞMAZ — farklı modül
 // specifier'ı, ayrı modül kaydı.
-vi.mock('@/hooks', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@/hooks')>()
+vi.mock('@repo/api-client', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@repo/api-client')>()
   return {
     ...actual,
     useFoods: vi.fn(),
@@ -71,17 +71,22 @@ import {
   useNutritionTargets,
   useSaveNutritionPlan,
   useSetNutritionTargets,
-} from '@/hooks'
+} from '@repo/api-client'
 import {
   sumNutritionLogsForDate,
   useCreateNutritionLog,
   useDeleteNutritionLog,
   type NutritionLog,
-} from '@/hooks/useNutritionLogs'
-// `todayIsoDate` ARTIK bu hook dosyasında DEĞİL, `src/lib/date.ts`te — dört
+} from '@repo/api-client/hooks/useNutritionLogs'
+import { SupabaseClientProvider } from '@repo/api-client/context'
+
+import { asSupabaseClient } from './test-utils'
+
+const supabase = asSupabaseClient({ from: fromMock })
+// `todayIsoDate` ARTIK bu hook dosyasında DEĞİL, ``@repo/api-client/date``te — dört
 // yazma yolunun da paylaştığı tek kaynak (bkz. o dosyanın başı ve
 // tests/unit/local-date-consistency.test.ts).
-import { todayIsoDate } from '@/lib/date'
+import { todayIsoDate } from '@repo/api-client/date'
 
 function wireNutritionLogsTable(): void {
   fromMock.mockImplementation((table: string) => {
@@ -101,7 +106,11 @@ function createWrapper() {
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   })
   return function Wrapper({ children }: { children: ReactNode }) {
-    return createElement(QueryClientProvider, { client: queryClient }, children)
+    return createElement(
+      SupabaseClientProvider,
+      { client: supabase },
+      createElement(QueryClientProvider, { client: queryClient }, children)
+    )
   }
 }
 
