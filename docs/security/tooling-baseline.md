@@ -201,3 +201,44 @@ Sonuç: **44 × `security/detect-object-injection`, 1 × `@next/next/no-img-elem
 | `eslint-plugin-security` (yalnızca yukarıdaki 4 isabetli kural)                             | error                                                              | `detect-object-injection` dahil edilmemeli (gürültü)                                                                                                                                    |
 
 Mevcut `.github/workflows/ci.yml` içinde bu kategoride hiçbir job yok (yalnızca lint/type-check/test/build + Playwright E2E + Docker build var); repo seviyesinde Dependabot aktif (branch listesinde `dependabot/npm_and_yarn/*`, `dependabot/docker/*`, `dependabot/github_actions/*` görülüyor) ama bu CI workflow'una bağlı bir gate değil.
+
+## 10. Denetim istisnaları (`pnpm audit` — CI `security` job)
+
+Bölüm 9'daki öneri sonrasında `.github/workflows/ci.yml`'e `pnpm audit --prod --audit-level=high` eklendi (bkz. `security` job). Bu bölüm, o kapının zaman içinde kabul ettiği **süreli, gerekçeli** istisnaları kaydeder. Kayıt kuralı: önce düzeltme denenir, düzeltme fiziken mümkün değilse (yamalı sürüm yok) istisna eklenir — asla eşik gevşetilmez, asla kapsam daraltılmaz.
+
+### 10.1 `image-size` — GHSA-w3rx-r6r6-pgpr, GHSA-5p2g-fcmc-qvqq
+
+**Tarih:** 2026-08-19
+**Tetikleyici:** Faz 4.5 commit 6 (`apps/mobile` Expo iskeleti) `expo`'yu `apps/mobile`'a bağımlılık olarak ekledi; `pnpm audit --prod --audit-level=high` denetlenen yüzeyi genişletti ve bu iki `image-size` bulgusunu ilk kez ortaya çıkardı (regresyon değil — daha önce hiç taranmayan bir alt ağacın ilk kez taranması).
+
+| Alan                | Değer                                                                                                                             |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| GHSA                | `GHSA-w3rx-r6r6-pgpr` — ICNS ayrıştırıcısında sonsuz döngü ile DoS                                                                |
+| GHSA                | `GHSA-5p2g-fcmc-qvqq` — JXL/HEIF ayrıştırıcılarında sonsuz döngü ile DoS                                                          |
+| Paket               | `image-size` (kurulu sürüm ≤2.0.2)                                                                                                |
+| Yol                 | `expo > @expo/metro > metro > image-size`                                                                                         |
+| Neden düzeltilemedi | Her iki advisory de `patched: <0.0.0` bildiriyor — yayınlanmış bir yama sürümü **yok**. "Güncelle" seçeneği fiziken mevcut değil. |
+
+**Neden kabul edilebilir (tehdit modeli):** Her iki zafiyet de saldırgan kontrolündeki bir görsel buffer'ının ayrıştırılmasıyla tetikleniyor. Bu ağaçta `image-size`'ı çağıran tek yer **Metro bundler**'dır (yalnızca `expo start`/`expo export`/build zamanı çalışır) ve ayrıştırdığı görseller **repodaki statik asset'lerdir** — yani geliştiricinin kendi commit'lediği dosyalar, saldırgan kontrollü bir girdi değil. Ölçülen ek gerekçe:
+
+- Sunucu tarafında kullanıcı yüklemesi bu ağaçtan hiç geçmiyor (web tarafı ayrı; `sharp`/Next Image Optimization kullanıyor, `image-size` değil).
+- Web Docker imajının `deps` aşamasında `react-native`/`expo` ile başlayan **0 paket** var (bkz. `docs/PROGRESS.md` §1, "Son doğrulama koşusu" — Faz 4.5 commit 6 satırı, 885 paket) — üretim web imajı bu bağımlılığı hiç taşımıyor.
+- Mobil tarafta henüz store/EAS build'i yok; `apps/mobile` iskelet aşamasında (bkz. B-052).
+
+En kötü senaryo: repoya yazma erişimi olan biri bozuk bir görsel commit'leyip yerel `expo start`/CI export'unu askıya alması — bu bir veri ihlali veya uzaktan kod çalıştırma değil, geliştirme/build sürecinde bir rahatsızlık.
+
+**Uygulama:** kök `package.json` → `pnpm.auditConfig.ignoreGhsas: ["GHSA-w3rx-r6r6-pgpr", "GHSA-5p2g-fcmc-qvqq"]`. Yalnızca bu iki GHSA susturuluyor; eşik (`--audit-level=high`) veya kapsam (`--prod`) değişmedi.
+
+**Gözden geçirme tarihi: 2026-11-19** (3 ay sonra). O tarihte `image-size` için bir yama yayınlanmışsa (ya da `metro`/`@expo/metro` bu paketi yamalı bir sürüme yükseltmişse) istisna kaldırılıp normal güncellemeye geçilmeli. Borç kaydı: `docs/PROGRESS.md` §3 B-053.
+
+**İstisna kabul kriterleri (gelecekteki kararlar için kural):**
+
+1. Yayınlanmış bir düzeltme **yok** VEYA mevcut düzeltme bu projenin ekosistem kısıtları içinde (ör. major sürüm sıçraması, peer dependency çakışması) uygulanamıyor.
+2. Paket yalnızca **build/CLI zamanı** çalışıyor ve **untrusted (saldırgan kontrollü) girdi işlemiyor** — runtime/prod isteği yolunda değil.
+3. Kabul buraya (`tooling-baseline.md`) GHSA numarası + gerekçe + **gözden geçirme tarihiyle** kayıtlı; `package.json` yorum taşıyamadığı için gerekçenin tek evi burasıdır.
+
+**Önce düzeltme, sonra istisna** — bu sıra tersine çevrilmez. Aynı turda `js-yaml` (GHSA-5p4m-2wfm-xmqj, `@expo/xcpretty`/`@eslint/eslintrc` → `^4.1.x`) gerçek bir güncellemeyle (`4.3.0` → `4.3.1`) düzeltildi, istisnaya gerek kalmadı — bkz. `docs/PROGRESS.md` §1 "Son doğrulama koşusu" bu tur satırı.
+
+> **Bu düzeltmenin evi YALNIZCA `pnpm-lock.yaml`'dır** — hiçbir manifest `js-yaml`'ı talep etmiyor, o saf bir transitive bağımlılık. Dolayısıyla bağımlılık ağacı bir gün yeniden çözülürse sürüm sessizce `4.3.0`'a dönebilir. Kalıcı bir `pnpm.overrides` girdisi **bilinçli olarak eklenmedi**: sahibi olmadığımız bir transitive'i pinlemek Expo `@expo/xcpretty`'yi yükselttiğinde çakışma üretir. Güvence şu: bu regresyon sessiz kalmaz, `pnpm audit --prod --audit-level=high` kapısı onu yakalar — nitekim bu bulguyu ilk ortaya çıkaran da o kapıydı (2026-08-18, Faz 4.5 c6). Kapı kırmızıya dönerse ilk bakılacak yer burasıdır.
+>
+> **Ayrıca ölçüldü (pnpm 10.34.5):** `pnpm update js-yaml` saf transitive paketlerde **hiçbir şey yapmaz** (`update` yalnızca bir manifestte doğrudan listelenen paketleri yeniden yazar; `--loglevel debug` çıktısında paket hiç geçmiyor). Sürümü çekmek için geçici bir `pnpm.overrides` girdisi eklenip `install` sonrası kaldırıldı; nihai `package.json`'da override izi yoktur.
