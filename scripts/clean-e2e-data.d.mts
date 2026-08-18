@@ -23,7 +23,13 @@ export interface TableRule {
   dependsOn: string[]
   /** Ölçütün gerekçesi (rapora basılır). */
   reason: string
-  /** SAF yüklem: true -> satır E2E artığıdır. */
+  /**
+   * [OPSİYONEL] `match()`ten ÖNCE çalışır, satırlara DB'ye bağımlı ek alanlar
+   * ekler (ör. `progress_entries` için `_derivedFromFormCheck`). `match()`in
+   * kendisi SAF kalmalıdır; DB erişimi gerektiren ayrımlar buraya taşınır.
+   */
+  augment?(client: unknown, rows: CleanupRow[]): Promise<CleanupRow[]>
+  /** SAF yüklem: true -> satır E2E artığıdır. `augment` varsa onun eklediği alanlara bakabilir. */
   match(row: CleanupRow): boolean
   /** dry-run listesinde satırı özetler. */
   describe(row: CleanupRow): string

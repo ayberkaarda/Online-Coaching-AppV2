@@ -49,7 +49,30 @@ const SEED_ROWS: Record<string, Record<string, unknown>[]> = {
   // Seed bu tabloya HİÇ satır yazmaz — boş fixture bilinçlidir.
   nutrition_logs: [],
   progress_photos: [],
-  progress_entries: [],
+  // Seed.sql'in KENDİSİ bu tabloya satır yazmaz, ama 6 form check/danışan
+  // (bkz. seed.sql §4) `form_checks_sync_progress_weight` trigger'ından
+  // (20260818090000) geçerek DOLAYLI olarak buraya düşer. `augment()`
+  // bunları `_derivedFromFormCheck: true` ile işaretler — bu fixture o
+  // sonucu ELLE simüle eder (augment() ağ gerektirdiği için burada
+  // çağrılmaz, bkz. dosya başlığı "SAF çekirdek").
+  progress_entries: [
+    {
+      id: 's16',
+      client_id: CLIENT1,
+      entry_date: '2026-07-14',
+      weight_kg: 92.4,
+      notes: null,
+      _derivedFromFormCheck: true,
+    },
+    {
+      id: 's17',
+      client_id: CLIENT2,
+      entry_date: '2026-07-14',
+      weight_kg: 61.0,
+      notes: null,
+      _derivedFromFormCheck: true,
+    },
+  ],
   messages: [
     {
       id: 's5',
@@ -172,7 +195,16 @@ const E2E_ROWS: Record<string, Record<string, unknown>[]> = {
     { id: 'e5', client_id: CLIENT1, taken_on: '2026-08-17', angle: 'front', photo_path: 'x/y.png' },
   ],
   progress_entries: [
-    { id: 'e6', client_id: CLIENT1, entry_date: '2026-08-18', weight_kg: 76.5, notes: null },
+    // Karşılığında AYNI yerel günde bir form_checks satırı YOK (yalnızca
+    // tests/e2e/progress.spec.ts'in yazdığı sayısal ölçüm) -> gerçek artık.
+    {
+      id: 'e6',
+      client_id: CLIENT1,
+      entry_date: '2026-08-18',
+      weight_kg: 76.5,
+      notes: null,
+      _derivedFromFormCheck: false,
+    },
   ],
   messages: [
     { id: 'e7', client_id: CLIENT1, kind: 'user', message: 'E2E mesaj 81151682' },
@@ -338,6 +370,64 @@ describe('ölçütler', () => {
     // Ve her biri gerekçesiyle raporlanır.
     expect(OUT_OF_SCOPE.length).toBeGreaterThan(0)
     for (const entry of OUT_OF_SCOPE) expect(entry.reason.length).toBeGreaterThan(20)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// 2b) progress_entries — form_checks trigger'ından türetme ayrımı
+//     (20260818090000_form_check_weight_to_progress.sql). Bu blok, ölçütün
+//     eski (ve şu an YANLIŞ) "tüm satırlar artıktır" varsayımına geri
+//     KAYMADIĞINI kilitler: seed'in form check'lerinden türeyen 12 satır
+//     GERÇEK E2E artığıyla KARIŞTIRILMAMALI.
+// ---------------------------------------------------------------------------
+
+describe('progress_entries — form_checks türetme ayrımı', () => {
+  const rule = ruleFor('progress_entries')
+
+  it('aynı danışan + aynı yerel gün için form_checks satırı VARSA (augment() true işaretler) silinmeye ADAY DEĞİLDİR', () => {
+    const derived = {
+      id: 'p1',
+      client_id: CLIENT1,
+      entry_date: '2026-07-14',
+      weight_kg: 92.4,
+      notes: null,
+      _derivedFromFormCheck: true,
+    }
+    expect(rule.match(derived)).toBe(false)
+  })
+
+  it('karşılığında form check YOKSA (augment() false işaretler) gerçek E2E artığıdır, ADAYDIR', () => {
+    const manual = {
+      id: 'p2',
+      client_id: CLIENT1,
+      entry_date: '2026-08-18',
+      weight_kg: 76.5,
+      notes: null,
+      _derivedFromFormCheck: false,
+    }
+    expect(rule.match(manual)).toBe(true)
+  })
+
+  it('karar YALNIZCA _derivedFromFormCheck bayrağına bakar; entry_date/weight_kg değerleri sonucu etkilemez', () => {
+    expect(
+      rule.match({ entry_date: '2099-01-01', weight_kg: 999, _derivedFromFormCheck: true })
+    ).toBe(false)
+    expect(
+      rule.match({ entry_date: '2000-01-01', weight_kg: 0, _derivedFromFormCheck: false })
+    ).toBe(true)
+  })
+
+  it('gerekçe metni artık trigger/form_checks kaynağını AÇIKÇA anar (eski "-> tüm satırlar artıktır" iddiasına kayıtsız şartsız dönüş yok)', () => {
+    expect(rule.reason).toMatch(/form_check/i)
+    expect(rule.reason).toMatch(/20260818090000/)
+    // Eski (yanlış) ölçüt tam olarak bu kalıptaydı: "... YOKTUR -> tüm satırlar
+    // artıktır." Yeni metin ifadeyi ALINTILAYABİLİR (bilerek "artık YANLIŞ"
+    // demek için) ama bu KOŞULSUZ sonuç kalıbını bir daha ÜRETMEMELİDİR.
+    expect(rule.reason).not.toMatch(/->\s*tüm satırlar artıktır/)
+  })
+
+  it("`augment` tanımlıdır — match() tek başına DB'ye erişemeyeceği için ayrım inspectTable aşamasında ÖNCEDEN hesaplanmalıdır", () => {
+    expect(typeof rule.augment).toBe('function')
   })
 })
 

@@ -131,7 +131,14 @@ export function isLocalTarget(url) {
 //   dependsOn  : bu tablonun FK ile bağlı olduğu EBEVEYN tablolar. Silme sırası
 //                buradan TÜRETİLİR (bkz. orderTablesForDelete) — elle sıralanmaz.
 //   reason     : ölçütün gerekçesi (rapora basılır)
-//   match(row) : SAF yüklem. true -> satır E2E artığıdır.
+//   augment    : [OPSİYONEL] async (client, rows) => rows. `match()` DB'ye
+//                dokunamayacağı için (SAF kalmalı — testlerde ağsız çağrılır),
+//                satır bazlı olmayan bir ayrımın (ör. başka bir tabloyla
+//                eşleşme) gerektiği durumlarda `inspectTable` bunu `match()`ten
+//                ÖNCE çalıştırıp satırlara ek alan ekler. Yalnızca
+//                `progress_entries` kullanır — bkz. o kuralın `reason`ı.
+//   match(row) : SAF yüklem. true -> satır E2E artığıdır. `augment` varsa onun
+//                eklediği alanlara bakabilir; kendi başına DB/ağ ERİŞEMEZ.
 //   describe   : dry-run listesinde satırı özetler
 // ---------------------------------------------------------------------------
 
@@ -178,9 +185,32 @@ export const TABLE_RULES = [
     columns: 'id, client_id, entry_date, weight_kg, notes',
     dependsOn: ['profiles'],
     reason:
-      'TABLO SEED-SİZ: `supabase/seed.sql` bu tabloya hiç satır yazmaz. tests/e2e/progress.spec.ts ' +
-      'yalnızca sayısal ölçü yazar (`notes` BOŞ kalır), yani metin işareti YOKTUR -> tüm satırlar artıktır.',
-    match: () => true,
+      'ARTIK "tüm satırlar artıktır" YANLIŞ (bu ölçüt 2026-08-18\'e kadar geçerliydi): ' +
+      '`supabase/migrations/20260818090000_form_check_weight_to_progress.sql` `form_checks` ' +
+      "üzerine bir AFTER INSERT trigger'ı (`form_checks_sync_progress_weight`) kurdu — bundan " +
+      'sonra HER form check, aynı danışan + aynı YEREL gün (Europe/Istanbul, ' +
+      "`public.form_check_entry_date()`) için bir `progress_entries` satırı ÜRETİYOR. Seed'in " +
+      "12 form check'i (danışan başına 6) bu trigger'dan geçtiği için bu tabloya DOLAYLI olarak " +
+      "(seed.sql'in kendisi DEĞİL, form_checks INSERT'i üzerinden) satır yazıyor. AYRIM: bir satır, " +
+      'aynı danışan + aynı yerel gün için bir `form_checks` satırından TÜREMİŞSE seed/trigger ' +
+      'kaynaklıdır ve silinmez; karşılığında böyle bir form check BULUNMAYAN satırlar ' +
+      '(tests/e2e/progress.spec.ts salt sayısal ölçüm girer, `notes` boş kalır) gerçek artıktır. ' +
+      'Yerel gün çevrimi BURADA TEKRAR YAZILMAZ — `augment()` veritabanının kendi ' +
+      '`form_check_entry_date()` fonksiyonunu RPC ile çağırır (bkz. `loadFormCheckLocalDays`), ' +
+      "aksi hâlde iki kopya bir gün birbirinden SAPARDI — tam olarak bu migration'ın kapattığı " +
+      'türden bir borç yeniden açılırdı.',
+    // `match` SAF kalır (yalnızca satırın kendi alanlarına bakar); form_checks
+    // ile eşleşmeyi hesaplamak DB erişimi gerektirir, bu yüzden `inspectTable`
+    // `augment()`i satırları okuduktan hemen sonra, `match()`ten ÖNCE çalıştırır
+    // ve sonucu `_derivedFromFormCheck` olarak satıra ekler (bkz. §5).
+    augment: async (client, rows) => {
+      const derivedDays = await loadFormCheckLocalDays(client)
+      return rows.map((row) => ({
+        ...row,
+        _derivedFromFormCheck: derivedDays.has(`${row.client_id}|${row.entry_date}`),
+      }))
+    },
+    match: (row) => !row._derivedFromFormCheck,
     describe: (row) => `${row.entry_date} — ${row.weight_kg} kg`,
   },
   {
@@ -506,12 +536,55 @@ async function countGuardTables(client) {
   return counts
 }
 
-/** Bir kuralın tablosunu okur ve ölçütü uygular. */
+/**
+ * `progress_entries` ölçütü için: `form_checks`teki her (danışan, yerel gün)
+ * çiftini `"client_id|entry_date"` biçiminde bir Set'e toplar.
+ *
+ * NEDEN JS'DE `::date` YOK: yerel gün çevrimi `Europe/Istanbul`e bağlıdır ve
+ * migration'ın kendi `public.form_check_entry_date()` fonksiyonunda TEK yerde
+ * yaşar (bkz. 20260818090000_form_check_weight_to_progress.sql KARAR 3 — bu
+ * repo gece yarısı kaymasıyla bir kez zaten yandı, d744eee). Aynı mantığı
+ * burada ELLE tekrar yazmak ikinci bir senkron noktası açardı; bunun yerine
+ * fonksiyon RPC ile ÇAĞRILIR (`SUPABASE_SERVICE_ROLE_KEY` -> `service_role`,
+ * fonksiyon `authenticated, service_role`e `grant execute` edilmiş durumda).
+ *
+ * Yerel/E2E veri hacmi küçük olduğundan (bugün 12 form check) satır başına bir
+ * RPC çağrısı kabul edilebilir; aynı `created_at` değeri tekrar ederse (aynı
+ * transaction'da yazılmış satırlar) önbellek tekrar çağrıyı önler.
+ */
+async function loadFormCheckLocalDays(client) {
+  const { data, error } = await client.from('form_checks').select('client_id, created_at')
+  if (error) {
+    throw new Error(`form_checks: okunamadı (progress_entries ölçütü için) — ${error.message}`)
+  }
+
+  const cache = new Map() // ham created_at metni -> yerel gün (string)
+  const days = new Set()
+  for (const row of data ?? []) {
+    if (!row.created_at) continue
+    let entryDate = cache.get(row.created_at)
+    if (entryDate === undefined) {
+      const { data: rpcResult, error: rpcError } = await client.rpc('form_check_entry_date', {
+        p_created_at: row.created_at,
+      })
+      if (rpcError) {
+        throw new Error(`form_check_entry_date RPC çağrısı başarısız — ${rpcError.message}`)
+      }
+      entryDate = rpcResult
+      cache.set(row.created_at, entryDate)
+    }
+    days.add(`${row.client_id}|${entryDate}`)
+  }
+  return days
+}
+
+/** Bir kuralın tablosunu okur, varsa `augment()`ı uygular, sonra ölçütü uygular. */
 async function inspectTable(client, rule) {
   const { data, error } = await client.from(rule.table).select(rule.columns)
   if (error) throw new Error(`${rule.table}: okunamadı — ${error.message}`)
-  const { matched, skipped } = selectRows(rule, data ?? [])
-  return { rule, total: (data ?? []).length, matched, skipped: skipped.length }
+  const rows = rule.augment ? await rule.augment(client, data ?? []) : (data ?? [])
+  const { matched, skipped } = selectRows(rule, rows)
+  return { rule, total: rows.length, matched, skipped: skipped.length }
 }
 
 async function deleteMatched(client, rule, matched) {
