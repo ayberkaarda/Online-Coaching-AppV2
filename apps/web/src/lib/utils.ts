@@ -3,7 +3,7 @@
 
 import { toast } from 'sonner'
 
-import { DAY_NAMES, type DayName } from '@/types/domain'
+import { DAY_NAMES, type DayName } from '@repo/types'
 
 /** Geriye dönük uyumluluk için eski `DAYS` adı (içerik DAY_NAMES ile aynı). */
 export const DAYS: readonly DayName[] = DAY_NAMES

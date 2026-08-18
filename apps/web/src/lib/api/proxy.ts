@@ -10,7 +10,7 @@ import { getServerEnv } from '@/env.server'
 import { errorResponse } from '@/lib/api/response'
 import { createRequestLogger } from '@/lib/logger'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { formatZodError } from '@/lib/validation/schemas'
+import { formatZodError } from '@repo/types/schemas'
 
 const UPSTREAM_TIMEOUT_MS = 30_000
 

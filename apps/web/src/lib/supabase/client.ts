@@ -23,7 +23,7 @@ import { createBrowserClient } from '@supabase/ssr'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { clientEnv } from '@/env'
-import type { Database } from '@/types/database'
+import type { Database } from '@repo/types'
 
 let browserClient: SupabaseClient<Database> | null = null
 

@@ -9,7 +9,7 @@ import { toast } from 'sonner'
 import { queryKeys } from '@/lib/query/keys'
 import { wrapSupabaseError } from '@/lib/query/supabase-error'
 import { supabase } from '@/lib/supabase/client'
-import { parseMacros, type DailyLog, type Macros } from '@/types'
+import { parseMacros, type DailyLog, type Macros } from '@repo/types'
 
 export function useDailyLogs(clientId?: string) {
   return useQuery({

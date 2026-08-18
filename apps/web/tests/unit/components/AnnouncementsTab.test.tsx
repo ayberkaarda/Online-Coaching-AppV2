@@ -2,7 +2,7 @@ import { render } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import AnnouncementsTab from '@/components/tabs/AnnouncementsTab'
-import type { Notification } from '@/types'
+import type { Notification } from '@repo/types'
 
 import { screen } from '../test-utils'
 

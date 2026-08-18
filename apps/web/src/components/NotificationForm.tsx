@@ -9,8 +9,8 @@ import { useForm } from 'react-hook-form'
 import type { JSX } from 'react'
 
 import { useSendNotification } from '@/hooks'
-import { notificationSchema, type NotificationInput } from '@/lib/validation/schemas'
-import type { Profile } from '@/types'
+import { notificationSchema, type NotificationInput } from '@repo/types/schemas'
+import type { Profile } from '@repo/types'
 
 export interface NotificationFormProps {
   clients: Profile[]

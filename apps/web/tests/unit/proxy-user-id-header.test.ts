@@ -30,7 +30,7 @@ vi.mock('@/lib/logger', () => {
 
 import { handleAiProxy } from '@/lib/api/proxy'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { aiWorkoutSchema } from '@/lib/validation/schemas'
+import { aiWorkoutSchema } from '@repo/types/schemas'
 
 const VALID_USER_ID = '22222222-2222-4222-8222-222222222222'
 const VALID_WORKOUT_BODY = { split_type: 'ppl', age: 25, goal: 'cut', weight: 80 }

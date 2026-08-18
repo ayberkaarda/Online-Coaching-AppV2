@@ -8,7 +8,7 @@ import {
   isDayName,
   parseMacros,
   parseWorkoutPlan,
-} from '@/types/domain'
+} from '@repo/types'
 
 describe('parseMacros', () => {
   it('sayısal alanları olduğu gibi döner', () => {

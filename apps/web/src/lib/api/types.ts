@@ -1,7 +1,7 @@
 // Frontend <-> Python (FastAPI) AI backend sözleşmesi.
 // Bu tipler ai_backend/app/schemas/*.py ile birebir eşleşmelidir.
 
-import type { Macros } from '@/types/domain'
+import type { Macros } from '@repo/types'
 
 export type SplitType = 'ppl_torso_limbs' | 'ppl' | 'upper_lower' | 'torso_limbs'
 export type Goal = 'cut' | 'bulk' | 'maintain'

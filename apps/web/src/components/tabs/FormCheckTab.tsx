@@ -18,8 +18,8 @@ import { EmptyState, QueryState, SkeletonCard } from '@/components/ui'
 import { useFormChecks, useSubmitFormCheck } from '@/hooks'
 import { ALLOWED_IMAGE_MIME, validateImageFile } from '@/lib/upload-validation'
 import { formatDateTR, formatDateTimeTR } from '@/lib/utils'
-import { formCheckSchema, type FormCheckInput } from '@/lib/validation/schemas'
-import type { UserRole } from '@/types'
+import { formCheckSchema, type FormCheckInput } from '@repo/types/schemas'
+import type { UserRole } from '@repo/types'
 
 export interface FormCheckTabProps {
   targetId: string | undefined

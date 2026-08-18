@@ -42,7 +42,7 @@ vi.mock('@/lib/logger', () => {
 import { getServerEnv } from '@/env.server'
 import { handleAiProxy } from '@/lib/api/proxy'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { aiWorkoutSchema } from '@/lib/validation/schemas'
+import { aiWorkoutSchema } from '@repo/types/schemas'
 
 // ---------------------------------------------------------------------------
 // Yardımcılar

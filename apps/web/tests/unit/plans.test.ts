@@ -24,7 +24,7 @@ import {
   EMPTY_WORKOUT_PLAN,
   type NutritionPlan,
   type WorkoutPlan,
-} from '@/types'
+} from '@repo/types'
 
 const row = (day: string, position: number, raw_line: string): WorkoutPlanExerciseRow => ({
   day,

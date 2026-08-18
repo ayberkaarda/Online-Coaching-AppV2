@@ -18,7 +18,7 @@ import {
   totalPlannedSets,
   type PlanExerciseRow,
 } from '@/hooks/useWorkoutSession'
-import type { WorkoutLog } from '@/types'
+import type { WorkoutLog } from '@repo/types'
 
 const CLIENT = '11111111-1111-1111-1111-111111111111'
 const PLAN_EX_A = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'

@@ -1,0 +1,8 @@
+{
+  // Paylaşılan katı derleyici tabanı @repo/config'ten gelir (ADR-0023 madde 1). DOM'suz
+  // `base.json` seçildi: bu paket yalnızca tip + zod şeması içerir, hiçbir tarayıcı/React
+  // API'sine dokunmaz — apps/mobile de aynı kaynağı tüketebilsin diye ortamdan bağımsız kalır.
+  "extends": "@repo/config/tsconfig/base.json",
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules"]
+}

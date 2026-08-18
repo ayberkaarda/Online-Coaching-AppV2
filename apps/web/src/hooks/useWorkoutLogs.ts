@@ -18,7 +18,7 @@ import { toast } from 'sonner'
 import { queryKeys } from '@/lib/query/keys'
 import { wrapSupabaseError } from '@/lib/query/supabase-error'
 import { supabase } from '@/lib/supabase/client'
-import type { TablesInsert, WorkoutLog } from '@/types'
+import type { TablesInsert, WorkoutLog } from '@repo/types'
 
 export function useWorkoutLogs(clientId?: string) {
   return useQuery({

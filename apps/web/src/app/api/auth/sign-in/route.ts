@@ -43,7 +43,7 @@ import { resolveTrustedClientIp } from '@/lib/api/client-ip'
 import { errorResponse } from '@/lib/api/response'
 import { createRequestLogger } from '@/lib/logger'
 import { createCookieBoundServerClient } from '@/lib/supabase/server'
-import { formatZodError } from '@/lib/validation/schemas'
+import { formatZodError } from '@repo/types/schemas'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'

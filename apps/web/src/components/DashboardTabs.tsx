@@ -21,7 +21,7 @@ import type { JSX, KeyboardEvent } from 'react'
 import { toast } from 'sonner'
 
 import { useNotifications, useProfile } from '@/hooks'
-import type { Profile, UserRole } from '@/types'
+import type { Profile, UserRole } from '@repo/types'
 
 import AnnouncementsTab from './tabs/AnnouncementsTab'
 import DailyLogTab from './tabs/DailyLogTab'

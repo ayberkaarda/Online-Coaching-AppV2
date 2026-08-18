@@ -69,7 +69,7 @@ import {
 } from '@/hooks'
 import { todayIsoDate } from '@/lib/date'
 import { formatDateTR } from '@/lib/utils'
-import type { UserRole } from '@/types'
+import type { UserRole } from '@repo/types'
 
 export interface StatsTabProps {
   targetId: string | undefined

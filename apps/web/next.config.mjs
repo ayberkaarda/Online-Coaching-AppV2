@@ -98,6 +98,11 @@ const nextConfig = {
   // Faz 4.5'ten beri bu kök `apps/web` değil MONOREPO KÖKÜ (yukarıdaki `workspaceRoot`).
   outputFileTracingRoot: workspaceRoot,
   turbopack: { root: workspaceRoot },
+  // Faz 4.5 commit 4 (ADR-0023 madde 1): @repo/types build adımı OLMAYAN bir workspace
+  // paketidir — ham .ts kaynağını yayınlar ve içinde ÇALIŞMA ZAMANI kodu (zod şemaları,
+  // database.ts Constants) taşır. Next node_modules altındaki kodu varsayılan olarak
+  // derlemez; paket burada listelenerek TS/JSX derlemesine dahil edilir.
+  transpilePackages: ['@repo/types'],
   async headers() {
     return [
       {

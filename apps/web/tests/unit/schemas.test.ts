@@ -13,7 +13,7 @@ import {
   quickAddFoodSchema,
   recommendationSchema,
   workoutLogSchema,
-} from '@/lib/validation/schemas'
+} from '@repo/types/schemas'
 
 describe('loginSchema', () => {
   it('geçerli e-posta ve şifre ile geçer', () => {

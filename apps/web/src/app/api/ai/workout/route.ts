@@ -2,7 +2,7 @@
 // API anahtarı yalnızca sunucuda kullanılır, istemciye asla gönderilmez.
 
 import { handleAiProxy } from '@/lib/api/proxy'
-import { aiWorkoutSchema } from '@/lib/validation/schemas'
+import { aiWorkoutSchema } from '@repo/types/schemas'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'

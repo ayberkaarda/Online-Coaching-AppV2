@@ -17,7 +17,7 @@ import { wrapSupabaseError } from '@/lib/query/supabase-error'
 import { FORM_CHECK_BUCKET, SIGNED_URL_STALE_TIME_MS, createSignedUrls } from '@/lib/storage'
 import { supabase } from '@/lib/supabase/client'
 import { assertValidImageFile } from '@/lib/upload-validation'
-import type { FormCheck } from '@/types'
+import type { FormCheck } from '@repo/types'
 
 /**
  * Form check satırı + poz fotoğrafları için üretilmiş imzalı adresler.

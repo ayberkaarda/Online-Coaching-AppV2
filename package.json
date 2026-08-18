@@ -24,7 +24,7 @@
     "test:e2e:ui": "pnpm --filter web run test:e2e:ui",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "db:types": "supabase gen types typescript --local --schema public > apps/web/src/types/database.ts",
+    "db:types": "supabase gen types typescript --local --schema public > packages/types/src/database.ts",
     "db:migrate": "supabase db push",
     "clean:foods": "node scripts/clean-foods.mjs",
     "db:import-catalog": "node scripts/import-catalog.mjs",

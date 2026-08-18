@@ -23,7 +23,7 @@ import { logger } from '@/lib/logger'
 import { queryKeys } from '@/lib/query/keys'
 import { wrapSupabaseError } from '@/lib/query/supabase-error'
 import { supabase } from '@/lib/supabase/client'
-import type { Exercise, FoodItem } from '@/types'
+import type { Exercise, FoodItem } from '@repo/types'
 
 const CATALOG_STALE_TIME = 30 * 60_000
 

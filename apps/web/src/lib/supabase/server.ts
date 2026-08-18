@@ -19,7 +19,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type { NextResponse } from 'next/server'
 
 import { clientEnv } from '@/env'
-import type { Database } from '@/types/database'
+import type { Database } from '@repo/types'
 
 /**
  * @param accessToken Kullanıcının Supabase access token'ı. Verilirse istekler

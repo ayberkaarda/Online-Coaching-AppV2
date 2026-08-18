@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { NotificationForm } from '@/components/NotificationForm'
 import { useSendNotification } from '@/hooks'
-import type { Profile } from '@/types'
+import type { Profile } from '@repo/types'
 
 import { screen, userEvent, waitFor } from '../test-utils'
 

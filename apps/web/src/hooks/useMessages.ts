@@ -12,7 +12,7 @@ import { wrapSupabaseError } from '@/lib/query/supabase-error'
 import { MESSAGE_ATTACHMENT_BUCKET, SIGNED_URL_STALE_TIME_MS, createSignedUrl } from '@/lib/storage'
 import { supabase } from '@/lib/supabase/client'
 import { assertValidImageFile } from '@/lib/upload-validation'
-import type { Message } from '@/types'
+import type { Message } from '@repo/types'
 
 import { useSession } from './useSession'
 

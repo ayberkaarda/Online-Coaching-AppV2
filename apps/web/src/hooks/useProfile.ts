@@ -19,7 +19,7 @@ import {
 } from '@/lib/storage'
 import { supabase } from '@/lib/supabase/client'
 import { assertValidImageFile } from '@/lib/upload-validation'
-import type { Profile } from '@/types'
+import type { Profile } from '@repo/types'
 
 /** Profil satırı + avatar için üretilmiş imzalı adres. */
 export interface ProfileWithAvatar extends Profile {

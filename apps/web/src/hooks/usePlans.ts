@@ -35,7 +35,7 @@ import {
   type Json,
   type NutritionPlan,
   type WorkoutPlan,
-} from '@/types'
+} from '@repo/types'
 
 /** `workout_plan_exercises` satırının gün metnini geri üretmek için gereken alanları. */
 export interface WorkoutPlanExerciseRow {

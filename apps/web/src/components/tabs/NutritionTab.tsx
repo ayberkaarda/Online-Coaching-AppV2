@@ -37,8 +37,14 @@ import {
 } from '@/hooks'
 import { todayIsoDate } from '@/lib/date'
 import { DAYS, downloadCSV, formatDateTR } from '@/lib/utils'
-import { aiDietSchema, type AiDietInput } from '@/lib/validation/schemas'
-import { DAY_NAMES, type DayName, type FoodItem, type NutritionPlan, type UserRole } from '@/types'
+import { aiDietSchema, type AiDietInput } from '@repo/types/schemas'
+import {
+  DAY_NAMES,
+  type DayName,
+  type FoodItem,
+  type NutritionPlan,
+  type UserRole,
+} from '@repo/types'
 
 export interface NutritionTabProps {
   targetId: string | undefined

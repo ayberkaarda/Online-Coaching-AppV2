@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { DashboardTabs } from '@/components/DashboardTabs'
 import { useNotifications, useProfile } from '@/hooks'
-import type { Notification, Profile } from '@/types'
+import type { Notification, Profile } from '@repo/types'
 
 import { fireEvent, screen } from '../test-utils'
 

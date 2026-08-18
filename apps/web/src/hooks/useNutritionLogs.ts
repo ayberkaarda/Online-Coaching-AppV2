@@ -34,7 +34,7 @@ import { toast } from 'sonner'
 import { queryKeys } from '@/lib/query/keys'
 import { wrapSupabaseError } from '@/lib/query/supabase-error'
 import { supabase } from '@/lib/supabase/client'
-import type { Tables } from '@/types'
+import type { Tables } from '@repo/types'
 
 export type NutritionLog = Tables<'nutrition_logs'>
 

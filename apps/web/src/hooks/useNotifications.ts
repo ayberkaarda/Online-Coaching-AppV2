@@ -8,7 +8,7 @@ import { toast } from 'sonner'
 import { queryKeyRoots, queryKeys, type NotificationQueryOptions } from '@/lib/query/keys'
 import { wrapSupabaseError } from '@/lib/query/supabase-error'
 import { supabase } from '@/lib/supabase/client'
-import type { Notification, TablesInsert } from '@/types'
+import type { Notification, TablesInsert } from '@repo/types'
 
 export type { NotificationQueryOptions }
 

@@ -67,7 +67,7 @@ import {
   type Json,
   type UserRole,
   type WorkoutPlan,
-} from '@/types'
+} from '@repo/types'
 
 export interface WorkoutTabProps {
   targetId: string | undefined

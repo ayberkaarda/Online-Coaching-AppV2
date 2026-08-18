@@ -13,8 +13,8 @@ import { QueryState, SkeletonCard } from '@/components/ui'
 import { useCreateDailyLog, useDailyLogs } from '@/hooks'
 import { todayIsoDate } from '@/lib/date'
 import { downloadCSV, formatDateTR, getMacroPercentage } from '@/lib/utils'
-import { dailyLogSchema, type DailyLogInput } from '@/lib/validation/schemas'
-import type { UserRole } from '@/types'
+import { dailyLogSchema, type DailyLogInput } from '@repo/types/schemas'
+import type { UserRole } from '@repo/types'
 
 export interface DailyLogTabProps {
   targetId: string | undefined

@@ -20,14 +20,14 @@ import {
 } from '@/hooks'
 import { QueryState, SkeletonCard, SkeletonText } from '@/components/ui'
 import { ALLOWED_IMAGE_MIME, validateImageFile } from '@/lib/upload-validation'
-import { passwordChangeSchema, type PasswordChangeInput } from '@/lib/validation/schemas'
+import { passwordChangeSchema, type PasswordChangeInput } from '@repo/types/schemas'
 import {
   DAY_NAMES,
   EMPTY_NUTRITION_PLAN,
   EMPTY_WORKOUT_PLAN,
   type NutritionPlan,
   type WorkoutPlan,
-} from '@/types/domain'
+} from '@repo/types'
 
 /**
  * Antrenman planı görünümü.

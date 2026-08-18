@@ -26,7 +26,7 @@ import { wrapSupabaseError } from '@/lib/query/supabase-error'
 import { SIGNED_URL_STALE_TIME_MS, createSignedUrls, removeStoredObject } from '@/lib/storage'
 import { supabase } from '@/lib/supabase/client'
 import { assertValidImageFile } from '@/lib/upload-validation'
-import type { Enums, Tables } from '@/types'
+import type { Enums, Tables } from '@repo/types'
 
 export const PROGRESS_PHOTOS_BUCKET = 'progress-photos'
 

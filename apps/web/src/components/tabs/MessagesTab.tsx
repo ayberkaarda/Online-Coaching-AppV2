@@ -23,7 +23,7 @@ import {
   useUnreadCount,
 } from '@/hooks'
 import { UploadValidationError, assertValidImageFile } from '@/lib/upload-validation'
-import type { Message, UserRole } from '@/types'
+import type { Message, UserRole } from '@repo/types'
 
 export interface MessagesTabProps {
   targetId: string | undefined

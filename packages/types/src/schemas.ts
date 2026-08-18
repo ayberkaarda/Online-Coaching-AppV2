@@ -3,7 +3,7 @@
 
 import { z } from 'zod'
 
-import { DAY_NAMES } from '@/types/domain'
+import { DAY_NAMES } from './domain'
 
 // ---------------------------------------------------------------------------
 // Ortak parçalar

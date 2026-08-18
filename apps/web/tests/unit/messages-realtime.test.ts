@@ -110,7 +110,7 @@ vi.mock('@/lib/supabase/client', () => ({
 import { QueryClient } from '@tanstack/react-query'
 
 import { queryKeys } from '@/lib/query/keys'
-import type { Message } from '@/types'
+import type { Message } from '@repo/types'
 
 import { useMessages } from '@/hooks/useMessages'
 

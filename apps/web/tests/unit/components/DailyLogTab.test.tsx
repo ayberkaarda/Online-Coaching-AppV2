@@ -5,7 +5,7 @@ import DailyLogTab from '@/components/tabs/DailyLogTab'
 import { useCreateDailyLog, useDailyLogs } from '@/hooks'
 import { todayIsoDate } from '@/lib/date'
 import { getMacroPercentage } from '@/lib/utils'
-import type { DailyLog } from '@/types'
+import type { DailyLog } from '@repo/types'
 
 import { screen, userEvent, waitFor } from '../test-utils'
 

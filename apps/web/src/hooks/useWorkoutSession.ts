@@ -22,7 +22,7 @@ import { useQuery } from '@tanstack/react-query'
 import { queryKeys } from '@/lib/query/keys'
 import { wrapSupabaseError } from '@/lib/query/supabase-error'
 import { supabase } from '@/lib/supabase/client'
-import type { DayName } from '@/types'
+import type { DayName } from '@repo/types'
 
 /** `workout_plan_exercises` satırının gym modu için gereken alanları. */
 export interface PlanExerciseRow {

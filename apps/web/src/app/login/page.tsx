@@ -8,7 +8,7 @@ import type { JSX } from 'react'
 import { useForm } from 'react-hook-form'
 
 import { useSignIn } from '@/hooks'
-import { loginSchema, type LoginInput } from '@/lib/validation/schemas'
+import { loginSchema, type LoginInput } from '@repo/types/schemas'
 
 export default function LoginPage(): JSX.Element {
   const router = useRouter()

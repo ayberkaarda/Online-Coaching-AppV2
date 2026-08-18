@@ -9,7 +9,7 @@ import { planToRpcPayload } from '@/hooks/usePlans'
 import { queryKeyRoots, queryKeys } from '@/lib/query/keys'
 import { wrapSupabaseError } from '@/lib/query/supabase-error'
 import { supabase } from '@/lib/supabase/client'
-import type { Json, ProgramApproval, WorkoutPlan } from '@/types'
+import type { Json, ProgramApproval, WorkoutPlan } from '@repo/types'
 
 /** WorkoutPlan bir arayüz/mapped tip olduğu için Json'a açıkça daraltılır. */
 function planToJson(plan: WorkoutPlan): Json {

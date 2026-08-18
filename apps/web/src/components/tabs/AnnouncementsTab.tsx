@@ -8,7 +8,7 @@ import type { JSX } from 'react'
 
 import { EmptyState } from '@/components/ui'
 import { formatDateTR } from '@/lib/utils'
-import type { Notification, UserRole } from '@/types'
+import type { Notification, UserRole } from '@repo/types'
 
 export interface AnnouncementsTabProps {
   announcements: Notification[]

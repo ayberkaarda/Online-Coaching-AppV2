@@ -1,0 +1,16 @@
+{
+  "name": "@repo/types",
+  "version": "0.0.0",
+  "private": true,
+  "description": "apps/web (ve gelecekte apps/mobile + @repo/api-client) arasında paylaşılan veritabanı/domain tipleri ve zod doğrulama şemaları (ADR-0023 madde 1/3, Faz 4.5 commit 4). Build adımı YOK: TS kaynağı doğrudan yayınlanır, tüketen taraf transpile eder (bkz. apps/web/next.config.mjs transpilePackages).",
+  "exports": {
+    ".": "./src/index.ts",
+    "./schemas": "./src/schemas.ts"
+  },
+  "dependencies": {
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@repo/config": "workspace:*"
+  }
+}
