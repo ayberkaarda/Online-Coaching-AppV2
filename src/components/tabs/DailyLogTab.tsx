@@ -11,6 +11,7 @@ import { toast } from 'sonner'
 
 import { QueryState, SkeletonCard } from '@/components/ui'
 import { useCreateDailyLog, useDailyLogs } from '@/hooks'
+import { todayIsoDate } from '@/lib/date'
 import { downloadCSV, formatDateTR, getMacroPercentage } from '@/lib/utils'
 import { dailyLogSchema, type DailyLogInput } from '@/lib/validation/schemas'
 import type { UserRole } from '@/types'
@@ -52,6 +53,10 @@ export default function DailyLogTab({
       water_lt: values.water_lt,
       sodium_mg: values.sodium_mg,
       macros: { protein: values.protein, carb: values.carb, fat: values.fat },
+      // Kullanıcının YEREL günü, AÇIKÇA gönderilir — DB'nin UTC `current_date`
+      // varsayılanına düşülseydi gece 00:00–03:00 arasında (UTC+3) gönderilen
+      // rapor DÜNÜN kaydını ezerdi (bkz. src/lib/date.ts).
+      log_date: todayIsoDate(),
     })
     reset()
   })

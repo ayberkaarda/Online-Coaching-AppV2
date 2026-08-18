@@ -22,7 +22,6 @@ import { toast } from 'sonner'
 import { QueryState, SkeletonTable } from '@/components/ui'
 import {
   sumNutritionLogsForDate,
-  todayIsoDate,
   useCreateNutritionLog,
   useDeleteNutritionLog,
   useFoods,
@@ -36,6 +35,7 @@ import {
   type NutritionTargets,
   type NutritionTotals,
 } from '@/hooks'
+import { todayIsoDate } from '@/lib/date'
 import { DAYS, downloadCSV, formatDateTR } from '@/lib/utils'
 import { aiDietSchema, type AiDietInput } from '@/lib/validation/schemas'
 import { DAY_NAMES, type DayName, type FoodItem, type NutritionPlan, type UserRole } from '@/types'
@@ -458,6 +458,12 @@ function ClientMealSection({ clientId, logs, foodDB }: ClientMealSectionProps): 
         protein_g: parsedProtein,
         carb_g: parsedCarb,
         fat_g: parsedFat,
+        // Kullanıcının YEREL günü, AÇIKÇA gönderilir: dashboard (`todayTotals`)
+        // aynı `todayIsoDate()` değeriyle filtreler. Alan boş bırakılıp DB'nin
+        // UTC `current_date` varsayılanına düşülseydi, UTC+3'te gece
+        // 00:00–03:00 arasında eklenen öğün "dün"e yazılır ve toplamda hiç
+        // görünmezdi (bkz. src/lib/date.ts).
+        log_date: todayIsoDate(),
       },
       {
         onSuccess: () => {

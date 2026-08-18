@@ -34,6 +34,12 @@ export const queryKeyRoots = {
   nutritionTargets: ['nutrition-targets'] as const,
   /** GERÇEKLEŞEN öğün kaydı (`nutrition_logs`) — bkz. `useNutritionLogs.ts::useNutritionLogs`. */
   nutritionLogs: ['nutrition-logs'] as const,
+  /**
+   * İlerleme ölçümleri (`progress_entries`) — bkz. `useProgressEntries.ts`.
+   * Kök ÖN EK olarak kullanılır: bir ölçüm kaydedildiğinde 7/30/90 aralığının
+   * ÜÇÜ birden bayatlar, bu yüzden invalidate tek tek değil ön ekle yapılır.
+   */
+  progressEntries: ['progress-entries'] as const,
 } as const
 
 export const queryKeys = {
@@ -100,4 +106,20 @@ export const queryKeys = {
   nutritionTargets: (clientId?: string) => ['nutrition-targets', clientId ?? null] as const,
   /** GERÇEKLEŞEN öğün kaydı (`nutrition_logs`) — danışanın manuel girdiği öğünler. */
   nutritionLogs: (clientId?: string) => ['nutrition-logs', clientId ?? null] as const,
+  /** Açı etiketli ilerleme fotoğrafları (`progress_photos`) — bkz. `useProgressPhotos.ts`. */
+  progressPhotos: (clientId?: string) => ['progress-photos', clientId ?? null] as const,
+
+  /**
+   * İlerleme ölçümleri (`progress_entries`) — AC-4.2'nin TEK endpoint'i.
+   *
+   * `rangeDays` (7/30/90) anahtarın PARÇASIDIR: her aralık SUNUCU TARAFINDA
+   * ayrı bir `entry_date >= ...` sorgusudur, dolayısıyla ayrı bir önbellek
+   * girdisidir. Aralık değişince eski seri gösterilmez, yeni seri ayrıca
+   * saklanır (ileri-geri geçişte yeniden istek yapılmaz).
+   *
+   * `progressPhotos`'tan AYRI köktür: fotoğraf listesi imzalı URL TTL'ine
+   * bağlıdır ve ölçüm kaydı onu bayatlatmamalıdır.
+   */
+  progressEntries: (clientId?: string, rangeDays?: number) =>
+    ['progress-entries', clientId ?? null, rangeDays ?? null] as const,
 } as const

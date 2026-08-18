@@ -33,13 +33,23 @@ export interface CreateDailyLogInput {
   water_lt: number | null
   sodium_mg: number | null
   macros: Macros
-  /** YYYY-MM-DD. Verilmezse veritabanı `current_date` kullanır. */
-  log_date?: string
+  /**
+   * `YYYY-MM-DD` — kullanıcının YEREL günü (`todayIsoDate()`, src/lib/date.ts).
+   *
+   * ZORUNLU (opsiyonel DEĞİL): alan opsiyonelken çağıran göndermediğinde satır
+   * veritabanının `default current_date` değerini (UTC) alıyordu. UTC+3'te
+   * gece 00:00–03:00 arasında gönderilen rapor bir ÖNCEKİ güne yazılır ve
+   * `(client_id, log_date)` tekilliği yüzünden dünün kaydını EZERDİ. Zorunlu
+   * tip, yeni bir çağıran eklendiğinde derleyicinin tarihi sormasını sağlar.
+   */
+  log_date: string
 }
 
 /**
  * Günlük kaydı oluşturur/günceller.
  * Şemada `(client_id, log_date)` benzersizdir; bu yüzden insert değil UPSERT kullanılır.
+ * `log_date` DAİMA istemciden gelir (yerel gün) — DB varsayılanı yalnızca bir
+ * güvenlik ağıdır, bu yolun kullandığı değer DEĞİLDİR.
  */
 export function useCreateDailyLog() {
   const queryClient = useQueryClient()
@@ -60,7 +70,7 @@ export function useCreateDailyLog() {
             water_lt,
             sodium_mg,
             macros: { protein: macros.protein, carb: macros.carb, fat: macros.fat },
-            ...(log_date ? { log_date } : {}),
+            log_date,
           },
           { onConflict: 'client_id,log_date' }
         )

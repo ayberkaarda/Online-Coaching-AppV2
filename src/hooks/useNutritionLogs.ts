@@ -201,8 +201,18 @@ export interface CreateNutritionLogInput {
   protein_g: number | null
   carb_g: number | null
   fat_g: number | null
-  /** YYYY-MM-DD. Verilmezse veritabanı `current_date` kullanır. */
-  log_date?: string
+  /**
+   * `YYYY-MM-DD` — kullanıcının YEREL günü (`todayIsoDate()`, src/lib/date.ts).
+   *
+   * ZORUNLU (opsiyonel DEĞİL) ve bu BİLİNÇLİDİR: alan opsiyonelken çağıran onu
+   * göndermeyi unutabiliyordu ve satır veritabanının `default current_date`
+   * değerini (UTC!) alıyordu. Okuma tarafı (`sumNutritionLogsForDate` +
+   * `todayIsoDate`) YEREL güne göre filtrelediği için UTC+3'te gece
+   * 00:00–03:00 arasında eklenen öğün "dün"e yazılıp dashboard'da HİÇ
+   * görünmüyordu. Tipi zorunlu yapmak hatanın SINIFINI kapatır: yeni bir
+   * yazma yolu eklendiğinde derleyici tarihi sormaya zorlar.
+   */
+  log_date: string
 }
 
 export function useCreateNutritionLog() {
@@ -219,7 +229,8 @@ export function useCreateNutritionLog() {
           protein_g: input.protein_g,
           carb_g: input.carb_g,
           fat_g: input.fat_g,
-          ...(input.log_date ? { log_date: input.log_date } : {}),
+          // DAİMA gönderilir — DB varsayılanına (UTC `current_date`) ASLA düşülmez.
+          log_date: input.log_date,
         })
         .select()
         .single()
@@ -262,6 +273,12 @@ export function useDeleteNutritionLog() {
 
 // ---------------------------------------------------------------------------
 // Saf yardımcılar — hook'tan bağımsız test edilebilir (tests/unit/nutrition-logs.test.ts)
+//
+// `todayIsoDate` ARTIK BURADA DEĞİL: `src/lib/date.ts`e taşındı. Dört yazma
+// yolu (nutrition_logs, daily_logs, progress_entries, progress_photos) ve
+// okuma filtreleri onu kullanıyor; "yerel gün" kavramının beslenme diliminde
+// yaşaması `useProgressEntries.ts -> useNutritionLogs.ts` gibi ters
+// bağımlılıklar üretiyordu (bkz. src/lib/date.ts dosya başı notu).
 // ---------------------------------------------------------------------------
 
 export interface NutritionTotals {
@@ -280,6 +297,8 @@ export function sumNutritionLogsForDate(
   logs: readonly NutritionLog[],
   date: string
 ): NutritionTotals {
+  // `date` çağıran tarafından YEREL gün olarak verilir (`todayIsoDate()`);
+  // yazma yolu da aynı değeri gönderdiği için karşılaştırma daima tutar.
   const dayLogs = logs.filter((log) => log.log_date === date)
   return dayLogs.reduce<NutritionTotals>(
     (acc, log) => ({
@@ -290,17 +309,4 @@ export function sumNutritionLogsForDate(
     }),
     { kcal: 0, protein_g: 0, carb_g: 0, fat_g: 0 }
   )
-}
-
-/**
- * Tarayıcının YEREL takvim gününü `YYYY-MM-DD` biçiminde döner.
- * `Date#toISOString()` KULLANILMAZ: o UTC'ye çevirir ve gece yarısına yakın
- * saatlerde günü kaydırabilir — `log_date` kullanıcının YEREL günüdür.
- */
-export function todayIsoDate(): string {
-  const now = new Date()
-  const year = now.getFullYear()
-  const month = String(now.getMonth() + 1).padStart(2, '0')
-  const day = String(now.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
 }
