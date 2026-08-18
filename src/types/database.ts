@@ -467,6 +467,94 @@ export type Database = {
           },
         ]
       }
+      progress_entries: {
+        Row: {
+          arm_cm: number | null
+          chest_cm: number | null
+          client_id: string
+          created_at: string
+          entry_date: string
+          hip_cm: number | null
+          id: string
+          notes: string | null
+          thigh_cm: number | null
+          updated_at: string
+          waist_cm: number | null
+          weight_kg: number | null
+        }
+        Insert: {
+          arm_cm?: number | null
+          chest_cm?: number | null
+          client_id: string
+          created_at?: string
+          entry_date?: string
+          hip_cm?: number | null
+          id?: string
+          notes?: string | null
+          thigh_cm?: number | null
+          updated_at?: string
+          waist_cm?: number | null
+          weight_kg?: number | null
+        }
+        Update: {
+          arm_cm?: number | null
+          chest_cm?: number | null
+          client_id?: string
+          created_at?: string
+          entry_date?: string
+          hip_cm?: number | null
+          id?: string
+          notes?: string | null
+          thigh_cm?: number | null
+          updated_at?: string
+          waist_cm?: number | null
+          weight_kg?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "progress_entries_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      progress_photos: {
+        Row: {
+          angle: Database["public"]["Enums"]["progress_photo_angle"]
+          client_id: string
+          created_at: string
+          id: string
+          photo_path: string
+          taken_on: string
+        }
+        Insert: {
+          angle: Database["public"]["Enums"]["progress_photo_angle"]
+          client_id: string
+          created_at?: string
+          id?: string
+          photo_path: string
+          taken_on?: string
+        }
+        Update: {
+          angle?: Database["public"]["Enums"]["progress_photo_angle"]
+          client_id?: string
+          created_at?: string
+          id?: string
+          photo_path?: string
+          taken_on?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "progress_photos_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workout_logs: {
         Row: {
           client_id: string
@@ -694,6 +782,7 @@ export type Database = {
         Args: { uid?: string }
         Returns: Database["public"]["Enums"]["user_role"]
       }
+      progress_photo_owner: { Args: { p_name: string }; Returns: string }
       save_nutrition_plan: {
         Args: { p_client_ids: string[]; p_plan: Json }
         Returns: number
@@ -729,6 +818,7 @@ export type Database = {
       approval_status: "pending" | "approved" | "rejected"
       form_check_status: "pending" | "reviewed"
       message_kind: "user" | "system"
+      progress_photo_angle: "front" | "side" | "back"
       user_role: "coach" | "client"
     }
     CompositeTypes: {
@@ -860,6 +950,7 @@ export const Constants = {
       approval_status: ["pending", "approved", "rejected"],
       form_check_status: ["pending", "reviewed"],
       message_kind: ["user", "system"],
+      progress_photo_angle: ["front", "side", "back"],
       user_role: ["coach", "client"],
     },
   },

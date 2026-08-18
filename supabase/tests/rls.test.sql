@@ -27,6 +27,31 @@
 --     hata plpgsql BEGIN/EXCEPTION bloğuyla YAKALANIR ve beklenen davranış
 --     olarak doğrulanır; script kırılmaz.
 --
+-- ### KENDİ KURULUMUNU YAPMA KURALI (2026-08-18) ####################
+--   Bu paket kendi yazdığını ROLLBACK ile geri alır. O yüzden KURULUM için de
+--   DIŞARIDAKİ duruma güvenemez: seed'in bir satırı `pending` bıraktığını,
+--   bir mesajın okunmamış kaldığını veya bir danışanın planının hâlâ v1
+--   olduğunu VARSAYAN her senaryo, E2E koşusu / elle kullanım / başka bir test
+--   tarafından SESSİZCE kırılabilir. (Gerçekten yaşandı: E2E'nin
+--   "danışan programı onaya sunar, koç onaylar" senaryosu seed'in tek `pending`
+--   `program_approvals` satırını TÜKETİYOR ve senaryo 54'ün kurulumunu
+--   çökertiyordu. Aynı şekilde koçun sohbeti okuması senaryo 92'nin, plan
+--   yayınlama senaryo 103'ün kurulumunu bozuyordu.)
+--
+--   KURAL: bir senaryo ihtiyaç duyduğu satırı KENDİ işleminde üretir.
+--     * Kurulum satırları `set local role` ÇAĞRILMADAN ÖNCE, `postgres`
+--       kimliğiyle yazılır (RLS bypass + guard trigger'ları `auth.uid()` NULL
+--       iken çekilir, bkz. 20260817150000 §6a / 20260817160000 §3a).
+--     * Kurulumun KİM tarafından yapıldığı ölçümün parçası DEĞİLDİR; ölçülen
+--       şey her zaman rol taklidinden SONRA gelen ifadedir. Bunun tersi
+--       (kurulumu test edilen yetkiyle yapmak) testi kendini kanıtlar hâle
+--       getirirdi — bu yüzden kurulum ile iddia BİLİNÇLİ olarak ayrılmıştır.
+--     * Kurulum satırları sabit (senaryo numarası taşıyan) UUID'ler kullanır ki
+--       iddia, veritabanında rastgele bulunan bir satıra değil ÜRETİLEN satıra
+--       kurulsun.
+--   Sonuç: `npm run test:rls` E2E'den sonra, `db reset` OLMADAN da yeşildir.
+-- ###################################################################
+--
 -- Seed kimlikleri (bkz. supabase/seed.sql):
 --   Koç (coach)  : 11111111-1111-1111-1111-111111111111 (Deniz Koç)
 --   Danışan A    : 22222222-2222-2222-2222-222222222222 (Ahmet Yılmaz)
@@ -134,8 +159,16 @@ rollback;
 
 -- =============================================================================
 -- SATIR IZOLASYONU — 6) Danışan A -> Danışan B'nin form_checks kayıtlarını göremez
+-- KURULUM: gizlenmesi GEREKEN satır burada üretilir. Aksi hâlde iddia B'nin
+-- seed satırlarına dayanırdı ve tablo boşalsa SESSİZCE geçerdi (boş küme her
+-- zaman "sızıntı yok" der).
 -- =============================================================================
 begin;
+
+insert into public.form_checks (id, client_id, current_weight, notes)
+values ('a0000000-0000-0000-0000-000000000006'::uuid,
+        '33333333-3333-3333-3333-333333333333', 61.00, 'zz-06 Danisan B form check');
+
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
 do $$
@@ -151,8 +184,13 @@ rollback;
 
 -- =============================================================================
 -- SATIR IZOLASYONU — 7) Danışan A -> Danışan B'nin daily_logs kayıtlarını göremez
+-- KURULUM: senaryo 6 ile aynı gerekçe — gizlenmesi gereken satır burada üretilir.
 -- =============================================================================
 begin;
+
+insert into public.daily_logs (client_id, log_date, water_lt)
+values ('33333333-3333-3333-3333-333333333333', date '2000-01-07', 2.25);
+
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
 do $$
@@ -168,8 +206,13 @@ rollback;
 
 -- =============================================================================
 -- SATIR IZOLASYONU — 8) Danışan A -> Danışan B'nin workout_logs kayıtlarını göremez
+-- KURULUM: senaryo 6 ile aynı gerekçe — gizlenmesi gereken satır burada üretilir.
 -- =============================================================================
 begin;
+
+insert into public.workout_logs (client_id, exercise_name, weight_kg, reps)
+values ('33333333-3333-3333-3333-333333333333', 'zz-08 Squat', 55.00, 8);
+
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
 do $$
@@ -188,8 +231,21 @@ rollback;
 -- Dayanıklı iddia: sabit sayı beklemek yerine (a) toplam > 0 ve (b) toplam,
 -- yalnızca Danışan A'ya ait satır sayısından fazla -- yani koç en az bir
 -- başka danışanın (B'nin) satırlarını da görüyor.
+--
+-- KURULUM: "B'nin de satırı var" ön koşulu seed'e BIRAKILMAZ, burada üretilir.
+-- Ölçüm iki katmanlıdır: (1) üretilen İKİ satırın da koça göründüğü ADIYLA
+-- doğrulanır, (2) toplam > yalnızca-A iddiası korunur.
 -- =============================================================================
 begin;
+
+insert into public.form_checks (client_id, current_weight, notes) values
+  ('22222222-2222-2222-2222-222222222222', 90.00, 'zz-09 A form check'),
+  ('33333333-3333-3333-3333-333333333333', 61.00, 'zz-09 B form check');
+
+insert into public.daily_logs (client_id, log_date, water_lt) values
+  ('22222222-2222-2222-2222-222222222222', date '2000-01-09', 3.00),
+  ('33333333-3333-3333-3333-333333333333', date '2000-01-09', 2.25);
+
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
 do $$
@@ -198,7 +254,20 @@ declare
   v_fc_a_only  int;
   v_dl_total   int;
   v_dl_a_only  int;
+  v_fc_setup   int;
+  v_dl_setup   int;
 begin
+  -- (1) Bu senaryonun ÜRETTİĞİ satırlar: ikisi de koça görünmeli.
+  select count(*) into v_fc_setup from public.form_checks where notes like 'zz-09 %';
+  if v_fc_setup is distinct from 2 then
+    raise exception 'BASARISIZ [Koc - tum form_checks gorur]: uretilen 2 satirdan % tanesi gorunuyor', v_fc_setup;
+  end if;
+  select count(*) into v_dl_setup from public.daily_logs where log_date = date '2000-01-09';
+  if v_dl_setup is distinct from 2 then
+    raise exception 'BASARISIZ [Koc - tum daily_logs gorur]: uretilen 2 satirdan % tanesi gorunuyor', v_dl_setup;
+  end if;
+
+  -- (2) Toplam iddiası (artık boş tabloda SESSİZCE geçemez).
   select count(*) into v_fc_total  from public.form_checks;
   select count(*) into v_fc_a_only from public.form_checks where client_id = '22222222-2222-2222-2222-222222222222';
   if v_fc_total <= 0 or v_fc_total <= v_fc_a_only then
@@ -411,8 +480,17 @@ rollback;
 
 -- =============================================================================
 -- MESAJLASMA — 16) Danışan A -> yalnızca kendi konuşmalarındaki mesajları görür
+-- KURULUM: gizlenmesi GEREKEN yabancı mesaj (koç <-> Danışan B) burada üretilir;
+-- iddia artık "messages tablosu boş" hâlinde de sessizce geçemez.
 -- =============================================================================
 begin;
+
+insert into public.messages (id, sender_id, receiver_id, message)
+values ('e0000000-0000-0000-0000-000000000016'::uuid,
+        '11111111-1111-1111-1111-111111111111',
+        '33333333-3333-3333-3333-333333333333',
+        'zz-16 koc -> Danisan B (A gormemeli)');
+
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
 do $$
@@ -1316,8 +1394,17 @@ rollback;
 
 -- =============================================================================
 -- MESAJLASMA (KONUSMA ANAHTARI) — 36) Danışan A -> gördüğü TÜM mesajların client_id'si kendisidir
+-- KURULUM: yabancı `client_id` taşıyan bir satır (B'nin konuşması) burada
+-- üretilir — senaryo 16 ile aynı gerekçe.
 -- =============================================================================
 begin;
+
+insert into public.messages (id, sender_id, receiver_id, message)
+values ('e0000000-0000-0000-0000-000000000036'::uuid,
+        '11111111-1111-1111-1111-111111111111',
+        '33333333-3333-3333-3333-333333333333',
+        'zz-36 koc -> Danisan B (yabanci client_id)');
+
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
 do $$
@@ -1338,15 +1425,35 @@ rollback;
 
 -- =============================================================================
 -- MESAJLASMA (KONUSMA ANAHTARI) — 37) Koç -> hem A hem B konuşmasının mesajlarını görür
+-- KURULUM: iki konuşmanın da mesajı OLMASI ön koşulu seed'e bırakılmaz; her iki
+-- satır da burada üretilir ve iddia o satırlar üzerinden de doğrulanır.
 -- =============================================================================
 begin;
+
+insert into public.messages (id, sender_id, receiver_id, message) values
+  ('e0000000-0000-0000-0000-000000000037'::uuid,
+   '22222222-2222-2222-2222-222222222222', '11111111-1111-1111-1111-111111111111',
+   'zz-37 Danisan A -> koc'),
+  ('e0000000-0000-0000-0000-00000000003b'::uuid,
+   '33333333-3333-3333-3333-333333333333', '11111111-1111-1111-1111-111111111111',
+   'zz-37 Danisan B -> koc');
+
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
 do $$
 declare
-  v_a int;
-  v_b int;
+  v_a     int;
+  v_b     int;
+  v_setup int;
 begin
+  -- Bu senaryonun ÜRETTİĞİ iki satır (her konuşmadan biri) koça görünmeli.
+  select count(*) into v_setup from public.messages
+   where id in ('e0000000-0000-0000-0000-000000000037'::uuid,
+                'e0000000-0000-0000-0000-00000000003b'::uuid);
+  if v_setup is distinct from 2 then
+    raise exception 'BASARISIZ [Koc - iki konusmayi da gorur]: uretilen 2 satirdan % tanesi gorunuyor', v_setup;
+  end if;
+
   select count(*) into v_a from public.messages where client_id = '22222222-2222-2222-2222-222222222222';
   select count(*) into v_b from public.messages where client_id = '33333333-3333-3333-3333-333333333333';
 
@@ -1985,22 +2092,22 @@ set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","r
 do $$
 declare
   v_rows   int;
+  v_id     uuid;
   v_status public.approval_status;
   v_by     uuid;
   v_at     timestamptz;
 begin
+  -- Geri okuma `returning` ile YAPILIR: `where workout_data = …` ile aramak,
+  -- veritabanında aynı payload'ı taşıyan BAŞKA bir satır (E2E artığı) varsa
+  -- yanlış satırı ölçerdi. Senaryo yalnızca KENDİ ürettiği satıra bakar.
   insert into public.program_approvals (client_id, workout_data, status)
-  values ('22222222-2222-2222-2222-222222222222', '{"Pazartesi":"1. Bench Press - 4x8"}'::jsonb, 'pending');
+  values ('22222222-2222-2222-2222-222222222222', '{"Pazartesi":"1. Bench Press - 4x8"}'::jsonb, 'pending')
+  returning id, status, reviewed_by, reviewed_at into v_id, v_status, v_by, v_at;
   get diagnostics v_rows = row_count;
 
-  if v_rows is distinct from 1 then
+  if v_rows is distinct from 1 or v_id is null then
     raise exception 'BASARISIZ [Danisan pending onay talebi acar]: beklenen 1 satir, etkilenen %', v_rows;
   end if;
-
-  select status, reviewed_by, reviewed_at into v_status, v_by, v_at
-    from public.program_approvals
-   where client_id = '22222222-2222-2222-2222-222222222222'
-     and workout_data = '{"Pazartesi":"1. Bench Press - 4x8"}'::jsonb;
 
   if v_status is distinct from 'pending'::public.approval_status or v_by is not null or v_at is not null then
     raise exception 'BASARISIZ [Danisan pending onay talebi]: status=%, reviewed_by=%, reviewed_at=%', v_status, v_by, v_at;
@@ -2013,8 +2120,28 @@ rollback;
 -- =============================================================================
 -- PROGRAM ONAYI — 54) [G-03 / AC-01] Danışan kendi `pending` satırını SİLİP
 -- `approved` olarak yeniden EKLEYEMEZ (canlı sömürü W7'nin kapanışı)
+--
+-- KURULUM (2026-08-18 — BU SENARYONUN KIRILGANLIĞI BURADAN GELİYORDU):
+-- Silinecek `pending` satır ESKİDEN seed'in §9 satırıydı. E2E'nin "danışan
+-- programı onaya sunar, koç onaylar" senaryosu o satırı `approved` yaparak
+-- TÜKETİYOR; ardından `npm run test:rls` "silinen=0" ile KIRMIZI dönüyordu
+-- (`db reset` ile geçiştirilmesi sorunu gizliyordu, çözmüyordu).
+-- Satır artık burada, `postgres` kimliğiyle üretiliyor (guard trigger
+-- `auth.uid()` NULL iken çekilir, 20260817160000 §3a) ve ROLLBACK ile geri
+-- alınıyor. ÖLÇÜM DEĞİŞMEDİ: silme YİNE danışan kimliğiyle, RLS
+-- (`program_approvals_delete`) altında yapılır — kurulumun kim tarafından
+-- yazıldığı iddianın gücüne dahil değildir.
 -- =============================================================================
 begin;
+
+insert into public.program_approvals (id, client_id, workout_data, status)
+values (
+  'b0000000-0000-0000-0000-000000000054'::uuid,
+  '22222222-2222-2222-2222-222222222222',
+  '{"Pazartesi":"1. Bench Press - 4x8"}'::jsonb,
+  'pending'::public.approval_status
+);
+
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
 do $$
@@ -2023,12 +2150,14 @@ declare
   v_caught  boolean := false;
 begin
   -- 1. adım: kendi BEKLEYEN talebini geri çekebilir (bilinçli olarak serbest).
+  -- Bu ADIM DA bir ölçümdür: `program_approvals_delete` politikası danışana
+  -- KENDİ 'pending' satırını sildirmeli. Hedef, senaryonun ürettiği satırdır.
   delete from public.program_approvals
-   where client_id = '22222222-2222-2222-2222-222222222222'
+   where id = 'b0000000-0000-0000-0000-000000000054'::uuid
      and status = 'pending'::public.approval_status;
   get diagnostics v_deleted = row_count;
 
-  if v_deleted < 1 then
+  if v_deleted is distinct from 1 then
     raise exception 'BASARISIZ [G-03 hazirlik]: danisan kendi pending talebini silemedi (silinen=%)', v_deleted;
   end if;
 
@@ -2145,13 +2274,28 @@ rollback;
 -- =============================================================================
 -- PROGRAM ONAYI — 57) [AC-01] Danışan mevcut satırın `status`'ünü UPDATE ile
 -- değiştiremez (canlı kanıt W6; RLS + trigger iki katmanlı savunma)
+--
+-- KURULUM: hedef satır burada üretilir. Aksi hâlde "etkilenen=0" iddiası,
+-- veritabanında A'ya ait HİÇ onay satırı kalmadığında (E2E temizliği, elle
+-- silme) SESSİZCE geçerdi — hiçbir şeyi güncelleyememek ile hiçbir şey
+-- bulamamak aynı sonucu verir. Satırın 'pending' KALDIĞI da doğrulanır.
 -- =============================================================================
 begin;
+
+insert into public.program_approvals (id, client_id, workout_data, status)
+values (
+  'b0000000-0000-0000-0000-000000000057'::uuid,
+  '22222222-2222-2222-2222-222222222222',
+  '{"Pazartesi":"1. Overhead Press - 4x8"}'::jsonb,
+  'pending'::public.approval_status
+);
+
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
 do $$
 declare
-  v_rows int;
+  v_rows   int;
+  v_status public.approval_status;
 begin
   update public.program_approvals
      set status = 'approved'::public.approval_status
@@ -2160,6 +2304,12 @@ begin
 
   if v_rows is distinct from 0 then
     raise exception 'BASARISIZ [Danisan status UPDATE edemez]: beklenen 0 satir, etkilenen %', v_rows;
+  end if;
+
+  select status into v_status from public.program_approvals
+   where id = 'b0000000-0000-0000-0000-000000000057'::uuid;
+  if v_status is distinct from 'pending'::public.approval_status then
+    raise exception 'BASARISIZ [Danisan status UPDATE edemez]: satir % oldu (pending kalmaliydi)', v_status;
   end if;
   raise notice 'GECTI [Danisan mevcut onay kaydinin status unu UPDATE ile degistiremez]';
 end $$;
@@ -3564,8 +3714,23 @@ rollback;
 -- Bu senaryo olmadan "kolonlar eklendi" ile "kolonlar KULLANILABİLİR" arasındaki
 -- fark ölçülmezdi (grant/RLS/trigger üçlüsünden biri eksik olsa da şema doğru
 -- görünürdü).
+--
+-- KURULUM: bağlanılacak plan satırı SEED'DEN OKUNMAZ, burada üretilir (seed'in
+-- plan tabloları E2E'nin "planı kaydet/yayınla" akışlarıyla değişir). Plan
+-- satırı `postgres` ile yazılır, ama senaryo onu YİNE danışan kimliğiyle ve RLS
+-- altında OKUR — yani "danışan kendi plan satırını görebiliyor mu" ölçümü
+-- korunur.
 -- =============================================================================
 begin;
+
+delete from public.workout_plans where client_id = '22222222-2222-2222-2222-222222222222';
+
+insert into public.workout_plans (id, client_id, version, is_active)
+values ('aaaaaaaa-0000-0000-0000-000000000086', '22222222-2222-2222-2222-222222222222', 1, true);
+
+insert into public.workout_plan_exercises (plan_id, day, position, raw_line, name, target_sets, target_reps)
+values ('aaaaaaaa-0000-0000-0000-000000000086', 'Pazartesi', 0, '1. Bench Press - 4x8', 'Bench Press', 4, 8);
+
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
 do $$
@@ -3584,7 +3749,7 @@ begin
    limit 1;
 
   if v_pe is null then
-    raise exception 'BASARISIZ [86 kurulum]: Danisan A nin plan satiri gorunmuyor (seed veya RLS bozuk)';
+    raise exception 'BASARISIZ [86 kurulum]: Danisan A nin plan satiri RLS altinda GORUNMUYOR';
   end if;
 
   insert into public.workout_logs
@@ -3621,22 +3786,29 @@ rollback;
 -- yüzden id, rol değiştirilmeden ÖNCE bir işlem-yerel GUC'a yazılır (saldırgan
 -- id'yi başka bir yoldan öğrenmiş varsayılır — en kötü durum).
 -- Üçüncü dal: KOÇ bile bu bağı kuramaz (bütünlük kuralı, yetki kuralı değil).
+--
+-- KURULUM: hem B'nin plan satırı hem A'nın (koç tarafından yeniden bağlanmaya
+-- çalışılacak) log satırı BURADA üretilir — ikisi de eskiden seed'den okunuyordu
+-- ve E2E'nin plan kaydetme / gym modu akışları ikisini de değiştirebiliyordu.
 -- =============================================================================
 begin;
+
+delete from public.workout_plans where client_id = '33333333-3333-3333-3333-333333333333';
+
+insert into public.workout_plans (id, client_id, version, is_active)
+values ('bbbbbbbb-0000-0000-0000-000000000087', '33333333-3333-3333-3333-333333333333', 1, true);
+
+insert into public.workout_plan_exercises (id, plan_id, day, position, raw_line)
+values ('bbbbbbbb-1111-0000-0000-000000000087', 'bbbbbbbb-0000-0000-0000-000000000087',
+        'Pazartesi', 0, '1. Squat - 5x5');
+
+insert into public.workout_logs (id, client_id, exercise_name, weight_kg, reps)
+values ('dddddddd-0000-0000-0000-000000000087', '22222222-2222-2222-2222-222222222222',
+        'zz-87 Danisan A logu', 60.00, 8);
+
 do $$
 begin
-  perform set_config('zz.pe_b', (
-    select wpe.id::text
-      from public.workout_plan_exercises wpe
-      join public.workout_plans wp on wp.id = wpe.plan_id
-     where wp.client_id = '33333333-3333-3333-3333-333333333333'::uuid
-     order by wpe.day, wpe.position
-     limit 1
-  ), true);
-
-  if coalesce(current_setting('zz.pe_b', true), '') = '' then
-    raise exception 'BASARISIZ [87 kurulum]: Danisan B nin plan satiri yok';
-  end if;
+  perform set_config('zz.pe_b', 'bbbbbbbb-1111-0000-0000-000000000087', true);
 end $$;
 
 set local role authenticated;
@@ -3674,11 +3846,13 @@ declare
   v_caught boolean := false;
   v_state  text;
 begin
+  -- Kurulumda üretilen log; koç onu RLS altında GÖRMELİ (aksi hâlde aşağıdaki
+  -- UPDATE 0 satır etkiler ve senaryo sahte bir yeşil verirdi).
   select id into v_log from public.workout_logs
-   where client_id = '22222222-2222-2222-2222-222222222222'::uuid limit 1;
+   where id = 'dddddddd-0000-0000-0000-000000000087'::uuid;
 
   if v_log is null then
-    raise exception 'BASARISIZ [87b kurulum]: Danisan A nin logu yok';
+    raise exception 'BASARISIZ [87b kurulum]: kurulumda uretilen log koca GORUNMUYOR';
   end if;
 
   begin
@@ -3989,8 +4163,23 @@ rollback;
 --   (b) `read_at` NULL'a çekilince `is_read` false OLUR
 --   (c) çelişkili yazma (read_at dolu + is_read=false) NORMALLEŞTİRİLİR (hata YOK)
 --   (d) trigger DEVRE DIŞI bırakılsa bile CHECK tutarsız satırı REDDEDER
+--
+-- KURULUM (2026-08-18): senaryo eskiden seed'in OKUNMAMIŞ bırakılmış mesajını
+-- arıyordu ("Danisan A ya gelmis OKUNMAMIS mesaj yok (seed degismis)"). E2E'nin
+-- mesajlaşma akışı sohbeti okundu işaretleyince o satır TÜKENİYOR ve senaryo
+-- kuruluma takılıyordu. Okunmamış mesaj artık burada üretilir.
 -- =============================================================================
 begin;
+
+insert into public.messages (id, sender_id, receiver_id, message, read_at)
+values (
+  'e0000000-0000-0000-0000-000000000092'::uuid,
+  '11111111-1111-1111-1111-111111111111',
+  '22222222-2222-2222-2222-222222222222',
+  'zz-92 okunmamis mesaj (read_at invaryanti)',
+  null
+);
+
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
 do $$
@@ -3999,13 +4188,13 @@ declare
   v_read_at timestamptz;
   v_flag    boolean;
 begin
+  -- Satır ALICI kimliğiyle, RLS altında okunur: görünmüyorsa senaryo anlamsızdır.
   select id into v_id
     from public.messages
-   where receiver_id = '22222222-2222-2222-2222-222222222222'::uuid
-     and read_at is null
-   limit 1;
+   where id = 'e0000000-0000-0000-0000-000000000092'::uuid
+     and read_at is null;
   if v_id is null then
-    raise exception 'BASARISIZ [92 kurulum]: Danisan A ya gelmis OKUNMAMIS mesaj yok (seed degismis)';
+    raise exception 'BASARISIZ [92 kurulum]: uretilen OKUNMAMIS mesaj aliciya gorunmuyor';
   end if;
 
   -- (a)
@@ -4158,8 +4347,21 @@ rollback;
 --   (a) POZİTİF: koç danışanın planına günlük hedef yazar
 --   (b) NEGATİF makro CHECK ile reddedilir (23514)
 --   (c) BAŞKA danışan bu hedefleri değiştiremez (0 satır)
+--
+-- KURULUM: hedef yazılacak AKTİF beslenme planı burada üretilir. Eskiden
+-- seed'in §2c planına güveniliyordu; "etkilenen 1 satır" iddiası, plan E2E
+-- tarafından yeniden yazılırsa/kaybolursa kuruluma takılırdı.
 -- =============================================================================
 begin;
+
+delete from public.nutrition_plans where client_id = '22222222-2222-2222-2222-222222222222';
+
+insert into public.nutrition_plans (id, client_id, version, is_active)
+values ('cccccccc-0000-0000-0000-000000000094', '22222222-2222-2222-2222-222222222222', 1, true);
+
+insert into public.nutrition_plan_meals (plan_id, day, position, description, kcal)
+values ('cccccccc-0000-0000-0000-000000000094', 'Pazartesi', 0, 'Yulaf Ezmesi 80g', 1850);
+
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
 do $$
@@ -4565,8 +4767,24 @@ rollback;
 -- KURULUM ÖNEMLİ: yayınlama dalına ancak aktif planın satırlarına bağlı BİR LOG
 -- varsa girilir (copy-on-write, migration KARAR 1/C). Bu yüzden önce danışan
 -- kendi adına bir set yazar (koç `workout_logs`'a INSERT EDEMEZ — senaryo 88).
+--
+-- BAŞLANGIÇ DURUMU BURADA KURULUR (2026-08-18): senaryo eskiden "Danışan A'nın
+-- seed'den gelen v1 aktif planı" varsayıyordu. E2E'nin plan kaydetme akışı
+-- (ve bu senaryonun kendisi, reset'siz koşulan bir ortamda) A'yı v2/v3'e
+-- taşıdığında versiyon iddiaları kayıyordu. Artık A'nın plan geçmişi
+-- SIFIRLANIR ve bilinen bir v1'den başlanır.
 -- =============================================================================
 begin;
+
+delete from public.workout_plans where client_id = '22222222-2222-2222-2222-222222222222';
+
+insert into public.workout_plans (id, client_id, version, is_active)
+values ('aaaaaaaa-0000-0000-0000-000000000100', '22222222-2222-2222-2222-222222222222', 1, true);
+
+insert into public.workout_plan_exercises (plan_id, day, position, raw_line) values
+  ('aaaaaaaa-0000-0000-0000-000000000100', 'Pazartesi', 0, '1. Zz Baslangic - 4x8'),
+  ('aaaaaaaa-0000-0000-0000-000000000100', 'Salı',      0, '1. Zz Baslangic 2 - 3x10');
+
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
 do $$
@@ -4578,7 +4796,7 @@ begin
     from public.workout_plans wp
    where wp.client_id = '22222222-2222-2222-2222-222222222222'::uuid and wp.is_active;
   if v_plan is null then
-    raise exception 'BASARISIZ [100 kurulum]: Danisan A nin aktif plani yok (seed bozuk)';
+    raise exception 'BASARISIZ [100 kurulum]: Danisan A nin aktif plani RLS altinda GORUNMUYOR';
   end if;
 
   select wpe.id into v_pe from public.workout_plan_exercises wpe where wpe.plan_id = v_plan
@@ -4649,8 +4867,19 @@ rollback;
 -- bağlı kalır — FK versiyonlu satıra" garantisi SAĞLANMIYORDU.
 --
 -- Bu senaryo 20260817210000 geri alınırsa KIRILIR (kırmızı-yeşil kanıtı).
+--
+-- BAŞLANGIÇ DURUMU BURADA KURULUR (senaryo 100 ile aynı gerekçe).
 -- =============================================================================
 begin;
+
+delete from public.workout_plans where client_id = '22222222-2222-2222-2222-222222222222';
+
+insert into public.workout_plans (id, client_id, version, is_active)
+values ('aaaaaaaa-0000-0000-0000-000000000101', '22222222-2222-2222-2222-222222222222', 1, true);
+
+insert into public.workout_plan_exercises (plan_id, day, position, raw_line)
+values ('aaaaaaaa-0000-0000-0000-000000000101', 'Pazartesi', 0, '1. Zz Baslangic - 4x8');
+
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
 do $$
@@ -4664,7 +4893,7 @@ begin
   select wpe.id into v_pe from public.workout_plan_exercises wpe where wpe.plan_id = v_plan
    order by wpe.day, wpe.position limit 1;
   if v_pe is null then
-    raise exception 'BASARISIZ [101 kurulum]: aktif planin egzersiz satiri yok';
+    raise exception 'BASARISIZ [101 kurulum]: aktif planin egzersiz satiri RLS altinda GORUNMUYOR';
   end if;
 
   insert into public.workout_logs (client_id, exercise_name, weight_kg, reps, set_number, plan_exercise_id, completed_at)
@@ -4726,8 +4955,21 @@ rollback;
 -- sorgularının (`.eq('is_active', true).maybeSingle()`) hâlâ TEK satır döndürmesi
 -- ve o satırın YENİ versiyon olması şart. `maybeSingle()` birden çok satırda
 -- HATA verir — yani arşiv sızarsa uygulama kırılırdı.
+--
+-- BAŞLANGIÇ DURUMU BURADA KURULUR (senaryo 100 ile aynı gerekçe): "yayından
+-- sonra TEK aktif plan ve TEK satır" iddiası, başlangıçtaki plan sayısına
+-- duyarlıdır.
 -- =============================================================================
 begin;
+
+delete from public.workout_plans where client_id = '22222222-2222-2222-2222-222222222222';
+
+insert into public.workout_plans (id, client_id, version, is_active)
+values ('aaaaaaaa-0000-0000-0000-000000000102', '22222222-2222-2222-2222-222222222222', 1, true);
+
+insert into public.workout_plan_exercises (plan_id, day, position, raw_line)
+values ('aaaaaaaa-0000-0000-0000-000000000102', 'Pazartesi', 0, '1. Zz Baslangic - 4x8');
+
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
 do $$
@@ -4738,6 +4980,9 @@ begin
   select wp.id into v_plan from public.workout_plans wp
    where wp.client_id = '22222222-2222-2222-2222-222222222222'::uuid and wp.is_active;
   select wpe.id into v_pe from public.workout_plan_exercises wpe where wpe.plan_id = v_plan limit 1;
+  if v_pe is null then
+    raise exception 'BASARISIZ [102 kurulum]: aktif planin egzersiz satiri RLS altinda GORUNMUYOR';
+  end if;
   insert into public.workout_logs (client_id, exercise_name, set_number, plan_exercise_id)
   values ('22222222-2222-2222-2222-222222222222'::uuid, 'zz-102', 1, v_pe);
 end $$;
@@ -4813,8 +5058,26 @@ rollback;
 -- `save_workout_plan(p_client_ids uuid[], ...)` aynı planı N danışana yazar;
 -- `version` GLOBAL değil DANIŞAN BAŞINA sayaçtır. Bu senaryoda A'nın geçmişi
 -- vardır (yayınlanır, v1 -> v2), B'nin yoktur (taslak, v1'de kalır).
+--
+-- BU SENARYONUN BAŞLANGIÇ DURUMU EN HASSASIDIR: iddia MUTLAK versiyon
+-- numaralarına (A=2, B=1) ve MUTLAK plan sayılarına (2/1) bakar. Daha önce
+-- seed'in "her danışan v1" hâline güveniyordu; A bir kez yayınlandığında
+-- (E2E ya da bu paketin 100/101/102 senaryoları reset'siz bir ortamda)
+-- v3 üretiliyor ve senaryo kırılıyordu. İki danışanın plan geçmişi de burada
+-- SIFIRLANIR: A bilinen bir v1 ile başlar, B ise HİÇ planı olmadan (RPC ona
+-- v1 açacak) — böylece "sayaç danışan başına" iddiası tam olarak ölçülür.
 -- =============================================================================
 begin;
+
+delete from public.workout_plans
+ where client_id in ('22222222-2222-2222-2222-222222222222', '33333333-3333-3333-3333-333333333333');
+
+insert into public.workout_plans (id, client_id, version, is_active)
+values ('aaaaaaaa-0000-0000-0000-000000000103', '22222222-2222-2222-2222-222222222222', 1, true);
+
+insert into public.workout_plan_exercises (plan_id, day, position, raw_line)
+values ('aaaaaaaa-0000-0000-0000-000000000103', 'Pazartesi', 0, '1. Zz Baslangic - 4x8');
+
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
 do $$
@@ -4823,6 +5086,9 @@ begin
   select wp.id into v_plan from public.workout_plans wp
    where wp.client_id = '22222222-2222-2222-2222-222222222222'::uuid and wp.is_active;
   select wpe.id into v_pe from public.workout_plan_exercises wpe where wpe.plan_id = v_plan limit 1;
+  if v_pe is null then
+    raise exception 'BASARISIZ [103 kurulum]: aktif planin egzersiz satiri RLS altinda GORUNMUYOR';
+  end if;
   insert into public.workout_logs (client_id, exercise_name, set_number, plan_exercise_id)
   values ('22222222-2222-2222-2222-222222222222'::uuid, 'zz-103', 1, v_pe);
 end $$;
@@ -4872,8 +5138,19 @@ rollback;
 --   (b) `workout_plans_client_version_uniq` — aynı danışanda aynı versiyon
 --       numarası iki kez üretilemez (fail-closed emniyet kemeri).
 --   (c) İki aktif plan ELLE de yazılamaz — indeks 23505 verir.
+--
+-- BAŞLANGIÇ DURUMU BURADA KURULUR (senaryo 100 ile aynı gerekçe).
 -- =============================================================================
 begin;
+
+delete from public.workout_plans where client_id = '22222222-2222-2222-2222-222222222222';
+
+insert into public.workout_plans (id, client_id, version, is_active)
+values ('aaaaaaaa-0000-0000-0000-000000000104', '22222222-2222-2222-2222-222222222222', 1, true);
+
+insert into public.workout_plan_exercises (plan_id, day, position, raw_line)
+values ('aaaaaaaa-0000-0000-0000-000000000104', 'Pazartesi', 0, '1. Zz Baslangic - 4x8');
+
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
 do $$
@@ -4882,6 +5159,9 @@ begin
   select wp.id into v_plan from public.workout_plans wp
    where wp.client_id = '22222222-2222-2222-2222-222222222222'::uuid and wp.is_active;
   select wpe.id into v_pe from public.workout_plan_exercises wpe where wpe.plan_id = v_plan limit 1;
+  if v_pe is null then
+    raise exception 'BASARISIZ [104 kurulum]: aktif planin egzersiz satiri RLS altinda GORUNMUYOR';
+  end if;
   insert into public.workout_logs (client_id, exercise_name, set_number, plan_exercise_id)
   values ('22222222-2222-2222-2222-222222222222'::uuid, 'zz-104', 1, v_pe);
 end $$;
@@ -4930,9 +5210,617 @@ end $$;
 rollback;
 
 
+
+-- =============================================================================
+-- ILERLEME TAKIBI — 105) *** AC-4.1 *** Aynı güne İKİNCİ kilo girişi
+--   (a) DÜZ ikinci `insert` duplicate satır ÜRETMEZ -> 23505
+--   (b) `upsert` (on conflict) ESKİ SATIRI günceller: satır sayısı 1 KALIR,
+--       `id` DEĞİŞMEZ (yeni satır doğmadı), değer yenilenir, dokunulmayan
+--       ölçü kolonu KORUNUR
+--   Kırmızı-yeşil: `progress_entries_client_date_uniq` düşürülünce (a) 23505
+--   almaz ve (b) `42P10 no unique or exclusion constraint` ile kırılır.
+-- =============================================================================
+begin;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+do $$
+declare
+  v_id     uuid;
+  v_id2    uuid;
+  v_n      int;
+  v_w      numeric;
+  v_caught boolean := false;
+  v_state  text;
+begin
+  insert into public.progress_entries (client_id, entry_date, weight_kg, waist_cm)
+  values ('22222222-2222-2222-2222-222222222222'::uuid, date '2026-08-10', 82.30, 88.50)
+  returning id into v_id;
+
+  -- (a) DÜZ ikinci insert
+  begin
+    insert into public.progress_entries (client_id, entry_date, weight_kg)
+    values ('22222222-2222-2222-2222-222222222222'::uuid, date '2026-08-10', 81.70);
+  exception when unique_violation then
+    v_caught := true; get stacked diagnostics v_state = returned_sqlstate;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [105a / AC-4.1]: ayni gune IKINCI satir GIRDI -- tekillik kisiti yok, DUPLICATE uretiliyor';
+  end if;
+  if v_state is distinct from '23505' then
+    raise exception 'BASARISIZ [105a hata kodu]: beklenen 23505, gelen %', v_state;
+  end if;
+
+  -- (b) UPSERT eskisini GÜNCELLER
+  insert into public.progress_entries (client_id, entry_date, weight_kg)
+  values ('22222222-2222-2222-2222-222222222222'::uuid, date '2026-08-10', 81.70)
+  on conflict (client_id, entry_date) do update
+    set weight_kg = excluded.weight_kg
+  returning id into v_id2;
+
+  select count(*), max(weight_kg) into v_n, v_w
+    from public.progress_entries
+   where client_id = '22222222-2222-2222-2222-222222222222'::uuid
+     and entry_date = date '2026-08-10';
+
+  if v_n is distinct from 1 then
+    raise exception 'BASARISIZ [105b / AC-4.1]: gunde % satir var (beklenen 1) -- DUPLICATE OLUSTU', v_n;
+  end if;
+  if v_w is distinct from 81.70 then
+    raise exception 'BASARISIZ [105b]: upsert eski satiri GUNCELLEMEDI (weight_kg=%)', v_w;
+  end if;
+  if v_id2 is distinct from v_id then
+    raise exception 'BASARISIZ [105b]: upsert YENI SATIR uretti (% -> %) -- id degisti', v_id, v_id2;
+  end if;
+
+  select waist_cm into v_w from public.progress_entries where id = v_id;
+  if v_w is distinct from 88.50 then
+    raise exception 'BASARISIZ [105b]: upsert dokunulmayan olcu kolonunu ezdi (waist_cm=%)', v_w;
+  end if;
+
+  raise notice 'GECTI [105 AC-4.1: ikinci insert 23505, upsert AYNI satiri gunceller, duplicate YOK]';
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- ILERLEME TAKIBI — 106) `progress_entries` erişim matrisi
+--   danışan: kendi satırı R/W  |  başka danışanınki: HİÇ
+--   koç    : *** SALT OKUMA *** (§6 "koç görünümü salt-okunur")
+--   anon   : permission denied
+-- =============================================================================
+begin;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+do $$
+declare v_id uuid; v_caught boolean := false;
+begin
+  insert into public.progress_entries (client_id, entry_date, weight_kg, notes)
+  values ('22222222-2222-2222-2222-222222222222'::uuid, date '2026-08-11', 82.10, 'zz-106 kendi girisi')
+  returning id into v_id;
+  perform set_config('zz.pe_106', v_id::text, true);
+
+  begin
+    insert into public.progress_entries (client_id, entry_date, weight_kg)
+    values ('33333333-3333-3333-3333-333333333333'::uuid, date '2026-08-11', 70.00);
+  exception when insufficient_privilege then
+    v_caught := true;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [106]: Danisan A, B adina ilerleme girisi yazabildi';
+  end if;
+
+  update public.progress_entries set weight_kg = 82.40 where id = v_id;
+  if (select weight_kg from public.progress_entries where id = v_id) is distinct from 82.40 then
+    raise exception 'BASARISIZ [106]: Danisan A KENDI girisini guncelleyemedi';
+  end if;
+end $$;
+
+set local request.jwt.claims = '{"sub":"33333333-3333-3333-3333-333333333333","role":"authenticated"}';
+do $$
+declare v_n int;
+begin
+  select count(*) into v_n from public.progress_entries where notes like 'zz-106%';
+  if v_n is distinct from 0 then
+    raise exception 'BASARISIZ [106 sizinti]: Danisan B, A nin kilo/olcu girisini GORUYOR (%)', v_n;
+  end if;
+end $$;
+
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+do $$
+declare v_n int; v_rows int; v_caught boolean := false;
+begin
+  select count(*) into v_n from public.progress_entries where notes like 'zz-106%';
+  if v_n is distinct from 1 then
+    raise exception 'BASARISIZ [106 koc okuma]: beklenen 1, gelen % -- koc gorunumu calismiyor', v_n;
+  end if;
+
+  begin
+    insert into public.progress_entries (client_id, entry_date, weight_kg)
+    values ('22222222-2222-2222-2222-222222222222'::uuid, date '2026-08-12', 99.90);
+  exception when insufficient_privilege then
+    v_caught := true;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [106 koc INSERT]: KOC danisanin ilerleme girisini YAZABILDI -- §6 "salt-okunur" IHLALI';
+  end if;
+
+  update public.progress_entries set weight_kg = 999 where id = current_setting('zz.pe_106')::uuid;
+  get diagnostics v_rows = row_count;
+  if v_rows is distinct from 0 then
+    raise exception 'BASARISIZ [106 koc UPDATE]: KOC % satir guncelledi (beklenen 0) -- salt-okunur IHLALI', v_rows;
+  end if;
+
+  delete from public.progress_entries where id = current_setting('zz.pe_106')::uuid;
+  get diagnostics v_rows = row_count;
+  if v_rows is distinct from 0 then
+    raise exception 'BASARISIZ [106 koc DELETE]: KOC % satir sildi (beklenen 0) -- salt-okunur IHLALI', v_rows;
+  end if;
+end $$;
+
+set local role anon;
+do $$
+declare v_caught boolean := false; v_n int;
+begin
+  begin
+    select count(*) into v_n from public.progress_entries;
+  exception when insufficient_privilege then
+    v_caught := true;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [106 anon]: giris yapmamis ziyaretci progress_entries okuyabildi (% satir)', v_n;
+  end if;
+  raise notice 'GECTI [106 progress_entries: danisan R/W kendi, baska danisan HIC, KOC SALT OKUMA, anon DENY]';
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- ILERLEME TAKIBI — 107) `progress_entries` DEĞER KISITLARI
+--   (a) negatif / sıfır / absürt kilo ve ölçü REDDEDİLİR (23514)
+--   (b) HİÇBİR ölçüm içermeyen satır REDDEDİLİR (o günün TEK yerini işgal edip
+--       grafikte hiçbir nokta üretmezdi)
+--   (c) absürt tarih (yıl yazım hatası) REDDEDİLİR
+--   (d) POZİTİF: tüm ölçüleri dolu gerçekçi satır GEÇER
+-- =============================================================================
+begin;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+do $$
+declare v_caught boolean; v_state text;
+begin
+  -- (a)
+  v_caught := false;
+  begin
+    insert into public.progress_entries (client_id, entry_date, weight_kg)
+    values ('22222222-2222-2222-2222-222222222222'::uuid, date '2026-08-13', -1);
+  exception when check_violation then v_caught := true; get stacked diagnostics v_state = returned_sqlstate;
+  end;
+  if not v_caught then raise exception 'BASARISIZ [107a]: NEGATIF kilo kabul edildi'; end if;
+  if v_state is distinct from '23514' then raise exception 'BASARISIZ [107a kod]: beklenen 23514, gelen %', v_state; end if;
+
+  v_caught := false;
+  begin
+    insert into public.progress_entries (client_id, entry_date, weight_kg)
+    values ('22222222-2222-2222-2222-222222222222'::uuid, date '2026-08-13', 600);
+  exception when check_violation then v_caught := true;
+  end;
+  if not v_caught then raise exception 'BASARISIZ [107a]: 600 kg ABSURT kilo kabul edildi'; end if;
+
+  v_caught := false;
+  begin
+    insert into public.progress_entries (client_id, entry_date, weight_kg)
+    values ('22222222-2222-2222-2222-222222222222'::uuid, date '2026-08-13', 0);
+  exception when check_violation then v_caught := true;
+  end;
+  if not v_caught then raise exception 'BASARISIZ [107a]: 0 kg kabul edildi'; end if;
+
+  v_caught := false;
+  begin
+    insert into public.progress_entries (client_id, entry_date, waist_cm)
+    values ('22222222-2222-2222-2222-222222222222'::uuid, date '2026-08-13', -5);
+  exception when check_violation then v_caught := true;
+  end;
+  if not v_caught then raise exception 'BASARISIZ [107a]: NEGATIF bel olcusu kabul edildi'; end if;
+
+  v_caught := false;
+  begin
+    insert into public.progress_entries (client_id, entry_date, thigh_cm)
+    values ('22222222-2222-2222-2222-222222222222'::uuid, date '2026-08-13', 350);
+  exception when check_violation then v_caught := true;
+  end;
+  if not v_caught then raise exception 'BASARISIZ [107a]: 350 cm ABSURT uyluk olcusu kabul edildi'; end if;
+
+  -- (b)
+  v_caught := false;
+  begin
+    insert into public.progress_entries (client_id, entry_date, notes)
+    values ('22222222-2222-2222-2222-222222222222'::uuid, date '2026-08-13', 'sadece not');
+  exception when check_violation then v_caught := true;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [107b]: OLCUMSUZ satir kabul edildi -- o gunun TEK yerini isgal eder, grafikte hicbir nokta uretmez';
+  end if;
+
+  -- (c)
+  v_caught := false;
+  begin
+    insert into public.progress_entries (client_id, entry_date, weight_kg)
+    values ('22222222-2222-2222-2222-222222222222'::uuid, date '0202-05-01', 80);
+  exception when check_violation then v_caught := true;
+  end;
+  if not v_caught then raise exception 'BASARISIZ [107c]: 0202 yili kabul edildi (yil yazim hatasi yakalanmiyor)'; end if;
+
+  -- (d)
+  insert into public.progress_entries
+    (client_id, entry_date, weight_kg, waist_cm, chest_cm, arm_cm, thigh_cm, hip_cm, notes)
+  values ('22222222-2222-2222-2222-222222222222'::uuid, date '2026-08-13',
+          82.40, 88.50, 104.20, 36.80, 58.30, 98.10, 'zz-107 tam olcum');
+
+  raise notice 'GECTI [107 CHECK: negatif/sifir/absurt/olcumsuz/absurt tarih RED, gercekci satir GECER]';
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- ILERLEME FOTOGRAFI — 108) `progress_photos` YOL SÖZLEŞMESİ + `angle` enum
+--   (a) POZİTİF: kanonik yol + geçerli açı KABUL edilir
+--   (b) YOL SÖZLEŞMESİ İHLALLERİ REDDEDİLİR (23514): tam URL, alt dizin,
+--       uzantısız, uid önekli klasör, ve *** BAŞKA DANIŞANIN KLASÖRÜ ***
+--   (c) geçersiz `angle` REDDEDİLİR (22P02) — enum, serbest metin değil
+--   (d) aynı `photo_path` iki satıra bağlanamaz (23505)
+--   (e) KOÇ okur ama YAZAMAZ (salt-okunur), Danışan B GÖREMEZ, anon DENY
+-- =============================================================================
+begin;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+do $$
+declare v_id uuid; v_caught boolean; v_state text; v_spec text[];
+begin
+  -- (a)
+  insert into public.progress_photos (client_id, taken_on, angle, photo_path)
+  values ('22222222-2222-2222-2222-222222222222'::uuid, date '2026-08-14', 'front',
+          '22222222-2222-2222-2222-222222222222/a8000000-0000-0000-0000-0000000000a1.jpg')
+  returning id into v_id;
+  perform set_config('zz.pp_108', v_id::text, true);
+
+  -- (b)
+  foreach v_spec slice 1 in array array[
+    ['tam URL',              'http://127.0.0.1:54321/storage/v1/object/public/progress-photos/22222222-2222-2222-2222-222222222222/a8000000-0000-0000-0000-0000000000a2.jpg'],
+    ['alt dizin',            '22222222-2222-2222-2222-222222222222/gizli/a8000000-0000-0000-0000-0000000000a3.jpg'],
+    ['uzantisiz',            '22222222-2222-2222-2222-222222222222/a8000000-0000-0000-0000-0000000000a4'],
+    ['klasorsuz',            'a8000000-0000-0000-0000-0000000000a5.jpg'],
+    ['onekli klasor',        'zz-22222222-2222-2222-2222-222222222222/a8000000-0000-0000-0000-0000000000a6.jpg'],
+    ['BASKA DANISAN klasoru','33333333-3333-3333-3333-333333333333/a8000000-0000-0000-0000-0000000000a7.jpg']
+  ] loop
+    v_caught := false;
+    begin
+      insert into public.progress_photos (client_id, taken_on, angle, photo_path)
+      values ('22222222-2222-2222-2222-222222222222'::uuid, date '2026-08-14', 'side', v_spec[2]);
+    exception when check_violation then v_caught := true;
+    end;
+    if not v_caught then
+      raise exception 'BASARISIZ [108b / %]: yol sozlesmesi IHLALI kabul edildi -> %', v_spec[1], v_spec[2];
+    end if;
+  end loop;
+
+  -- (c) enum
+  v_caught := false;
+  begin
+    execute format(
+      'insert into public.progress_photos (client_id, taken_on, angle, photo_path) values (%L::uuid, date ''2026-08-14'', %L, %L)',
+      '22222222-2222-2222-2222-222222222222', 'left',
+      '22222222-2222-2222-2222-222222222222/a8000000-0000-0000-0000-0000000000b1.jpg');
+  exception when others then
+    v_caught := true; get stacked diagnostics v_state = returned_sqlstate;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [108c]: gecersiz aci (''left'') kabul edildi -- angle serbest metin gibi davraniyor';
+  end if;
+  if v_state is distinct from '22P02' then
+    raise exception 'BASARISIZ [108c hata kodu]: beklenen 22P02 (enum), gelen %', v_state;
+  end if;
+
+  -- (d) aynı dosyaya ikinci satır
+  v_caught := false;
+  begin
+    insert into public.progress_photos (client_id, taken_on, angle, photo_path)
+    values ('22222222-2222-2222-2222-222222222222'::uuid, date '2026-08-15', 'back',
+            '22222222-2222-2222-2222-222222222222/a8000000-0000-0000-0000-0000000000a1.jpg');
+  exception when unique_violation then v_caught := true;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [108d]: ayni dosyaya IKINCI satir baglandi';
+  end if;
+
+  -- POZİTİF: aynı gün / aynı açı YENİDEN ÇEKİM meşrudur (tekillik YOK)
+  insert into public.progress_photos (client_id, taken_on, angle, photo_path)
+  values ('22222222-2222-2222-2222-222222222222'::uuid, date '2026-08-14', 'front',
+          '22222222-2222-2222-2222-222222222222/a8000000-0000-0000-0000-0000000000c1.jpg');
+end $$;
+
+set local request.jwt.claims = '{"sub":"33333333-3333-3333-3333-333333333333","role":"authenticated"}';
+do $$
+declare v_n int;
+begin
+  select count(*) into v_n from public.progress_photos
+   where photo_path like '22222222-2222-2222-2222-222222222222/a8000000-%';
+  if v_n is distinct from 0 then
+    raise exception 'BASARISIZ [108e sizinti]: Danisan B, A nin ilerleme fotografi SATIRINI goruyor (%)', v_n;
+  end if;
+end $$;
+
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+do $$
+declare v_n int; v_rows int; v_caught boolean := false;
+begin
+  select count(*) into v_n from public.progress_photos
+   where photo_path like '22222222-2222-2222-2222-222222222222/a8000000-%';
+  if v_n is distinct from 2 then
+    raise exception 'BASARISIZ [108e koc okuma]: beklenen 2, gelen %', v_n;
+  end if;
+
+  begin
+    insert into public.progress_photos (client_id, taken_on, angle, photo_path)
+    values ('22222222-2222-2222-2222-222222222222'::uuid, date '2026-08-16', 'back',
+            '22222222-2222-2222-2222-222222222222/a8000000-0000-0000-0000-0000000000d1.jpg');
+  exception when insufficient_privilege then v_caught := true;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [108e koc INSERT]: KOC danisanin ilerleme fotografi satirini YAZABILDI -- §6 IHLALI';
+  end if;
+
+  delete from public.progress_photos where id = current_setting('zz.pp_108')::uuid;
+  get diagnostics v_rows = row_count;
+  if v_rows is distinct from 0 then
+    raise exception 'BASARISIZ [108e koc DELETE]: KOC % satir sildi (beklenen 0)', v_rows;
+  end if;
+end $$;
+
+set local role anon;
+do $$
+declare v_caught boolean := false; v_n int;
+begin
+  begin
+    select count(*) into v_n from public.progress_photos;
+  exception when insufficient_privilege then v_caught := true;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [108 anon]: giris yapmamis ziyaretci progress_photos okuyabildi (% satir)', v_n;
+  end if;
+  raise notice 'GECTI [108 progress_photos: yol sozlesmesi + enum + tekil dosya + KOC SALT OKUMA + izolasyon]';
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- ILERLEME FOTOGRAFI — 109) `progress-photos` BUCKET politikaları
+--   (a) OKUMA: sahibi EVET, KOÇ EVET, BAŞKA DANIŞAN HAYIR, anon HAYIR
+--   (b) ayrıştırıcı FAIL-CLOSED: bozuk adlar hiç kimseye görünmez
+--   (c) YAZMA: kendi klasörü EVET, başkasının klasörü HAYIR (koç DAHİL)
+--   (d) SİLME: koç BAŞKASININ nesnesini SİLEMEZ (§6 salt-okunur)
+--
+-- KURULUM NOTU (senaryo 81/82/90 ile aynı): `storage.objects` seed'lenmez;
+-- nesneler `postgres` kimliğiyle yaratılıp ROLLBACK ile geri alınır.
+-- =============================================================================
+begin;
+
+insert into storage.objects (bucket_id, name, owner, owner_id) values
+  ('progress-photos', '22222222-2222-2222-2222-222222222222/b9000000-0000-0000-0000-0000000000a1.jpg',
+    '22222222-2222-2222-2222-222222222222', '22222222-2222-2222-2222-222222222222'),
+  ('progress-photos', '33333333-3333-3333-3333-333333333333/b9000000-0000-0000-0000-0000000000a2.jpg',
+    '33333333-3333-3333-3333-333333333333', '33333333-3333-3333-3333-333333333333'),
+  -- Ayrıştırılamayan adlar (fail-closed dalları)
+  ('progress-photos', 'kotu-ad.jpg', null, null),
+  ('progress-photos', '22222222-2222-2222-2222-222222222222/gizli/d5000000-0000-0000-0000-0000000000a3.jpg', null, null),
+  ('progress-photos', 'zz-22222222-2222-2222-2222-222222222222/d5000000-0000-0000-0000-0000000000a4.jpg', null, null),
+  ('progress-photos', '22222222-2222-2222-2222-222222222222/notauuid.jpg', null, null);
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+do $$
+declare v_own int; v_other int; v_junk int;
+begin
+  select count(*) into v_own from storage.objects
+   where bucket_id = 'progress-photos'
+     and name = '22222222-2222-2222-2222-222222222222/b9000000-0000-0000-0000-0000000000a1.jpg';
+  select count(*) into v_other from storage.objects
+   where bucket_id = 'progress-photos'
+     and name = '33333333-3333-3333-3333-333333333333/b9000000-0000-0000-0000-0000000000a2.jpg';
+  select count(*) into v_junk from storage.objects
+   where bucket_id = 'progress-photos'
+     and name in ('kotu-ad.jpg',
+                  '22222222-2222-2222-2222-222222222222/gizli/d5000000-0000-0000-0000-0000000000a3.jpg',
+                  'zz-22222222-2222-2222-2222-222222222222/d5000000-0000-0000-0000-0000000000a4.jpg',
+                  '22222222-2222-2222-2222-222222222222/notauuid.jpg');
+
+  if v_own is distinct from 1 then
+    raise exception 'BASARISIZ [109a kendi fotografi]: beklenen 1, gelen % -- danisan KENDI fotografini goremiyor', v_own;
+  end if;
+  if v_other is distinct from 0 then
+    raise exception 'BASARISIZ [109a *** SIZINTI ***]: Danisan A, Danisan B nin ILERLEME FOTOGRAFINI GORUYOR (%)!', v_other;
+  end if;
+  if v_junk is distinct from 0 then
+    raise exception 'BASARISIZ [109b ayristirici]: bozuk adli % nesne gorunuyor -- FAIL-OPEN', v_junk;
+  end if;
+end $$;
+
+-- Koç: tüm danışanların ilerleme fotoğraflarını görür (tek koçlu model,
+-- form_checks medyasıyla AYNI mahremiyet seviyesi).
+--   NOT: koç için `is_coach()` dalı DOĞRUDUR, yani ayrıştırılamayan adları da
+--   görür (mevcut üç bucket'ta da böyledir — koç görünürlüğü ad ayrıştırmasına
+--   DEĞİL role dayanır). Bu yüzden aşağıdaki sayım KANONİK adlara daraltılmıştır;
+--   fail-closed iddiası DANIŞAN tarafında (yukarıda) sınanır.
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+do $$
+declare v_n int; v_bad text; v_caught boolean := false;
+begin
+  select count(*) into v_n from storage.objects
+   where bucket_id = 'progress-photos' and name like '%/b9000000-0000-0000-0000-%';
+  if v_n is distinct from 2 then
+    raise exception 'BASARISIZ [109a koc]: beklenen 2 nesne, gelen %', v_n;
+  end if;
+
+  -- (c) KOÇ bile BAŞKASININ klasörüne yazamaz
+  begin
+    insert into storage.objects (bucket_id, name)
+    values ('progress-photos', '22222222-2222-2222-2222-222222222222/b9000000-0000-0000-0000-0000000000c1.jpg');
+  exception when others then v_caught := true;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [109c koc yazma]: KOC danisanin klasorune dosya BIRAKABILDI -- §6 salt-okunur IHLALI';
+  end if;
+
+  -- (d) KOÇ başkasının nesnesini SİLEMEZ / DEĞİŞTİREMEZ
+  --     NOT: `delete from storage.objects` SQL ile denenemez — Storage'ın
+  --     kendi trigger'ı ("Direct deletion from storage tables is not allowed")
+  --     rolden BAĞIMSIZ olarak reddeder. Bu yüzden iddia POLİTİKA ŞEKLİ
+  --     üzerinden kurulur: silme/güncelleme/yazma dallarında `is_coach()`
+  --     BULUNMAMALIDIR (diğer üç bucket'ta bulunur — §6 salt-okunur sapması).
+  select string_agg(policyname || '=' || coalesce(qual, '') || '|' || coalesce(with_check, ''), ', ')
+    into v_bad
+    from pg_policies
+   where schemaname = 'storage' and tablename = 'objects'
+     and policyname in ('progress_photos_insert_own', 'progress_photos_update_own', 'progress_photos_delete_own')
+     and (coalesce(qual, '') like '%is_coach%' or coalesce(with_check, '') like '%is_coach%');
+  if v_bad is not null then
+    raise exception 'BASARISIZ [109d]: progress-photos YAZMA/SILME politikasinda koc dali VAR -> % -- §6 "koc gorunumu salt-okunur" IHLALI (satir kalir, dosya kaybolurdu)', v_bad;
+  end if;
+
+  -- POZİTİF karşıtlık: OKUMA politikası koç dalını İÇERMELİ (aksi hâlde koç
+  -- imzalı adres üretemez ve ilerleme sekmesi koç tarafında boş kalır).
+  select string_agg(policyname, ', ') into v_bad
+    from pg_policies
+   where schemaname = 'storage' and tablename = 'objects'
+     and policyname = 'progress_photos_select_own_or_coach'
+     and coalesce(qual, '') like '%is_coach%';
+  if v_bad is null then
+    raise exception 'BASARISIZ [109d]: progress-photos OKUMA politikasinda koc dali YOK -- koc createSignedUrl uretemez';
+  end if;
+end $$;
+
+-- (c) Danışan A: kendi klasörüne EVET, B'nin klasörüne HAYIR
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+do $$
+declare v_caught boolean := false;
+begin
+  insert into storage.objects (bucket_id, name)
+  values ('progress-photos', '22222222-2222-2222-2222-222222222222/b9000000-0000-0000-0000-0000000000c2.jpg');
+
+  begin
+    insert into storage.objects (bucket_id, name)
+    values ('progress-photos', '33333333-3333-3333-3333-333333333333/b9000000-0000-0000-0000-0000000000c3.jpg');
+  exception when others then v_caught := true;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [109c]: Danisan A, B nin ilerleme klasorune dosya BIRAKABILDI';
+  end if;
+end $$;
+
+set local role anon;
+do $$
+declare v_n int;
+begin
+  select count(*) into v_n from storage.objects where bucket_id = 'progress-photos';
+  if v_n is distinct from 0 then
+    raise exception 'BASARISIZ [109 anon]: giris yapmamis ziyaretci % ilerleme fotografi goruyor', v_n;
+  end if;
+  raise notice 'GECTI [109 progress-photos bucket: sahip EVET, koc OKUR, baska danisan HAYIR, bozuk ad HAYIR, anon HAYIR, koc YAZAMAZ/SILEMEZ]';
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- ILERLEME TAKIBI — 110) YENİ YÜZEYİN SERTLEŞTİRME DENETİMİ
+--   (a) FORCE ROW LEVEL SECURITY her iki yeni tabloda AÇIK (senaryo 74'ün
+--       tablo-özel tekrarı: 74 dinamiktir, bu senaryo HATA MESAJINI
+--       Faz 4a'ya bağlar)
+--   (b) `authenticated` / `anon` TRUNCATE / REFERENCES / TRIGGER ALMAZ
+--   (c) `authenticated` S/I/U/D ALIR, `anon` HİÇBİR ŞEY almaz
+--   (d) `updated_at` trigger'ı KURULU (nutrition_logs deseni)
+--   (e) bucket PRIVATE (I-4) ve 4 storage politikası mevcut
+--   (f) bu migration HİÇBİR sequence yaratmadı (uuid PK)
+-- =============================================================================
+begin;
+do $$
+declare v_bad text; v_pub boolean; v_pol int;
+begin
+  -- (a)
+  select string_agg(c.relname, ', ' order by c.relname) into v_bad
+    from pg_class c
+   where c.oid in ('public.progress_entries'::regclass, 'public.progress_photos'::regclass)
+     and not (c.relrowsecurity and c.relforcerowsecurity);
+  if v_bad is not null then
+    raise exception 'BASARISIZ [110a]: FORCE/ENABLE RLS kapali -> % (yeni tablolar 20260817170000 in DO dongusune YETISEMEZ, FORCE u kendileri almalidir)', v_bad;
+  end if;
+
+  -- (b)
+  select string_agg(format('%s/%s/%s', g.role_name, t.tbl, p.priv), ', ') into v_bad
+    from (values ('public.progress_entries'), ('public.progress_photos')) as t(tbl)
+    cross join (values ('authenticated'), ('anon')) as g(role_name)
+    cross join (values ('TRUNCATE'), ('REFERENCES'), ('TRIGGER')) as p(priv)
+   where has_table_privilege(g.role_name, t.tbl, p.priv);
+  if v_bad is not null then
+    raise exception 'BASARISIZ [110b / AC-03]: fazla yetki -> %', v_bad;
+  end if;
+
+  -- (c)
+  select string_agg(format('%s/%s', t.tbl, p.priv), ', ') into v_bad
+    from (values ('public.progress_entries'), ('public.progress_photos')) as t(tbl)
+    cross join (values ('SELECT'), ('INSERT'), ('UPDATE'), ('DELETE')) as p(priv)
+   where not has_table_privilege('authenticated', t.tbl, p.priv);
+  if v_bad is not null then
+    raise exception 'BASARISIZ [110c]: authenticated yetki kaybetti -> %', v_bad;
+  end if;
+
+  select string_agg(format('%s/%s', t.tbl, p.priv), ', ') into v_bad
+    from (values ('public.progress_entries'), ('public.progress_photos')) as t(tbl)
+    cross join (values ('SELECT'), ('INSERT'), ('UPDATE'), ('DELETE')) as p(priv)
+   where has_table_privilege('anon', t.tbl, p.priv);
+  if v_bad is not null then
+    raise exception 'BASARISIZ [110c]: anon yetkili -> %', v_bad;
+  end if;
+
+  -- (d)
+  if not exists (
+    select 1 from pg_trigger
+     where tgrelid = 'public.progress_entries'::regclass
+       and tgname  = 'set_progress_entries_updated_at'
+       and not tgisinternal
+  ) then
+    raise exception 'BASARISIZ [110d]: progress_entries uzerinde updated_at trigger i YOK';
+  end if;
+
+  -- (e)
+  select public into v_pub from storage.buckets where id = 'progress-photos';
+  if v_pub is null then
+    raise exception 'BASARISIZ [110e]: progress-photos bucket i YOK';
+  end if;
+  if v_pub then
+    raise exception 'BASARISIZ [110e]: progress-photos PUBLIC -- I-4 ihlali, imzasiz okuma acilir';
+  end if;
+
+  select count(*) into v_pol from pg_policies
+   where schemaname = 'storage' and tablename = 'objects' and policyname like 'progress_photos_%';
+  if v_pol <> 4 then
+    raise exception 'BASARISIZ [110e]: progress_photos storage politikasi sayisi % (beklenen 4)', v_pol;
+  end if;
+
+  -- (f)
+  if exists (
+    select 1 from pg_class c join pg_namespace n on n.oid = c.relnamespace
+     where n.nspname = 'public' and c.relkind = 'S' and c.relname like 'progress\_%'
+  ) then
+    raise exception 'BASARISIZ [110f]: beklenmeyen sequence (uuid PK bekleniyordu)';
+  end if;
+
+  raise notice 'GECTI [110 Faz 4a sertlestirme: FORCE RLS, D/x/t YOK, S/I/U/D VAR, anon YOK, updated_at trigger, bucket PRIVATE + 4 politika, sequence YOK]';
+end $$;
+rollback;
+
+
 -- =============================================================================
 -- TOPLAM ÖZET
--- Bu noktaya yalnızca YUKARIDAKİ 104 senaryonun HEPSİ GECTI verdiyse ulaşılır --
+-- Bu noktaya yalnızca YUKARIDAKİ 110 senaryonun HEPSİ GECTI verdiyse ulaşılır --
 -- herhangi biri BASARISIZ olsaydı raise exception + ON_ERROR_STOP psql'i
 -- daha önce sıfırdan farklı çıkış koduyla durdururdu.
 --   * 1–19  : Faz 1a ve öncesi (profiles, notifications, form_checks, daily_logs,
@@ -4977,11 +5865,22 @@ rollback;
 --             da TEK aktif planı görür (102); toplu atamada versiyon danışan
 --             başına bağımsız ilerler ve taslak dalı versiyon şişirmez (103);
 --             tekillik indeksleri ihlal edilmez (104)
+--   * 105–110: Faz 4a — ilerleme takibi şeması (§6): AC-4.1 aynı güne ikinci
+--             kilo girişi duplicate ÜRETMEZ, upsert aynı satırı günceller
+--             (105); progress_entries erişim matrisi — KOÇ SALT OKUR (106);
+--             değer kısıtları: negatif/sıfır/absürt/ölçümsüz/absürt tarih RED
+--             (107); progress_photos yol sözleşmesi + `angle` enum + tekil
+--             dosya + koç salt-okuma (108); `progress-photos` bucket'ında
+--             danışan izolasyonu, fail-closed ad ayrıştırıcısı, koçun
+--             YAZAMAMASI/SİLEMEMESİ (109); yeni yüzeyin sertleştirme denetimi
+--             (FORCE RLS, D/x/t yok, S/I/U/D var, anon yok, updated_at
+--             trigger'ı, bucket PRIVATE + 4 politika, sequence yok) (110)
 --
--- NOT: `nutrition_logs` ayrıca senaryo 73 (yetki) ve 74 (RLS+FORCE) tarafından
--- DİNAMİK olarak kapsanır — o iki senaryo tablo listesini `pg_tables`'tan okur.
+-- NOT: `nutrition_logs`, `progress_entries` ve `progress_photos` ayrıca senaryo
+-- 73 (yetki) ve 74 (RLS+FORCE) tarafından DİNAMİK olarak kapsanır — o iki
+-- senaryo tablo listesini `pg_tables`'tan okur.
 -- =============================================================================
 do $$
 begin
-  raise notice 'TUM RLS TESTLERI GECTI (104 senaryo)';
+  raise notice 'TUM RLS TESTLERI GECTI (110 senaryo)';
 end $$;

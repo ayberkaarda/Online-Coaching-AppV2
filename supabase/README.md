@@ -160,6 +160,8 @@ Kısaltmalar: **S** = satır sahibi (`client_id`/`id` = `auth.uid()`), **K** = k
 | `program_approvals` | S veya K | Sadece kendi adına — **her zaman `status='pending'`, `reviewed_*` boş** (trigger, bkz. 4e) | **Sadece K** (onay/ret; `reviewed_by`/`reviewed_at` **sunucudan** dolar) | K **veya** S ama **yalnızca `status='pending'` satırında** (bkz. 4e) |
 | `messages` | gönderen **veya** alıcı veya K | `sender_id = auth.uid()` + `client_id` trigger doğrulaması — **`kind='system'` istemciden üretilemez** (bkz. 4e); `attachment_path` **satırın kendi konuşmasına** ait olmak zorunda (CHECK, bkz. 4h) | **Sadece alıcı** — **ve yalnızca `read_at` / `is_read`**; `attachment_path` dahil diğer her sütun dokunulmaz (trigger, bkz. 4e/4h) | gönderen veya K |
 | `nutrition_logs` | S veya K | **Sadece kendi adına** | **Sadece S** — koç danışanın öğün loguna YAZAMAZ (§3.2, bkz. 4h) | **Sadece S** |
+| `progress_entries` | S veya K | **Sadece kendi adına** — `(client_id, entry_date)` TEKİL, upsert zorunlu (AC-4.1, bkz. 4k) | **Sadece S** — **koç görünümü salt-okunur** (§6, bkz. 4k) | **Sadece S** |
+| `progress_photos` | S veya K | **Sadece kendi adına** — `photo_path` klasörü satırın `client_id`'si olmak zorunda (CHECK, bkz. 4k) | **Sadece S** — koç salt-okunur | **Sadece S** |
 | `exercises` | Tüm `authenticated` | Sadece K | Sadece K | Sadece K |
 | `food_database` | Tüm `authenticated` | Sadece K | Sadece K | Sadece K |
 | `workout_plans` | S veya K | K **veya** kendi planı | K veya kendi planı | K veya kendi planı |
@@ -228,13 +230,14 @@ satırını güncelleyebilir ama **rolünü `coach`'a çeviremez**. Yalnızca ko
 
 ### Storage politikaları
 
-Her iki bucket da **PRIVATE**'tır (`20260817100000_private_storage.sql`).
+Bucket'ların **tamamı PRIVATE**'tır (`20260817100000_private_storage.sql` ve sonrası).
 
 | Bucket | Public | Okuma (SELECT) | Yazma / Silme |
 |---|---|---|---|
 | `avatars` | **hayır** | sahibi (`<auth.uid()>-...`), **koçun avatarı (herkese)**, veya koç; `anon` **hiç** | dosya adı `<auth.uid()>-...` ile başlamalı, veya koç |
 | `form-checks-media` | **hayır** | sahibi (`poses/<auth.uid()>-...`) veya koç; `anon` **hiç** | yol `poses/<auth.uid()>-...` olmalı, veya koç |
 | `message-attachments` | **hayır** | **sohbetin iki tarafı**: klasör `<auth.uid()>/…` (danışan) veya koç; `anon` **hiç** (bkz. 4h) | klasör kendi konuşman (koç: her konuşma) **ve** dosya adı `<auth.uid()>-…` ile başlamalı; silme: yükleyen veya koç |
+| `progress-photos` | **hayır** | sahibi (klasör `<auth.uid()>/…`) veya koç; `anon` **hiç** (bkz. 4k) | **yalnızca kendi klasörün — KOÇ DAHİL kimse başkasının klasörüne yazamaz/silemez** (§6 "koç görünümü salt-okunur"; diğer üç bucket'tan bilinçli sapma) |
 
 > **Neden private?** Public bucket'ta `storage.objects` SELECT politikası okuma yolunu
 > hiç etkilemez: `/storage/v1/object/public/<bucket>/<yol>` adresi kimlik doğrulamasız
@@ -244,7 +247,8 @@ Her iki bucket da **PRIVATE**'tır (`20260817100000_private_storage.sql`).
 **Okuma nasıl çalışır (imzalı adres):**
 
 1. Kolonlar tam URL değil **yol** saklar: `form_checks.front_pose_path`,
-   `form_checks.back_pose_path`, `profiles.avatar_path` (eskiden `*_url`).
+   `form_checks.back_pose_path`, `profiles.avatar_path` (eskiden `*_url`),
+   `messages.attachment_path`, `progress_photos.photo_path`.
 2. İstemci `src/lib/storage.ts` üzerinden `createSignedUrl` / `createSignedUrls`
    çağırır; Storage API imzayı üretmeden **önce** RLS SELECT yetkisini doğrular.
 3. Üretilen adres `SIGNED_URL_TTL_SECONDS = 3600` (1 saat) sonra geçersiz olur.
@@ -1340,6 +1344,153 @@ Migration dosyasının sonunda çalıştırılabilir bir `-- DOWN` bloğu vardı
 **UYARI:** geri alma yukarıdaki veri kaybını **yeniden açar**. Zaten oluşmuş arşiv
 versiyonları silinmez (onlara bağlı loglar vardır); okuma yolları `is_active=true`
 filtrelediği için görünmezler.
+
+---
+
+## 4k. Faz 4a — İlerleme Takibi Şeması (`progress_entries` / `progress_photos`)
+
+`20260817220000_progress_tracking.sql`. `active_planprogram.md` §6: "Kilo/ölçü girişi
+(günde bir kayıt, **upsert**), trend grafikleri (7/30/90 gün); foto: açı etiketli
+yükleme, önce/sonra karşılaştırma — **signed URL**; **koç görünümü salt-okunur**."
+
+### AC-4.1 şemada kilitlidir, uygulamada değil
+
+`progress_entries_client_date_uniq` (`unique (client_id, entry_date)`) olmadan
+istemcinin `upsert(..., { onConflict: 'client_id,entry_date' })` çağrısı **çalışamaz**:
+`ON CONFLICT` bir arbiter kısıtı ister, yoksa `42P10` verir. Kısıt sayesinde uygulama
+katmanı unutsa bile ikinci düz `insert` `23505` ile **gürültülü** ölür — sessizce ikinci
+satır yazılmaz. Aynı tuzağın emsali `daily_logs_client_date_uniq`'tir (§7 madde 1).
+
+### Ölçüler `jsonb` DEĞİL ayrı kolon — ve nedeni
+
+| Ölçüt | `jsonb measurements` | ayrı kolonlar (seçilen) |
+|---|---|---|
+| Trend sorgusu | `(measurements->>'waist')::numeric` — satır bazında patlayabilen cast, ifade indeksi gerekir | sıradan kolon, hazır btree |
+| `db:types` | `Json` (= `string \| number \| boolean \| null \| {...}`) → UI'da runtime daraltma borcu | `number \| null` — borç yok |
+| CHECK | anahtar başına dev ifade **+ anahtar beyaz listesi** şart | kolon başına tek satır |
+| Yazım hatası | `{"wiast": 80}` **sessizce** kabul edilir, veri aylar sonra "kayıp" bulunur | `42703 column ... does not exist`, anında |
+| Evrim | anahtar migration'sız doğar; ne zaman/neden belirsiz | `add column`, `db:types`'ta **görünür** |
+
+Proje içi emsal: `daily_logs.macros` jsonb'dir ama o **daima bütün olarak** okunan sabit
+bir torbadır; `nutrition_plans.target_*` ayrı kolondur ve tek tek karşılaştırılır/çizilir
+— bu tablonun durumu ikincisidir.
+
+**Ölçek:** `weight_kg numeric(6,2)`, `form_checks.current_weight` ile **birebir aynı**
+(aralık CHECK'i de: `> 0 and < 500`). Gerekçe: StatsTab kilo grafiğini bugün
+`form_checks`'ten çiziyor; o veri buraya taşınacak ve **aynı tip = kayıpsız taşıma**.
+`tests/e2e/README.md`'deki `274.00 → 274` tuzağı **ölçekten bağımsızdır** (scale 1 de
+`274.0 → 274` verirdi), bu yüzden savunma katmanı değişmedi: E2E ondalık haneyi 1–9
+arasında üretir.
+
+**Boş satır yasak** (`progress_entries_not_empty_chk`): tekillik yüzünden bir gün tek
+satır taşır; hepsi NULL bir satır o günün yerini işgal eder ve grafikte hiçbir nokta
+üretmezdi. `notes` tek başına bir giriş **değildir**.
+
+**"Gelecek tarih yasak" bir CHECK'e yazılamaz:** `current_date` STABLE'dır, IMMUTABLE
+değil (`42P17`). Sabit sınırlar (`2000-01-01` … `2100-01-01`) yıl yazım hatasını yakalar;
+"yarın"ı yakalamak bir trigger isterdi ve saat dilimi farkı yüzünden **meşru** bir girişi
+reddedebilirdi — yazılmadı.
+
+### `angle` ENUM (`text` + CHECK değil)
+
+`public.progress_photo_angle` = `front` / `side` / `back`. `db:types` çıktısı
+`"front" | "side" | "back"` — açı seçicisi ve önce/sonra slider'ı **derleme zamanında**
+eksiksizlik denetimi alır. `text` + CHECK düz `string` üretir ve UI kendi union'ını
+yeniden tanımlamak zorunda kalırdı (**I-3 ihlali**). Değer eklemek ucuz
+(`alter type ... add value`), silmek zor — ve öyle olmalı.
+
+### `progress-photos` bucket'ı — neden sızdırmıyor
+
+Yol sözleşmesi: **`progress-photos/<client_id>/<uuid>.<ext>`** (tek seviye klasör =
+sahip). `message-attachments`'taki iki-kimlikli kalıp gerekmez: yükleyen **daima**
+danışanın kendisidir (koç yazamaz).
+
+1. **SELECT** klasörü `auth.uid()` ile kıyaslar → danışan A, B'nin klasörünü okuyamaz.
+   `anon` hiçbirini göremez (politikalar yalnızca `authenticated` rolüne verildi).
+2. **INSERT** aynı eşitliği şart koşar → klasör **sahtelenemez**, B'nin klasörüne dosya
+   bırakılamaz (delil yerleştirme kapalı).
+3. **Ayrıştırıcı `public.progress_photo_owner(text)` KATI ve FAIL-CLOSED**: kanonik iki
+   UUID + tek `/` + uzantı; desen tutmazsa `NULL`, `NULL = auth.uid()` → `NULL` → politika
+   FALSE → **red**. `::uuid` cast'i yalnızca regex'in doğruladığı dalda çalışır (politika
+   içinden fırlayan bir hata `createSignedUrl`'i **herkes** için kırardı).
+4. **Bucket PRIVATE**: `/object/public/...` 400 döner; okuma yalnızca `createSignedUrl`
+   (TTL 3600 sn) ile ve o çağrı imzayı üretmeden **önce** SELECT politikasını uygular.
+5. **Beşinci kilit veritabanında**: `progress_photos_path_chk` yolun klasörünü satırın
+   `client_id`'sine eşitler → bucket'ta okuyamadığın bir yolu tabloya **yazamazsın** da.
+   Ayrıca `progress_photos_path_uniq` aynı dosyanın iki satıra bağlanmasını engeller.
+
+**Diğer üç bucket'tan bilinçli sapma:** `avatars` / `form-checks-media` /
+`message-attachments` koça INSERT/UPDATE/DELETE de verir (moderasyon). Burada
+**vermez** — §6 "koç görünümü salt-okunur". Koçun bir ilerleme fotoğrafını silebilmesi,
+tablo tarafında kapatılan yazma yetkisini storage tarafından geri açardı (satır kalır,
+dosya kaybolur → onarılamaz tutarsızlık). Koç yine **kendi** klasörüne yazabilir; kural
+"klasör = `auth.uid()`"tur, "koç değilsin" değil.
+
+### İndeks ve RPC kararı
+
+* **`progress_entries` için EK İNDEKS YOK.** `unique (client_id, entry_date)` zaten bir
+  btree'dir ve Postgres onu **geriye** tarayarak `where client_id = $1 and entry_date >= $2
+  order by entry_date desc` sorgusunu karşılar. İkinci bir `(client_id, entry_date desc)`
+  indeksi aynı ağacın kopyası olurdu: her yazmada iki kez yazılır, planlayıcıya hiçbir yeni
+  yol açmaz. Migration'ın §9(h) bloğu bu btree'nin **varlığını ölçer**, varsaymaz.
+  FK indeksi de aynı kısıtın `client_id` ön ekiyle karşılanır.
+* **`progress_photos` için indeks VAR** (`progress_photos_client_date_idx`) — orada
+  tekillik kısıtı yoktur, hazır btree de yoktur.
+* **RPC YAZILMADI.** AC-4.2'nin "tek endpoint"i şemada değil **istemci veri katmanında**
+  yaşar (tek hook + tek `queryKeys` fabrikası, §3.4). `SECURITY INVOKER` bir RPC tablonun
+  üstüne hiçbir şey katmazdı; `SECURITY DEFINER` ise RLS'i baypas eden yeni bir
+  yetkilendirme yüzeyi açar ve kendi `p_client_id` denetimini yazmayı gerektirirdi
+  (senaryo 79'un koruduğu hata sınıfı). Mevcut RPC'ler (`post_system_message`,
+  `submit_program_for_approval`) **atomik çok tablolu yazma** yapar; okuma için emsal değil.
+
+### RLS — koç SALT OKUR
+
+`nutrition_logs` (§4h) deseni birebir: SELECT `client_id = auth.uid() or is_coach()`,
+INSERT/UPDATE/DELETE yalnızca `client_id = auth.uid()`. **ADR-0014 sapması bu yüzeye
+taşınmadı** — o sapma mevcut bir akışı kurtarmak için kabul edilmişti, burada kırılacak
+akış yok. `FORCE ROW LEVEL SECURITY` iki tabloya da **açıkça** verilir: `20260817170000`
+§2 bir DO döngüsüydü ve o an var olan tabloları gezdi.
+
+### Testler
+
+```bash
+npm run test:rls   # 110 senaryo (105–110 bu migration'a ait)
+```
+
+* **105** — **AC-4.1:** ikinci düz `insert` `23505`; `upsert` **aynı satırı** günceller
+  (`id` değişmez, satır sayısı 1 kalır, dokunulmayan ölçü kolonu korunur)
+* **106** — `progress_entries` erişim matrisi: danışan kendi satırında R/W, başka
+  danışanınkine erişim yok, **koç SALT OKUR** (INSERT `42501`, UPDATE/DELETE 0 satır),
+  `anon` DENY
+* **107** — değer kısıtları: negatif / sıfır / absürt kilo ve ölçü, ölçümsüz satır,
+  absürt tarih **RED** (`23514`); gerçekçi tam satır geçer
+* **108** — `progress_photos`: yol sözleşmesi ihlalleri (tam URL, alt dizin, uzantısız,
+  klasörsüz, önekli klasör, **başka danışanın klasörü**) RED; geçersiz `angle` `22P02`;
+  aynı dosyaya ikinci satır `23505`; koç okur ama yazamaz
+* **109** — `progress-photos` bucket'ı: sahip görür, koç görür, **danışan A → B'nin
+  fotoğrafı 0 satır**, bozuk adlar hiç kimseye görünmez (fail-closed), `anon` 0,
+  koç başkasının klasörüne **yazamaz**; silme/yazma politikalarında `is_coach()` dalının
+  **bulunmadığı** doğrulanır (`delete from storage.objects` Storage trigger'ı tarafından
+  rolden bağımsız engellendiği için iddia politika şekli üzerinden kurulur)
+* **110** — sertleştirme denetimi: FORCE RLS, `authenticated`/`anon` için D/x/t yok,
+  S/I/U/D var, `anon` hiçbir şey almaz, `updated_at` trigger'ı kurulu, bucket PRIVATE +
+  4 storage politikası, sequence yaratılmadı (uuid PK)
+
+> **Kırmızı-yeşil doğrulandı (üç ayrı mutasyon):**
+> (1) `progress_entries_client_date_uniq` düşürülünce **105** `"ayni gune IKINCI satir
+> GIRDI -- tekillik kisiti yok, DUPLICATE uretiliyor"` ile düşer.
+> (2) `progress_entries_insert` politikasına `or public.is_coach()` eklenince **106**
+> `"KOC danisanin ilerleme girisini YAZABILDI -- §6 salt-okunur IHLALI"` ile düşer.
+> (3) `progress_photos_insert_own` storage politikasına `or public.is_coach()` eklenince
+> **109** `"KOC danisanin klasorune dosya BIRAKABILDI"` ile düşer.
+> Üç mutasyon da geri alındıktan sonra 110/110 yeşil.
+
+### Geri alma
+
+Migration dosyasının sonunda çalıştırılabilir bir `-- DOWN` bloğu vardır.
+**UYARI:** `progress_entries` DROP edilirse tüm kilo/ölçü geçmişi kaybolur;
+`progress_photos` DROP edilirse bucket'taki dosyalar öksüz kalır (hangi açıya/güne ait
+oldukları bilinemez). Blok yedek alma komutlarını da içerir.
 
 ---
 
