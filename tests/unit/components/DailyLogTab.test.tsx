@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import DailyLogTab from '@/components/tabs/DailyLogTab'
 import { useCreateDailyLog, useDailyLogs } from '@/hooks'
+import { todayIsoDate } from '@/lib/date'
 import { getMacroPercentage } from '@/lib/utils'
 import type { DailyLog } from '@/types'
 
@@ -156,11 +157,15 @@ describe('DailyLogTab', () => {
     await waitFor(() => expect(mutation.mutateAsync).toHaveBeenCalledTimes(1))
     // `toHaveBeenCalledWith` derin eşitlik yapar: sayı yerine string ('150') gönderilseydi
     // bu assertion başarısız olurdu — bu, sayısal makro regresyonunun testidir.
+    // `log_date` AÇIKÇA gönderilir (kullanıcının YEREL günü): DB'nin UTC
+    // `current_date` varsayılanına düşülseydi gece yarısı penceresinde rapor
+    // DÜNÜN satırını ezerdi — bkz. tests/unit/local-date-consistency.test.ts.
     expect(mutation.mutateAsync).toHaveBeenCalledWith({
       clientId: 'std-1',
       water_lt: 2.5,
       sodium_mg: 2000,
       macros: { protein: 150, carb: 200, fat: 60 },
+      log_date: todayIsoDate(),
     })
   })
 

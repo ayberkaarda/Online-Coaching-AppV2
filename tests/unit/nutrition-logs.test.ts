@@ -74,11 +74,14 @@ import {
 } from '@/hooks'
 import {
   sumNutritionLogsForDate,
-  todayIsoDate,
   useCreateNutritionLog,
   useDeleteNutritionLog,
   type NutritionLog,
 } from '@/hooks/useNutritionLogs'
+// `todayIsoDate` ARTIK bu hook dosyasında DEĞİL, `src/lib/date.ts`te — dört
+// yazma yolunun da paylaştığı tek kaynak (bkz. o dosyanın başı ve
+// tests/unit/local-date-consistency.test.ts).
+import { todayIsoDate } from '@/lib/date'
 
 function wireNutritionLogsTable(): void {
   fromMock.mockImplementation((table: string) => {
@@ -182,7 +185,7 @@ describe('todayIsoDate', () => {
 // ---------------------------------------------------------------------------
 
 describe('useCreateNutritionLog', () => {
-  it('açıklama + makrolarla insert() çağırır, log_date verilmemişse GÖNDERMEZ (DB current_date kullanır)', async () => {
+  it('açıklama + makrolarla insert() çağırır ve log_date DAİMA gönderilir (DB varsayılanına düşülmez)', async () => {
     wireNutritionLogsTable()
     insertSelectSingleMock.mockResolvedValue({ data: log(), error: null })
 
@@ -194,9 +197,14 @@ describe('useCreateNutritionLog', () => {
       protein_g: 45,
       carb_g: 60,
       fat_g: 15,
+      log_date: '2026-08-17',
     })
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    // `log_date` payload'da VARDIR: alan artık zorunlu ve hook onu koşulsuz
+    // gönderir. Eskiden opsiyoneldi ve gönderilmediğinde satır veritabanının
+    // UTC `current_date` varsayılanını alıyordu — gece yarısı hatasının kökü
+    // (bkz. tests/unit/local-date-consistency.test.ts).
     expect(insertMock).toHaveBeenCalledWith({
       client_id: 'client-1',
       description: 'Izgara tavuk + pilav',
@@ -204,6 +212,7 @@ describe('useCreateNutritionLog', () => {
       protein_g: 45,
       carb_g: 60,
       fat_g: 15,
+      log_date: '2026-08-17',
     })
     expect(toast.success).toHaveBeenCalledWith('Öğün eklendi.')
   })
@@ -223,6 +232,7 @@ describe('useCreateNutritionLog', () => {
       protein_g: null,
       carb_g: null,
       fat_g: null,
+      log_date: '2026-08-17',
     })
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
@@ -246,6 +256,7 @@ describe('useCreateNutritionLog', () => {
       protein_g: null,
       carb_g: null,
       fat_g: null,
+      log_date: '2026-08-17',
     })
 
     await waitFor(() => expect(result.current.isError).toBe(true))
@@ -411,6 +422,8 @@ describe('NutritionTab — koçun yazma denemesi arayüzde SUNULMAZ', () => {
     await user.type(screen.getByLabelText('KALORİ'), '350')
     await user.click(screen.getByRole('button', { name: 'Öğünü Ekle' }))
 
+    // `log_date` bileşen tarafından AÇIKÇA eklenir (kullanıcının YEREL günü) —
+    // DB varsayılanına bırakılmaz.
     expect(createMutation.mutate).toHaveBeenCalledWith(
       {
         clientId: 'client-1',
@@ -419,6 +432,7 @@ describe('NutritionTab — koçun yazma denemesi arayüzde SUNULMAZ', () => {
         protein_g: null,
         carb_g: null,
         fat_g: null,
+        log_date: todayIsoDate(),
       },
       expect.anything()
     )
