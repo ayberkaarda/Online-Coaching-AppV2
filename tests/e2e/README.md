@@ -31,6 +31,20 @@ npm run test:e2e
 
 `playwright.config.ts`, `npm run build && npm run start` ile uygulamayı otomatik ayağa kaldırır (`webServer`). Sunucu zaten `localhost:3000`'de çalışıyorsa (`reuseExistingServer`) yeniden başlatılmaz.
 
+**Yerelde tam paket ara sıra kırmızı çıkıyorsa:** `playwright.config.ts`'teki
+worker tavanı (`localWorkers`) ölçülerek seçilmiş en yüksek değerdir, ama
+"her zaman 54/54" GARANTİSİ vermez — kapsamlı teşhis (ürün hızı, video kaydı,
+OneDrive I/O sırayla ölçülüp elendi, bkz. o dosyadaki yorum) hâlâ açıklanamayan
+bir yerel-çalıştırma-ortamı maliyeti olduğunu gösteriyor. Aynı başarısızlığı
+tekrar tekrar görüyorsanız ve zaman kaybetmek istemiyorsanız:
+
+```
+CI=1 npx playwright test
+```
+
+Bu, CI'ın kullandığı `workers: 1, retries: 2` yapılandırmasını yerelde
+çalıştırır (daha yavaştır ama şimdiye kadar HER ZAMAN 54/54 verdi).
+
 ## Test kullanıcılarını özelleştirme
 
 Varsayılan e-posta/parola değerleri `supabase/seed.sql`'den alınır. Farklı bir ortamda (ör. staging) çalıştırmak için env değişkenleriyle geçersiz kılabilirsiniz:
@@ -81,6 +95,49 @@ test('...', { annotation: [resource('a:client2'), resource('b:client2')] }, asyn
 ## Tuzak: `numeric` kolonların JSON gidiş-dönüşü sondaki sıfırı atar
 
 `form_checks.current_weight` gibi `numeric(6,2)` kolonlar PostgREST'ten **JSON sayısı** olarak döner ve JS sondaki sıfırı atar: DB'deki `274.00` arayüze `274` basılır. Testin ürettiği `"274.0"` dizesiyle locator eşleşmesi bu yüzden kırılır. Rastgele ondalıklı değer üretirken **ondalık haneyi 1-9 arasında tutun** (bkz. `form-check.spec.ts`) — iddiayı gevşetmek yerine gidiş-dönüşü kayıpsız yapın.
+
+## Kural: ekrandaki toplam/sayaç değerlerine MUTLAK iddia yazma
+
+Dashboard'daki toplam/sayaç metinleri (ör. "gerçekleşen / hedef kcal", "N ölçüm
+günü kayıtlı") **yerel veritabanında koşular arası birikir** — önceki
+(başarısız/yarım kalmış dahil) koşulardan kalan satırlar toplama girer. Testin
+kendi eklediği kaydın ekrandaki toplamın TAMAMI olduğunu varsayan bir iddia
+(`` `${x} / ${y} kcal` `` gibi) er ya da geç kırılır (ölçülen örnek:
+`nutrition.spec.ts`, kalıntı 800 kcal varken test 400 kcal bekledi).
+
+**Kural:** eylemden ÖNCE değeri OKU, eylemi yap, sonra "önceki + beklenen artış"
+(delta) iddia et — iddianın kendisini ZAYIFLATMA, yalnızca doğru şeyi ölç.
+Referans desen: `supabase/tests/rls.test.sql` senaryo 12/77,
+`tests/e2e/progress.spec.ts` (`readMeasuredDays`) ve `tests/e2e/nutrition.spec.ts`
+(`readActualKcal`).
+
+Testin kendi ürettiği BENZERSİZ bir değere bakan iddialar (ör. rastgele
+üretilmiş açıklama/plan metni, `toHaveCount(1)`/`toHaveCount(2)` gibi belirli
+bir benzersiz metinle FİLTRELENMİŞ sayımlar) bu kuralın kapsamı DIŞINDADIR —
+kırılgan olan, testin ürettiği veriden BAĞIMSIZ bir toplam/sayaca mutlak değer
+iddia etmektir.
+
+## Artık temizliği: `npm run db:clean-e2e`
+
+Yukarıdaki delta kuralı testi **doğru** yapar; bu script veritabanını **temiz** tutar. İkisi birbirinin yerine geçmez.
+
+```
+npm run db:clean-e2e                        # DENEME — hiçbir şey silinmez, ne silineceğini listeler
+npm run db:clean-e2e -- --yes               # GERÇEK silme
+npm run db:clean-e2e -- --yes --skip-storage
+node scripts/clean-e2e-data.mjs --help
+```
+
+`scripts/clean-e2e-data.mjs`, koşular arası biriken E2E satırlarını (`E2E ` işaretli beslenme/antrenman/mesaj/bildirim/onay kayıtları, form check'ler ve uygulama tarafından yüklenmiş poz fotoğrafları) siler. Ne zaman koşturulur: **tam paketi çalıştırmadan önce** ve bir koşu yarıda kaldığında.
+
+Dört yapısal koruması vardır:
+
+1. **Varsayılan `--dry-run`.** Bayrak olmadan hiçbir şey silinmez (CLAUDE.md §6 — aracın var olması onu çalıştırma onayı değildir).
+2. **Yalnızca yerel.** Hedef `127.0.0.1` / `localhost` değilse script **hiçbir istek atmadan** çıkar. `npx dotenv -e .env.hosted.local -- node scripts/clean-e2e-data.mjs --yes` bile reddedilir.
+3. **Seed'e dokunmaz.** Ölçütler tablo tablo belirlenmiştir ve hiçbiri `supabase/seed.sql`'in yazdığı bir satırı seçmez; ölçüt belirlenemeyen tablolar (`daily_logs`, plan tabloları — hepsi "tümünü değiştir" semantiğindedir, satır biriktirmez) **kapsam dışıdır** ve gerekçesiyle raporlanır. `tests/unit/clean-e2e-data.test.ts` bunu gerçek seed satırlarıyla kilitler.
+4. **Koruma sayaçları.** `profiles` / `exercises` / `food_database` / plan tabloları silme öncesi ve sonrası sayılır; biri bile değişirse script hata koduyla biter.
+
+Seed verisini tam olarak geri getirmek (ör. plan içeriği E2E metnine ezildiyse) hâlâ `npx supabase db reset` işidir — bu script onun yerine geçmez, aralarındaki her şeyi temiz tutar.
 
 ## Tuzak: Türkçe İ/ı case-insensitive eşleşme
 

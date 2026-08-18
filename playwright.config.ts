@@ -1,5 +1,6 @@
 import { defineConfig, devices } from '@playwright/test'
 import os from 'node:os'
+import path from 'node:path'
 
 // ---------------------------------------------------------------------------
 // KATMAN 1 — UZAK (BARINDIRILAN) SUPABASE'E KARŞI E2E KOŞMAYI ENGELLEYEN İDDİA
@@ -43,28 +44,91 @@ if (/\.supabase\.(co|com)$/.test(supabaseHost) && process.env.E2E_ALLOW_REMOTE_S
 }
 
 /**
- * Yerel worker tavanı — YALNIZCA SUNUCU YÜKÜ İÇİN.
+ * Yerel worker tavanı — YALNIZCA SUNUCU/ÇALIŞTIRMA YÜKÜ İÇİN.
  *
  * NE İÇİN DEĞİL: veri çakışması. O sorun `tests/e2e/resource-lock.ts` ile
  * kaynak bazında çözülür; worker sayısını kısmak çakışmayı yalnızca
  * SEYRELTİR, ÇÖZMEZ (ve `workers: 1` geri bildirim süresini katlar).
  *
- * NE İÇİN: Playwright varsayılanı mantıksal çekirdeğin YARISIDIR (bu makinede
- * 12 -> 6). Testlerin çoğu ikinci bir tarayıcı bağlamı da açtığından bu, TEK
- * bir `next start` süreci ve tek bir yerel Supabase yığınına karşı ~12 eş
- * zamanlı tarayıcı bağlamı demek. Ölçüldü: 6 worker'da tam paket koşusunda
- * `workout.spec.ts` bir kez, hiçbir iddiada değil, koç panelini yeniden
- * yükledikten sonra (`selectClient`) sunucu doygunluğu yüzünden timeout'a
- * düştü. Tavan, doygunluğu ortadan kaldırır ama gerçek paralelliği korur.
+ * ###########################################################################
+ * # TAVAN İKİNCİ KEZ AYARLANIYOR (2026-08) — TAM TEŞHİS GEÇMİŞİ             #
+ * ###########################################################################
  *
- * `PLAYWRIGHT_WORKERS` ile geçersiz kılınabilir (ör. daha güçlü bir makinede).
+ * Paket 50'den 54 teste çıkıp Faz 4 ekranları ağırlaşınca (imzalı adres
+ * üretimi, trend sorgusu, 1328 satırlık katalog) eski tavan (4, bu makinede
+ * `Math.max(2, Math.min(4, Math.ceil(cpus/2)))`) yerelde KARARSIZ hale geldi:
+ * tam paket koşusunda düzenli olarak 5 failed/49 passed, hepsi AYNI imza
+ * (`page.waitForURL: Test timeout of 30000ms exceeded — waiting for
+ * navigation to "/"`, login sonrası dashboard yüklemesi). CI (`workers: 1,
+ * retries: 2`) HER ZAMAN 54/54 geçti — yani bu bir ürün regresyonu ya da test
+ * mantığı hatası DEĞİL, YEREL çalıştırma ortamının bir sınırı.
+ *
+ * SIRAYLA ELENEN HİPOTEZLER (her biri ayrıca ölçüldü):
+ *
+ *  1. Ürün yavaşlığı — ELENDİ. İzole (sıfır eşzamanlılık) login+dashboard
+ *     açılışı `waitForURL('/')` 97-140ms, tam networkidle ~900-1300ms sürdü.
+ *     16 eşzamanlı login'de bile navWaitMs tavanı ~450ms. Sunucuyu `/`
+ *     reload'la döven ayrı bir stres testinde (20 eşzamanlı bağlam) taze
+ *     login'ler yine ~1.6s'de kaldı. SOĞUK BAŞLANGIÇ testinde — taze
+ *     `next start` hazır olur olmaz 14 eşzamanlı login + AYNI ANDA
+ *     Stats/Antrenman/Beslenme/Sohbet sekmelerine tıklama (paket
+ *     başlangıcının en agresif taklidi) — navWaitMs yine ~490ms'de tavan
+ *     yaptı, toplam akış 2.5s'i geçmedi. 30 saniyeye yaklaşan HİÇBİR ölçüm
+ *     yok. (Ayrıca doğrulandı: sekmeler koşullu render edilir — DOM'da gizli
+ *     durmaz — ve katalog/trend/imzalı-adres sorguları yalnızca ilgili
+ *     sekmeye TIKLANINCA çalışır, dashboard açılışında DEĞİL.)
+ *  2. Video kaydı CPU maliyeti — ELENDİ. `video: 'retain-on-failure'` HER
+ *     testte sürekli encode yapar (yalnızca geçerse dosya silinir); yerelde
+ *     `video: 'off'` ile aynı tavanda (4) tam paket yine AYNI BÜYÜKLÜKTE
+ *     başarısız oldu (5 failed/49 passed) — hatta düşen testlerin kimliği
+ *     bile koşudan koşuya değişti. Video ayarı bu yüzden ESKİ HALİNE
+ *     (`retain-on-failure`) geri alındı: performansa faydası yok ama yerelde
+ *     bir test düşünce gerçek teşhis değeri taşıyor.
+ *  3. OneDrive senkron I/O — ELENDİ. Repo `OneDrive\Masaüstü\...` altında;
+ *     varsayılan `outputDir` (`test-results/`) de bu senkronlu klasörün
+ *     içindeydi. Çıktı `os.tmpdir()`'a (OneDrive DIŞI, bkz. `outputDir`
+ *     aşağıda) taşınıp aynı tavanda (4) tekrar koşuldu — yine AYNI
+ *     BÜYÜKLÜKTE başarısız oldu (5 failed/49 passed, yine farklı testler).
+ *     `outputDir` yine de OneDrive dışında BIRAKILDI (zararsız, hijyen).
+ *
+ * KALAN AÇIKLAMA (elenmedi, doğrulanamadı da): gerçek Playwright
+ * çalıştırması bu betiklerle ölçülemeyen bir CPU yükü taşıyor olabilir —
+ * birden fazla GERÇEK Chromium örneğinin (headless de olsa) JS/layout/
+ * paint/GC maliyeti, iddia polling'i, ve özellikle İKİNCİ bir tarayıcı
+ * bağlamı açan testlerin (6/9 spec dosyası) ikiye katlanan ayak izi. Düşen
+ * testler tavan=2'de İKİ AYRI KOŞUDA BİREBİR AYNI ikiliydi
+ * (`plans.spec.ts:292`, `progress.spec.ts:66` — ikisi de ikinci bağlam açan
+ * testler) — rastgele çekişme olsa kurban seti değişirdi; bu, en ağır
+ * testlerin CPU baskısı altında ilk açlık çekenler olduğunu düşündürüyor.
+ *
+ * SONUÇ: tavan=2 dahi 54/54'e HER ZAMAN ulaşmadı (ölçülen: 52/54 iki ayrı
+ * koşuda, aynı iki test). Tavan=3 ve 4 daha kötüydü (sırasıyla 3 ve 5 farklı
+ * başarısızlık). tavan=2, ÖLÇÜLEN en yüksek/en iyi yerel değer olduğu için
+ * seçildi — "kararlı 54/54" GARANTİSİ DEĞİL. Yerelde tam paket ara sıra
+ * kırmızı çıkarsa ve tekrar koşmak istemiyorsanız `CI=1 npx playwright test`
+ * kullanın (bkz. tests/e2e/README.md) — CI yolu her zaman 54/54 verdi.
+ *
+ * Paket büyüdükçe (54'ten fazla test, daha ağır ekranlar) bu tavan yeniden
+ * ölçülüp değerlendirilmeli — bu not böyle bir yeniden değerlendirmenin
+ * İKİNCİ turu.
+ *
+ * `PLAYWRIGHT_WORKERS` ile geçersiz kılınabilir (ör. daha güçlü bir makinede,
+ * ya da CPU sayısına göre yeniden ölçüm yapıldığında).
  */
-const localWorkers = process.env.PLAYWRIGHT_WORKERS
-  ? Number(process.env.PLAYWRIGHT_WORKERS)
-  : Math.max(2, Math.min(4, Math.ceil(os.cpus().length / 2)))
+const localWorkers = process.env.PLAYWRIGHT_WORKERS ? Number(process.env.PLAYWRIGHT_WORKERS) : 2
 
 export default defineConfig({
   testDir: './tests/e2e',
+  // ÖLÇÜLDÜ VE ELENDİ (bkz. `localWorkers` yorumu — hipotez #3): repo
+  // `OneDrive\Masaüstü\...` altında, yani OneDrive'ın canlı senkronladığı bir
+  // klasörde; varsayılan `outputDir` (`test-results/`) da bu klasörün
+  // içindeydi. Çıktı `os.tmpdir()`'a (OneDrive DIŞI) taşınıp aynı tavanda tam
+  // paket tekrar koşuldu — 30sn'lik takılmalar AYNI BÜYÜKLÜKTE devam etti,
+  // yani OneDrive I/O senkronu bunların NEDENİ değil. Taşıma yine de burada
+  // BIRAKILDI: zararsız ve test artefaktlarını (video/screenshot/trace)
+  // bulut-senkronlu bir klasörün dışında tutmak kendi başına hijyenik bir
+  // iyileştirme — geri almanın bir gerekçesi yok.
+  outputDir: path.join(os.tmpdir(), 'pw-results-my-coaching-appv2'),
   // Koşu başında sahipsiz kalmış paylaşılan-kaynak kilitlerini siler
   // (bkz. tests/e2e/resource-lock.ts).
   globalSetup: './tests/e2e/global-setup.ts',
@@ -81,8 +145,21 @@ export default defineConfig({
   reporter: [['html', { open: 'never' }], ['list']],
   use: {
     baseURL: process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:3000',
+    // `trace: 'on-first-retry'` yerelde zaten MALİYETSİZ: `retries: 0` olduğu için
+    // hiçbir yerel test asla "ilk retry"ye ulaşmaz, trace hiç toplanmaz. CI'da
+    // (`retries: 2`) tanı amacıyla ilk retry'de devreye girer — DOKUNULMADI.
     trace: 'on-first-retry',
+    // `screenshot: 'only-on-failure'` zaten ucuz: yalnızca başarısızlık anında TEK
+    // kare alınır, sürekli bir kayıt maliyeti yok — DOKUNULMADI.
     screenshot: 'only-on-failure',
+    //
+    // ÖLÇÜLDÜ VE ELENDİ — video kaydı ("her testte sürekli ffmpeg encode, yalnızca
+    // hatada dosya tutulur" maliyeti) 30sn'lik yerel takılmaların nedeni DEĞİL:
+    // yerelde `video: 'off'` ile mevcut worker tavanında (4) tam paket yine
+    // AYNI BÜYÜKLÜKTE başarısız oldu (5 failed/49 passed, orijinal baseline'la
+    // birebir aynı sayı). Video kaydının kapatılmasının performansa faydası
+    // OLMADIĞI ÖLÇÜLDÜ; buna karşılık video, yerelde bir test düşünce GERÇEK
+    // teşhis değeri taşır — o yüzden buradan geri alındı, eski hâli korunuyor.
     video: 'retain-on-failure',
   },
   projects: [
