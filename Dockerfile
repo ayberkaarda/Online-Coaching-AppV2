@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM node:24-alpine AS base
+FROM node:26-alpine AS base
 
 # ---- deps: install dependencies with full lockfile fidelity ----
 FROM base AS deps
