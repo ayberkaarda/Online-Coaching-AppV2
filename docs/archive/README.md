@@ -19,6 +19,7 @@ başındadır.
 | [progress-faz-1.7-borc-temizligi.md](progress-faz-1.7-borc-temizligi.md)   | Borç temizliği, katalog import'u, bayat kayıt taraması                            |
 | [progress-faz-2-cekirdek-akis.md](progress-faz-2-cekirdek-akis.md)         | Koç-danışan çekirdek akışı (2a–2j)                                                |
 | [progress-hosted-senkron-ve-env.md](progress-hosted-senkron-ve-env.md)     | ADR-0020 hosted senkronizasyonu; env koruması ve yerel PG 15 → 17                 |
+| [progress-faz-4-ilerleme-takibi.md](progress-faz-4-ilerleme-takibi.md)     | İlerleme Takibi: şema, grafik tekleştirme, trend, foto; 3 düzeltme turu           |
 | [progress-yol-haritasi-arsivi.md](progress-yol-haritasi-arsivi.md)         | Kapanmış yol haritası adımları, Faz 1b kapsamı, ertelenenler listesi              |
 | [progress-kararlar-tablosu.md](progress-kararlar-tablosu.md)               | **DONDURULMUŞ** eski karar tablosu (kanonik kayıt: `docs/adr/`)                   |
 | [progress-oturum-gunlugu.md](progress-oturum-gunlugu.md)                   | Oturum günlüğü tam tablosu — yeni satırlar buraya eklenir                         |

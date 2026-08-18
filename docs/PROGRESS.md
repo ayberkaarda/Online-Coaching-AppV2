@@ -19,23 +19,24 @@ Bu dosyanın bölüm numaraları arşivlemeden sonra **yenidir**. `active_planpr
 `docs/security/AUDIT.md` ve diğer belgelerdeki `docs/PROGRESS.md §N` referansları aşağıdaki
 dosyalarda çözülür; taşınan bölüm başlıkları arşivde **birebir** korunmuştur.
 
-| Eski bölüm                                    | Nerede                                                                      |
-| --------------------------------------------- | --------------------------------------------------------------------------- |
-| §1 (mevcut durum, doğrulama)                  | Güncel hâli aşağıda §1; tarihsel satırlar ilgili fazın arşiv dosyasında     |
-| §1.1, §2, §3 (2026-08-16 turları)             | `archive/progress-2026-08-16-v1-yukseltme.md`                               |
-| §3 "Faz 1a — …"                               | `archive/progress-faz-1a.md`                                                |
-| §3 "Faz 1.5 — …"                              | `archive/progress-faz-1.5-guvenlik.md`                                      |
-| §3 "Faz 1.6 — …"                              | `archive/progress-faz-1.6-gorsel-kimlik.md`                                 |
-| §3 "Faz 1.7 — …"                              | `archive/progress-faz-1.7-borc-temizligi.md`                                |
-| §3 "Faz 2 — …"                                | `archive/progress-faz-2-cekirdek-akis.md`                                   |
-| §3 "Hosted senkronizasyonu", "Env koruması …" | `archive/progress-hosted-senkron-ve-env.md`                                 |
-| §4 (karar kaydı)                              | `archive/progress-kararlar-tablosu.md` (DONDURULMUŞ) — kanonik: `docs/adr/` |
-| §5 (açık ve bloke işler)                      | Açık olanlar aşağıda §3 borç tablosunda; kapananlar ilgili fazın arşivinde  |
-| §6, §6b, §8                                   | `archive/progress-yol-haritasi-arsivi.md`                                   |
-| §6a (Faz 1 çıkış kriterleri)                  | `archive/progress-faz-1a.md`                                                |
-| §7 (plan v1.1 revizyonu)                      | `archive/progress-2026-08-16-v1-yukseltme.md`                               |
-| §9 (oturum günlüğü)                           | `archive/progress-oturum-gunlugu.md`                                        |
-| §3 (bölüm adı verilmeden)                     | Referansın bağlamındaki faza ait `archive/progress-*.md` dosyası            |
+| Eski bölüm                                                                                              | Nerede                                                                      |
+| ------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| §1 (mevcut durum, doğrulama)                                                                            | Güncel hâli aşağıda §1; tarihsel satırlar ilgili fazın arşiv dosyasında     |
+| §1.1, §2, §3 (2026-08-16 turları)                                                                       | `archive/progress-2026-08-16-v1-yukseltme.md`                               |
+| §3 "Faz 1a — …"                                                                                         | `archive/progress-faz-1a.md`                                                |
+| §3 "Faz 1.5 — …"                                                                                        | `archive/progress-faz-1.5-guvenlik.md`                                      |
+| §3 "Faz 1.6 — …"                                                                                        | `archive/progress-faz-1.6-gorsel-kimlik.md`                                 |
+| §3 "Faz 1.7 — …"                                                                                        | `archive/progress-faz-1.7-borc-temizligi.md`                                |
+| §3 "Faz 2 — …"                                                                                          | `archive/progress-faz-2-cekirdek-akis.md`                                   |
+| §3 "Hosted senkronizasyonu", "Env koruması …"                                                           | `archive/progress-hosted-senkron-ve-env.md`                                 |
+| §4 (karar kaydı)                                                                                        | `archive/progress-kararlar-tablosu.md` (DONDURULMUŞ) — kanonik: `docs/adr/` |
+| §5 (açık ve bloke işler)                                                                                | Açık olanlar aşağıda §3 borç tablosunda; kapananlar ilgili fazın arşivinde  |
+| §6, §6b, §8                                                                                             | `archive/progress-yol-haritasi-arsivi.md`                                   |
+| §6a (Faz 1 çıkış kriterleri)                                                                            | `archive/progress-faz-1a.md`                                                |
+| §7 (plan v1.1 revizyonu)                                                                                | `archive/progress-2026-08-16-v1-yukseltme.md`                               |
+| §9 (oturum günlüğü)                                                                                     | `archive/progress-oturum-gunlugu.md`                                        |
+| "Faz 4 — İlerleme Takibi" (PROGRESS.md'de hiç bölüm numarası taşımadı — anlatı doğrudan arşive yazıldı) | `archive/progress-faz-4-ilerleme-takibi.md`                                 |
+| §3 (bölüm adı verilmeden)                                                                               | Referansın bağlamındaki faza ait `archive/progress-*.md` dosyası            |
 
 Kaynaktan ölçüldü (2026-08-17): repoda `docs/PROGRESS.md §N` biçiminde **71** referans var
 (en yoğunu `active_planprogram.md`, 24 adet) ve §15 hariç hepsi yukarıdaki tabloyla çözülüyor.
@@ -44,11 +45,18 @@ gösteriyordu; bu arşivlemenin yarattığı bir kırık değildir.
 
 ---
 
-## 1. Bugünkü durum (2026-08-17)
+## 1. Bugünkü durum (2026-08-18)
 
-- **Faz durumu:** Faz 0 → Faz 2, hosted senkronizasyonu ve env koruması tamamlandı.
-  Faz 3 (Yemek Fotoğrafı Makro Tahmini) **ertelendi** (ADR-0021, `active_planprogram.md`
-  §5). **Sıradaki iş: Faz 4 — İlerleme Takibi** (bkz. §5).
+- **Faz durumu:** Faz 0 → Faz 2, hosted senkronizasyonu, env koruması ve **Faz 4 — İlerleme
+  Takibi** tamamlandı. Faz 3 (Yemek Fotoğrafı Makro Tahmini) **ertelendi** (ADR-0021,
+  `active_planprogram.md` §5). **Sıradaki iş: Faz 4.5 — Monorepo ve Mobil Temel**
+  (bkz. §5).
+- **Faz 4 sonucu (2026-08-17/18):** kilo/ölçü girişi + trend grafikleri (AC-4.1, AC-4.2),
+  önce/sonra fotoğraf karşılaştırma, grafik kütüphanesi `recharts`'a tekleştirildi (AC-4.3,
+  B-013 eksen rengi kısmı kapandı). Doğrulamada gerçek bir kullanıcı hatası bulundu ve
+  düzeltildi (00:00–03:00 arası UTC/yerel tarih uyuşmazlığı, `todayIsoDate()` tek kaynağa
+  taşındı ve tarih alanı tipte zorunlu yapıldı). Ayrıntı: §2 tablosu ve
+  `archive/progress-faz-4-ilerleme-takibi.md`.
 - **Yerel yığın:** `npx supabase start` ile ayakta; PostgreSQL **17.6**
   (`public.ecr.aws/supabase/postgres:17.6.1.141`), 25 migration + seed, 14 tablo,
   **14/14 RLS enabled + forced**.
@@ -63,7 +71,8 @@ gösteriyordu; bu arşivlemenin yarattığı bir kırık değildir.
 - **Lint uyarıları bilinçlidir:** `@next/next/no-img-element` (harici/dinamik görsellerde
   `next/image` bilerek tercih edilmedi — Supabase URL'leri ve `ui-avatars.com`) ve `no-console`
   (`src/lib/logger.ts` tarayıcı adaptöründe, `pino` tarayıcı bundle'ına girmesin diye).
-  Son turda 14 uyarı; sayı turdan tura değişir, sıfırlanması hedeflenmiyor.
+  Son turda 17 uyarı (Faz 4 öncesi 14'tü; artış Faz 4'ün fotoğraf gösterimi, aynı `no-img-element`
+  sınıfı — B-041); sayı turdan tura değişir, sıfırlanması hedeflenmiyor.
 
 ### Servis sürümleri (yerel = hosted)
 
@@ -104,16 +113,17 @@ Tarihsel doğrulama satırları ilgili fazın arşiv dosyasındadır.
 
 ## 2. Tamamlanan fazlar (anlatı arşivde)
 
-| Faz / tur                          | Sonuç                                                                          | Arşiv                                         |
-| ---------------------------------- | ------------------------------------------------------------------------------ | --------------------------------------------- |
-| v1.0 yükseltmesi + ilk 4 oturum    | TS strict, FastAPI, Supabase RLS, test/CI/Docker; E2E ilk koşu, 3 kritik kırık | `archive/progress-2026-08-16-v1-yukseltme.md` |
-| Faz 1a                             | Roller `coach`/`client`, ADR ayrıştırması, private storage + signed URL        | `archive/progress-faz-1a.md`                  |
-| Faz 1b                             | Planların normalize tablolara taşınması — **ayrı kapanış kaydı yazılmadı**     | `archive/progress-yol-haritasi-arsivi.md`     |
-| Faz 1.5                            | Güvenlik denetimi: 39 bulgu, 37'si kapandı (A-05/A-14 ertelendi)               | `archive/progress-faz-1.5-guvenlik.md`        |
-| Faz 1.6                            | Görsel kimlik Katman A: token, tipografi, CI ratchet                           | `archive/progress-faz-1.6-gorsel-kimlik.md`   |
-| Faz 1.7                            | Borç temizliği + katalog import'u (10 → 1328 / 591)                            | `archive/progress-faz-1.7-borc-temizligi.md`  |
-| Faz 2                              | Koç-danışan çekirdek akışı (2a–2j); AC-2.1–2.4 + AC-1.6.7                      | `archive/progress-faz-2-cekirdek-akis.md`     |
-| Hosted senkron + env koruması/PG17 | ADR-0020 push + parite; üç katmanlı env guard'ı, yerel PG 15 → 17              | `archive/progress-hosted-senkron-ve-env.md`   |
+| Faz / tur                          | Sonuç                                                                                       | Arşiv                                         |
+| ---------------------------------- | ------------------------------------------------------------------------------------------- | --------------------------------------------- |
+| v1.0 yükseltmesi + ilk 4 oturum    | TS strict, FastAPI, Supabase RLS, test/CI/Docker; E2E ilk koşu, 3 kritik kırık              | `archive/progress-2026-08-16-v1-yukseltme.md` |
+| Faz 1a                             | Roller `coach`/`client`, ADR ayrıştırması, private storage + signed URL                     | `archive/progress-faz-1a.md`                  |
+| Faz 1b                             | Planların normalize tablolara taşınması — **ayrı kapanış kaydı yazılmadı**                  | `archive/progress-yol-haritasi-arsivi.md`     |
+| Faz 1.5                            | Güvenlik denetimi: 39 bulgu, 37'si kapandı (A-05/A-14 ertelendi)                            | `archive/progress-faz-1.5-guvenlik.md`        |
+| Faz 1.6                            | Görsel kimlik Katman A: token, tipografi, CI ratchet                                        | `archive/progress-faz-1.6-gorsel-kimlik.md`   |
+| Faz 1.7                            | Borç temizliği + katalog import'u (10 → 1328 / 591)                                         | `archive/progress-faz-1.7-borc-temizligi.md`  |
+| Faz 2                              | Koç-danışan çekirdek akışı (2a–2j); AC-2.1–2.4 + AC-1.6.7                                   | `archive/progress-faz-2-cekirdek-akis.md`     |
+| Hosted senkron + env koruması/PG17 | ADR-0020 push + parite; üç katmanlı env guard'ı, yerel PG 15 → 17                           | `archive/progress-hosted-senkron-ve-env.md`   |
+| Faz 4                              | İlerleme takibi (4a–4d) + 3 düzeltme turu; AC-4.1–AC-4.3; UTC/yerel tarih hatası düzeltildi | `archive/progress-faz-4-ilerleme-takibi.md`   |
 
 ---
 
@@ -124,43 +134,49 @@ kapandığında satırı buradan silinir ve kapatan fazın arşiv dosyasına kap
 Yeni borç, bir sonraki boş `B-xxx` numarasını alır (numaralar tekrar kullanılmaz). Her
 maddenin tam metni ve kanıtı `Kaynak` sütunundaki arşiv dosyasındadır.
 
-| ID    | Borç                                                                                                      | Kaynak                                                                    | Durum                                                                |
-| ----- | --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- | -------------------------------------------------------------------- |
-| B-001 | PWA `runtimeCaching` `workout_logs` yanıtlarını cihazda 7 gün tutuyor                                     | v1 yükseltmesi — `archive/progress-2026-08-16-v1-yukseltme.md`            | Kısmi — `profiles` cache'i kaldırıldı, logout temizliği eklendi      |
-| B-002 | `npm audit` dev ağacında zafiyet var; `npm audit fix --force` ÇALIŞTIRILMAMALI (Next 16'yı düşürür)       | v1 yükseltmesi — aynı dosya                                               | Açık — `--omit=dev` 0 zafiyet, kalan kök `next-pwa` build ağacı      |
-| B-003 | `src/middleware.ts` → Next 16 `proxy` konvansiyonuna göç                                                  | v1 yükseltmesi / Faz 1b devri — `archive/progress-yol-haritasi-arsivi.md` | Açık — şu an yalnızca deprecation uyarısı                            |
-| B-004 | Kullanıcıya görünen Türkçe arayüz metinlerinin ürün diliyle hizası tam doğrulanmadı                       | Faz 1a — `archive/progress-faz-1a.md`                                     | Açık — Faz 2a bir süpürme yaptı, kalan metinler sayılmadı            |
-| B-005 | Birikmiş eski yetim storage dosyaları için toplu temizlik yok; storage dışı mutlak URL'ler dönüştürülmedi | Faz 1.7 — `archive/progress-faz-1.7-borc-temizligi.md`                    | Kısmi — yeni yüklemede eski avatar siliniyor; toplu silme onay ister |
-| B-006 | Oturum token'ları `localStorage`'da, JS'ten okunabilir (A-05)                                             | Faz 1.5 — `docs/security/AUDIT.md` §7                                     | Açık — kullanıcı kararıyla ertelendi (`@supabase/ssr` cookie geçişi) |
-| B-007 | CSP `script-src 'unsafe-inline'` içeriyor (A-14)                                                          | Faz 1.5 — `docs/security/AUDIT.md` §7                                     | Açık — A-05 ile birlikte tek iş (nonce tabanlı CSP)                  |
-| B-008 | Yüklenen dosya inline servis ediliyor (`download`/`Content-Disposition` yok)                              | Faz 1.5 — `archive/progress-faz-1.5-guvenlik.md`                          | Açık                                                                 |
-| B-009 | `42501` (RLS reddi) yalnızca kullanıcının kendi tarayıcı konsoluna yazılıyor                              | Faz 1.5 + Faz 1.7 — `archive/progress-faz-1.7-borc-temizligi.md`          | Kısmi — merkezî yakalama var, sunucu tarafı güvenlik kaydı yok       |
-| B-010 | Plan tablolarında denetim izi yok (satırı kimin yazdığı tutulmuyor)                                       | Faz 1.5 — `archive/progress-faz-1.5-guvenlik.md`                          | Açık — ADR-0014'ün kabul edilen bedeli                               |
-| B-011 | Ekranlardaki `text-gray-400`/`text-gray-500` kullanımları `text-secondary`'ye çevrilmedi                  | Faz 1.6 — `archive/progress-faz-1.6-gorsel-kimlik.md`                     | Kısmi — token tanımlı ve AA doğrulamalı, ekranlar Katman B'de        |
-| B-012 | Katman B restilizasyonu tamamlanmadı (`font-black` 25, `rounded-3xl` 15, gradyan 12)                      | Faz 1.6 / Faz 2 — `archive/progress-faz-1.6-gorsel-kimlik.md`             | Açık — ratchet yalnızca kötüleşmeyi engelliyor                       |
-| B-013 | Chart.js eksen rengi ve `html2canvas` dışa aktarımı kimlik sisteminin dışında                             | Faz 1.6 — aynı dosya                                                      | Açık — kapanış Faz 4 grafik tekleştirme işi (AC-4.3)                 |
-| B-014 | `border` token'ı anlamlı UI sınırları için WCAG 1.4.11'i (3:1) geçmiyor                                   | Faz 1.6 — aynı dosya                                                      | Açık — `border-strong` ihtiyacı Katman B'de doğacak                  |
-| B-015 | `::-webkit-scrollbar-thumb` hâlâ ham `#3f3f46`                                                            | Faz 1.6 — aynı dosya                                                      | Açık — bilinçli olarak token sisteminin dışında                      |
-| B-016 | Revize `warning` token'ı ekranlara akmıyor (bileşenler `text-orange-*`/`amber-*`)                         | Faz 1.6 — aynı dosya                                                      | Açık — kontrast kazancı Katman B'de gerçekleşecek                    |
-| B-017 | Ratchet emoji sayacının sözcük çözümleyicisi tam ayrıştırıcı değil                                        | Faz 1.6 — aynı dosya                                                      | Açık — ADR-0018'in kabul ettiği takas                                |
-| B-018 | Katalog sayfalamasız `select('*')` ile mount anında toptan çekiliyor                                      | Faz 1.7 — `archive/progress-faz-1.7-borc-temizligi.md`                    | Açık — sunucu taraflı arama + sayfalama Faz 2'de yapılmadı           |
-| B-019 | `useApproveProgram` (koç onay yolu) hâlâ 3 atomik olmayan çağrı yapıyor                                   | Faz 1.7 + Faz 2 (mükerrer kayıt birleştirildi)                            | Açık — aynı RPC muamelesi için aday                                  |
-| B-020 | `pg_default_acl`'deki `supabase_admin` kaydı (tablo ve sequence) değiştirilemiyor                         | Faz 1.5 / Faz 1.7                                                         | Açık — pratik etkisi yok; RLS senaryo 73/84 izliyor                  |
-| B-021 | RLS senaryo 83 her koşuda `exercises` id'lerinde 1 boşluk bırakıyor                                       | Faz 1.7 — aynı dosya                                                      | Açık — zararsız, dosyada belgelendi                                  |
-| B-022 | `exercises.csv` (8.7 MB ham) hâlâ repoda; `data/README.md` Git LFS öneriyor                               | Faz 1.7 — aynı dosya                                                      | Açık — kanonik import kaynağı `clean_exercises_v2.csv`               |
-| B-023 | Yerel E2E veritabanı birikiyor, hiç temizlenmiyor; imzalı URL yükü her koşuda büyüyor                     | Faz 2 — `archive/progress-faz-2-cekirdek-akis.md`                         | Açık — temizlik script'i destructive, açık onay ister                |
-| B-024 | E2E kilit ilanı zorunlu değil (`resource(...)` ilan edilmezse sessiz yarış)                               | Faz 2 — aynı dosya                                                        | Açık — tek koruma README kuralı                                      |
-| B-025 | AC-2.2 payı ~2x ve yük duyarlı (ölçüm 233–1005 ms, sınır 2000 ms)                                         | Faz 2 — aynı dosya                                                        | Açık — B-023 büyürse ilk burası sıkışır                              |
-| B-026 | Arşiv plan versiyonları için GC yok; versiyon gezgini UI'ı yok                                            | Faz 2 — aynı dosya                                                        | Açık — şema hazır, yüzey yok                                         |
-| B-027 | `video_url` hiçbir yerde doldurulmuyor (allowlist'li embed yolu uykuda)                                   | Faz 2 — aynı dosya                                                        | Açık                                                                 |
-| B-028 | `message-attachments` için storage tarafında magic-byte doğrulaması yok                                   | Faz 2 — aynı dosya                                                        | Açık — istemci tarafı doğrulama var                                  |
-| B-029 | Koçun ara plan düzenlemeleri arşivlenmiyor                                                                | Faz 2 — aynı dosya                                                        | Açık — copy-on-write'ın bilinçli bedeli                              |
-| B-030 | Hosted yedeği tek kopya ve elle alınmış; düzenli yedekleme stratejisi yok                                 | Hosted senkron — `archive/progress-hosted-senkron-ve-env.md`              | Açık — gerçek danışan verisi oluşmadan çözülmeli                     |
-| B-031 | Tarayıcıdan doğrudan Supabase'e yazma yolunu yalnızca Katman 0+1 kapatıyor                                | Env koruması — aynı dosya                                                 | Açık — sunucu guard'ı bu yolu tasarım gereği kesemez                 |
-| B-032 | Guard regex'i `*.supabase.co`/`.com` ile sınırlı; custom domain'li proje takılmaz                         | Env koruması — aynı dosya                                                 | Açık — sessizce geçer                                                |
-| B-033 | `.env.hosted.local` diskte düz metin `service_role` anahtarı taşıyor                                      | Env koruması — aynı dosya                                                 | Açık — değişen tek şey varsayılan olarak yüklenmemesi                |
-| B-034 | PostgREST v14.5 eşleşmesi `.temp` manifestine bağlı; hosted yükseltilirse sessiz sürükleme                | Env koruması — aynı dosya                                                 | Açık — `supabase link` yeniden koşulmalı                             |
-| B-035 | Supabase CLI global PATH'te yok                                                                           | Ortam                                                                     | Açık — `supabase ...` yerine `npx supabase ...` kullanılmalı         |
+| ID    | Borç                                                                                                           | Kaynak                                                                    | Durum                                                                                                                             |
+| ----- | -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| B-001 | PWA `runtimeCaching` `workout_logs` yanıtlarını cihazda 7 gün tutuyor                                          | v1 yükseltmesi — `archive/progress-2026-08-16-v1-yukseltme.md`            | Kısmi — `profiles` cache'i kaldırıldı, logout temizliği eklendi                                                                   |
+| B-002 | `npm audit` dev ağacında zafiyet var; `npm audit fix --force` ÇALIŞTIRILMAMALI (Next 16'yı düşürür)            | v1 yükseltmesi — aynı dosya                                               | Açık — `--omit=dev` 0 zafiyet, kalan kök `next-pwa` build ağacı                                                                   |
+| B-003 | `src/middleware.ts` → Next 16 `proxy` konvansiyonuna göç                                                       | v1 yükseltmesi / Faz 1b devri — `archive/progress-yol-haritasi-arsivi.md` | Açık — şu an yalnızca deprecation uyarısı                                                                                         |
+| B-004 | Kullanıcıya görünen Türkçe arayüz metinlerinin ürün diliyle hizası tam doğrulanmadı                            | Faz 1a — `archive/progress-faz-1a.md`                                     | Açık — Faz 2a bir süpürme yaptı, kalan metinler sayılmadı                                                                         |
+| B-005 | Birikmiş eski yetim storage dosyaları için toplu temizlik yok; storage dışı mutlak URL'ler dönüştürülmedi      | Faz 1.7 — `archive/progress-faz-1.7-borc-temizligi.md`                    | Kısmi — yeni yüklemede eski avatar siliniyor; toplu silme onay ister                                                              |
+| B-006 | Oturum token'ları `localStorage`'da, JS'ten okunabilir (A-05)                                                  | Faz 1.5 — `docs/security/AUDIT.md` §7                                     | Açık — kullanıcı kararıyla ertelendi (`@supabase/ssr` cookie geçişi)                                                              |
+| B-007 | CSP `script-src 'unsafe-inline'` içeriyor (A-14)                                                               | Faz 1.5 — `docs/security/AUDIT.md` §7                                     | Açık — A-05 ile birlikte tek iş (nonce tabanlı CSP)                                                                               |
+| B-008 | Yüklenen dosya inline servis ediliyor (`download`/`Content-Disposition` yok)                                   | Faz 1.5 — `archive/progress-faz-1.5-guvenlik.md`                          | Açık                                                                                                                              |
+| B-009 | `42501` (RLS reddi) yalnızca kullanıcının kendi tarayıcı konsoluna yazılıyor                                   | Faz 1.5 + Faz 1.7 — `archive/progress-faz-1.7-borc-temizligi.md`          | Kısmi — merkezî yakalama var, sunucu tarafı güvenlik kaydı yok                                                                    |
+| B-010 | Plan tablolarında denetim izi yok (satırı kimin yazdığı tutulmuyor)                                            | Faz 1.5 — `archive/progress-faz-1.5-guvenlik.md`                          | Açık — ADR-0014'ün kabul edilen bedeli                                                                                            |
+| B-011 | Ekranlardaki `text-gray-400`/`text-gray-500` kullanımları `text-secondary`'ye çevrilmedi                       | Faz 1.6 — `archive/progress-faz-1.6-gorsel-kimlik.md`                     | Kısmi — token tanımlı ve AA doğrulamalı, ekranlar Katman B'de                                                                     |
+| B-012 | Katman B restilizasyonu tamamlanmadı (`font-black` 25, `rounded-3xl` 15, gradyan 12)                           | Faz 1.6 / Faz 2 — `archive/progress-faz-1.6-gorsel-kimlik.md`             | Açık — ratchet yalnızca kötüleşmeyi engelliyor                                                                                    |
+| B-013 | Chart.js eksen rengi ve `html2canvas` dışa aktarımı kimlik sisteminin dışında                                  | Faz 1.6 — aynı dosya                                                      | Kısmi — Faz 4'te Chart.js kaldırıldı, eksen rengi token'a çekildi; `html2canvas` PNG dışa aktarımı hâlâ açık                      |
+| B-014 | `border` token'ı anlamlı UI sınırları için WCAG 1.4.11'i (3:1) geçmiyor                                        | Faz 1.6 — aynı dosya                                                      | Açık — `border-strong` ihtiyacı Katman B'de doğacak                                                                               |
+| B-015 | `::-webkit-scrollbar-thumb` hâlâ ham `#3f3f46`                                                                 | Faz 1.6 — aynı dosya                                                      | Açık — bilinçli olarak token sisteminin dışında                                                                                   |
+| B-016 | Revize `warning` token'ı ekranlara akmıyor (bileşenler `text-orange-*`/`amber-*`)                              | Faz 1.6 — aynı dosya                                                      | Açık — kontrast kazancı Katman B'de gerçekleşecek                                                                                 |
+| B-017 | Ratchet emoji sayacının sözcük çözümleyicisi tam ayrıştırıcı değil                                             | Faz 1.6 — aynı dosya                                                      | Açık — ADR-0018'in kabul ettiği takas                                                                                             |
+| B-018 | Katalog sayfalamasız `select('*')` ile mount anında toptan çekiliyor                                           | Faz 1.7 — `archive/progress-faz-1.7-borc-temizligi.md`                    | Açık — sunucu taraflı arama + sayfalama Faz 2'de yapılmadı                                                                        |
+| B-019 | `useApproveProgram` (koç onay yolu) hâlâ 3 atomik olmayan çağrı yapıyor                                        | Faz 1.7 + Faz 2 (mükerrer kayıt birleştirildi)                            | Açık — aynı RPC muamelesi için aday                                                                                               |
+| B-020 | `pg_default_acl`'deki `supabase_admin` kaydı (tablo ve sequence) değiştirilemiyor                              | Faz 1.5 / Faz 1.7                                                         | Açık — pratik etkisi yok; RLS senaryo 73/84 izliyor                                                                               |
+| B-021 | RLS senaryo 83 her koşuda `exercises` id'lerinde 1 boşluk bırakıyor                                            | Faz 1.7 — aynı dosya                                                      | Açık — zararsız, dosyada belgelendi                                                                                               |
+| B-022 | `exercises.csv` (8.7 MB ham) hâlâ repoda; `data/README.md` Git LFS öneriyor                                    | Faz 1.7 — aynı dosya                                                      | Açık — kanonik import kaynağı `clean_exercises_v2.csv`                                                                            |
+| B-023 | Yerel E2E veritabanı birikiyor, hiç temizlenmiyor; imzalı URL yükü her koşuda büyüyor                          | Faz 2 — `archive/progress-faz-2-cekirdek-akis.md`                         | Kısmi — Faz 4'te `scripts/clean-e2e-data.mjs` (`db:clean-e2e`) yazıldı, varsayılan `--dry-run`; gerçek silme hâlâ açık onay ister |
+| B-024 | E2E kilit ilanı zorunlu değil (`resource(...)` ilan edilmezse sessiz yarış)                                    | Faz 2 — aynı dosya                                                        | Açık — tek koruma README kuralı                                                                                                   |
+| B-025 | AC-2.2 payı ~2x ve yük duyarlı (ölçüm 233–1005 ms, sınır 2000 ms)                                              | Faz 2 — aynı dosya                                                        | Açık — B-023 büyürse ilk burası sıkışır                                                                                           |
+| B-026 | Arşiv plan versiyonları için GC yok; versiyon gezgini UI'ı yok                                                 | Faz 2 — aynı dosya                                                        | Açık — şema hazır, yüzey yok                                                                                                      |
+| B-027 | `video_url` hiçbir yerde doldurulmuyor (allowlist'li embed yolu uykuda)                                        | Faz 2 — aynı dosya                                                        | Açık                                                                                                                              |
+| B-028 | `message-attachments` için storage tarafında magic-byte doğrulaması yok                                        | Faz 2 — aynı dosya                                                        | Açık — istemci tarafı doğrulama var                                                                                               |
+| B-029 | Koçun ara plan düzenlemeleri arşivlenmiyor                                                                     | Faz 2 — aynı dosya                                                        | Açık — copy-on-write'ın bilinçli bedeli                                                                                           |
+| B-030 | Hosted yedeği tek kopya ve elle alınmış; düzenli yedekleme stratejisi yok                                      | Hosted senkron — `archive/progress-hosted-senkron-ve-env.md`              | Açık — gerçek danışan verisi oluşmadan çözülmeli                                                                                  |
+| B-031 | Tarayıcıdan doğrudan Supabase'e yazma yolunu yalnızca Katman 0+1 kapatıyor                                     | Env koruması — aynı dosya                                                 | Açık — sunucu guard'ı bu yolu tasarım gereği kesemez                                                                              |
+| B-032 | Guard regex'i `*.supabase.co`/`.com` ile sınırlı; custom domain'li proje takılmaz                              | Env koruması — aynı dosya                                                 | Açık — sessizce geçer                                                                                                             |
+| B-033 | `.env.hosted.local` diskte düz metin `service_role` anahtarı taşıyor                                           | Env koruması — aynı dosya                                                 | Açık — değişen tek şey varsayılan olarak yüklenmemesi                                                                             |
+| B-034 | PostgREST v14.5 eşleşmesi `.temp` manifestine bağlı; hosted yükseltilirse sessiz sürükleme                     | Env koruması — aynı dosya                                                 | Açık — `supabase link` yeniden koşulmalı                                                                                          |
+| B-035 | Supabase CLI global PATH'te yok                                                                                | Ortam                                                                     | Açık — `supabase ...` yerine `npx supabase ...` kullanılmalı                                                                      |
+| B-036 | `CoachUserManagement` hâlâ kendi kilo grafiğini `form_checks`'ten çiziyor (AC-4.2 "tüm ekranlar" tam değil)    | Faz 4 — `archive/progress-faz-4-ilerleme-takibi.md`                       | Açık — form check kilolarının `progress_entries`'e taşınmasıyla kapanır                                                           |
+| B-037 | `plans.spec.ts:292` / `progress.spec.ts:66` yerel E2E'de paralellik > 1'de sistematik düşüyor                  | Faz 4 — aynı dosya                                                        | Açık — CI (workers=1) etkilenmiyor; yerel worker tavanı 2'ye indirildi                                                            |
+| B-038 | `progress_photos` yüklemesinde `insert` başarısız olursa storage nesnesi yetim kalıyor                         | Faz 4 — aynı dosya                                                        | Açık — `useFormChecks.uploadPose`'daki mevcut takasın aynısı, yeni değil                                                          |
+| B-039 | `scripts/clean-e2e-data.mjs` mutasyona uğramış seed satırlarının durumunu geri yüklemiyor                      | Faz 4 — aynı dosya                                                        | Açık — bilinçli, gerekçesi script çıktısında                                                                                      |
+| B-040 | `seed.sql`'in tek `pending` onay satırı hem demo hem fikstür işi görüyor; E2E tüketince demo kuyruğu boşalıyor | Faz 4 — aynı dosya                                                        | Açık — öneri: E2E kendi `pending` satırını üretsin                                                                                |
+| B-041 | Lint uyarı tabanı 14 → 17 (Faz 4'ün fotoğraf gösterimi, bilinen `no-img-element` sınıfı)                       | Faz 4 — aynı dosya                                                        | Açık — bilinçli, `next/image` harici URL'lerde bilerek tercih edilmedi                                                            |
 
 **Ertelenenler (borç değil, bilinçli v2 kuyruğu):** pnpm+Turborepo, Expo mobil, nonce tabanlı
 CSP, Redis/Upstash rate limiter, `next-pwa` → `@ducanh2912/next-pwa` veya Turbopack geçişi,
@@ -212,27 +228,27 @@ ADR'si olmayan ama hâlâ bağlayıcı üç sözleşme:
 
 ## 5. Sıradaki iş
 
-**Faz 4 — İlerleme Takibi** (`active_planprogram.md` §6). Faz 3 — Yemek Fotoğrafı Makro
-Tahmini — **ertelendi** (ADR-0021, `active_planprogram.md` §5); V0 (LLM'siz foto ekleme)
-dahil şimdilik yapılmıyor.
+**Faz 4.5 — Monorepo ve Mobil Temel** (`active_planprogram.md` §7). Faz 4 — İlerleme
+Takibi — **tamamlandı** (2026-08-17/18, bkz. §2, `archive/progress-faz-4-ilerleme-takibi.md`).
+Faz 3 — Yemek Fotoğrafı Makro Tahmini — **ertelendi** (ADR-0021, `active_planprogram.md`
+§5); V0 (LLM'siz foto ekleme) dahil şimdilik yapılmıyor.
 
-**Faz sırası notu:** kalan fazlar faz düzeyinde paralelleşmiyor — Faz 2 ve Faz 4 aynı dosyalara
-dokunuyor (`StatsTab.tsx`, `CoachUserManagement.tsx`). Gerçek paralellik ekseni faz-vs-faz
-değil, backend-vs-web.
-
-Faz dışı, sıraya girmiş iş kalemleri: E2E veritabanı temizlik script'i (B-023, destructive —
-onay ister) · katalog için sunucu taraflı arama + sayfalama (B-018) · A-05/A-14 cookie + nonce
-CSP geçişi (B-006, B-007) · düzenli hosted yedekleme stratejisi (B-030).
+Faz dışı, sıraya girmiş iş kalemleri: E2E veritabanı temizlik script'inin gerçek silme
+onayı (B-023, script yazıldı — `db:clean-e2e`) · katalog için sunucu taraflı arama +
+sayfalama (B-018) · A-05/A-14 cookie + nonce CSP geçişi (B-006, B-007) · düzenli hosted
+yedekleme stratejisi (B-030) · `CoachUserManagement` kilo grafiğinin `progress_entries`'e
+bağlanması (B-036).
 
 ---
 
 ## 6. Son oturumlar
 
-| Tarih                                  | İş                                                                                  |
-| -------------------------------------- | ----------------------------------------------------------------------------------- |
-| 2026-08-17 (Faz 2)                     | Koç-danışan çekirdek akışı, on dilim; vitest 502/502, RLS 104/104, E2E 50/50        |
-| 2026-08-17 (hosted senkronizasyonu)    | ADR-0020 uygulandı; hosted sıfırlanıp 25 migration push edildi, parite doğrulandı   |
-| 2026-08-17 (env koruması + yerel PG17) | Üç katmanlı env guard'ı + yerel Postgres 17; vitest 511/511, RLS 104/104, E2E 50/50 |
+| Tarih                                  | İş                                                                                                                          |
+| -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| 2026-08-17 (Faz 2)                     | Koç-danışan çekirdek akışı, on dilim; vitest 502/502, RLS 104/104, E2E 50/50                                                |
+| 2026-08-17 (hosted senkronizasyonu)    | ADR-0020 uygulandı; hosted sıfırlanıp 25 migration push edildi, parite doğrulandı                                           |
+| 2026-08-17 (env koruması + yerel PG17) | Üç katmanlı env guard'ı + yerel Postgres 17; vitest 511/511, RLS 104/104, E2E 50/50                                         |
+| 2026-08-17/18 (Faz 4)                  | İlerleme takibi (4a–4d) + 3 düzeltme turu (UTC/yerel tarih hatası); vitest 598/598, RLS 110/110, E2E CI 54/54 / yerel 52/54 |
 
 Tam oturum günlüğü (ve yeni oturum satırlarının ekleneceği yer):
 `archive/progress-oturum-gunlugu.md`.

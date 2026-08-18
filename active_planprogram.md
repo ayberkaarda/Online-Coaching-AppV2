@@ -964,7 +964,30 @@ true`). Model çıktısı katı JSON şemaya parse edilir; parse hatasında 1 re
 
 ---
 
-## 6. Faz 4 — İlerleme Takibi
+## 6. Faz 4 — İlerleme Takibi (TAMAMLANDI)
+
+**Durum — TAMAMLANDI (2026-08-17/18).** Dört dilim (4a şema, 4b grafik tekleştirme, 4c
+giriş+trend, 4d foto+önce/sonra) + üç düzeltme turu yürütüldü. **AC-4.1 karşılandı**
+(`onConflict: 'client_id,entry_date'` upsert, ölçüm kolonları her zaman gönderilir —
+alan boş bırakılırsa eski değer sessizce korunmaz). **AC-4.3 karşılandı** (`chart.js` +
+`react-chartjs-2` kod tabanından tamamen düştü, `grep -r "chart.js\|react-chartjs-2" src/`
+boş döner). **AC-4.2 kısmen karşılandı:** ölçüm §'ün öngördüğü ayrı `progress.getTrends`
+endpoint'i yerine tek TanStack Query anahtarı + tek `queryFn` + tek saf üretici
+(`buildTrendSeries`) kuruldu — `useProgressTrend` aynı isteği `select` ile türetiyor, ikinci
+ağ isteği yok; bu, mimarinin geri kalanıyla (ayrı endpoint katmanı yok, doğrudan Supabase
+sorguları) tutarlı bir uyarlama. Ancak `CoachUserManagement` hâlâ kendi kilo grafiğini
+`form_checks`'ten çiziyor — "tüm ekranlar aynı seriyi çizer" şartı tam kapanmadı (borç
+B-036). Ölçüler plan §3.1'in `measurements jsonb` önerisinden bilinçli olarak sapıp ayrı
+`numeric(5,2)` kolonlara alındı (gerekçe: cast/indeks riski, `db:types` daraltması, anahtar
+beyaz listesi yokluğu — tam gerekçe arşivde). Doğrulama zinciri yeşil: vitest **598/598**
+(48 dosya), `test:rls` **110/110**, `test:transform` 26/26, type-check/lint/format temiz,
+build başarılı, ratchet 6/6. E2E dürüstçe karışık: **CI yapılandırması (workers=1) 54/54,
+yerel (workers=4) 52/54** — iki test paralellik >1'de sistematik düşüyor, kök neden ürün
+kusuru değil çoklu Chromium örneğinin CPU maliyeti (ayrıntı ve borç listesi:
+`docs/archive/progress-faz-4-ilerleme-takibi.md`). Doğrulama sırasında gerçek bir kullanıcı
+hatası da bulunup düzeltildi: dört tarih kolonu UTC varsayılan taşırken okuma tarafı tarayıcı
+yerel tarihine göre filtreliyordu, TR saatiyle 00:00–03:00 arası günlükler dashboard'a hiç
+yansımıyordu.
 
 - Kilo/ölçü girişi (günde bir kayıt, upsert), trend grafikleri (7/30/90 gün
   aralık seçici; boş günler grafikte gap olarak kalır, interpolasyon yapılmaz).
