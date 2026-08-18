@@ -709,6 +709,16 @@ export type Database = {
           rows_reviewed: number
         }[]
       }
+      backfill_form_check_weight_to_progress: {
+        Args: never
+        Returns: {
+          rows_filled: number
+          rows_inserted: number
+          rows_out_of_range: number
+          rows_skipped: number
+          source_days: number
+        }[]
+      }
       backfill_messages_conversation_key: {
         Args: never
         Returns: {
@@ -734,6 +744,7 @@ export type Database = {
         Args: { p_day: string; p_plan_id: string; p_text: string }
         Returns: number
       }
+      form_check_entry_date: { Args: { p_created_at: string }; Returns: string }
       increment_streak: { Args: { user_id: string }; Returns: number }
       is_coach: { Args: { uid?: string }; Returns: boolean }
       is_coach_profile: { Args: { target: string }; Returns: boolean }

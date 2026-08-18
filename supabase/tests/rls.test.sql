@@ -5221,6 +5221,13 @@ rollback;
 --   almaz ve (b) `42P10 no unique or exclusion constraint` ile kırılır.
 -- =============================================================================
 begin;
+-- KURULUM (postgres): hedef gün BOŞ olmalı. 20260818090000'den beri seed'in
+-- form check'leri de aynı yerel günlere `progress_entries` satırı düşürüyor
+-- (çift-yazım trigger'ı) -> senaryonun kendi satırı 23505 ile çakışabilirdi.
+-- "Kendi kurulumunu yap" kuralı: dışarıdaki duruma güvenme, günü kendin temizle.
+delete from public.progress_entries
+ where client_id = '22222222-2222-2222-2222-222222222222'::uuid
+   and entry_date = date '2026-08-10';
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
 do $$
@@ -5289,6 +5296,14 @@ rollback;
 --   anon   : permission denied
 -- =============================================================================
 begin;
+-- KURULUM (postgres): bkz. senaryo 105'in aynı notu — çift-yazım trigger'ı
+-- seed form check'lerinden bu günlere satır düşürmüş olabilir.
+delete from public.progress_entries
+ where client_id in (
+         '22222222-2222-2222-2222-222222222222'::uuid,
+         '33333333-3333-3333-3333-333333333333'::uuid
+       )
+   and entry_date in (date '2026-08-11', date '2026-08-12');
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
 do $$
@@ -5383,6 +5398,11 @@ rollback;
 --   (d) POZİTİF: tüm ölçüleri dolu gerçekçi satır GEÇER
 -- =============================================================================
 begin;
+-- KURULUM (postgres): bkz. senaryo 105'in aynı notu. (d) şıkkı POZİTİF bir
+-- insert yapar; günün boş olmaması onu 23505 ile düşürürdü.
+delete from public.progress_entries
+ where client_id = '22222222-2222-2222-2222-222222222222'::uuid
+   and entry_date = date '2026-08-13';
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
 do $$
@@ -5819,8 +5839,303 @@ rollback;
 
 
 -- =============================================================================
+-- ILERLEME TAKIBI — 111) *** B-036 *** FORM CHECK -> `progress_entries` ÇİFT-YAZIMI
+--   (a) danışan form check eklediğinde AYNI YEREL GÜNE bir `progress_entries`
+--       satırı DÜŞER (koç panelinin kilo grafiği artık bu satırdan beslenir)
+--   (b) *** GECE YARISI TUZAĞI *** çevrim `Europe/Istanbul`'dur: Türkiye
+--       saatiyle 00:30'da gönderilen form check O GÜNE yazılır. Oturum UTC
+--       olduğu için düz `::date` BİR ÖNCEKİ günü verirdi — senaryo bunu ÖLÇER
+--       (yalnızca varsaymaz), yani tuzağın gerçekliği testin parçasıdır.
+--   (c) *** trigger fonksiyonu SECURITY DEFINER DEĞİLDİR *** ve yine de
+--       çalışır: yazma gerçek `authenticated` rolüyle, RLS AÇIKKEN yapılır.
+--       RLS zinciri: form_checks_insert (client_id = auth.uid()) ->
+--       progress_entries_insert (client_id = auth.uid()).
+--   (d) koç bu TÜRETİLMİŞ satırları okuyabilir (grafik koç panelinde çizilir)
+-- =============================================================================
+begin;
+set local time zone 'UTC';
+
+-- KURULUM (postgres, rol taklidinden ÖNCE): iddianın kurulacağı günler
+-- temizlenir ki ölçüm DIŞARIDA bulunan bir satıra değil ÜRETİLEN satıra kurulsun.
+delete from public.progress_entries
+ where client_id = '22222222-2222-2222-2222-222222222222'::uuid
+   and entry_date in (date '2026-08-13', date '2026-08-14');
+
+do $$
+declare v_secdef boolean;
+begin
+  select p.prosecdef into v_secdef
+    from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public' and p.proname = 'form_checks_sync_progress_weight';
+  if v_secdef is null then
+    raise exception 'BASARISIZ [111c]: form_checks_sync_progress_weight fonksiyonu YOK -> cift-yazim kurulmamis';
+  end if;
+  if v_secdef then
+    raise exception 'BASARISIZ [111c]: trigger fonksiyonu SECURITY DEFINER -> RLS i baypas eden yeni yetkilendirme yuzeyi acilmis; ihtiyac YOKTU (bkz. 20260818090000 KARAR 1b)';
+  end if;
+end $$;
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+do $$
+declare v_w numeric; v_naive date; v_n int;
+begin
+  -- Tuzağın GERÇEK olduğunun kanıtı: bu oturumda naif cast BİR ÖNCEKİ günü verir.
+  v_naive := (timestamptz '2026-08-14 00:30:00+03')::date;
+  if v_naive is distinct from date '2026-08-13' then
+    raise exception 'BASARISIZ [111b kurulum]: oturum saat dilimi UTC degil -> gece yarisi tuzagi olculemez (naif ::date = %)', v_naive;
+  end if;
+
+  -- Türkiye saatiyle 14 Ağustos 00:30 = UTC 13 Ağustos 21:30
+  insert into public.form_checks (client_id, current_weight, notes, created_at)
+  values (
+    '22222222-2222-2222-2222-222222222222'::uuid,
+    77.25,
+    'zz-111 gece yarisi gonderimi',
+    timestamptz '2026-08-14 00:30:00+03'
+  );
+
+  select weight_kg into v_w
+    from public.progress_entries
+   where client_id  = '22222222-2222-2222-2222-222222222222'::uuid
+     and entry_date = date '2026-08-14';
+  if v_w is null then
+    raise exception 'BASARISIZ [111a]: form check eklendi ama 2026-08-14 icin progress_entries satiri OLUSMADI -> cift-yazim calismiyor (koc grafigi bos kalir)';
+  end if;
+  if v_w is distinct from 77.25 then
+    raise exception 'BASARISIZ [111a]: beklenen 77.25, gelen %', v_w;
+  end if;
+
+  select count(*) into v_n
+    from public.progress_entries
+   where client_id  = '22222222-2222-2222-2222-222222222222'::uuid
+     and entry_date = date '2026-08-13';
+  if v_n is distinct from 0 then
+    raise exception 'BASARISIZ [111b]: satir BIR ONCEKI gune (2026-08-13) dustu -> gece yarisi tarih kaymasi geri geldi (Europe/Istanbul cevrimi yok sayilmis)';
+  end if;
+end $$;
+
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+do $$
+declare v_w numeric;
+begin
+  select weight_kg into v_w
+    from public.progress_entries
+   where client_id  = '22222222-2222-2222-2222-222222222222'::uuid
+     and entry_date = date '2026-08-14';
+  if v_w is distinct from 77.25 then
+    raise exception 'BASARISIZ [111d]: KOC turetilmis ilerleme satirini OKUYAMADI (gelen %) -> koc panelindeki kilo grafigi bos kalir', v_w;
+  end if;
+  raise notice 'GECTI [111 form_check -> progress_entries cift-yazimi: yerel gun Europe/Istanbul, SECURITY DEFINER YOK, koc okuyabiliyor]';
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- ILERLEME TAKIBI — 112) ÇAKIŞMA KURALI: *** ELLE GİRİŞ KAZANIR ***
+--   (a) o güne ait ELLE girilmiş satırın `weight_kg`'i form check ile EZİLMEZ
+--       ve `notes` gibi diğer alanlara DOKUNULMAZ
+--   (b) satır VAR ama `weight_kg` NULL ise (o gün tartılmamış, yalnızca çevre
+--       ölçüsü girilmiş) YALNIZCA `weight_kg` dolar; `waist_cm`/`notes` AYNEN
+--       kalır — boşluk doldurmak kayıp değil KAZANÇTIR
+--   (c) aynı güne İKİNCİ form check artık dolu olan satırı DEĞİŞTİRMEZ
+--       (bilinen asimetri: canlı trigger yolunda İLK form check kazanır)
+-- =============================================================================
+begin;
+set local time zone 'UTC';
+
+delete from public.progress_entries
+ where client_id = '22222222-2222-2222-2222-222222222222'::uuid
+   and entry_date in (date '2026-08-15', date '2026-08-16');
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+do $$
+declare v_w numeric; v_waist numeric; v_notes text;
+begin
+  -- (a) ELLE giriş (danışanın kendi tartı okuması) -----------------------------
+  insert into public.progress_entries (client_id, entry_date, weight_kg, notes)
+  values ('22222222-2222-2222-2222-222222222222'::uuid, date '2026-08-15', 70.00, 'zz-112 elle girildi');
+
+  insert into public.form_checks (client_id, current_weight, notes, created_at)
+  values ('22222222-2222-2222-2222-222222222222'::uuid, 99.90, 'zz-112a form check',
+          timestamptz '2026-08-15 12:00:00+03');
+
+  select weight_kg, notes into v_w, v_notes
+    from public.progress_entries
+   where client_id = '22222222-2222-2222-2222-222222222222'::uuid
+     and entry_date = date '2026-08-15';
+  if v_w is distinct from 70.00 then
+    raise exception 'BASARISIZ [112a]: ELLE girilen kilo form check ile EZILDI (70.00 -> %) -- kullanicinin duzeltmesi sessizce geri alindi', v_w;
+  end if;
+  if v_notes is distinct from 'zz-112 elle girildi' then
+    raise exception 'BASARISIZ [112a]: notes alanina DOKUNULDU (%)', v_notes;
+  end if;
+
+  -- (b) weight_kg NULL -> yalnızca O kolon dolar -------------------------------
+  insert into public.progress_entries (client_id, entry_date, waist_cm, notes)
+  values ('22222222-2222-2222-2222-222222222222'::uuid, date '2026-08-16', 80.50, 'zz-112 sadece olcu');
+
+  insert into public.form_checks (client_id, current_weight, notes, created_at)
+  values ('22222222-2222-2222-2222-222222222222'::uuid, 68.30, 'zz-112b form check',
+          timestamptz '2026-08-16 09:00:00+03');
+
+  select weight_kg, waist_cm, notes into v_w, v_waist, v_notes
+    from public.progress_entries
+   where client_id = '22222222-2222-2222-2222-222222222222'::uuid
+     and entry_date = date '2026-08-16';
+  if v_w is distinct from 68.30 then
+    raise exception 'BASARISIZ [112b]: weight_kg NULL iken form check ile DOLDURULMADI (gelen %) -- grafikte bosluk kalir', v_w;
+  end if;
+  if v_waist is distinct from 80.50 then
+    raise exception 'BASARISIZ [112b]: waist_cm e DOKUNULDU (80.50 -> %) -- trigger yalnizca weight_kg yazmali', v_waist;
+  end if;
+  if v_notes is distinct from 'zz-112 sadece olcu' then
+    raise exception 'BASARISIZ [112b]: notes alanina DOKUNULDU (%)', v_notes;
+  end if;
+
+  -- (c) aynı güne İKİNCİ form check artık dolu satırı DEĞİŞTİRMEZ --------------
+  insert into public.form_checks (client_id, current_weight, notes, created_at)
+  values ('22222222-2222-2222-2222-222222222222'::uuid, 55.00, 'zz-112c ikinci form check',
+          timestamptz '2026-08-16 21:00:00+03');
+
+  select weight_kg into v_w
+    from public.progress_entries
+   where client_id = '22222222-2222-2222-2222-222222222222'::uuid
+     and entry_date = date '2026-08-16';
+  if v_w is distinct from 68.30 then
+    raise exception 'BASARISIZ [112c]: ayni gune ikinci form check dolu satiri EZDI (68.30 -> %)', v_w;
+  end if;
+
+  -- Duplicate satır de OLUŞMAMALI (AC-4.1 tekillik kısıtı trigger yolunda da geçerli)
+  if (select count(*) from public.progress_entries
+       where client_id = '22222222-2222-2222-2222-222222222222'::uuid
+         and entry_date = date '2026-08-16') is distinct from 1 then
+    raise exception 'BASARISIZ [112c]: 2026-08-16 icin BIRDEN COK progress_entries satiri var';
+  end if;
+
+  raise notice 'GECTI [112 cakisma kurali: elle giris kazanir, NULL weight_kg dolar, diger alanlara dokunulmaz, duplicate yok]';
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- ILERLEME TAKIBI — 113) BACKFILL (`backfill_form_check_weight_to_progress`)
+--   (a) aynı YEREL günde birden çok form check varsa *** EN YENİSİ *** kazanır
+--   (b) hedefte satır varsa EZİLMEZ (elle giriş kazanır — trigger ile AYNI kural)
+--   (c) hedefte satır var ama `weight_kg` NULL ise YALNIZCA o kolon dolar
+--   (d) *** IDEMPOTENT *** — ikinci koşu 0 satır ekler, 0 satır doldurur
+--   Kurulum, trigger'ın ürettiği satırı SİLEREK "migration öncesi" hâli taklit
+--   eder; ölçülen şey backfill'in KENDİSİDİR, trigger değil.
+-- =============================================================================
+begin;
+set local time zone 'UTC';
+
+-- KURULUM (postgres) --------------------------------------------------------
+insert into public.form_checks (id, client_id, current_weight, notes, created_at) values
+  ('cccc0113-0000-4000-8000-000000000001'::uuid, '33333333-3333-3333-3333-333333333333'::uuid,
+   70.00, 'zz-113 ayni gun ESKI',  timestamptz '2026-08-15 08:00:00+03'),
+  ('cccc0113-0000-4000-8000-000000000002'::uuid, '33333333-3333-3333-3333-333333333333'::uuid,
+   71.50, 'zz-113 ayni gun YENI',  timestamptz '2026-08-15 20:00:00+03'),
+  ('cccc0113-0000-4000-8000-000000000003'::uuid, '33333333-3333-3333-3333-333333333333'::uuid,
+   66.60, 'zz-113 elle giris gunu', timestamptz '2026-08-16 10:00:00+03'),
+  ('cccc0113-0000-4000-8000-000000000004'::uuid, '33333333-3333-3333-3333-333333333333'::uuid,
+   64.40, 'zz-113 null kilo gunu',  timestamptz '2026-08-17 10:00:00+03');
+
+-- (a) hedefi BOŞALT -> backfill'in kendisi yazsın
+delete from public.progress_entries
+ where client_id = '33333333-3333-3333-3333-333333333333'::uuid
+   and entry_date = date '2026-08-15';
+
+-- (b) ELLE düzeltilmiş satır (trigger'ın yazdığı değer kullanıcı tarafından değiştirildi)
+update public.progress_entries
+   set weight_kg = 60.10, notes = 'zz-113 elle duzeltildi'
+ where client_id = '33333333-3333-3333-3333-333333333333'::uuid
+   and entry_date = date '2026-08-16';
+
+-- (c) o gün tartılmamış: kilo NULL, yalnızca çevre ölçüsü var
+update public.progress_entries
+   set weight_kg = null, waist_cm = 75.50
+ where client_id = '33333333-3333-3333-3333-333333333333'::uuid
+   and entry_date = date '2026-08-17';
+
+do $$
+declare
+  v_first  record;
+  v_second record;
+  v_w      numeric;
+  v_waist  numeric;
+  v_notes  text;
+begin
+  select * into v_first from public.backfill_form_check_weight_to_progress();
+
+  -- (a) EN YENİSİ kazanır
+  select weight_kg into v_w from public.progress_entries
+   where client_id = '33333333-3333-3333-3333-333333333333'::uuid and entry_date = date '2026-08-15';
+  if v_w is distinct from 71.50 then
+    raise exception 'BASARISIZ [113a]: ayni gunde EN YENI form check kazanmadi (beklenen 71.50, gelen %)', v_w;
+  end if;
+  if v_first.rows_inserted < 1 then
+    raise exception 'BASARISIZ [113a]: backfill hicbir satir EKLEMEDI (rows_inserted=%)', v_first.rows_inserted;
+  end if;
+
+  -- (b) elle düzeltilmiş satır EZİLMEZ
+  select weight_kg, notes into v_w, v_notes from public.progress_entries
+   where client_id = '33333333-3333-3333-3333-333333333333'::uuid and entry_date = date '2026-08-16';
+  if v_w is distinct from 60.10 then
+    raise exception 'BASARISIZ [113b]: backfill ELLE duzeltilen kiloyu EZDI (60.10 -> %)', v_w;
+  end if;
+  if v_notes is distinct from 'zz-113 elle duzeltildi' then
+    raise exception 'BASARISIZ [113b]: backfill notes alanina DOKUNDU (%)', v_notes;
+  end if;
+
+  -- (c) NULL kilo dolar, çevre ölçüsü korunur
+  select weight_kg, waist_cm into v_w, v_waist from public.progress_entries
+   where client_id = '33333333-3333-3333-3333-333333333333'::uuid and entry_date = date '2026-08-17';
+  if v_w is distinct from 64.40 then
+    raise exception 'BASARISIZ [113c]: NULL weight_kg backfill ile DOLMADI (gelen %)', v_w;
+  end if;
+  if v_waist is distinct from 75.50 then
+    raise exception 'BASARISIZ [113c]: backfill waist_cm e DOKUNDU (75.50 -> %)', v_waist;
+  end if;
+  if v_first.rows_filled < 1 then
+    raise exception 'BASARISIZ [113c]: rows_filled 0 -> NULL doldurma sayilmiyor';
+  end if;
+
+  -- (d) IDEMPOTENT: ikinci koşu HİÇBİR ŞEY yapmamalı
+  select * into v_second from public.backfill_form_check_weight_to_progress();
+  if v_second.rows_inserted is distinct from 0 or v_second.rows_filled is distinct from 0 then
+    raise exception 'BASARISIZ [113d]: backfill IDEMPOTENT DEGIL -> ikinci kosu % ekledi, % doldurdu (fazladan satir uretir)',
+      v_second.rows_inserted, v_second.rows_filled;
+  end if;
+  if v_second.source_days is distinct from v_first.source_days then
+    raise exception 'BASARISIZ [113d]: aday gun sayisi iki kosu arasinda degisti (% -> %)', v_first.source_days, v_second.source_days;
+  end if;
+
+  -- HİÇBİR (danışan, yerel gün) çifti karşılıksız kalmamalı
+  if exists (
+    select 1
+      from (select distinct fc.client_id, public.form_check_entry_date(fc.created_at) as entry_date
+              from public.form_checks fc
+             where public.form_check_entry_date(fc.created_at) >= date '2000-01-01'
+               and public.form_check_entry_date(fc.created_at) <  date '2100-01-01') as days
+     where not exists (
+       select 1 from public.progress_entries pe
+        where pe.client_id = days.client_id and pe.entry_date = days.entry_date
+     )
+  ) then
+    raise exception 'BASARISIZ [113]: backfill sonrasi hala KARSILIKSIZ (danisan, gun) cifti var';
+  end if;
+
+  raise notice 'GECTI [113 backfill: en yenisi kazanir, elle giris ezilmez, NULL kilo dolar, IDEMPOTENT (aday gun=%, eklenen=%, doldurulan=%)]',
+    v_first.source_days, v_first.rows_inserted, v_first.rows_filled;
+end $$;
+rollback;
+
+
+-- =============================================================================
 -- TOPLAM ÖZET
--- Bu noktaya yalnızca YUKARIDAKİ 110 senaryonun HEPSİ GECTI verdiyse ulaşılır --
+-- Bu noktaya yalnızca YUKARIDAKİ 113 senaryonun HEPSİ GECTI verdiyse ulaşılır --
 -- herhangi biri BASARISIZ olsaydı raise exception + ON_ERROR_STOP psql'i
 -- daha önce sıfırdan farklı çıkış koduyla durdururdu.
 --   * 1–19  : Faz 1a ve öncesi (profiles, notifications, form_checks, daily_logs,
@@ -5875,6 +6190,16 @@ rollback;
 --             YAZAMAMASI/SİLEMEMESİ (109); yeni yüzeyin sertleştirme denetimi
 --             (FORCE RLS, D/x/t yok, S/I/U/D var, anon yok, updated_at
 --             trigger'ı, bucket PRIVATE + 4 politika, sequence yok) (110)
+--   * 111–113: Faz 4 / B-036 — kilo serisinin TEK KAYNAĞA bağlanması
+--             (20260818090000_form_check_weight_to_progress.sql): form check
+--             eklendiğinde aynı YEREL güne (Europe/Istanbul) `progress_entries`
+--             satırı düşer, gece yarısı penceresi bir önceki güne KAYMAZ ve
+--             trigger fonksiyonu SECURITY DEFINER DEĞİLDİR — yazma gerçek
+--             `authenticated` rolüyle, RLS açıkken yapılır; koç türetilmiş
+--             satırı okuyabilir (111); çakışmada ELLE GİRİŞ KAZANIR, yalnızca
+--             `weight_kg` NULL ise dolar, diğer kolonlara dokunulmaz,
+--             duplicate satır oluşmaz (112); backfill aynı günde EN YENİ form
+--             check'i seçer, var olan satırı ezmez ve IDEMPOTENTTİR (113)
 --
 -- NOT: `nutrition_logs`, `progress_entries` ve `progress_photos` ayrıca senaryo
 -- 73 (yetki) ve 74 (RLS+FORCE) tarafından DİNAMİK olarak kapsanır — o iki
@@ -5882,5 +6207,5 @@ rollback;
 -- =============================================================================
 do $$
 begin
-  raise notice 'TUM RLS TESTLERI GECTI (110 senaryo)';
+  raise notice 'TUM RLS TESTLERI GECTI (113 senaryo)';
 end $$;

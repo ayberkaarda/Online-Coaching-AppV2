@@ -8,17 +8,43 @@
 // normalize tablolarında yaşıyor ve yalnızca ilgili sekmelerden yazılıyor;
 // bu editörler cutover sonrası DEPRECATED profil kolonlarına yazan "ölü yazma"
 // hâline gelmişti (koç kaydediyor, danışan hiç görmüyordu).
+//
+// ###########################################################################
+// # B-036 — KİLO GRAFİĞİ ARTIK `progress_entries`TEN BESLENİYOR              #
+// #                                                                           #
+// # Bu grafik Faz 4c'ye kadar `form_checks.current_weight`ten çiziliyordu;    #
+// # `StatsTab` ise aynı dönemde `progress_entries`e geçmişti. İki ekran AYNI  #
+// # danışan için FARKLI kilo eğrileri gösteriyordu (drift) — AC-4.2'nin       #
+// # ("grafik verisi TEK endpoint'ten gelir ve TÜM EKRANLAR AYNI SERİYİ        #
+// # çizer") doğrudan ihlali. Artık ikisi de `useProgressTrend`i çağırır.      #
+// #                                                                           #
+// # DRIFT VERİ KATMANINDA KAPANDI, GÖRÜNTÜLEME HİLESİYLE DEĞİL:              #
+// # `20260818090000_form_check_weight_to_progress.sql` bir AFTER INSERT       #
+// # trigger'ı + idempotent bir backfill ile form check kilolarını             #
+// # `progress_entries`e taşır. Yani bu bileşenin iki kaynağı istemcide        #
+// # birleştirmesine GEREK YOKTUR; tek tablo okur.                             #
+// #                                                                           #
+// # DAVRANIŞ DEĞİŞİKLİĞİ (bilinçli, kabul edildi): eski `1 Hafta / 1 Ay /    #
+// # Tümü` seçicisi §6'nın 7/30/90 GÜN seçicisiyle değişti. "Tümü" KALKTI —    #
+// # `useProgressTrend` sabit uzunlukta bir seri üretir (boş günler GAP kalır, #
+// # interpolasyon YOKTUR) ve sınırsız bir aralık bu sözleşmeyle bağdaşmaz.    #
+// # Karşılığında koç ile danışan ARTIK AYNI GRAFİĞİ görür.                    #
+// #                                                                           #
+// # POZ KARTLARINDAKİ "82 kg" ETİKETLERİ KALDI: onlar FOTOĞRAFIN meta         #
+// # verisidir ("bu kare çekildiğinde tartı bunu gösteriyordu"), trend serisi  #
+// # değildir (migration KARAR 4).                                             #
+// ###########################################################################
 
 import { Bell, Clock, ImageOff } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { JSX } from 'react'
 import {
+  Area,
+  AreaChart,
   Bar,
   BarChart,
   CartesianGrid,
   Legend,
-  Line,
-  LineChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -29,13 +55,18 @@ import { toast } from 'sonner'
 import { EmptyState, SkeletonCard, SkeletonChart } from '@/components/ui'
 import { tokens } from '@/design/tokens'
 import {
+  DEFAULT_TREND_RANGE_DAYS,
+  TREND_RANGE_DAYS,
+  summarizeMetric,
   useDailyLogs,
   useFormChecks,
   useLastCheckins,
   usePendingFormChecks,
+  useProgressTrend,
   useReviewFormCheck,
   useSendNotification,
   useSession,
+  type TrendRangeDays,
 } from '@/hooks'
 import type { ProfileWithAvatar } from '@/hooks/useProfile'
 import { daysSince, formatDateTR, formatDateTimeTR } from '@/lib/utils'
@@ -45,12 +76,10 @@ export interface CoachUserManagementProps {
   clients: ProfileWithAvatar[]
 }
 
-type WeightPeriod = 'week' | 'month' | 'all'
-
 export function CoachUserManagement({ clients }: CoachUserManagementProps): JSX.Element {
   const [selectedClient, setSelectedClient] = useState<ProfileWithAvatar | null>(null)
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
-  const [weightChartPeriod, setWeightChartPeriod] = useState<WeightPeriod>('month')
+  const [trendRangeDays, setTrendRangeDays] = useState<TrendRangeDays>(DEFAULT_TREND_RANGE_DAYS)
   // Kıyaslama seçimleri türetilmiş değer; state yalnızca kullanıcının manuel seçimini (override) tutar.
   const [beforePoseOverride, setBeforePoseOverride] = useState<string | null>(null)
   const [afterPoseOverride, setAfterPoseOverride] = useState<string | null>(null)
@@ -73,6 +102,9 @@ export function CoachUserManagement({ clients }: CoachUserManagementProps): JSX.
   const { data: lastCheckins } = useLastCheckins()
   const formChecksQuery = useFormChecks(selectedClient?.id)
   const dailyLogsQuery = useDailyLogs(selectedClient?.id)
+  // AC-4.2'nin TEK ENDPOINT'i. `StatsTab` de aynı hook'u aynı anahtarla çağırır
+  // -> koç ile danışan AYNI seriyi görür (bkz. dosya başlığı, B-036).
+  const trendQuery = useProgressTrend(selectedClient?.id, trendRangeDays)
   const sendNotification = useSendNotification()
   const { data: session } = useSession()
   const coachId = session?.user.id
@@ -199,39 +231,22 @@ export function CoachUserManagement({ clients }: CoachUserManagementProps): JSX.
     return daysSince(lastDate, new Date(nowMs)) > 7
   }
 
-  const filteredWeightData = useMemo(() => {
-    if (poses.length === 0) return []
-
-    // Render saf kalsın diye Date.now() yerine state'teki `nowMs` kullanılır.
-    let cutoff = new Date(0)
-    if (weightChartPeriod === 'week') cutoff = new Date(nowMs - 7 * 86_400_000)
-    else if (weightChartPeriod === 'month') cutoff = new Date(nowMs - 30 * 86_400_000)
-
-    return poses
-      .filter((pose) => new Date(pose.created_at) >= cutoff)
-      .map((pose) => ({
-        date: new Date(pose.created_at).toLocaleDateString('tr-TR', {
-          day: 'numeric',
-          month: 'short',
-        }),
-        kilo: pose.current_weight,
-      }))
-      .reverse()
-  }, [poses, weightChartPeriod, nowMs])
-
-  const firstWeight = filteredWeightData[0]
-  const lastWeight = filteredWeightData[filteredWeightData.length - 1]
+  // Seri BURADA ÜRETİLMEZ: `useProgressTrend` (-> `buildTrendSeries`) üretir.
+  // Özet de aynı seriden türetilir, ham satırlardan DEĞİL — böylece grafik ile
+  // altındaki metin ASLA birbirinden ayrışamaz.
+  const trend = trendQuery.data
+  const weightSummaryData = trend ? summarizeMetric(trend, 'weight_kg') : null
   const weightSummary =
-    firstWeight && lastWeight
-      ? `İlk kayıt ${firstWeight.kilo} kg, son kayıt ${lastWeight.kilo} kg, net değişim ${(
-          lastWeight.kilo - firstWeight.kilo
+    weightSummaryData?.first && weightSummaryData.last
+      ? `İlk ölçüm ${weightSummaryData.first.value} kg, son ölçüm ${weightSummaryData.last.value} kg, net değişim ${(
+          weightSummaryData.delta ?? 0
         ).toFixed(1)} kg.`
       : ''
 
   const beforePose = poses.find((p) => p.id === beforePoseId)
   const afterPose = poses.find((p) => p.id === afterPoseId)
   const clientCards = clients.filter((c) => c.role !== 'coach')
-  const isLoading = formChecksQuery.isLoading || dailyLogsQuery.isLoading
+  const isLoading = formChecksQuery.isLoading || dailyLogsQuery.isLoading || trendQuery.isLoading
 
   return (
     <div>
@@ -464,61 +479,42 @@ export function CoachUserManagement({ clients }: CoachUserManagementProps): JSX.
                       <h3 className="text-sm font-bold uppercase tracking-wider text-gray-500">
                         Kilo Değişim Trendi
                       </h3>
-                      <div className="flex rounded-lg bg-gray-100 p-1 dark:bg-zinc-900">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            // "Şimdi" event handler'da tazelenir; render saf kalır.
-                            setWeightChartPeriod('week')
-                            setNowMs(Date.now())
-                          }}
-                          aria-pressed={weightChartPeriod === 'week'}
-                          className={`rounded-md px-3 py-1 text-xs font-bold ${
-                            weightChartPeriod === 'week'
-                              ? 'bg-white text-accent dark:bg-zinc-700'
-                              : 'text-gray-500'
-                          }`}
-                        >
-                          1 Hafta
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setWeightChartPeriod('month')
-                            setNowMs(Date.now())
-                          }}
-                          aria-pressed={weightChartPeriod === 'month'}
-                          className={`rounded-md px-3 py-1 text-xs font-bold ${
-                            weightChartPeriod === 'month'
-                              ? 'bg-white text-accent dark:bg-zinc-700'
-                              : 'text-gray-500'
-                          }`}
-                        >
-                          1 Ay
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setWeightChartPeriod('all')
-                            setNowMs(Date.now())
-                          }}
-                          aria-pressed={weightChartPeriod === 'all'}
-                          className={`rounded-md px-3 py-1 text-xs font-bold ${
-                            weightChartPeriod === 'all'
-                              ? 'bg-white text-accent dark:bg-zinc-700'
-                              : 'text-gray-500'
-                          }`}
-                        >
-                          Tümü
-                        </button>
+                      {/* ARALIK SEÇİCİ — §6: 7/30/90 GÜN. `StatsTab` ile AYNI
+                          değerler ve AYNI hook parametresi; "Tümü" seçeneği
+                          bilinçli olarak KALDIRILDI (bkz. dosya başlığı). */}
+                      <div
+                        role="group"
+                        aria-label="Trend aralığı"
+                        className="flex rounded-lg bg-gray-100 p-1 dark:bg-zinc-900"
+                      >
+                        {TREND_RANGE_DAYS.map((days) => (
+                          <button
+                            key={days}
+                            type="button"
+                            onClick={() => {
+                              setTrendRangeDays(days)
+                              // "Şimdi" event handler'da tazelenir; render saf kalır.
+                              // (Gecikme göstergeleri `nowMs`'e bakar.)
+                              setNowMs(Date.now())
+                            }}
+                            aria-pressed={trendRangeDays === days}
+                            className={`rounded-md px-3 py-1 text-xs font-bold ${
+                              trendRangeDays === days
+                                ? 'bg-white text-accent dark:bg-zinc-700'
+                                : 'text-gray-500'
+                            }`}
+                          >
+                            {days} gün
+                          </button>
+                        ))}
                       </div>
                     </div>
                     <figure className="h-64 w-full">
-                      {filteredWeightData.length > 0 ? (
+                      {trend && trend.measuredDays > 0 ? (
                         <>
                           <ResponsiveContainer width="100%" height="100%">
-                            <LineChart
-                              data={filteredWeightData}
+                            <AreaChart
+                              data={trend.points}
                               margin={{ top: 5, right: 10, left: -20, bottom: 0 }}
                             >
                               <CartesianGrid
@@ -528,11 +524,12 @@ export function CoachUserManagement({ clients }: CoachUserManagementProps): JSX.
                                 vertical={false}
                               />
                               <XAxis
-                                dataKey="date"
+                                dataKey="label"
                                 stroke="#666"
                                 fontSize={12}
                                 tickLine={false}
                                 axisLine={false}
+                                minTickGap={16}
                               />
                               <YAxis
                                 stroke="#666"
@@ -549,26 +546,37 @@ export function CoachUserManagement({ clients }: CoachUserManagementProps): JSX.
                                   color: '#fff',
                                 }}
                               />
-                              <Line
+                              <Area
                                 type="monotone"
-                                dataKey="kilo"
+                                dataKey="weight_kg"
+                                name="Kilo (kg)"
+                                // İNTERPOLASYON YOK (§6): seri ölçümsüz gün için
+                                // `null` taşır ve `connectNulls` AÇIKÇA false'tur —
+                                // recharts varsayılanına GÜVENİLMEZ, sessizce
+                                // dönerse boşluklar kapanır ve kimse fark etmez.
+                                // `StatsTab`teki grafikle BİREBİR aynı sözleşme.
+                                connectNulls={false}
                                 // Recharts JS renk değeri bekliyor; statik tokens.light.accent
                                 // kullanılıyor (tema duyarlı grafik renkleri Faz 4 grafik
                                 // tekleştirme işine ait, bkz. AC-4.3).
                                 stroke={tokens.light.accent}
+                                fill={tokens.light.accent}
+                                fillOpacity={0.2}
                                 strokeWidth={3}
                                 dot={{ r: 4, fill: tokens.light.accent }}
                                 activeDot={{ r: 6 }}
                               />
-                            </LineChart>
+                            </AreaChart>
                           </ResponsiveContainer>
                           <figcaption className="sr-only">
-                            Kilo değişim grafiği: {filteredWeightData.length} kayıt. {weightSummary}
+                            Kilo değişim grafiği, son {trend.rangeDays} gün. {trend.measuredDays}{' '}
+                            ölçüm günü. {weightSummary} Ölçüm yapılmayan günlerde çizgi kesilir; ara
+                            değer üretilmez.
                           </figcaption>
                         </>
                       ) : (
                         <div className="flex h-full items-center justify-center text-sm text-gray-500">
-                          Veri yok.
+                          Seçili aralıkta kayıtlı ölçüm yok.
                         </div>
                       )}
                     </figure>
