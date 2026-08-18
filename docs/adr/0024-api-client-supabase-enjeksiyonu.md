@@ -221,3 +221,194 @@ Faz 4.5 commit 5'te (bu ADR'nin kapsamı dışında, ileride):
 - `apps/mobile/**` — kendi Supabase istemcisi + aynı sarmalama (commit 6 ile birlikte)
 - `tests/unit/test-utils.tsx` ve ilgili 9 test dosyası — mock hedefi güncellenir
 - `scripts/identity-ratchet.mjs` deseninde yeni bir CI kontrolü (commit 7)
+
+## Uygulama sözleşmesi (2026-08-18 eki)
+
+Bu ADR yazılırken iki kalem **fiyatlanmamıştı**: `apps/web/src/lib/storage.ts`'in
+hook olmadığı için `useSupabaseClient()` çağıramaması, ve `apps/web/src/lib/logger.ts`'in
+taşıma sonrası evi. İkisi de ölçüldü ve commit 5 başlamadan önce burada somut bir sözleşmeye
+bağlandı. Yukarıdaki "Karar" bölümü **değişmedi** — bu yalnızca eksik iki kalemin eki, mevcut
+metnin yerini almaz.
+
+### Ek-1 — `storage.ts` hook değil: istemci parametre sözleşmesi
+
+Ölçüm: `apps/web/src/lib/storage.ts` (173 satır) **üç düz `async function` export** ediyor —
+`createSignedUrl` (satır 61), `removeStoredObject` (satır 101), `createSignedUrls` (satır 133) —
+ve her biri gövdesinde doğrudan modül seviyesindeki `supabase` singleton'ını kullanıyor (`import
+{ supabase } from '@/lib/supabase/client'`, satır 14). Bunlar React hook'u DEĞİL; dolayısıyla
+Karar bölümündeki `const supabase = useSupabaseClient()` deseni bu üç fonksiyonun **içinde**
+uygulanamaz — React hook kuralları hook olmayan bir fonksiyonun içinde `useContext` tabanlı bir
+hook çağırmasına izin vermez.
+
+Ölçülen tüketiciler — 4 hook (hepsi zaten §"Etkilenen dosyalar" tablosundaki 16 dosyanın
+içinde, kendi `useSupabaseClient()` geçişlerini yapacaklar):
+
+| Hook                             | Çağrı satırı | Fonksiyon(lar)                                              |
+| -------------------------------- | ------------ | ----------------------------------------------------------- |
+| `src/hooks/useFormChecks.ts`     | 66, 175      | `createSignedUrls`                                          |
+| `src/hooks/useMessages.ts`       | 464          | `createSignedUrl`                                           |
+| `src/hooks/useProfile.ts`        | 45, 63, 134  | `createSignedUrl`, `createSignedUrls`, `removeStoredObject` |
+| `src/hooks/useProgressPhotos.ts` | 77, 179      | `createSignedUrls`, `removeStoredObject`                    |
+
+**Karar: istemci açık ilk parametre olarak geçer.** Tam imzalar (bugünkü imzaların önüne
+`client: SupabaseClient<Database>` eklenir, geri kalan parametre sırası ve dönüş tipleri
+**değişmez**):
+
+```ts
+import type { SupabaseClient } from '@supabase/supabase-js'
+import type { Database } from '@repo/types'
+
+export async function createSignedUrl(
+  client: SupabaseClient<Database>,
+  bucket: string,
+  path: string | null | undefined
+): Promise<string | null>
+
+export async function removeStoredObject(
+  client: SupabaseClient<Database>,
+  bucket: string,
+  path: string | null | undefined
+): Promise<boolean>
+
+export async function createSignedUrls(
+  client: SupabaseClient<Database>,
+  bucket: string,
+  paths: readonly (string | null | undefined)[]
+): Promise<Map<string, string>>
+```
+
+Fonksiyon gövdelerinde `supabase.storage...` çağrıları `client.storage...` olarak değişir
+(satır 69, 109, 144); geri kalan mantık (normalize, `isStoragePath`, hata politikası — asla
+fırlatmaz) **birebir korunur**. Çağıran taraf deseni (örnek, `useProfile.ts`):
+
+```ts
+// Öncesi
+import { createSignedUrl } from '@/lib/storage'
+// ... hook gövdesinde:
+avatarSignedUrl: await createSignedUrl(AVATAR_BUCKET, data.avatar_path)
+
+// Sonrası
+import { useSupabaseClient } from '@repo/api-client/context'
+import { createSignedUrl } from '@repo/api-client/storage'
+// ... hook gövdesinde:
+const supabase = useSupabaseClient()
+// ...
+avatarSignedUrl: await createSignedUrl(supabase, AVATAR_BUCKET, data.avatar_path)
+```
+
+`useMessages.ts`'teki kullanım (satır 464) bir `queryFn: () => createSignedUrl(...)`
+kapatması içinde; `supabase` değişkeni saran hook'un üst kapsamında `useSupabaseClient()`'tan
+bir kez alınır ve closure ile taşınır — TanStack Query'nin `queryFn`'i her çağrıda yeniden
+oluşturulmadığı sürece davranış değişmez.
+
+#### Değerlendirilen alternatifler
+
+- **Fabrika fonksiyonu** (`createStorageClient(client)` bağlı üç fonksiyon döndürür, hook
+  `useMemo(() => createStorageClient(supabase), [supabase])` ile bir kez üretir). Reddedildi:
+  üç fonksiyon zaten durumsuz (stateless); istemciyi bağlamak için bir nesne icat etmek, tek bir
+  parametre eklemenin sağladığı sadeliğe hiçbir şey katmıyor, üstüne her hook'a bir `useMemo`
+  yükü ekliyor.
+- **Modül seviyesi setter** (`let _client; export function setStorageClient(c) { _client = c }`,
+  fonksiyonlar `_client`'ı kapanışta okur). Reddedildi: bu ADR'nin Karar bölümünün tam olarak
+  kaçındığı modül-seviyesi singleton desenini birebir yeniden üretiyor — mobil, `Provider`
+  render edilmeden önce setter'ı çağırmayı unutursa sessizce web'in (ya da hiçbir) istemcisiyle
+  çalışır; iki uygulama örneği (ör. test + gerçek render) aynı anda farklı istemci enjekte
+  ederse son çağıran kazanır ve diğeri sessizce bozulur. AC-4.5.5'in "yalnızca
+  `packages/api-client` içinde `.from(`" şartını yapısal değil disiplinle sağlar hale getirir —
+  Karar bölümünün reddettiği "Singleton'ı `packages/api-client`'a taşımak" alternatifiyle aynı
+  sınıf hatayı taşır.
+
+#### Test etkisi
+
+- **`apps/web/tests/unit/storage.test.ts`**: bugün `vi.mock('@/lib/supabase/client', () => ({
+supabase: { storage: { from: fromMock } } }))` (satır 21-23) ile modülü taklit edip
+  `createSignedUrl(AVATAR_BUCKET, 'uid-1.jpg')` gibi çağırıyor (satır 61). İstemci artık parametre
+  olduğu için bu `vi.mock`/`vi.hoisted` bloğu (satır 9-23) **tamamen kalkar** — test yerine sahte
+  bir istemci nesnesi kurup doğrudan geçirir: `createSignedUrl(fakeClient, AVATAR_BUCKET,
+'uid-1.jpg')` (`fakeClient = { storage: { from: fromMock } } as unknown as
+SupabaseClient<Database>`). Test dosyası `packages/api-client`'ın kendi test dizinine taşınır
+  (bkz. taşıma envanteri §4, vitest config paket başına ayrılıyor).
+- **`apps/web/tests/unit/storage-cleanup.test.ts`**: hem `removeStoredObject`'i doğrudan çağırıyor
+  (satır 111 vb., `client` parametresi eklenmesi gerekir) hem de `useUploadAvatar`'ı (`useProfile.ts`)
+  `renderHook` ile sürüyor (satır 150+). `useProfile.ts` da aynı commit'te `useSupabaseClient()`'a
+  geçeceği için bugünkü `vi.mock('@/lib/supabase/client', ...)` (satır 38-45) kalkar;
+  `createWrapper()` (satır 92-99) `QueryClientProvider`'ın yanına `<SupabaseClientProvider
+client={fakeClient}>` eklemeli — bu, ADR'nin "Riskler" bölümünde zaten öngörülen 9 test
+  dosyasının ortak kalıbıyla aynıdır.
+
+### Ek-2 — `logger.ts`'in evi
+
+Ölçüm: `apps/web/src/lib/logger.ts` (242 satır) tarayıcıda `createConsoleLogger` (satır 127,
+pino KULLANMAZ, salt `console.*` + `maskForConsole` derin maskeleme), sunucuda `createPinoLogger`
+(satır 179) kullanıyor; seçim `typeof window !== 'undefined'` (satır 233) ile yapılıyor.
+`createPinoLogger` içindeki `require('pino')` (satır 185) **yalnızca**
+`process.env.NEXT_RUNTIME === 'nodejs'` dalında çalışır (satır 181) — dosyanın kendi yorumu
+(satır 176-177) bu dalın istemci derlemesinde webpack tarafından sabit `false`'a indirgenip
+**tamamen elendiğini** iddia ediyor; bu, Next.js'in `DefinePlugin` + üretim minifikasyonuyla
+bilinen, dosyanın bugün güvenle dayandığı bir davranış.
+
+`apps/web/src` içinde logger'ı import eden **11 dosya** ölçüldü (`grep -rl "from
+'@/lib/logger'"`), ikiye ayrılıyor:
+
+| Grup                                                                                                                                                                 | Sayı | Kader (bu ADR + ADR-0023 kapsamı)                                                                                                                       |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Sunucu-özel Route Handler / middleware yardımcıları (`src/lib/api/proxy.ts`, `src/lib/api/response.ts`, `src/app/api/auth/sign-in/route.ts`, `src/proxy.ts`)         | 4    | `apps/web`'de kalıyor (taşıma envanteri §3) — pino dalına gerçekten ihtiyaç duyuyor                                                                     |
+| İstemci bileşenleri (`src/components/ui/ErrorBoundary.tsx`, `src/app/error.tsx`)                                                                                     | 2    | `apps/web`'de kalıyor — yalnızca konsol dalını kullanıyor                                                                                               |
+| `packages/api-client`'a taşınacak modüller (`src/hooks/useFormChecks.ts`, `useCatalog.ts`, `useSession.ts`, `src/lib/storage.ts`, `src/lib/query/security-event.ts`) | 5    | konsol dalına ihtiyaç duyuyor, pino dalına **hiç** duymuyor — bunlar her zaman `'use client'` React hook'ları, hiçbir zaman sunucu tarafında çalışmıyor |
+
+Yani `packages/api-client`'a taşınan hiçbir tüketici pino'ya ihtiyaç duymuyor; `apps/web`'de
+kalan 4 Route Handler yardımcısı ise gerçekten pino'ya bağımlı. Sorun logger'ın kendisinin değil,
+`packages/api-client`'ın (ve ileride `apps/mobile`'ın) `apps/web/src/lib/logger.ts`'e bağımlı hale
+gelmesi — monorepo'da paketler uygulamalara bağımlı OLAMAZ (bağımlılık yönü tersine döner: `apps/web`
+zaten `packages/api-client`'a bağımlı, tersi bir döngü kurar).
+
+**Karar: yeni `packages/logger` paketi.** Platformdan bağımsız çekirdek (`Logger` arayüzü,
+`REDACT_PATHS`/`SENSITIVE_KEYS`, `maskForConsole`, `createConsoleLogger`, ve bunlardan kurulan
+hazır bir `logger = createConsoleLogger()` + `createRequestLogger`) bu pakete taşınır.
+`REDACT_PATHS` gerçekten platformdan bağımsız — yalnızca anahtar-adı desenleri, hiçbir Node/DOM
+API'sine dokunmuyor (ölçüldü, satır 37-71). `apps/web/src/lib/logger.ts` **kalır** ama küçülür:
+yalnızca `createPinoLogger` + `typeof window` dallanan `createLogger()` orkestratörünü tutar,
+çekirdeği `@repo/logger`'dan import eder. `packages/api-client`'ın 5 modülü (yukarıdaki tablo)
+`@repo/logger`'dan doğrudan `logger` alır — pino'ya hiç dokunmadığı için `SupabaseClientProvider`
+gibi bir context enjeksiyonuna ihtiyaçları yok, davranış platform başına değişmiyor.
+
+#### Değerlendirilen alternatifler
+
+- **(a) `logger.ts`'i bütünüyle `packages/api-client`'a taşımak.** Reddedildi — `apps/mobile`
+  (commit 6) bu paketi Supabase istemcisiyle birlikte import edecek; `createPinoLogger`'daki
+  `require('pino')` çağrısı `NEXT_RUNTIME` kontrolüyle çalışma zamanında ölü dal olsa da, bu
+  eleme Next.js'in webpack `DefinePlugin`+üretim minifikasyonuna özgü bir davranış (dosyanın
+  kendi yorumu, satır 176-177). React Native'in derleyicisi (Metro) `process.env.NEXT_RUNTIME`'ı
+  tanımıyor/sabitlemiyor ve webpack'in yaptığı gibi ölü dalı çözümleme AŞAMASINDAN ÖNCE elemiyor
+  — Metro dosyanın AST'sini tarayıp bulduğu her `require()` çağrısını modül grafiğine eklemeye
+  çalışır, dal çalışma zamanında hiç yürütülmese bile. `pino` (ve `thread-stream`/`sonic-boom`
+  gibi Node çekirdek modüllerine — `fs`, `worker_threads` — bağımlı alt bağımlılıkları) Metro'da
+  polyfill'siz çözümlenemez; en olası sonuç bundle-time "Unable to resolve module" hatası. (Not:
+  `apps/mobile` henüz yok — Faz 4.5 commit 6 — bu yüzden bu iddia bu turda gerçek bir Metro
+  build'iyle DOĞRULANAMADI; belgelenmiş Metro davranışına dayanan bir çıkarımdır, commit 6'da
+  ölçülerek teyit edilmeli.) Bu, ADR'nin Karar bölümünün "Singleton'ı `packages/api-client`'a
+  taşımak" alternatifini reddetme gerekçesiyle (web'e özgü bir çalışma zamanı bağımlılığının
+  mobile sızması) aynı sınıf risktir.
+- **(c) `logger.ts` `apps/web`'de kalsın, `packages/api-client` ona context enjeksiyonuyla
+  erişsin** (Supabase istemcisiyle simetrik bir `LoggerProvider`/`useLogger()`). Reddedildi, iki
+  gerekçeyle: (1) Supabase istemciği için enjeksiyon gerekliydi çünkü platform başına GERÇEKTEN
+  farklı bir uygulama var (cookie deposu vs. `SecureStore`); konsol adaptörü ise web ve mobilde
+  **birebir aynı** — enjekte edilecek platforma özgü bir varyant yok, bu yüzden bir context
+  katmanı yalnızca mekanik yük ekler (her kök layout'a bir `Provider` daha, "provider dışında
+  çağrıldı" hata sınıfı bir kez daha). (2) Yapısal olarak ters: `packages/api-client`'ın
+  `apps/web`'deki bir dosyaya bağımlı olması, monorepo'da paketlerin uygulamalara değil
+  uygulamaların paketlere bağımlı olması gerektiği yönü tersine çevirir — `apps/web/src/lib/logger.ts`
+  zaten `packages/api-client`'a bağımlı olacak (Karar bölümündeki context deseni üzerinden
+  dolaylı olarak değil ama `providers.tsx` üzerinden doğrudan), döngüsel bir paket grafiği
+  kurulurdu.
+
+#### Etkilenen dosyalar (bu ekin kapsamı — commit 5'te, bu tur yalnızca sözleşme)
+
+- `packages/logger/**` (yeni paket)
+- `apps/web/src/lib/logger.ts` (küçülür, `@repo/logger`'ı import eder)
+- `apps/web/src/lib/storage.ts` → `packages/api-client/src/storage.ts` (Ek-1 imzalarıyla)
+- `apps/web/src/hooks/useFormChecks.ts`, `useMessages.ts`, `useProfile.ts`, `useProgressPhotos.ts`
+  (storage çağrılarına `supabase` parametresi eklenir)
+- `apps/web/src/lib/query/queryClient.ts`, `security-event.ts`, `supabase-error.ts` →
+  `packages/api-client` (logger importu `@repo/logger`'a döner)
+- `apps/web/tests/unit/storage.test.ts`, `storage-cleanup.test.ts` (Ek-1 test etkisi)

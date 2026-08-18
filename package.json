@@ -17,6 +17,7 @@
     "lint": "pnpm --filter web run lint",
     "lint:fix": "pnpm --filter web run lint:fix",
     "type-check": "pnpm --filter web run type-check",
+    "type-check:e2e": "pnpm --filter web run type-check:e2e",
     "test": "pnpm --filter web run test",
     "test:watch": "pnpm --filter web run test:watch",
     "test:coverage": "pnpm --filter web run test:coverage",
