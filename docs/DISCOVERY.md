@@ -1,5 +1,8 @@
 # Keşif Envanteri — Mevcut Durum
 
+> Bu dosya 2026-08-16 anlık görüntüsüdür, dondurulmuştur; Faz 4.5 taşıma envanteri şurada:
+> `docs/discovery/faz-4.5-tasima-envanteri.md`.
+
 **Tarih:** 2026-08-16
 **Üretim gerekçesi:** Bu doküman `active_planprogram.md` §0.1 ("Keşif önce gelir — hiçbir kod
 yazmadan önce tüm repo'yu tara, mevcut şemayı/route'ları/component'leri çıkar ve

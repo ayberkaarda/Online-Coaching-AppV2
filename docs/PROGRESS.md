@@ -48,9 +48,26 @@ gösteriyordu; bu arşivlemenin yarattığı bir kırık değildir.
 ## 1. Bugünkü durum (2026-08-18)
 
 - **Faz durumu:** Faz 0 → Faz 2, hosted senkronizasyonu, env koruması, **Faz 4 — İlerleme
-  Takibi** ve **A-05/A-14 turu** (ADR-0022) tamamlandı. Faz 3 (Yemek Fotoğrafı Makro Tahmini)
-  **ertelendi** (ADR-0021, `active_planprogram.md` §5). **Sıradaki iş: Faz 4.5 — Monorepo ve
-  Mobil Temel** (bkz. §5).
+  Takibi**, **A-05/A-14 turu** (ADR-0022) ve **B-036 borç turu** tamamlandı. Faz 3 (Yemek
+  Fotoğrafı Makro Tahmini) **ertelendi** (ADR-0021, `active_planprogram.md` §5). **Faz 4.5 —
+  Monorepo ve Mobil Temel**: ADR-0023/0024 + taşıma envanteri hazır, sıradaki adım koda geçiş
+  (commit 1 — npm → pnpm). Bkz. §5.
+- **B-036 turu sonucu (2026-08-18):** `CoachUserManagement` kilo grafiği artık
+  `progress_entries`'ten besleniyor (`useProgressTrend`); `form_checks` üzerine `AFTER INSERT`
+  trigger + idempotent backfill eklendi
+  (`supabase/migrations/20260818090000_form_check_weight_to_progress.sql`), yerel gün çevrimi
+  `form_check_entry_date()`'te (`Europe/Istanbul`), trigger `SECURITY INVOKER`. AC-4.2 "tüm
+  ekranlar" yarısı tamamlandı. Davranış değişikliği: koç grafiği seçicisi `1 Hafta/1 Ay/Tümü` →
+  `7/30/90` gün oldu, "Tümü" kalktı (bilinçli, ADR yok). `scripts/clean-e2e-data.mjs` yan
+  etkiyle düzeltildi — artık `progress_entries` satırlarının form check kökenli olup olmadığını
+  DB'nin kendi `form_check_entry_date()` fonksiyonuyla ayırt ediyor; B-023 açık kalmaya devam
+  ediyor.
+- **Faz 4.5 hazırlık turu sonucu (2026-08-18):** ADR-0023 (monorepo kesim planı, pnpm+Turborepo,
+  7 commit, iki dur-ve-sor kapısı) ve ADR-0024 (`packages/api-client` Supabase istemcisinin
+  React Context ile enjeksiyonu) kabul edildi; `docs/discovery/faz-4.5-tasima-envanteri.md`
+  taşımanın "önce" fotoğrafı. Kesin: `src/lib/api`'nin tamamı değil, yalnızca istemci-güvenli
+  kısmı (`types/client/ai/index`) `packages/api-client`'a taşınacak;
+  `proxy/auth-rate-limit/client-ip/response` `apps/web`'de kalıyor.
 - **Faz 4 sonucu (2026-08-17/18):** kilo/ölçü girişi + trend grafikleri (AC-4.1, AC-4.2),
   önce/sonra fotoğraf karşılaştırma, grafik kütüphanesi `recharts`'a tekleştirildi (AC-4.3,
   B-013 eksen rengi kısmı kapandı). Doğrulamada gerçek bir kullanıcı hatası bulundu ve
@@ -64,7 +81,7 @@ gösteriyordu; bu arşivlemenin yarattığı bir kırık değildir.
   `next-themes` nonce zinciri ADR'de öngörülmemişti) — ayrıntı: ADR-0022 "Uygulama notu" ekleri
   ve `archive/progress-a05-a14-cookie-nonce-csp.md`.
 - **Yerel yığın:** `npx supabase start` ile ayakta; PostgreSQL **17.6**
-  (`public.ecr.aws/supabase/postgres:17.6.1.141`), 25 migration + seed, 14 tablo,
+  (`public.ecr.aws/supabase/postgres:17.6.1.141`), 27 migration + seed, 14 tablo,
   **14/14 RLS enabled + forced**.
 - **Hosted proje:** `nxftmxkpmuyeelrmwofv.supabase.co` — yerel zincirin birebir aynısı
   (25 migration; tablo=14, force_rls=14, public politika=57, storage politika=12, fonksiyon=31).
@@ -119,6 +136,17 @@ gösteriyordu; bu arşivlemenin yarattığı bir kırık değildir.
 | Production build (A-05/A-14 sonrası)                             | `npm run build`                                                        | Başarılı; route tablosunda `○` kalmadı (10/10 `ƒ`)                                                                          | 2026-08-18 |
 | E2E testleri, paralel (A-05/A-14 sonrası)                        | `npm run test:e2e`                                                     | **52/54** — düşen ikili `plans.spec.ts:292` / `progress.spec.ts:66` (B-037, cookie/CSP kaynaklı değil)                      | 2026-08-18 |
 | E2E testleri, seri doğrulama (A-05/A-14 sonrası)                 | `npm run test:e2e -- --workers=1` (düşen ikili)                        | **14/14**                                                                                                                   | 2026-08-18 |
+| Veritabanı migration'ları (B-036 sonrası)                        | `npx supabase db reset`                                                | **27 migration, 0 hata**                                                                                                    | 2026-08-18 |
+| RLS politika testleri (B-036 sonrası)                            | `npm run test:rls`                                                     | **113/113** (110'dan; 3 yeni senaryo)                                                                                       | 2026-08-18 |
+| Plan transform testleri (B-036 sonrası)                          | `npm run test:transform`                                               | 26/26                                                                                                                       | 2026-08-18 |
+| Tip kontrolü (B-036 sonrası)                                     | `npm run type-check`                                                   | Temiz                                                                                                                       | 2026-08-18 |
+| Lint (B-036 sonrası)                                             | `npm run lint`                                                         | 0 hata, 17 uyarı (taban korundu)                                                                                            | 2026-08-18 |
+| Biçim (B-036 sonrası)                                            | `npm run format:check`                                                 | Temiz                                                                                                                       | 2026-08-18 |
+| Birim/bileşen testleri (B-036 sonrası)                           | `npm run test`                                                         | **626/626 (51 dosya)** (tur başında 614/50)                                                                                 | 2026-08-18 |
+| Production build (B-036 sonrası)                                 | `npm run build`                                                        | Başarılı                                                                                                                    | 2026-08-18 |
+| `db:types` diff (B-036 sonrası)                                  | `supabase gen types --local`                                           | 11 satır (yeni iki fonksiyon)                                                                                               | 2026-08-18 |
+| E2E testleri, paralel (B-036 sonrası)                            | `npm run test:e2e`                                                     | **52/54** — düşen ikili yine `plans.spec.ts:292` / `progress.spec.ts:66`                                                    | 2026-08-18 |
+| E2E testleri, seri doğrulama (B-036 sonrası)                     | `npm run test:e2e -- --workers=1` (plans+progress+form-check)          | **16/16** — düşüş B-037 kaynaklı, B-036'dan bağımsız olduğu kanıtlandı                                                      | 2026-08-18 |
 
 Tarihsel doğrulama satırları ilgili fazın arşiv dosyasındadır.
 
@@ -182,7 +210,6 @@ maddenin tam metni ve kanıtı `Kaynak` sütunundaki arşiv dosyasındadır.
 | B-033 | `.env.hosted.local` diskte düz metin `service_role` anahtarı taşıyor                                           | Env koruması — aynı dosya                                        | Açık — değişen tek şey varsayılan olarak yüklenmemesi                                                                                                                       |
 | B-034 | PostgREST v14.5 eşleşmesi `.temp` manifestine bağlı; hosted yükseltilirse sessiz sürükleme                     | Env koruması — aynı dosya                                        | Açık — `supabase link` yeniden koşulmalı                                                                                                                                    |
 | B-035 | Supabase CLI global PATH'te yok                                                                                | Ortam                                                            | Açık — `supabase ...` yerine `npx supabase ...` kullanılmalı                                                                                                                |
-| B-036 | `CoachUserManagement` hâlâ kendi kilo grafiğini `form_checks`'ten çiziyor (AC-4.2 "tüm ekranlar" tam değil)    | Faz 4 — `archive/progress-faz-4-ilerleme-takibi.md`              | Açık — form check kilolarının `progress_entries`'e taşınmasıyla kapanır                                                                                                     |
 | B-037 | `plans.spec.ts:292` / `progress.spec.ts:66` yerel E2E'de paralellik > 1'de sistematik düşüyor                  | Faz 4 — aynı dosya                                               | Açık — CI (workers=1) etkilenmiyor; yerel worker tavanı 2'ye indirildi                                                                                                      |
 | B-038 | `progress_photos` yüklemesinde `insert` başarısız olursa storage nesnesi yetim kalıyor                         | Faz 4 — aynı dosya                                               | Açık — `useFormChecks.uploadPose`'daki mevcut takasın aynısı, yeni değil                                                                                                    |
 | B-039 | `scripts/clean-e2e-data.mjs` mutasyona uğramış seed satırlarının durumunu geri yüklemiyor                      | Faz 4 — aynı dosya                                               | Açık — bilinçli, gerekçesi script çıktısında                                                                                                                                |
@@ -243,31 +270,33 @@ ADR'si olmayan ama hâlâ bağlayıcı üç sözleşme:
 
 ## 5. Sıradaki iş
 
-**Faz 4.5 — Monorepo ve Mobil Temel** (`active_planprogram.md` §7). Faz 4 — İlerleme
-Takibi — **tamamlandı** (2026-08-17/18, bkz. §2, `archive/progress-faz-4-ilerleme-takibi.md`).
+**Faz 4.5 — Monorepo ve Mobil Temel** (`active_planprogram.md` §7). ADR-0023 (kesim planı) ve
+ADR-0024 (api-client enjeksiyonu) + `docs/discovery/faz-4.5-tasima-envanteri.md` — **hazır**
+(2026-08-18); sıradaki adım Faz 4.5 **commit 1 (npm → pnpm)**. Faz 4 — İlerleme Takibi —
+**tamamlandı** (2026-08-17/18, bkz. §2, `archive/progress-faz-4-ilerleme-takibi.md`).
 A-05/A-14 turu (ADR-0022) — **tamamlandı** (2026-08-18, bkz. §2,
-`archive/progress-a05-a14-cookie-nonce-csp.md`). Faz 3 — Yemek Fotoğrafı Makro Tahmini —
-**ertelendi** (ADR-0021, `active_planprogram.md` §5); V0 (LLM'siz foto ekleme) dahil
-şimdilik yapılmıyor.
+`archive/progress-a05-a14-cookie-nonce-csp.md`). B-036 borç turu — **tamamlandı** (2026-08-18,
+bkz. §1). Faz 3 — Yemek Fotoğrafı Makro Tahmini — **ertelendi** (ADR-0021,
+`active_planprogram.md` §5); V0 (LLM'siz foto ekleme) dahil şimdilik yapılmıyor.
 
 Faz dışı, sıraya girmiş iş kalemleri: E2E veritabanı temizlik script'inin gerçek silme
 onayı (B-023, script yazıldı — `db:clean-e2e`) · katalog için sunucu taraflı arama +
-sayfalama (B-018) · düzenli hosted yedekleme stratejisi (B-030) ·
-`CoachUserManagement` kilo grafiğinin `progress_entries`'e bağlanması (B-036) · Faz 4.5'ten
-sonra sıraya giren Faz 4.6 — Güvenlik Tamamlama: KVKK hesap silme + AI kota
-(`active_planprogram.md` §7a; B-042, B-043).
+sayfalama (B-018) · düzenli hosted yedekleme stratejisi (B-030) · Faz 4.5'ten sonra sıraya
+giren Faz 4.6 — Güvenlik Tamamlama: KVKK hesap silme + AI kota (`active_planprogram.md` §7a;
+B-042, B-043).
 
 ---
 
 ## 6. Son oturumlar
 
-| Tarih                                  | İş                                                                                                                          |
-| -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| 2026-08-17 (Faz 2)                     | Koç-danışan çekirdek akışı, on dilim; vitest 502/502, RLS 104/104, E2E 50/50                                                |
-| 2026-08-17 (hosted senkronizasyonu)    | ADR-0020 uygulandı; hosted sıfırlanıp 25 migration push edildi, parite doğrulandı                                           |
-| 2026-08-17 (env koruması + yerel PG17) | Üç katmanlı env guard'ı + yerel Postgres 17; vitest 511/511, RLS 104/104, E2E 50/50                                         |
-| 2026-08-17/18 (Faz 4)                  | İlerleme takibi (4a–4d) + 3 düzeltme turu (UTC/yerel tarih hatası); vitest 598/598, RLS 110/110, E2E CI 54/54 / yerel 52/54 |
-| 2026-08-18 (A-05/A-14)                 | Oturum deposu cookie'ye, nonce tabanlı CSP; vitest 614/614, E2E 52/54 (seri doğrulama 14/14)                                |
+| Tarih                                  | İş                                                                                                                                                                     |
+| -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-08-17 (Faz 2)                     | Koç-danışan çekirdek akışı, on dilim; vitest 502/502, RLS 104/104, E2E 50/50                                                                                           |
+| 2026-08-17 (hosted senkronizasyonu)    | ADR-0020 uygulandı; hosted sıfırlanıp 25 migration push edildi, parite doğrulandı                                                                                      |
+| 2026-08-17 (env koruması + yerel PG17) | Üç katmanlı env guard'ı + yerel Postgres 17; vitest 511/511, RLS 104/104, E2E 50/50                                                                                    |
+| 2026-08-17/18 (Faz 4)                  | İlerleme takibi (4a–4d) + 3 düzeltme turu (UTC/yerel tarih hatası); vitest 598/598, RLS 110/110, E2E CI 54/54 / yerel 52/54                                            |
+| 2026-08-18 (A-05/A-14)                 | Oturum deposu cookie'ye, nonce tabanlı CSP; vitest 614/614, E2E 52/54 (seri doğrulama 14/14)                                                                           |
+| 2026-08-18 (B-036 + Faz 4.5 hazırlığı) | Form check kilosu progress_entries'e (trigger + backfill), koç grafiği bağlandı; ADR-0023/0024 + taşıma envanteri; vitest 626/626, RLS 113/113, E2E 52/54 (seri 16/16) |
 
 Tam oturum günlüğü (ve yeni oturum satırlarının ekleneceği yer):
 `archive/progress-oturum-gunlugu.md`.

@@ -1,6 +1,8 @@
 # 0009 — Monorepo ve mobil uygulamanın Faz 4.5'e ertelenmesi
 
-- **Durum:** Kabul edildi
+- **Durum:** Yerini aldı: 0023 (2026-08-18) — erteleme kararının kendisi geçerliydi ve
+  uygulandı; `0023-monorepo-kesim-plani.md` ertelenen işin **nasıl** kesileceğine dair somut
+  planı taşır.
 - **Tarih:** 2026-08-16
 - **Karar verenler:** Proje sahibi
 
