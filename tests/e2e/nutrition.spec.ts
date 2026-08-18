@@ -2,7 +2,10 @@
 //
 // AKIŞ: koç günlük makro hedefi belirler -> danışan (ikinci bir tarayıcı
 // bağlamında) hedefi görür -> öğün ekler -> dashboard (hedef vs gerçekleşen)
-// güncellenir -> danışan kaydı siler -> dashboard sıfırlanır.
+// güncellenir -> danışan kaydı siler -> dashboard ÖNCEKİ (silme öncesi) değere
+// döner. Dashboard iddiaları MUTLAK değil, DELTA'dır (bkz. `readActualKcal`
+// yorumu ve tests/e2e/README.md) — bugünün nutrition_logs toplamı önceki
+// koşulardan kalan satırları da kapsayabildiği için "0'dan başlar" varsayılmaz.
 //
 // Ayrıca koçun beslenme LOG'una (nutrition_logs) hiçbir yazma eylemi
 // SUNULMADIĞINI (RLS: koç salt okur, bkz. supabase/README.md §4h) gerçek
@@ -47,7 +50,54 @@ async function selectClient(page: Page, fullName: string): Promise<void> {
 /** Aktif sekme paneli — strict-mode ihlallerini önlemek için tüm seçiciler buna kapsanır. */
 const panelOf = (page: Page) => page.getByRole('tabpanel')
 
+/**
+ * Panelde "{gerçekleşen} / {hedef} kcal" satırındaki GERÇEKLEŞEN sayıyı okur.
+ *
+ * MUTLAK DEĞİL, FARK (delta) ÖLÇÜLÜR — bkz. tests/e2e/README.md ve
+ * `supabase/tests/rls.test.sql` senaryo 12/77 (aynı desen): `sumNutritionLogsForDate`
+ * (src/hooks/useNutritionLogs.ts) BUGÜNÜN nutrition_logs satırlarının TAMAMINI
+ * toplar, yani önceki (başarısız/yarım kalmış) koşulardan kalan satırlar da
+ * toplama girer — "henüz öğün girilmedi -> 0 kcal" varsayımı ÖLÇÜLEREK kırıldı
+ * (kalıntı: 2 satır/800 kcal, test 400 kcal bekliyordu, bkz. git geçmişi).
+ * `targetKcal` bu koşuya özgü rastgele bir değer olduğu için satırı benzersiz
+ * hedefler; ayrıca regex'in tam sayıyı araması hedefin GERÇEKTEN sayısal bir
+ * değer olduğunu (0 ile "hedef belirlenmedi" karışmadığını) da doğrular.
+ */
+async function readActualKcal(
+  panel: ReturnType<typeof panelOf>,
+  targetKcal: number
+): Promise<number> {
+  const row = panel.getByText(new RegExp(`/ ${targetKcal} kcal`))
+  await expect(row).toBeVisible()
+  const text = (await row.textContent()) ?? ''
+  const match = /^\s*(\d+)\s*\//.exec(text)
+  if (!match?.[1]) throw new Error(`Kalori satırı ayrıştırılamadı: "${text}"`)
+  return Number(match[1])
+}
+
 test.describe('Beslenme Akışı (§4.2)', () => {
+  // SAAT DİLİMİ — `test.use({ timezoneId: 'UTC' })` KALDIRILDI (bilerek).
+  //
+  // Bu dosyada bir süre tarayıcı bağlamı UTC'ye sabitlenmişti, çünkü öğün
+  // eklerken `log_date` GÖNDERİLMİYOR, veritabanının `current_date` (UTC)
+  // varsayılanına düşülüyordu; dashboard ise `todayIsoDate()` ile YEREL günü
+  // filtreliyordu. UTC+3'te yerel gece 00:00–03:00 penceresinde ikisi FARKLI
+  // takvim günü üretiyor ve eklenen öğün toplamda hiç görünmüyordu (ÖLÇÜLDÜ).
+  // Tarayıcıyı veritabanıyla aynı dilime sabitlemek yalnızca SEMPTOMU
+  // gizliyordu — gerçek kullanıcıyı korumuyordu.
+  //
+  // Hata ÜRÜN KODUNDA düzeltildi: dört yazma yolu da (nutrition_logs,
+  // daily_logs, progress_entries, progress_photos) tarihi İSTEMCİDEN, yerel
+  // gün olarak AÇIKÇA gönderir ve tarih alanları tiplerde ZORUNLUDUR
+  // (src/lib/date.ts + tests/unit/local-date-consistency.test.ts). Yazma ve
+  // okuma artık AYNI kaynağı kullandığı için senaryo tarayıcının saat
+  // diliminden BAĞIMSIZDIR; sabitlemeye gerek yoktur ve sabitlemek, aynı
+  // hatanın geri gelmesini bu testten SAKLARDI.
+  //
+  // DOĞRULANDI: bu spec, host makinesi Europe/Istanbul (UTC+3) iken ve yerel
+  // saat gece yarısı penceresinin İÇİNDEYKEN (yerel ~00:45 / UTC ~21:45,
+  // yani yerel gün UTC gününden İLERİDE) sabitleme olmadan koşuldu ve GEÇTİ.
+
   // İZOLASYON: aşağıdaki senaryo client1'in TEK aktif `nutrition_plans`
   // satırının hedef kolonlarına ve `nutrition_logs` kayıtlarına yazar. Dosya içi
   // `mode: 'default'` YETMİYORDU, çünkü her spec AYNI anda iki projede
@@ -93,9 +143,10 @@ test.describe('Beslenme Akışı (§4.2)', () => {
 
         const clientPanel = panelOf(clientPage)
         await expect(clientPanel.getByText('Günlük Makro Durumu')).toBeVisible()
-        // Henüz öğün girilmedi -> "0 / {hedef} kcal" (0 İLE "hedef verilmedi"
-        // KARIŞTIRILMAZ: hedef burada GERÇEKTEN sayısal bir değerdir).
-        await expect(clientPanel.getByText(`0 / ${targetKcal} kcal`)).toBeVisible()
+        // MUTLAK DEĞİL, FARK (delta) ÖLÇÜLÜR (bkz. `readActualKcal` yorumu): bugünkü
+        // gerçekleşen kcal önceki (başarısız/yarım kalmış) koşulardan kalan
+        // satırları da içerebilir, bu yüzden burada 0 VARSAYILMAZ — okunur.
+        const baseActualKcal = await readActualKcal(clientPanel, targetKcal)
 
         // Danışan koç değildir -> hedef editörünü GÖRMEZ.
         await expect(clientPanel.getByText('Günlük Makro Hedefi')).toHaveCount(0)
@@ -108,14 +159,24 @@ test.describe('Beslenme Akışı (§4.2)', () => {
         // useNutritionLogs.ts -> useCreateNutritionLog onSuccess toast'ı.
         await expect(clientPage.getByText('Öğün eklendi.')).toBeVisible()
 
-        // --- 4) Dashboard güncellenir: gerçekleşen artık mealKcal'dır ---
-        await expect(clientPanel.getByText(`${mealKcal} / ${targetKcal} kcal`)).toBeVisible()
+        // --- 4) Dashboard güncellenir: gerçekleşen ÖNCEKİ DEĞER + mealKcal olmalı (delta) ---
+        await expect
+          .poll(() => readActualKcal(clientPanel, targetKcal), {
+            message: 'öğün eklendikten sonra dashboard güncellemesini beklerken',
+          })
+          .toBe(baseActualKcal + mealKcal)
         await expect(clientPanel.getByText(mealDescription)).toBeVisible()
 
-        // --- 5) Danışan kaydı siler, dashboard 0'a döner ---
+        // --- 5) Danışan kaydı siler, dashboard ÖNCEKİ DEĞERE (baseActualKcal) döner ---
+        // (0'a DEĞİL — birikmiş kalıntı varsa dashboard o kalıntıya geri döner;
+        // bu test yalnızca KENDİ eklediği satırı siler.)
         await clientPanel.getByRole('button', { name: `${mealDescription} kaydını sil` }).click()
         await expect(clientPage.getByText('Öğün silindi.')).toBeVisible()
-        await expect(clientPanel.getByText(`0 / ${targetKcal} kcal`)).toBeVisible()
+        await expect
+          .poll(() => readActualKcal(clientPanel, targetKcal), {
+            message: 'öğün silindikten sonra dashboard güncellemesini beklerken',
+          })
+          .toBe(baseActualKcal)
         await expect(clientPanel.getByText(mealDescription)).toHaveCount(0)
       } finally {
         await clientContext.close()
