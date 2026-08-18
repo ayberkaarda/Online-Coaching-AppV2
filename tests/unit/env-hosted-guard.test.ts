@@ -78,7 +78,7 @@ describe('getServerEnv — barındırılan Supabase hedefi guard (KATMAN 2)', ()
   // KRİTİK REGRESYON TESTİ — guard'ın `NODE_ENV`'e KOŞULLANMADIĞININ kanıtı.
   //
   // ADR-0020'nin ilk önerisi olan `NODE_ENV !== 'production'` koşullu guard İŞE YARAMAZDI:
-  // kaza eseri yazmanın gerçek yolu `npm run build && npm run start` üzerinden geçiyor ve
+  // kaza eseri yazmanın gerçek yolu `pnpm run build && pnpm run start` üzerinden geçiyor ve
   // `next start` NODE_ENV=production ile koşuyor (e2e paketi de öyle). Guard, korumaya
   // çalıştığı senaryonun tam ortasında kendini kapatırdı. Bu test o hatanın geri gelmesini
   // engeller: birisi guard'ı `NODE_ENV` ile koşullarsa BU TEST KIRILIR.
@@ -109,7 +109,7 @@ describe('getServerEnv — barındırılan Supabase hedefi guard (KATMAN 2)', ()
 
     expect(caught).toBeDefined()
     expect(caught?.message).toContain('ALLOW_HOSTED_TARGET=1')
-    expect(caught?.message).toContain('npm run dev:hosted')
+    expect(caught?.message).toContain('pnpm run dev:hosted')
     expect(caught?.message).toContain('.env.local')
     expect(caught?.message).toContain('docs/DEPLOYMENT.md')
     // Hedef host teşhis için mesajda olmalı; hicbir ANAHTAR DEGERI (JWT) olmamalı.

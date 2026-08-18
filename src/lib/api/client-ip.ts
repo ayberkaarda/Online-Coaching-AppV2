@@ -11,7 +11,7 @@
 // GROUP.serverOnly` içinde sınıflandırır (bkz. `node_modules/next/dist/lib/constants.js`) ve
 // `server-only`'yi o katmanda no-op bir modüle alias'lar (bkz.
 // `node_modules/next/dist/build/create-compiler-aliases.js`, `createServerOnlyClientOnlyAliases`);
-// yani `src/proxy.ts` içinde `server-only` fiilen SORUNSUZ ÇALIŞIR. `npm run build` ile
+// yani `src/proxy.ts` içinde `server-only` fiilen SORUNSUZ ÇALIŞIR. `pnpm run build` ile
 // doğrulandı (bkz. AC-11 kabul kanıtı).
 //
 // Mantık A-02'den (güvenlik denetimi, findings-app-surface.md §3.2) devralınmıştır; daha önce

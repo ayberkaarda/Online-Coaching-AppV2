@@ -59,13 +59,13 @@ export type ServerEnv = z.infer<typeof serverSchema>
  * KATMAN 2 — BARINDIRILAN (hosted) SUPABASE PROJESİNE KAZA ESERİ SUNUCU TARAFI ERİŞİM.
  *
  * KAPATILAN YOL: bu süreçte `SUPABASE_SERVICE_ROLE_KEY` ile atılan her istek RLS'i BAYPAS
- * eder. Yerelde çalıştığını sanan bir `npm run build && npm run start` (ya da bir bakım
+ * eder. Yerelde çalıştığını sanan bir `pnpm run build && pnpm run start` (ya da bir bakım
  * script'i) barındırılan projeye yönlendirilmişse, gerçek production verisini hiçbir satır
  * seviyesinde politika durdurmadan yazabilir/silebilir. Bu, kaza eseri yazmanın EN PAHALI
  * yoludur, o yüzden burada FAIL-CLOSED kesilir.
  *
  * `NODE_ENV`'E KASITLI OLARAK KOŞULLANMADI. İlk akla gelen `NODE_ENV !== 'production'`
- * koşulu İŞE YARAMAZ: tehlikeli yol tam olarak `npm run build && npm run start` üzerinden
+ * koşulu İŞE YARAMAZ: tehlikeli yol tam olarak `pnpm run build && pnpm run start` üzerinden
  * geçer ve `next start` NODE_ENV=production ile koşar. Guard, korumaya çalıştığı senaryonun
  * içinde kendini kapatırdı. Bunun regresyon testi: `tests/unit/env-hosted-guard.test.ts`
  * ("NODE_ENV=production iken de fırlatır").
@@ -115,8 +115,8 @@ function assertHostedTargetAllowed(): void {
       'Ne yapmalı:\n' +
       '  - Yerel geliştirme/test: `.env.local` dosyanızın yerel yığını (http://127.0.0.1:54321) ' +
       'gösterdiğinden emin olun (`npx supabase status`).\n' +
-      '  - Barındırılan projeye BİLEREK bağlanıyorsanız: `npm run dev:hosted` (ya da ' +
-      '`npm run start:hosted`) kullanın — bunlar `.env.hosted.local` üzerinden ' +
+      '  - Barındırılan projeye BİLEREK bağlanıyorsanız: `pnpm run dev:hosted` (ya da ' +
+      '`pnpm run start:hosted`) kullanın — bunlar `.env.hosted.local` üzerinden ' +
       'ALLOW_HOSTED_TARGET=1 sağlar.\n' +
       '  - Gerçek production dağıtımı (Vercel/Docker): ortam değişkenlerine ' +
       'ALLOW_HOSTED_TARGET=1 ekleyin (bkz. docs/DEPLOYMENT.md §5).'

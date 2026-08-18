@@ -30,7 +30,7 @@ birkaç **entegrasyon uyuşmazlığının** (Next.js 16'da kaldırılan `next li
 dizisinin `@types/node`'u devre dışı bırakması, Dockerfile'ın sabit port bağlaması, taşınan CSV
 yollarının güncel olmayan dokümantasyonu, `downloadCSV`'nin iç içe nesneleri `[object Object]`
 yazması) düzeltilmesiyle birlikte hazırlandı. Aşağıdaki 7. ve 5. bölümler, bu ortamda
-doğrulanamayan noktaları ve bilinen teknik borcu dürüstçe listeler — ilk gerçek `npm install` /
+doğrulanamayan noktaları ve bilinen teknik borcu dürüstçe listeler — ilk gerçek `pnpm install` /
 `type-check` çalıştırmasında ek hatalar çıkması beklenmelidir.
 
 ---
@@ -48,7 +48,7 @@ doğrulanamayan noktaları ve bilinen teknik borcu dürüstçe listeler — ilk 
 - `src/types/` yapısı: `database.ts` (Supabase şemasından üretilen tipler), `domain.ts`
   (uygulama içi alan tipleri, ör. `DayName`), `index.ts`.
 - **Not:** `src/types/database.ts` şu an **elle yazılmış**. Gerçek şemayla senkron olduğu
-  doğrulanmamıştır; `npm run db:types` çalıştırılıp diff'lenmelidir (bkz. Bölüm 6 ve 7).
+  doğrulanmamıştır; `pnpm run db:types` çalıştırılıp diff'lenmelidir (bkz. Bölüm 6 ve 7).
 
 ### 2.2 Python backend servisleştirme
 
@@ -125,13 +125,13 @@ auth.uid())`: `SECURITY DEFINER`, `profiles` tablosundaki RLS'in kendi kendini �
   (`v8` provider) `lines 60 / functions 60 / branches 55 / statements 60`. Testler
   `tests/unit/` altında (`api-client`, `domain`, `env`, `query-keys`, `rate-limit`, `schemas`,
   `utils` ve `tests/unit/components/{EmptyState,ErrorBoundary,QueryState,Skeleton,
-ThemeToggle}.test.tsx`). Çalıştırma: `npm run test` / `npm run test:coverage`.
+ThemeToggle}.test.tsx`). Çalıştırma: `pnpm run test` / `pnpm run test:coverage`.
 - **pytest (backend)**: `ai_backend/tests/` — `conftest.py`, `test_csv_loader.py`,
   `test_health.py`, `test_nutrition_router.py`, `test_nutrition_service.py`,
   `test_recommendations_router.py`, `test_workout_router.py`, `test_workout_service.py`.
   Eşik `--cov-fail-under=70`.
 - **Playwright (E2E)**: `playwright.config.ts` — `testDir: './tests/e2e'`, chromium +
-  Mobile Chrome projeleri, `webServer` testten önce `npm run build && npm run start`
+  Mobile Chrome projeleri, `webServer` testten önce `pnpm run build && pnpm run start`
   otomatik çalıştırıyor. **Bu inceleme sırasında `tests/e2e/` dizini repoda henüz mevcut
   değildi** (bkz. Bölüm 5 ve 7) — README'de anılan `tests/e2e/README.md` ve senaryo
   dosyaları büyük olasılıkla hâlâ başka bir ajan tarafından yazılıyor.
@@ -214,8 +214,8 @@ ThemeToggle}.test.tsx`). Çalıştırma: `npm run test` / `npm run test:coverage
 
 Bu makinede `node`, `npm`, `python`, `git` PATH'te **yok**. Hiçbir build/test/lint/type-check
 komutu bu görev kapsamında çalıştırılamadı. Tüm kod statik inceleme (dosya okuma, grep,
-sözleşme/tip uyumu kontrolü) ile yazıldı ve gözden geçirildi. **İlk gerçek `npm install` /
-`npm run type-check` çalıştırmasında ek tip hataları çıkması beklenebilir** — özellikle
+sözleşme/tip uyumu kontrolü) ile yazıldı ve gözden geçirildi. **İlk gerçek `pnpm install` /
+`pnpm run type-check` çalıştırmasında ek tip hataları çıkması beklenebilir** — özellikle
 elle yazılmış `src/types/database.ts`'in gerçek şemayla uyuşup uyuşmadığı hiç doğrulanmadı.
 
 Ayrıca bu inceleme sırasında somut olarak gözlemlenen, henüz doğrulanamayan/eksik olabilecek
@@ -223,7 +223,7 @@ bir nokta: `playwright.config.ts` içindeki `testDir: './tests/e2e'` dizini bu g
 sırasında dosya sisteminde **bulunamadı** (yalnızca `tests/unit/` mevcuttu). README'de
 `tests/e2e/README.md`'den bahsediliyor olması, bu dizinin başka bir ajan tarafından hâlâ
 yazılmakta olduğuna işaret ediyor olabilir; ancak bu görev bitiminde durumu tekrar kontrol
-etmek gerekir — aksi halde `npm run test:e2e` boş/başarısız sonuç verir.
+etmek gerekir — aksi halde `pnpm run test:e2e` boş/başarısız sonuç verir.
 
 `docs/DEPLOYMENT.md` Bölüm 2 (Railway), Dockerfile'daki sabit `--port 8000`'in Railway'de
 `$PORT`'a uymadığını "bu değişiklik henüz kod tabanında yapılmamıştır" notuyla belgeliyordu.
@@ -236,25 +236,25 @@ düzenlemeyle güncellenmelidir.
 
 ## 6. Sıradaki adımlar
 
-Aşağıdaki adımları **sırayla** çalıştırın. `npm run type-check` ilk gerçek doğrulama noktasıdır
+Aşağıdaki adımları **sırayla** çalıştırın. `pnpm run type-check` ilk gerçek doğrulama noktasıdır
 ve muhtemelen ilk hataların çıkacağı yerdir.
 
 ```bash
 # 1) Frontend bağımlılıklarını kurar
-npm install
+pnpm install
 
 # 2) İLK GERÇEK DOĞRULAMA — TypeScript strict tip kontrolü.
 #    src/types/database.ts elle yazıldığı için burada hata çıkması olası.
-npm run type-check
+pnpm run type-check
 
 # 3) ESLint (flat config, eslint.config.mjs)
-npm run lint
+pnpm run lint
 
 # 4) Vitest birim/bileşen testleri
-npm run test
+pnpm run test
 
 # 5) Production build (next.config.mjs: output: 'standalone')
-npm run build
+pnpm run build
 
 # 6) Yerel Supabase yığınını başlatır (Postgres + Auth + Storage + Studio)
 npx supabase start
@@ -265,13 +265,13 @@ npx supabase db reset
 
 # 8) database.ts'i GERÇEK şemadan yeniden üretir — elle yazılmış olanla diff'leyin,
 #    farklılık varsa tip hatalarının kaynağı budur.
-npm run db:types
+pnpm run db:types
 
 # 9) AI backend: bağımlılık kurulumu, lint, tip kontrolü, testler
 cd ai_backend && uv sync && uv run ruff check . && uv run mypy app && uv run pytest
 
 # 10) E2E testler (tests/e2e/ dizininin mevcut ve dolu olduğunu önce doğrulayın — bkz. Bölüm 5)
-npm run test:e2e
+pnpm run test:e2e
 ```
 
 ### Windows PowerShell karşılıkları
@@ -280,17 +280,17 @@ PowerShell'de `&&` yoktur; sıralı ama koşulsuz zincirleme için `;` kullanın
 komutun başarısını kontrol etmek isterseniz `if ($?) { ... }` ekleyin.
 
 ```powershell
-npm install
-npm run type-check
-npm run lint
-npm run test
-npm run build
+pnpm install
+pnpm run type-check
+pnpm run lint
+pnpm run test
+pnpm run build
 npx supabase start
 
 # DİKKAT: yerel veritabanını TAMAMEN SİLER, migration + seed'i yeniden uygular.
 npx supabase db reset
 
-npm run db:types
+pnpm run db:types
 
 Set-Location ai_backend
 uv sync
@@ -299,7 +299,7 @@ uv run mypy app
 uv run pytest
 Set-Location ..
 
-npm run test:e2e
+pnpm run test:e2e
 ```
 
 ---
@@ -310,15 +310,15 @@ npm run test:e2e
 
 | Risk                                                                                                                                           | Etki                                                                         | Öneri                                                                                                                                                                                             |
 | ---------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `tests/e2e/` dizini bu görev sırasında dosya sisteminde bulunamadı, `playwright.config.ts` ona işaret ediyor                                   | `npm run test:e2e` boş sonuç verir veya CI `e2e` job'u başarısız olur        | Dizinin gerçekten yazılıp yazılmadığını kontrol edin; eksikse önce en az bir kritik akış (giriş → günlük veri girişi → dashboard doğrulama, README'de tarif edildiği gibi) için senaryo eklenmeli |
+| `tests/e2e/` dizini bu görev sırasında dosya sisteminde bulunamadı, `playwright.config.ts` ona işaret ediyor                                   | `pnpm run test:e2e` boş sonuç verir veya CI `e2e` job'u başarısız olur       | Dizinin gerçekten yazılıp yazılmadığını kontrol edin; eksikse önce en az bir kritik akış (giriş → günlük veri girişi → dashboard doğrulama, README'de tarif edildiği gibi) için senaryo eklenmeli |
 | `docs/DEPLOYMENT.md`'deki Railway notu artık güncel değil (Dockerfile bu görevde `$PORT` destekler hale getirildi)                             | Dokümantasyon-kod tutarsızlığı, kafa karıştırıcı                             | `docs/DEPLOYMENT.md` Bölüm 2'deki ilgili paragraf güncellenmeli (bu görevin dosya sahipliği kapsamı dışında bırakıldı)                                                                            |
 | `next-pwa` v5 sürdürülmüyor, Next.js 16 ile uyumu doğrulanmadı                                                                                 | PWA/service worker davranışı üretimde beklenmedik şekilde bozulabilir        | `@ducanh2912/next-pwa`'ya geçiş değerlendirilmeli                                                                                                                                                 |
 | CSP'de `script-src 'unsafe-inline'` (App Router hydration script'i nedeniyle)                                                                  | XSS yüzeyi teorik olarak daha geniş                                          | Nonce tabanlı CSP'ye geçiş (`next.config.mjs` içinde zaten TODO ile işaretli)                                                                                                                     |
 | Bellek içi rate limiter (Next.js middleware + FastAPI `slowapi` `MemoryStorage`) tek instance'ta çalışır                                       | Çok-instance/yatay ölçeklemede gerçek limit `N × limit`'e çıkar              | Upstash Redis / `@vercel/kv` gibi paylaşımlı bir sayaç deposu                                                                                                                                     |
 | `ai_backend/uv.lock` üretilmedi, `Dockerfile`'daki `uv sync --frozen --no-dev \|\| uv sync --no-dev` fallback'i kilitsiz kuruluma izin veriyor | Reprodüklenebilir olmayan build'ler                                          | `uv lock` çalıştırılıp commit'lenmeli, ardından Dockerfile'daki fallback kaldırılmalı                                                                                                             |
-| `src/types/database.ts` elle yazıldı, gerçek şemayla hiç karşılaştırılmadı                                                                     | Tip güvenliği yanıltıcı olabilir                                             | `npm run db:types` çalıştırılıp diff kontrol edilmeli (bkz. Bölüm 6, adım 8)                                                                                                                      |
+| `src/types/database.ts` elle yazıldı, gerçek şemayla hiç karşılaştırılmadı                                                                     | Tip güvenliği yanıltıcı olabilir                                             | `pnpm run db:types` çalıştırılıp diff kontrol edilmeli (bkz. Bölüm 6, adım 8)                                                                                                                     |
 | Planlar (`profiles.nutrition_plan`/`workout_plan`) `text` sütununda JSON string olarak tutuluyor                                               | Postgres tarafında sorgulanamaz/indekslenemez, versiyon geçmişi yok          | `jsonb`'ye migration veya ayrı `plan_versions` tablosu (bkz. `docs/ARCHITECTURE.md` Bölüm 6)                                                                                                      |
-| Test kapsamı eşikleri (frontend %60/%55, backend %70) ilk çalıştırmada karşılanmayabilir                                                       | CI kırmızı başlayabilir                                                      | İlk `npm run test:coverage` / `uv run pytest` sonucuna göre eksik testler tamamlanmalı                                                                                                            |
+| Test kapsamı eşikleri (frontend %60/%55, backend %70) ilk çalıştırmada karşılanmayabilir                                                       | CI kırmızı başlayabilir                                                      | İlk `pnpm run test:coverage` / `uv run pytest` sonucuna göre eksik testler tamamlanmalı                                                                                                           |
 | `data/exercises.csv` 8.7 MB repoda düz dosya olarak duruyor                                                                                    | Repo boyutu/clone süresi                                                     | Git LFS'e taşıma değerlendirilmeli (`data/README.md`'de zaten not düşülmüş)                                                                                                                       |
 | Rol enum'ları `admin`/`student` olarak korundu (ürün dilinde koç/danışan)                                                                      | İsimlendirme kod ile ürün dili arasında sürekli zihinsel çeviri gerektiriyor | İleride yeniden adlandırma bir migration + tüm RLS/RPC gözden geçirmesi gerektirir (bkz. ADR-3, bilinçli olarak ertelendi)                                                                        |
 | `useAdminId()` koç oturumlarında da gereksiz çalışıyor                                                                                         | Küçük, performans etkisi ihmal edilebilir                                    | Düşük öncelik — fırsat bulundukça temizlenebilir                                                                                                                                                  |

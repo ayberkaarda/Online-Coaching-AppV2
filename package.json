@@ -2,8 +2,10 @@
   "name": "my-coaching-app",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "pnpm@10.34.5",
   "engines": {
-    "node": ">=20.11.0"
+    "node": ">=20.11.0",
+    "pnpm": ">=10"
   },
   "scripts": {
     "dev": "next dev --webpack",
@@ -30,7 +32,13 @@
     "test:rls": "docker exec -i supabase_db_my-coaching-app psql -U postgres -d postgres -v ON_ERROR_STOP=1 -f - < supabase/tests/rls.test.sql",
     "test:transform": "docker exec -i supabase_db_my-coaching-app psql -U postgres -d postgres -v ON_ERROR_STOP=1 -f - < supabase/tests/transform.test.sql",
     "ratchet": "node scripts/identity-ratchet.mjs",
-    "ci": "npm run lint && npm run type-check && npm run test && npm run build"
+    "ci": "pnpm run lint && pnpm run type-check && pnpm run test && pnpm run build"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "unrs-resolver"
+    ]
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

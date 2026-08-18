@@ -31,16 +31,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # pnpm, setup-node'dan ÖNCE kurulmalı: `cache: 'pnpm'` setup-node'un pnpm store
+      # yolunu `pnpm store path` ile sorgulaması demektir, pnpm o anda PATH'te yoksa adım
+      # düşer. `version` BİLEREK verilmiyor — action, package.json'daki `packageManager`
+      # alanını okuyup sürümü oradan sabitler (tek doğruluk kaynağı).
+      - uses: pnpm/action-setup@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
+          cache: 'pnpm'
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Lint
-        run: npm run lint
+        run: pnpm run lint
 
       - name: Kimlik ratchet (ADR-0018)
         # Tek yönlü mandal: eski görsel dilin (font-black, gradyan, rounded-3xl,
@@ -48,13 +54,13 @@ jobs:
         # kırmızı olur. bkz. docs/adr/0018-kimlik-gecisi-iki-katman-ve-ci-ratchet.md
         # ve scripts/identity-ratchet.mjs. Ucuz bir grep taraması olduğu için ayrı
         # bir job değil, mevcut frontend job'una bir adım olarak eklendi.
-        run: npm run ratchet
+        run: pnpm run ratchet
 
       - name: Type-check
-        run: npm run type-check
+        run: pnpm run type-check
 
       - name: Unit tests (coverage)
-        run: npm run test:coverage
+        run: pnpm run test:coverage
 
       - name: Upload coverage report
         uses: actions/upload-artifact@v4
@@ -65,7 +71,7 @@ jobs:
           retention-days: 14
 
       - name: Build
-        run: npm run build
+        run: pnpm run build
 
   backend:
     name: Backend (ruff / mypy / pytest)
@@ -102,9 +108,9 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
     timeout-minutes: 20
-    # NOT: playwright.config.ts'deki webServer bloğu `npm run build && npm run
+    # NOT: playwright.config.ts'deki webServer bloğu `pnpm run build && pnpm run
     # start` çalıştırıyor ve CI'da (process.env.CI true olduğu için)
-    # reuseExistingServer: false oluyor — yani `npm run test:e2e` adımı
+    # reuseExistingServer: false oluyor — yani `pnpm run test:e2e` adımı
     # webServer'ı kendi alt process'i olarak başlatıp gizlice TEKRAR build
     # alıyor. Bu ikinci (örtük) build de gerçek Supabase URL/anon key'e
     # ihtiyaç duyar, yoksa testler hiçbir yere bağlanamaz.
@@ -125,13 +131,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # pnpm, setup-node'dan ÖNCE (bkz. `frontend` job'undaki aynı notu).
+      - uses: pnpm/action-setup@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
+          cache: 'pnpm'
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Install Supabase CLI
         uses: supabase/setup-cli@v1
@@ -150,7 +159,7 @@ jobs:
         run: supabase db reset
 
       - name: Verify Supabase DB container is up
-        # `npm run test:rls` (package.json) hedef container adını
+        # `pnpm run test:rls` (package.json) hedef container adını
         # `supabase_db_my-coaching-app` olarak SABİT kullanıyor; bu ad
         # `supabase/config.toml`'daki `project_id = "my-coaching-app"`
         # değerinden türüyor. `supabase start` bu adı örtük olarak üretir,
@@ -173,7 +182,7 @@ jobs:
         # reset" SONRASI (seed verisi hazir olmali) ve "build" ONCESI
         # calistiriliyor: RLS kirilmissa job build/E2E'ye hic girmeden,
         # erken ve net bir mesajla dussun.
-        run: npm run test:rls
+        run: pnpm run test:rls
 
       - name: Capture local Supabase connection info
         # Yerel anon key, Supabase CLI'nin tüm kurulumlarında sabit ve
@@ -190,7 +199,7 @@ jobs:
           supabase status -o env | sed -E 's/^([A-Z_]+)="(.*)"$/\1=\2/' >> "$GITHUB_ENV"
 
       - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium
+        run: pnpm exec playwright install --with-deps chromium
 
       - name: Build
         env:
@@ -198,7 +207,7 @@ jobs:
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ env.ANON_KEY }}
           # A-12 (src/env.ts, superRefine): NODE_ENV === 'production' iken
           # AI_BACKEND_API_KEY zorunlu, aksi halde middleware (`src/proxy.ts`)
-          # her `/api/*` isteğinde fail-fast eder. `npm run build` bunu
+          # her `/api/*` isteğinde fail-fast eder. `pnpm run build` bunu
           # doğrudan tetiklemiyor (doğrulama build zamanında değil, istek
           # zamanında `proxy()` içinde çalışıyor — yerelde build tek başına
           # bu değişken olmadan da doğrulandı, geçti). Yine de bu adımın
@@ -207,14 +216,14 @@ jobs:
           # bu adımdan itibaren tutarlı kurmak için burada da açıkça set
           # ediliyor (bkz. aşağıdaki not).
           AI_BACKEND_API_KEY: ci-e2e-placeholder-key
-        run: npm run build
+        run: pnpm run build
 
       - name: Run E2E tests
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ env.API_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ env.ANON_KEY }}
           # A-12 (src/env.ts): bu adım `playwright.config.ts`'in `webServer`
-          # bloğu üzerinden `npm run start` (next start, NODE_ENV=production)
+          # bloğu üzerinden `pnpm run start` (next start, NODE_ENV=production)
           # çalıştırır; middleware her `/api/*` isteğinde AI_BACKEND_API_KEY
           # arar. `playwright.config.ts` zaten kendi içinde bu değişken için
           # 'playwright-e2e-local-test-key' varsayılanını taşıdığından (o
@@ -226,7 +235,7 @@ jobs:
           # servisi bu job'ta ayağa kalkmaz, zod doğrulamasını geçecek boş
           # olmayan bir CI-yerel test değeri yeterlidir.
           AI_BACKEND_API_KEY: ci-e2e-placeholder-key
-        run: npm run test:e2e
+        run: pnpm run test:e2e
 
       - name: Upload Playwright report
         uses: actions/upload-artifact@v4
@@ -271,7 +280,7 @@ jobs:
           push: false
 
   security:
-    name: Security scanning (semgrep / gitleaks / npm audit / pip-audit)
+    name: Security scanning (semgrep / gitleaks / pnpm audit / pip-audit)
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -286,10 +295,13 @@ jobs:
         with:
           fetch-depth: 0
 
+      # pnpm, setup-node'dan ÖNCE (bkz. `frontend` job'undaki aynı notu).
+      - uses: pnpm/action-setup@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
+          cache: 'pnpm'
 
       - name: Install uv
         uses: astral-sh/setup-uv@v5
@@ -362,15 +374,20 @@ jobs:
         if: github.event_name == 'schedule'
         run: gitleaks detect --source . --redact -v
 
-      # --- npm audit (bağımlılık zafiyetleri, yalnızca prod bağımlılıkları) ---
-      # DİKKAT: `next-pwa@5.6.0` şu an `package.json`'da `dependencies` altında duruyor ve
-      # build-time zafiyetler taşıyan terk edilmiş bir ağaca sahip (T-04, tooling-baseline.md
-      # §2). Bu paket bu Faz 1.5 turunda paralel bir ajan tarafından `devDependencies`'e
-      # taşınıyor (Grup 5) — o değişiklik bu PR'a girene/merge olana kadar bu adım KIRMIZI
-      # olabilir. `continue-on-error` BİLEREK eklenmedi: T-04 taşınana kadar bu job'un kırmızı
-      # kalması beklenen ve doğru bir sinyaldir, sessizce yeşile boyanmamalı.
-      - name: npm audit (production bağımlılıkları)
-        run: npm audit --audit-level=high --omit=dev
+      # --- pnpm audit (bağımlılık zafiyetleri, yalnızca prod bağımlılıkları) ---
+      # `npm audit --audit-level=high --omit=dev` idi; `package-lock.json` silindiği için
+      # npm'in denetimi artık çalışamaz. pnpm karşılığı `--prod` (= `--omit=dev`) +
+      # `--audit-level=high`. Niyet AYNEN korunuyor: high ve üstü bir bulguda job kırılır.
+      # Ölçüldü (pnpm 10.34.5, bu ağaç): `--prod` ile "No known vulnerabilities found",
+      # exit 0; `--prod`suz aynı komut 8 high + 1 critical bulup exit 1 veriyor — yani
+      # hem prod/dev ayrımı hem de kırılma davranışı beklendiği gibi çalışıyor.
+      # Çıktı biçimi npm'inkinden farklı (tablo, JSON değil) ama bu adım çıktıyı
+      # ayrıştırmıyor, yalnızca exit kodunu kullanıyor.
+      # T-04 (tooling-baseline.md §2) ÇÖZÜLDÜ: `next-pwa@5.6.0` build-time zafiyetler taşıyan
+      # terk edilmiş ağacıyla birlikte `package.json`'da artık `devDependencies` altında
+      # (production ağacının dışında), bu yüzden `--prod` taraması onu kapsamıyor.
+      - name: pnpm audit (production bağımlılıkları)
+        run: pnpm audit --prod --audit-level=high
 
       # --- pip-audit (ai_backend Python bağımlılıkları) ---
       # `uvx pip-audit` ÇIPLAK ÇALIŞTIRILMAZ — pip-audit'in KENDİ izole ortamını tarayıp

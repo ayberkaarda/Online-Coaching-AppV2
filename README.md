@@ -139,6 +139,7 @@ Derinlemesine mimari kararlar, veri modeli ve ADR'ler için bkz. [`docs/ARCHITEC
 | AI servis doğrulama       | Pydantic + pydantic-settings         | ≥2.9 / ≥2.6       | Şema ve ayar doğrulama                       |
 | AI servis loglama         | structlog                            | ≥24.4             | Yapılandırılmış JSON log                     |
 | AI servis rate limit      | slowapi                              | ≥0.1.9            | İstek sınırlama                              |
+| Paket yöneticisi (JS)     | pnpm                                 | 10.34.5           | `package.json#packageManager` ile sabitli    |
 | Paket yöneticisi (Python) | uv                                   | —                 | Bağımlılık/venv yönetimi                     |
 | Birim/bileşen test        | Vitest + Testing Library             | ^2.1.8            | Frontend testleri                            |
 | Backend test              | pytest + pytest-cov                  | ≥8.3              | FastAPI testleri                             |
@@ -153,6 +154,7 @@ Derinlemesine mimari kararlar, veri modeli ve ADR'ler için bkz. [`docs/ARCHITEC
 ### Önkoşullar
 
 - **Node.js ≥ 20.11** (bkz. `package.json#engines`)
+- **pnpm ≥ 10** — JS paket yöneticisi. Kesin sürüm `package.json#packageManager` alanında (`pnpm@10.34.5`) sabitlidir; pnpm 10 bu alanı okuyup kendini o sürüme ayarlar. Kurulum: `npm i -g pnpm@10.34.5` (corepack Node 25 ile dağıtımdan çıkarıldığı için kullanılmıyor).
 - **Python ≥ 3.12**
 - **[uv](https://docs.astral.sh/uv/)** — Python paket/venv yöneticisi
 - **[Supabase CLI](https://supabase.com/docs/guides/cli)** — yerel Postgres/Auth/Storage/Studio için
@@ -166,7 +168,7 @@ git clone <repo-url>
 cd my-coaching-appv2
 
 # 2) Frontend bağımlılıklarını yükleyin
-npm ci
+pnpm install --frozen-lockfile
 
 # 3) Ortam değişkenlerini kopyalayıp doldurun
 cp .env.example .env.local
@@ -176,12 +178,12 @@ cp .env.example .env.local
 npx supabase start
 
 # 5) Migration'ları uygulayın (+ yerel seed verisi)
-npm run db:migrate
+pnpm run db:migrate
 # not: db:migrate `supabase db push` çalıştırır; TAMAMEN sıfırdan + seed için
 # `supabase db reset` kullanın (bkz. supabase/README.md — bu komut veriyi SİLER)
 
 # 6) TypeScript tiplerini üretin
-npm run db:types
+pnpm run db:types
 
 # 7) AI backend bağımlılıklarını kurun
 cd ai_backend
@@ -193,7 +195,7 @@ cd ..
 
 ```bash
 # Terminal 1 — Next.js (http://localhost:3000)
-npm run dev
+pnpm run dev
 
 # Terminal 2 — FastAPI (http://localhost:8000, --reload ile hot-reload)
 cd ai_backend
@@ -206,14 +208,14 @@ uv run uvicorn app.main:app --reload
 git clone <repo-url>
 Set-Location my-coaching-appv2
 
-npm ci
+pnpm install --frozen-lockfile
 
 Copy-Item .env.example .env.local
 # .env.local dosyasını açıp Supabase proje bilgilerinizi girin
 
 npx supabase start
-npm run db:migrate
-npm run db:types
+pnpm run db:migrate
+pnpm run db:types
 
 Set-Location ai_backend
 uv sync
@@ -224,7 +226,7 @@ Set-Location ..
 
 ```powershell
 # Pencere 1
-npm run dev
+pnpm run dev
 
 # Pencere 2
 Set-Location ai_backend
@@ -275,25 +277,25 @@ Uygulama `http://localhost:3000`, AI servisi `http://localhost:8000` (Swagger: `
 
 ### Next.js (`package.json`)
 
-| Komut                   | Ne yapar                                                                          |
-| ----------------------- | --------------------------------------------------------------------------------- |
-| `npm run dev`           | Geliştirme sunucusu (`next dev --webpack`).                                       |
-| `npm run build`         | Production build (`output: 'standalone'`).                                        |
-| `npm run start`         | Production build'i çalıştırır.                                                    |
-| `npm run lint`          | ESLint flat config (`eslint.config.mjs`) ile lint çalıştırır.                     |
-| `npm run lint:fix`      | ESLint, otomatik düzeltmeyle.                                                     |
-| `npm run type-check`    | `tsc --noEmit` — derleme yapmadan tip kontrolü.                                   |
-| `npm run test`          | Vitest, tek seferlik çalıştırma.                                                  |
-| `npm run test:watch`    | Vitest, izleme modu.                                                              |
-| `npm run test:coverage` | Vitest, kapsam raporuyla.                                                         |
-| `npm run test:e2e`      | Playwright E2E testleri.                                                          |
-| `npm run test:e2e:ui`   | Playwright, arayüzlü mod.                                                         |
-| `npm run format`        | Prettier ile tüm dosyaları biçimlendirir.                                         |
-| `npm run format:check`  | Prettier biçim kontrolü (yazmadan).                                               |
-| `npm run db:types`      | Yerel Supabase şemasından `src/types/database.ts` üretir.                         |
-| `npm run db:migrate`    | `supabase db push` — bekleyen migration'ları uygular.                             |
-| `npm run clean:foods`   | `data/daily_food_nutrition_dataset.csv` → `data/clean_foods.csv` dönüşümü.        |
-| `npm run ci`            | `lint && type-check && test && build` — CI'nin frontend job'unun yerel karşılığı. |
+| Komut                    | Ne yapar                                                                          |
+| ------------------------ | --------------------------------------------------------------------------------- |
+| `pnpm run dev`           | Geliştirme sunucusu (`next dev --webpack`).                                       |
+| `pnpm run build`         | Production build (`output: 'standalone'`).                                        |
+| `pnpm run start`         | Production build'i çalıştırır.                                                    |
+| `pnpm run lint`          | ESLint flat config (`eslint.config.mjs`) ile lint çalıştırır.                     |
+| `pnpm run lint:fix`      | ESLint, otomatik düzeltmeyle.                                                     |
+| `pnpm run type-check`    | `tsc --noEmit` — derleme yapmadan tip kontrolü.                                   |
+| `pnpm run test`          | Vitest, tek seferlik çalıştırma.                                                  |
+| `pnpm run test:watch`    | Vitest, izleme modu.                                                              |
+| `pnpm run test:coverage` | Vitest, kapsam raporuyla.                                                         |
+| `pnpm run test:e2e`      | Playwright E2E testleri.                                                          |
+| `pnpm run test:e2e:ui`   | Playwright, arayüzlü mod.                                                         |
+| `pnpm run format`        | Prettier ile tüm dosyaları biçimlendirir.                                         |
+| `pnpm run format:check`  | Prettier biçim kontrolü (yazmadan).                                               |
+| `pnpm run db:types`      | Yerel Supabase şemasından `src/types/database.ts` üretir.                         |
+| `pnpm run db:migrate`    | `supabase db push` — bekleyen migration'ları uygular.                             |
+| `pnpm run clean:foods`   | `data/daily_food_nutrition_dataset.csv` → `data/clean_foods.csv` dönüşümü.        |
+| `pnpm run ci`            | `lint && type-check && test && build` — CI'nin frontend job'unun yerel karşılığı. |
 
 ### AI Backend (`ai_backend/`)
 
@@ -312,10 +314,10 @@ Uygulama `http://localhost:3000`, AI servisi `http://localhost:8000` (Swagger: `
 
 Test piramidi üç katmandan oluşur:
 
-1. **Vitest (birim/bileşen)** — `vitest.config.ts`. Ortam: jsdom. Kapsam eşikleri (`v8` provider): `lines 60`, `functions 60`, `branches 55`, `statements 60`. Çalıştırma: `npm run test:coverage`; HTML rapor `coverage/index.html`, terminalde `text` özeti. Güncel durum: **203/203 test, 18 dosya** (`src/lib/storage.ts` testleri dahil).
+1. **Vitest (birim/bileşen)** — `vitest.config.ts`. Ortam: jsdom. Kapsam eşikleri (`v8` provider): `lines 60`, `functions 60`, `branches 55`, `statements 60`. Çalıştırma: `pnpm run test:coverage`; HTML rapor `coverage/index.html`, terminalde `text` özeti. Güncel durum: **203/203 test, 18 dosya** (`src/lib/storage.ts` testleri dahil).
 2. **pytest (backend)** — `ai_backend/pyproject.toml` → `--cov=app --cov-report=term-missing --cov-fail-under=70`. Çalıştırma: `cd ai_backend && uv run pytest`. Güncel durum: **63 test, kapsam %92**.
-3. **Playwright (E2E)** — `playwright.config.ts`, senaryolar `tests/e2e/` altında (chromium + Mobile Chrome projeleri). Örnek akış: **giriş yap → günlük veri girişi (`daily_logs`) → dashboard'da güncellenmiş veriyi doğrula**. Çalıştırma: `npm run test:e2e`; rapor `playwright-report/index.html`. `webServer` ayarı testten önce otomatik `npm run build && npm run start` çalıştırır. Güncel durum: **16 senaryo × 2 profil (chromium + Mobile Chrome) = 16×2 koşum**, hepsi geçiyor.
-4. **RLS (SQL)** — `supabase/tests/rls.test.sql`, `npm run test:rls`. Güncel durum: **19/19 senaryo** geçiyor (bkz. [Veritabanı ve RLS](#veritabanı-ve-rls)).
+3. **Playwright (E2E)** — `playwright.config.ts`, senaryolar `tests/e2e/` altında (chromium + Mobile Chrome projeleri). Örnek akış: **giriş yap → günlük veri girişi (`daily_logs`) → dashboard'da güncellenmiş veriyi doğrula**. Çalıştırma: `pnpm run test:e2e`; rapor `playwright-report/index.html`. `webServer` ayarı testten önce otomatik `pnpm run build && pnpm run start` çalıştırır. Güncel durum: **16 senaryo × 2 profil (chromium + Mobile Chrome) = 16×2 koşum**, hepsi geçiyor.
+4. **RLS (SQL)** — `supabase/tests/rls.test.sql`, `pnpm run test:rls`. Güncel durum: **19/19 senaryo** geçiyor (bkz. [Veritabanı ve RLS](#veritabanı-ve-rls)).
 
 CI, her PR'da bu katmanları çalıştırır (bkz. `.github/workflows/ci.yml`); `test:e2e` yalnızca `pull_request` event'inde tetiklenir.
 
@@ -334,8 +336,8 @@ CI, her PR'da bu katmanları çalıştırır (bkz. `.github/workflows/ci.yml`); 
 Migration ve tip üretimi:
 
 ```bash
-npm run db:migrate   # bekleyen migration'ları uzak/yerel projeye uygular
-npm run db:types     # src/types/database.ts dosyasını yeniden üretir
+pnpm run db:migrate   # bekleyen migration'ları uzak/yerel projeye uygular
+pnpm run db:types     # src/types/database.ts dosyasını yeniden üretir
 ```
 
 CSV import (referans katalogları `exercises`/`food_database` için) dahil tüm detaylar, RLS tablosu, storage bucket politikaları ve bilinen uyumsuzluklar için bkz. [`supabase/README.md`](supabase/README.md).

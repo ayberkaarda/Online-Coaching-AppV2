@@ -27,9 +27,9 @@ içermez. Yalnızca satır sayıları, kolon adları, veri şekli ve istatistik 
 Sorgulama sırasında `daily_logs` gibi tablolardan tek satır çekilip kolon adları çıkarılmış,
 değerler diske yazılmadan atılmıştır.
 
-**Sorgulama yöntemi:** Geçici bir Node.js betiği (`@supabase/supabase-js`) repo dışında
-(`C:\Users\Ayber\.claude\jobs\d3ed9e51\tmp\`) oluşturulup çalıştırılmış, iş bitince orada
-bırakılmıştır — repoya hiçbir betik veya ham veri dosyası eklenmemiştir.
+**Sorgulama yöntemi:** Geçici bir Node.js betiği (`@supabase/supabase-js`) **repo dışında**,
+makineye özel geçici bir dizinde oluşturulup çalıştırılmış ve orada bırakılmıştır — repoya
+hiçbir betik veya ham veri dosyası eklenmemiştir.
 
 ---
 

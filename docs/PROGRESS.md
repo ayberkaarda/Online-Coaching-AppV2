@@ -50,8 +50,25 @@ gösteriyordu; bu arşivlemenin yarattığı bir kırık değildir.
 - **Faz durumu:** Faz 0 → Faz 2, hosted senkronizasyonu, env koruması, **Faz 4 — İlerleme
   Takibi**, **A-05/A-14 turu** (ADR-0022) ve **B-036 borç turu** tamamlandı. Faz 3 (Yemek
   Fotoğrafı Makro Tahmini) **ertelendi** (ADR-0021, `active_planprogram.md` §5). **Faz 4.5 —
-  Monorepo ve Mobil Temel**: ADR-0023/0024 + taşıma envanteri hazır, sıradaki adım koda geçiş
-  (commit 1 — npm → pnpm). Bkz. §5.
+  Monorepo ve Mobil Temel**: ADR-0023/0024 + taşıma envanteri hazır, **commit 1 (npm → pnpm)
+  tamamlandı**, sıradaki adım commit 2 (`apps/web` taşıması). Paket yöneticisi artık **pnpm**.
+  Bkz. §5.
+- **Faz 4.5 commit 1 sonucu (2026-08-18):** repo npm'den pnpm'e geçti
+  (`packageManager: "pnpm@10.34.5"`); dizin yerleşimi değişmedi (`apps/`/`packages/` yok,
+  Turborepo yok — commit 2+), `ai_backend` (uv) etkilenmedi. Yeni: `pnpm-lock.yaml`, `.npmrc`.
+  Silinen: `package-lock.json`. Değişen: `package.json` (`packageManager`, `engines.pnpm`,
+  `pnpm.onlyBuiltDependencies: ["esbuild","unrs-resolver"]`, `ci` script'i),
+  `playwright.config.ts`, `.github/workflows/ci.yml` (üç job), `Dockerfile`, `README.md`,
+  `CONTRIBUTING.md`, `tests/e2e/README.md`, `.prettierignore`. **ADR-0023 madde 11'in
+  dur-ve-sor noktası tetiklenmedi** — `next-pwa`'nın `require('webpack')` hayalet bağımlılığı
+  pnpm'in kendi gizli hoist dizini (`node_modules/.pnpm/node_modules`) sayesinde çözüldü; ne kök
+  `webpack` devDependency'si, ne `public-hoist-pattern`, ne `shamefully-hoist` gerekti; izolasyon
+  korundu. İki planlanmamış sapma: (a) `.npmrc`'ye `lockfile=true` eklendi — pnpm 10
+  `package-lock=false`'u kendi kilidine de devrediyor, `pnpm import` bayraksız
+  `ERR_PNPM_CONFIG_CONFLICT_LOCKFILE_ONLY_WITH_NO_LOCKFILE` ile düşüyordu; (b) `pnpm-lock.yaml`
+  `.prettierignore`'a eklendi — Prettier YAML'ı biçimlendirdiği için `format:check` kırılıyordu.
+  **Yeni tuzak:** `pnpm run X -- --flag` npm gibi davranmaz, pnpm `--`'yi script'e olduğu gibi
+  iletir; doğru biçim ayırıcısız: `pnpm run db:clean-e2e --yes` (bkz. §4).
 - **B-036 turu sonucu (2026-08-18):** `CoachUserManagement` kilo grafiği artık
   `progress_entries`'ten besleniyor (`useProgressTrend`); `form_checks` üzerine `AFTER INSERT`
   trigger + idempotent backfill eklendi
@@ -147,6 +164,18 @@ gösteriyordu; bu arşivlemenin yarattığı bir kırık değildir.
 | `db:types` diff (B-036 sonrası)                                  | `supabase gen types --local`                                           | 11 satır (yeni iki fonksiyon)                                                                                               | 2026-08-18 |
 | E2E testleri, paralel (B-036 sonrası)                            | `npm run test:e2e`                                                     | **52/54** — düşen ikili yine `plans.spec.ts:292` / `progress.spec.ts:66`                                                    | 2026-08-18 |
 | E2E testleri, seri doğrulama (B-036 sonrası)                     | `npm run test:e2e -- --workers=1` (plans+progress+form-check)          | **16/16** — düşüş B-037 kaynaklı, B-036'dan bağımsız olduğu kanıtlandı                                                      | 2026-08-18 |
+| Lint (Faz 4.5 c1 — npm → pnpm sonrası)                           | `pnpm run lint`                                                        | 0 hata, 17 uyarı (taban korundu)                                                                                            | 2026-08-18 |
+| Kimlik ratchet (Faz 4.5 c1 sonrası)                              | `pnpm run ratchet`                                                     | Tüm sayaçlar tavanla eşit                                                                                                   | 2026-08-18 |
+| Tip kontrolü (Faz 4.5 c1 sonrası)                                | `pnpm run type-check`                                                  | Temiz                                                                                                                       | 2026-08-18 |
+| Biçim (Faz 4.5 c1 sonrası)                                       | `pnpm run format:check`                                                | Temiz                                                                                                                       | 2026-08-18 |
+| Birim/bileşen testleri (Faz 4.5 c1 sonrası)                      | `pnpm run test`                                                        | **626/626 (51 dosya)** — geçiş öncesiyle birebir                                                                            | 2026-08-18 |
+| Production build (Faz 4.5 c1 sonrası)                            | `pnpm run build`                                                       | Başarılı, route tablosu 10/10 `ƒ`                                                                                           | 2026-08-18 |
+| PWA zinciri (Faz 4.5 c1 sonrası)                                 | build sonrası `public/sw.js` + `workbox-*.js`                          | **Taze üretildi** — pnpm altında next-pwa sağlam                                                                            | 2026-08-18 |
+| RLS / transform (Faz 4.5 c1 sonrası)                             | `pnpm run test:rls` / `test:transform`                                 | 113/113 · 26/26                                                                                                             | 2026-08-18 |
+| Docker imajı (Faz 4.5 c1 sonrası)                                | yerel `docker build` + çalıştırma                                      | Build geçti; `/api/health` 200, `/sw.js` 200                                                                                | 2026-08-18 |
+| `pnpm audit --prod` (Faz 4.5 c1 sonrası)                         | `pnpm audit --prod --audit-level=high`                                 | 0 zafiyet, exit 0 (`--prod` olmadan dev ağacında bulgular var — niyet korundu)                                              | 2026-08-18 |
+| E2E testleri, paralel (Faz 4.5 c1 sonrası)                       | `pnpm run test:e2e`                                                    | **52/54** — düşen ikili yine `plans.spec.ts:292` / `progress.spec.ts:66`                                                    | 2026-08-18 |
+| E2E testleri, seri doğrulama (Faz 4.5 c1 sonrası)                | `pnpm run test:e2e -- --workers=1`                                     | **14/14** — düşüşün B-037 olduğu, pnpm kaynaklı olmadığı kanıtlandı                                                         | 2026-08-18 |
 
 Tarihsel doğrulama satırları ilgili fazın arşiv dosyasındadır.
 
@@ -220,7 +249,8 @@ maddenin tam metni ve kanıtı `Kaynak` sütunundaki arşiv dosyasındadır.
 | B-044 | `style-src 'unsafe-inline'` kalıcı boşluk — nonce inline `style` niteliklerine (`style-src-attr`) uygulanmıyor | A-05/A-14 turu — `archive/progress-a05-a14-cookie-nonce-csp.md`  | Açık — bilinçli (ADR-0022 Karar 4); 17 `style={{}}` kullanımı + `recharts` çalışma anı stilleri                                                                             |
 | B-045 | Cookie geçişinden sonra tarayıcılarda kalan eski `sb-*-auth-token` `localStorage` artıkları temizlenmiyor      | A-05/A-14 turu — `archive/progress-a05-a14-cookie-nonce-csp.md`  | Açık — zararsız artık; tek seferlik temizlik kodu yazılmadı                                                                                                                 |
 
-**Ertelenenler (borç değil, bilinçli v2 kuyruğu):** pnpm+Turborepo, Expo mobil,
+**Ertelenenler (borç değil, bilinçli v2 kuyruğu):** Turborepo (pnpm'e geçiş Faz 4.5 commit
+1'de tamamlandı — bkz. §1), Expo mobil,
 Redis/Upstash rate limiter, `next-pwa` → `@ducanh2912/next-pwa` veya Turbopack geçişi,
 `exercises.csv` için Git LFS, `useCoachId()`'nin koç
 oturumlarında gereksiz çalışması, planların `jsonb` sütuna taşınması. Tam liste:
@@ -237,7 +267,7 @@ ADR'si olmayan ama hâlâ bağlayıcı üç sözleşme:
 - Prettier `semi: false` — kod tabanı noktalı virgülsüz.
 - CSP `connect-src`/`img-src` **yalnızca** `NEXT_PUBLIC_SUPABASE_URL`'den türetilen somut
   origin'i içerir; wildcard yok.
-- RLS testleri düz SQL script'tir (pgTAP değil): `npm run test:rls`.
+- RLS testleri düz SQL script'tir (pgTAP değil): `pnpm run test:rls`.
 
 **Tuzaklar** (hepsi bu projede en az bir kez gerçekten yakıldı):
 
@@ -265,6 +295,8 @@ ADR'si olmayan ama hâlâ bağlayıcı üç sözleşme:
 - **Bash aracı ~8 KB üzerinde içeriği ortadan kırpar** ve yanıltıcı `unexpected EOF` verir —
   uzun içerik 6 KB altı parçalara bölünüp `>>` ile eklenmelidir. Alt ajanların rapor `.md`
   dosyalarını `Write` ile yazması engellenebiliyor; `Edit` veya heredoc kullanılmalı.
+- **`pnpm run X -- --flag` npm gibi davranmaz:** pnpm `--`'yi script'e olduğu gibi iletir;
+  doğru biçim ayırıcısız — `pnpm run db:clean-e2e --yes` (Faz 4.5 c1).
 
 ---
 
@@ -272,7 +304,9 @@ ADR'si olmayan ama hâlâ bağlayıcı üç sözleşme:
 
 **Faz 4.5 — Monorepo ve Mobil Temel** (`active_planprogram.md` §7). ADR-0023 (kesim planı) ve
 ADR-0024 (api-client enjeksiyonu) + `docs/discovery/faz-4.5-tasima-envanteri.md` — **hazır**
-(2026-08-18); sıradaki adım Faz 4.5 **commit 1 (npm → pnpm)**. Faz 4 — İlerleme Takibi —
+(2026-08-18); **commit 1 (npm → pnpm) tamamlandı** (2026-08-18, bkz. §1), sıradaki adım
+**commit 2 — `apps/web` taşıması** (ADR-0023 madde 12'nin iki dur-ve-sor noktası ve madde 13'ün
+dörtlü "davranış değişmedi" kanıt paketi bu commit'te geçerli). Faz 4 — İlerleme Takibi —
 **tamamlandı** (2026-08-17/18, bkz. §2, `archive/progress-faz-4-ilerleme-takibi.md`).
 A-05/A-14 turu (ADR-0022) — **tamamlandı** (2026-08-18, bkz. §2,
 `archive/progress-a05-a14-cookie-nonce-csp.md`). B-036 borç turu — **tamamlandı** (2026-08-18,
@@ -297,6 +331,7 @@ B-042, B-043).
 | 2026-08-17/18 (Faz 4)                  | İlerleme takibi (4a–4d) + 3 düzeltme turu (UTC/yerel tarih hatası); vitest 598/598, RLS 110/110, E2E CI 54/54 / yerel 52/54                                            |
 | 2026-08-18 (A-05/A-14)                 | Oturum deposu cookie'ye, nonce tabanlı CSP; vitest 614/614, E2E 52/54 (seri doğrulama 14/14)                                                                           |
 | 2026-08-18 (B-036 + Faz 4.5 hazırlığı) | Form check kilosu progress_entries'e (trigger + backfill), koç grafiği bağlandı; ADR-0023/0024 + taşıma envanteri; vitest 626/626, RLS 113/113, E2E 52/54 (seri 16/16) |
+| 2026-08-18 (Faz 4.5 c1)                | npm → pnpm geçişi; next-pwa dur-ve-sor tetiklenmedi; vitest 626/626, E2E 52/54 (seri 14/14), docker build geçti                                                        |
 
 Tam oturum günlüğü (ve yeni oturum satırlarının ekleneceği yer):
 `archive/progress-oturum-gunlugu.md`.

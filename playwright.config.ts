@@ -7,13 +7,13 @@ import path from 'node:path'
 //
 // NEDEN AYRI BİR SATIR: aşağıdaki `webServer.env` bloğu da aynı tuzağı kapatıyor,
 // ama o blok bir gün "env'i sadeleştirelim" diye silinirse koruma SESSİZCE kaybolur
-// ve bir sonraki `npm run test:e2e` barındırılan projeye GERÇEK VERİ YAZAR
+// ve bir sonraki `pnpm run test:e2e` barındırılan projeye GERÇEK VERİ YAZAR
 // (`daily-log` senaryosu kayıt oluşturur; bkz. docs/PROGRESS.md §5). Bu iddia
 // config nesnesi kurulmadan ÖNCE, modül değerlendirme anında çalışır: tek tarayıcı
-// açılmadan, `npm run build` bile alınmadan düşer. İki koruma birbirini YEDEKLER —
+// açılmadan, `pnpm run build` bile alınmadan düşer. İki koruma birbirini YEDEKLER —
 // biri kaybolursa diğeri hâlâ ayakta kalır, o yüzden ikisi de burada durur.
 //
-// KASITLI OLARAK `NODE_ENV`'E KOŞULLU DEĞİL: e2e paketi `npm run build && npm run
+// KASITLI OLARAK `NODE_ENV`'E KOŞULLU DEĞİL: e2e paketi `pnpm run build && pnpm run
 // start` üzerinden koşar ve `next start` NODE_ENV=production ile çalışır (bkz.
 // aşağıdaki A-12 notu). `NODE_ENV !== 'production'` gibi bir koşul, korumaya
 // çalıştığı senaryonun tam olarak içinde kendini kapatırdı.
@@ -105,7 +105,7 @@ if (/\.supabase\.(co|com)$/.test(supabaseHost) && process.env.E2E_ALLOW_REMOTE_S
  * koşuda, aynı iki test). Tavan=3 ve 4 daha kötüydü (sırasıyla 3 ve 5 farklı
  * başarısızlık). tavan=2, ÖLÇÜLEN en yüksek/en iyi yerel değer olduğu için
  * seçildi — "kararlı 54/54" GARANTİSİ DEĞİL. Yerelde tam paket ara sıra
- * kırmızı çıkarsa ve tekrar koşmak istemiyorsanız `CI=1 npx playwright test`
+ * kırmızı çıkarsa ve tekrar koşmak istemiyorsanız `CI=1 pnpm exec playwright test`
  * kullanın (bkz. tests/e2e/README.md) — CI yolu her zaman 54/54 verdi.
  *
  * Paket büyüdükçe (54'ten fazla test, daha ağır ekranlar) bu tavan yeniden
@@ -175,15 +175,15 @@ export default defineConfig({
   webServer: {
     // CI'da build ayrı bir adımda (.github/workflows/ci.yml -> e2e job'u,
     // "Build" step'i) gerçek Supabase env değişkenleriyle zaten alınıyor;
-    // burada tekrar `npm run build` çalıştırmak boşa zaman harcar ve
-    // webServer.timeout'u aşma riski taşır. Yerelde ise `npm run test:e2e`
+    // burada tekrar `pnpm run build` çalıştırmak boşa zaman harcar ve
+    // webServer.timeout'u aşma riski taşır. Yerelde ise `pnpm run test:e2e`
     // tek başına çalışabilsin diye build adımı komuta dahil edilir.
-    command: process.env.CI ? 'npm run start' : 'npm run build && npm run start',
+    command: process.env.CI ? 'pnpm run start' : 'pnpm run build && pnpm run start',
     url: process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:3000',
     reuseExistingServer: !process.env.CI,
     // ORTAM TUZAĞI KAPATILDI — `NEXT_PUBLIC_*` değişkenleri BUILD ZAMANINDA
     // bundle'a gömülür. `.env.local` eskiden BARINDIRILAN (uzak) Supabase projesini
-    // gösteriyordu; bu blok olmadan yukarıdaki `npm run build` uygulamayı uzak projeye
+    // gösteriyordu; bu blok olmadan yukarıdaki `pnpm run build` uygulamayı uzak projeye
     // bağlıyor, yerel seed kullanıcıları orada bulunmadığı için TÜM E2E login'leri
     // kırılıyor ve dahası uzak veritabanına gerçek veri yazılıyordu. (Bu tuzak iki kez
     // vakit kaybettirdi.) `.env.local` artık yerel yığını gösteriyor ve dosyanın

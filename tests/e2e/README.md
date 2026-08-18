@@ -26,10 +26,10 @@ Bu klasördeki testler gerçek bir Supabase örneğine ve seed verisine ihtiyaç
 ## Çalıştırma
 
 ```
-npm run test:e2e
+pnpm run test:e2e
 ```
 
-`playwright.config.ts`, `npm run build && npm run start` ile uygulamayı otomatik ayağa kaldırır (`webServer`). Sunucu zaten `localhost:3000`'de çalışıyorsa (`reuseExistingServer`) yeniden başlatılmaz.
+`playwright.config.ts`, `pnpm run build && pnpm run start` ile uygulamayı otomatik ayağa kaldırır (`webServer`). Sunucu zaten `localhost:3000`'de çalışıyorsa (`reuseExistingServer`) yeniden başlatılmaz.
 
 **Yerelde tam paket ara sıra kırmızı çıkıyorsa:** `playwright.config.ts`'teki
 worker tavanı (`localWorkers`) ölçülerek seçilmiş en yüksek değerdir, ama
@@ -39,7 +39,7 @@ bir yerel-çalıştırma-ortamı maliyeti olduğunu gösteriyor. Aynı başarıs
 tekrar tekrar görüyorsanız ve zaman kaybetmek istemiyorsanız:
 
 ```
-CI=1 npx playwright test
+CI=1 pnpm exec playwright test
 ```
 
 Bu, CI'ın kullandığı `workers: 1, retries: 2` yapılandırmasını yerelde
@@ -117,23 +117,26 @@ bir benzersiz metinle FİLTRELENMİŞ sayımlar) bu kuralın kapsamı DIŞINDADI
 kırılgan olan, testin ürettiği veriden BAĞIMSIZ bir toplam/sayaca mutlak değer
 iddia etmektir.
 
-## Artık temizliği: `npm run db:clean-e2e`
+## Artık temizliği: `pnpm run db:clean-e2e`
 
 Yukarıdaki delta kuralı testi **doğru** yapar; bu script veritabanını **temiz** tutar. İkisi birbirinin yerine geçmez.
 
 ```
-npm run db:clean-e2e                        # DENEME — hiçbir şey silinmez, ne silineceğini listeler
-npm run db:clean-e2e -- --yes               # GERÇEK silme
-npm run db:clean-e2e -- --yes --skip-storage
+pnpm run db:clean-e2e                     # DENEME — hiçbir şey silinmez, ne silineceğini listeler
+pnpm run db:clean-e2e --yes               # GERÇEK silme
+pnpm run db:clean-e2e --yes --skip-storage
 node scripts/clean-e2e-data.mjs --help
 ```
+
+Bayraklardan önce `--` AYIRICISI YOKTUR: npm onu yutuyordu, pnpm ise script'e OLDUĞU GİBİ
+iletiyor ve `parseArgs` bunu `Bilinmeyen seçenek: --` diye reddediyor.
 
 `scripts/clean-e2e-data.mjs`, koşular arası biriken E2E satırlarını (`E2E ` işaretli beslenme/antrenman/mesaj/bildirim/onay kayıtları, form check'ler ve uygulama tarafından yüklenmiş poz fotoğrafları) siler. Ne zaman koşturulur: **tam paketi çalıştırmadan önce** ve bir koşu yarıda kaldığında.
 
 Dört yapısal koruması vardır:
 
 1. **Varsayılan `--dry-run`.** Bayrak olmadan hiçbir şey silinmez (CLAUDE.md §6 — aracın var olması onu çalıştırma onayı değildir).
-2. **Yalnızca yerel.** Hedef `127.0.0.1` / `localhost` değilse script **hiçbir istek atmadan** çıkar. `npx dotenv -e .env.hosted.local -- node scripts/clean-e2e-data.mjs --yes` bile reddedilir.
+2. **Yalnızca yerel.** Hedef `127.0.0.1` / `localhost` değilse script **hiçbir istek atmadan** çıkar. `pnpm exec dotenv -e .env.hosted.local -- node scripts/clean-e2e-data.mjs --yes` bile reddedilir.
 3. **Seed'e dokunmaz.** Ölçütler tablo tablo belirlenmiştir ve hiçbiri `supabase/seed.sql`'in yazdığı bir satırı seçmez; ölçüt belirlenemeyen tablolar (`daily_logs`, plan tabloları — hepsi "tümünü değiştir" semantiğindedir, satır biriktirmez) **kapsam dışıdır** ve gerekçesiyle raporlanır. `tests/unit/clean-e2e-data.test.ts` bunu gerçek seed satırlarıyla kilitler.
 4. **Koruma sayaçları.** `profiles` / `exercises` / `food_database` / plan tabloları silme öncesi ve sonrası sayılır; biri bile değişirse script hata koduyla biter.
 

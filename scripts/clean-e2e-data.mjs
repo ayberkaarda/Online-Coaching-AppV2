@@ -15,9 +15,9 @@
 // imzalı URL üretiyor — birikim doğrudan sayfa yükleme süresine yazılıyor).
 //
 // Kullanım:
-//   npm run db:clean-e2e                 # DENEME (dry-run) — hiçbir şey silinmez
-//   npm run db:clean-e2e -- --yes        # GERÇEK silme
-//   npm run db:clean-e2e -- --yes --skip-storage
+//   pnpm run db:clean-e2e                 # DENEME (dry-run) — hiçbir şey silinmez
+//   pnpm run db:clean-e2e --yes           # GERÇEK silme
+//   pnpm run db:clean-e2e --yes --skip-storage
 //   node scripts/clean-e2e-data.mjs --help
 //
 // GÜVENLİK (bu bir TOPLU SİLME aracıdır — CLAUDE.md §6):
@@ -41,7 +41,7 @@
 // dosyası bu script tarafından OKUNMAZ, hedef açıkça verilir):
 //   SUPABASE_URL (veya NEXT_PUBLIC_SUPABASE_URL)
 //   SUPABASE_SERVICE_ROLE_KEY
-// `npm run db:clean-e2e` bunları `.env.local`'dan `dotenv-cli` ile geçirir;
+// `pnpm run db:clean-e2e` bunları `.env.local`'dan `dotenv-cli` ile geçirir;
 // hedef yine de (2) numaralı korumadan geçmek zorundadır.
 import { pathToFileURL } from 'node:url'
 import { createClient } from '@supabase/supabase-js'
@@ -321,7 +321,7 @@ export const OUT_OF_SCOPE = [
       'kodda SABİT tutulmama gerekçesi); (2) "E2E tüketti" ile "koç gerçekten onayladı" ayırt ' +
       'edilemez, `approved` bir satırı `pending`e çekmek GERÇEK bir denetim izini ' +
       '(reviewed_by/reviewed_at) yok ederdi — 20260817160000 §4 tam da bunu yasaklar. ' +
-      'ETKİSİ: `npm run test:rls` bundan ETKİLENMEZ; RLS paketindeki her senaryo ihtiyaç duyduğu ' +
+      'ETKİSİ: `pnpm run test:rls` bundan ETKİLENMEZ; RLS paketindeki her senaryo ihtiyaç duyduğu ' +
       'satırı kendi işleminde üretir (bkz. supabase/tests/rls.test.sql başlığı, "KENDİ KURULUMUNU ' +
       'YAPMA KURALI"). Gerçek bir seed taban çizgisi gerekiyorsa doğru araç `npx supabase db reset`tir.',
   },
@@ -722,7 +722,7 @@ async function main() {
     console.error('  atılmadan çıkılıyor.')
     console.error('')
     console.error('  Yerel yığına yönlendirmek için:')
-    console.error('    npm run db:clean-e2e            (.env.local üzerinden)')
+    console.error('    pnpm run db:clean-e2e            (.env.local üzerinden)')
     console.error('    $env:SUPABASE_URL="http://127.0.0.1:54321"; ...')
     console.error('')
     process.exitCode = 1
@@ -867,7 +867,7 @@ async function main() {
       `\n--dry-run (varsayılan): HİÇBİR ŞEY SİLİNMEDİ. ` +
         `${totalMatched} satır ve ${totalOrphans} dosya silinmeye aday.`
     )
-    console.log('Gerçekten silmek için: npm run db:clean-e2e -- --yes')
+    console.log('Gerçekten silmek için: pnpm run db:clean-e2e --yes')
   }
 }
 

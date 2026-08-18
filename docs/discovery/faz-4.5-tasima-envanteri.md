@@ -207,7 +207,7 @@ zamanında (`next/server` mobilde çözülmez) veya çalışma zamanında kırı
 | `test:rls`          | `docker exec -i supabase_db_my-coaching-app psql ... < supabase/tests/rls.test.sql` | kökte kalır                                                                                                                           |
 | `test:transform`    | `docker exec -i ... < supabase/tests/transform.test.sql`                            | kökte kalır                                                                                                                           |
 | `ratchet`           | `node scripts/identity-ratchet.mjs`                                                 | kökte kalır; ADR-0024'ün önerdiği "`supabase.from(` yalnızca `packages/api-client`'ta" kontrolü de bu script'in deseniyle eklenebilir |
-| `ci`                | `npm run lint && npm run type-check && npm run test && npm run build`               | `pnpm turbo lint type-check test build` (affected-graph ile)                                                                          |
+| `ci`                | `pnpm run lint && pnpm run type-check && pnpm run test && pnpm run build`           | `pnpm turbo lint type-check test build` (affected-graph ile)                                                                          |
 
 **Kökte kalan script sayısı: 7** (`db:migrate`, `clean:foods`, `db:import-catalog`,
 `db:clean-e2e`, `test:rls`, `test:transform`, `format`/`format:check` — 8 sayılırsa).

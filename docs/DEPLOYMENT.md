@@ -18,7 +18,7 @@ Frontend Vercel'e, AI backend Railway veya Fly.io'ya, veritabanı Supabase'e da�
 ## 1. Frontend → Vercel
 
 1. **Projeyi bağlayın:** Vercel Dashboard → _Add New → Project_ → bu GitHub deposunu seçin. Vercel, `package.json`'dan Next.js'i otomatik algılar; ek yapılandırma gerekmez (`next.config.mjs`'deki `output: 'standalone'` Vercel'in kendi build/serve mekanizmasıyla çalışır, Docker/`server.js` yalnızca kendi barındırdığınız ortamlar — Railway/Fly.io/Docker — için gereklidir).
-2. **Build komutu:** Varsayılan `next build` (`npm run build`) yeterlidir, override gerekmez.
+2. **Build komutu:** Varsayılan `next build` (`pnpm run build`) yeterlidir, override gerekmez.
 3. **Ortam değişkenlerini girin:** Vercel Dashboard → _Settings → Environment Variables_. **Production** ve **Preview** ortamlarını ayrı ayrı doldurun:
 
    | Değişken                        | Production                              | Preview                                                                            |
@@ -31,7 +31,7 @@ Frontend Vercel'e, AI backend Railway veya Fly.io'ya, veritabanı Supabase'e da�
    | `NEXT_PUBLIC_APP_URL`           | `https://<prod-domain>`                 | Vercel'in ürettiği preview URL'i (bilinmiyorsa prod domain ile aynı bırakılabilir) |
    | `ALLOW_HOSTED_TARGET`           | **`1` — ZORUNLU** (aşağıya bakın)       | **`1` — ZORUNLU**                                                                  |
 
-   > **`ALLOW_HOSTED_TARGET=1` UNUTULURSA UYGULAMA AÇILMAZ — bu KASITLIDIR.** `src/env.server.ts` içindeki fail-closed guard, `NEXT_PUBLIC_SUPABASE_URL` bir `*.supabase.co` / `*.supabase.com` adresiyse ve bu bayrak `1` değilse `getServerEnv()` çağrısında hata fırlatır. `getServerEnv()` middleware'den (`src/proxy.ts`) çağrıldığı için **ilk istekten** itibaren her istek 500 döner ve Vercel Runtime Logs'ta ne yapılacağını söyleyen Türkçe hata görünür. Guard'ın amacı, yerelde çalıştığını sanan bir `npm run build && npm run start`ın (veya bir bakım script'inin) barındırılan projeye `SUPABASE_SERVICE_ROLE_KEY` ile — yani **RLS'i baypas ederek** — kaza eseri yazmasını engellemektir. Guard **`NODE_ENV`'e KOŞULLANMAZ**: tehlikeli yol tam da `next start` (NODE_ENV=production) üzerinden geçtiği için `NODE_ENV !== 'production'` koşullu bir guard, korumaya çalıştığı senaryonun içinde kendini kapatırdı. Bu yüzden gerçek production da bayrağı açıkça beyan etmek zorundadır. Bkz. `tests/unit/env-hosted-guard.test.ts`.
+   > **`ALLOW_HOSTED_TARGET=1` UNUTULURSA UYGULAMA AÇILMAZ — bu KASITLIDIR.** `src/env.server.ts` içindeki fail-closed guard, `NEXT_PUBLIC_SUPABASE_URL` bir `*.supabase.co` / `*.supabase.com` adresiyse ve bu bayrak `1` değilse `getServerEnv()` çağrısında hata fırlatır. `getServerEnv()` middleware'den (`src/proxy.ts`) çağrıldığı için **ilk istekten** itibaren her istek 500 döner ve Vercel Runtime Logs'ta ne yapılacağını söyleyen Türkçe hata görünür. Guard'ın amacı, yerelde çalıştığını sanan bir `pnpm run build && pnpm run start`ın (veya bir bakım script'inin) barındırılan projeye `SUPABASE_SERVICE_ROLE_KEY` ile — yani **RLS'i baypas ederek** — kaza eseri yazmasını engellemektir. Guard **`NODE_ENV`'e KOŞULLANMAZ**: tehlikeli yol tam da `next start` (NODE_ENV=production) üzerinden geçtiği için `NODE_ENV !== 'production'` koşullu bir guard, korumaya çalıştığı senaryonun içinde kendini kapatırdı. Bu yüzden gerçek production da bayrağı açıkça beyan etmek zorundadır. Bkz. `tests/unit/env-hosted-guard.test.ts`.
 
    > **UYARI: `NEXT_PUBLIC_*` ile başlayan tüm değişkenler build-time'da tarayıcı bundle'ına gömülür.** Bir `NEXT_PUBLIC_*` değişkenini değiştirdikten sonra **yeniden deploy etmeden** değişiklik yansımaz (runtime'da okunmaz). `SUPABASE_SERVICE_ROLE_KEY` bu kategoride **DEĞİLDİR** — yalnızca sunucu tarafında (Vercel Serverless/Edge Functions) çalışır, tarayıcıya asla gönderilmez; yine de yanlışlıkla `NEXT_PUBLIC_` öneki eklenmemesine dikkat edin.
 
@@ -138,20 +138,20 @@ Frontend Vercel'e, AI backend Railway veya Fly.io'ya, veritabanı Supabase'e da�
 
 ### 5.1 `ALLOW_HOSTED_TARGET` — barındırılan hedefe kaza eseri yazmaya karşı üç katman
 
-Geliştirme sırasında `.env.local` uzun süre **barındırılan** Supabase projesini gösteriyordu; env override'ı olmayan bir `npm run build && npm run start` ya da bir E2E koşusu, canlı veritabanına gerçek veri yazıyordu. Barındırılan proje artık gerçek production şemasını taşıdığından bu tuzak üç ayrı katmanla kapatıldı ve **her katman farklı bir yolu** keser:
+Geliştirme sırasında `.env.local` uzun süre **barındırılan** Supabase projesini gösteriyordu; env override'ı olmayan bir `pnpm run build && pnpm run start` ya da bir E2E koşusu, canlı veritabanına gerçek veri yazıyordu. Barındırılan proje artık gerçek production şemasını taşıdığından bu tuzak üç ayrı katmanla kapatıldı ve **her katman farklı bir yolu** keser:
 
-| Katman | Nerede                               | Hangi yolu keser                                                                       | Nasıl aşılır (bilerek)                                 |
-| ------ | ------------------------------------ | -------------------------------------------------------------------------------------- | ------------------------------------------------------ |
-| 0      | `.env.local` / `.env.hosted.local`   | Varsayılan hedefin kendisi: `.env.local` artık **yerel** yığını gösterir               | `npm run dev:hosted` / `build:hosted` / `start:hosted` |
-| 1      | `playwright.config.ts` (dosya başı)  | E2E paketinin uzak projeye yönlendirilmesi (tarayıcı açılmadan, build alınmadan düşer) | `E2E_ALLOW_REMOTE_SUPABASE=1`                          |
-| 2      | `src/env.server.ts` (`getServerEnv`) | Sunucu tarafında `SUPABASE_SERVICE_ROLE_KEY` ile **RLS'i baypas eden** yazmalar        | `ALLOW_HOSTED_TARGET=1`                                |
+| Katman | Nerede                               | Hangi yolu keser                                                                       | Nasıl aşılır (bilerek)                                  |
+| ------ | ------------------------------------ | -------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| 0      | `.env.local` / `.env.hosted.local`   | Varsayılan hedefin kendisi: `.env.local` artık **yerel** yığını gösterir               | `pnpm run dev:hosted` / `build:hosted` / `start:hosted` |
+| 1      | `playwright.config.ts` (dosya başı)  | E2E paketinin uzak projeye yönlendirilmesi (tarayıcı açılmadan, build alınmadan düşer) | `E2E_ALLOW_REMOTE_SUPABASE=1`                           |
+| 2      | `src/env.server.ts` (`getServerEnv`) | Sunucu tarafında `SUPABASE_SERVICE_ROLE_KEY` ile **RLS'i baypas eden** yazmalar        | `ALLOW_HOSTED_TARGET=1`                                 |
 
 Katman 2 `server-only`dir; kodu istemci paketine girmez, dolayısıyla **tarayıcının barındırılan projeye meşru bağlanmasını etkilemez**. Aynı sebeple tarayıcıdan doğrudan Supabase'e giden yazmaları (ör. `daily-log`) da kesemez — o yolu Katman 0 ve 1 kapatır.
 
 **Dağıtım sözleşmesi:** gerçek production'da (Vercel / Docker / Fly.io) hedef zaten `*.supabase.co` olduğu için **`ALLOW_HOSTED_TARGET=1` ayarlanmak ZORUNDADIR**. Unutulursa uygulama sessizce yanlış davranmaz; ilk istekte anlaşılır bir hata ile düşer.
 
 - **Vercel:** _Settings → Environment Variables_ altına Production **ve** Preview için ekleyin (§1'deki tablo).
-- **Docker / `docker run`:** çalışma zamanı ortamına verin — `docker run -e ALLOW_HOSTED_TARGET=1 ...`. Kök `Dockerfile` yalnızca `NEXT_PUBLIC_*` değerlerini `ARG`/`ENV` olarak alır; `ALLOW_HOSTED_TARGET` **build-time'da gerekmez** — ölçüldü: hedef `*.supabase.co` iken bayrak olmadan `npm run build` sorunsuz tamamlanır (guard yalnızca `getServerEnv()` çağrılınca, yani çalışma zamanında middleware/proxy içinde değerlendirilir), aynı build çalıştırılınca ilk istek 500 döner, aynı build'e çalışma zamanında `ALLOW_HOSTED_TARGET=1` verilince `/api/health` 200 döner. Dolayısıyla `Dockerfile`'a yeni bir `ARG` eklemeye **gerek yoktur**.
+- **Docker / `docker run`:** çalışma zamanı ortamına verin — `docker run -e ALLOW_HOSTED_TARGET=1 ...`. Kök `Dockerfile` yalnızca `NEXT_PUBLIC_*` değerlerini `ARG`/`ENV` olarak alır; `ALLOW_HOSTED_TARGET` **build-time'da gerekmez** — ölçüldü: hedef `*.supabase.co` iken bayrak olmadan `pnpm run build` sorunsuz tamamlanır (guard yalnızca `getServerEnv()` çağrılınca, yani çalışma zamanında middleware/proxy içinde değerlendirilir), aynı build çalıştırılınca ilk istek 500 döner, aynı build'e çalışma zamanında `ALLOW_HOSTED_TARGET=1` verilince `/api/health` 200 döner. Dolayısıyla `Dockerfile`'a yeni bir `ARG` eklemeye **gerek yoktur**.
 
   > **Guard, uygulamanın BUILD ALINDIĞI hedefi görür.** `NEXT_PUBLIC_*` değişkenleri sunucu paketine de build-time'da gömüldüğü için, `next start` sırasında `NEXT_PUBLIC_SUPABASE_URL`'i değiştirmek guard'ın gördüğü değeri DEĞİŞTİRMEZ. Bu istenen davranıştır: uygulamanın gerçekten konuşacağı Supabase projesi build-time'da belirlenir. `ALLOW_HOSTED_TARGET` ise sıradan bir sunucu değişkenidir, **çalışma zamanında** okunur — bu yüzden yeniden build almadan verilebilir/geri alınabilir.
 
@@ -172,7 +172,7 @@ Katman 2 `server-only`dir; kodu istemci paketine girmez, dolayısıyla **tarayı
 
   ```bash
   # Vercel build'i lokalde simüle etmek için:
-  npm run build
+  pnpm run build
   grep -r "SUPABASE_SERVICE_ROLE_KEY" .next/static .next/standalone 2>/dev/null
   # Windows PowerShell:
   Get-ChildItem -Recurse .next\static, .next\standalone | Select-String "SUPABASE_SERVICE_ROLE_KEY"

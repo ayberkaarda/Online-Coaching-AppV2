@@ -6,12 +6,23 @@ FROM node:20-alpine AS base
 FROM base AS deps
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
-COPY package.json package-lock.json ./
-RUN npm ci
+# pnpm, corepack ile DEĞİL doğrudan npm ile kuruluyor: corepack Node 25'ten itibaren
+# dağıtımdan çıkarıldı. Sürüm, package.json'daki `packageManager` alanıyla BİREBİR aynı
+# tutulmalıdır — ikisi ayrışırsa imaj CI/yerelden farklı bir çözümleme üretir.
+RUN npm i -g pnpm@10.34.5
+# `.npmrc` de kopyalanır: `auto-install-peers` ayarı next-pwa'nın hayalet `webpack`
+# bağımlılığını çözen şeydir, dosya olmadan build aşaması kırılır.
+COPY package.json pnpm-lock.yaml .npmrc ./
+RUN pnpm install --frozen-lockfile
 
 # ---- builder: build the Next.js standalone output ----
 FROM base AS builder
 WORKDIR /app
+# Aynı pnpm sürümü burada da gerekiyor: `pnpm run build` script'i bu aşamada koşuyor.
+# `runner` aşamasına BİLEREK eklenmiyor — orada yalnızca `node server.js` çalışır.
+RUN npm i -g pnpm@10.34.5
+# pnpm'in node_modules'ü symlink'lidir; bağlantılar node_modules/.pnpm içine GÖRELİ
+# olarak işaret ettiği için dizin bir bütün olarak kopyalandığında bozulmaz.
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
@@ -25,7 +36,7 @@ ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY
 ENV NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL
 ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN npm run build
+RUN pnpm run build
 
 # ---- runner: minimal production image ----
 FROM base AS runner

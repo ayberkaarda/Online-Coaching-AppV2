@@ -30,7 +30,7 @@ let browserClient: SupabaseClient<Database> | null = null
 /**
  * `Secure` bayrağı ORTAMDAN türetilir, `NODE_ENV`'den DEĞİL.
  *
- * TUZAK: E2E paketi `npm run build && npm run start` ile, yani `NODE_ENV=production` altında
+ * TUZAK: E2E paketi `pnpm run build && pnpm run start` ile, yani `NODE_ENV=production` altında
  * ama `http://localhost:3000` üzerinden koşar. `Secure` koşulsuz set edilseydi tarayıcı
  * cookie'yi düz http'de HİÇ saklamazdı → oturum kurulamaz → tüm E2E paketi düşerdi.
  *

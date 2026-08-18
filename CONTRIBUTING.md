@@ -88,7 +88,7 @@ chore(deps): @supabase/supabase-js sürümünü 2.110.0'a yükselt
 - **`any` yasak.** Tip bilinmiyorsa `unknown` kullanıp daraltın (narrowing); üçüncü parti bir tipin gerçekten karşılığı yoksa yerel bir arayüz tanımlayın.
 - **Named export tercih edilir.** `export default` yalnızca Next.js'in zorunlu kıldığı yerlerde (sayfa/layout bileşenleri) kullanılır; paylaşılan yardımcı fonksiyon/bileşenler named export ile dışa açılır.
 - **Kullanıcıya görünen tüm metinler Türkçedir.** Hata mesajları, toast'lar, form etiketleri, boş durum (empty state) metinleri dahil — kod içi yorum/değişken adları İngilizce kalabilir, ama kullanıcı arayüzüne çıkan hiçbir string İngilizce bırakılmaz.
-- **Tailwind sınıf sırası** `prettier-plugin-tailwindcss` tarafından otomatik uygulanır; elle sıralama yapmayın, `npm run format` çalıştırın.
+- **Tailwind sınıf sırası** `prettier-plugin-tailwindcss` tarafından otomatik uygulanır; elle sıralama yapmayın, `pnpm run format` çalıştırın.
 - **Python (`ai_backend/`):** `ruff check` ve `ruff format --check` temiz olmalı; `mypy app` **strict** modda (`disallow_untyped_defs`, `warn_return_any`) hatasız geçmelidir. Yeni public fonksiyon/metodlara tip anotasyonu zorunludur.
 
 ## 4. PR Süreci
@@ -119,11 +119,11 @@ chore(deps): @supabase/supabase-js sürümünü 2.110.0'a yükselt
    ```
 
 2. **RLS politikasını unutmayın.** Yeni bir tablo eklerseniz, o tabloda RLS'i **açmadan** (`alter table ... enable row level security`) ve en az bir SELECT/INSERT/UPDATE/DELETE politikası tanımlamadan PR açmayın — RLS kapalı bir tablo, `anon`/`authenticated` rolüne varsayılan olarak tüm satırları açar. `supabase/README.md`'deki RLS matrisini örnek alın; koç (`is_admin()`) ve satır sahibi (`student_id = auth.uid()`) ayrımını netleştirin.
-3. **`npm run db:types` ile tipleri yeniden üretin** — migration'ı yerel Supabase'e uyguladıktan sonra:
+3. **`pnpm run db:types` ile tipleri yeniden üretin** — migration'ı yerel Supabase'e uyguladıktan sonra:
 
    ```bash
    supabase db reset      # veya: yeni migration'ı `supabase db push` ile uzak/yerel projeye uygulayın
-   npm run db:types
+   pnpm run db:types
    ```
 
    Üretilen `src/types/database.ts` dosyasını PR'a dahil edin; elle düzenlemeyin.
