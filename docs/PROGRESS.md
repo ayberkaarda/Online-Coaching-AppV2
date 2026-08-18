@@ -333,6 +333,14 @@ ADR'si olmayan ama hâlâ bağlayıcı üç sözleşme:
   dosyalarını `Write` ile yazması engellenebiliyor; `Edit` veya heredoc kullanılmalı.
 - **`pnpm run X -- --flag` npm gibi davranmaz:** pnpm `--`'yi script'e olduğu gibi iletir;
   doğru biçim ayırıcısız — `pnpm run db:clean-e2e --yes` (Faz 4.5 c1).
+- **`git checkout -- <dosya>` `format:check`'i GÖRÜNMEZ biçimde kırar.** Repoda
+  `core.autocrlf=true` ve `.gitattributes` `* text=auto`; çalışma kopyasındaki dosyaların çoğu
+  LF (araçlar öyle yazdı), ama `git checkout --` ile geri alınan dosya **CRLF** olarak yazılır
+  (`git ls-files --eol` → `i/lf w/crlf`). Prettier'ın `endOfLine: "lf"` varsayılanı buna takılır
+  ve `pnpm run format:check` düşer — üstelik `git diff --numstat` **boş** olduğu için kırık
+  görünmez. Kırmızı-yeşil kanıtı için geçici dosya bozup geri alan her ajan bunu üretir; çözüm
+  geri aldıktan sonra `npx prettier --write <dosya>` çalıştırmak. CI (Linux, LF) bunu hiç
+  görmez — yalnızca yerelde ısırır. (2026-08-18, B-047/B-048 turunda yakalandı.)
 - **CI'ın ambient `process.env`'i doludur, yerelde boştur:** `vi.unstubAllEnvs()` çağıran
   testler (env-hosted-guard, env, env-production, auth-sign-in-rate-limit, security-events,
   proxy-rate-limit, csp-nonce) test sonunda ambient env'e düşer. CI'ın workflow-env'i

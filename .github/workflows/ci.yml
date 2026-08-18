@@ -69,6 +69,17 @@ jobs:
       - name: Type-check
         run: pnpm run type-check
 
+      - name: Type-check (E2E testleri)
+        # B-048: kök `type-check` (tsc, apps/web/tsconfig.json) `tests/e2e`'yi kendi
+        # `exclude` listesinde bilerek dışlıyor (bkz. o dosyadaki not) — yani E2E test
+        # dosyalarındaki tip hataları hiçbir CI kapısında yakalanmıyordu.
+        # `apps/web/tsconfig.e2e.json` ayrı bir katı taban (@repo/config/tsconfig/e2e.json)
+        # kullanıp SADECE `tests/e2e/**/*.ts` + `playwright.config.ts`'i kapsıyor.
+        # Bu adım yerel bir Supabase yığını GEREKTİRMEZ (salt tip denetimi), bu yüzden
+        # yığının olmadığı `frontend` job'unda güvenle çalışır — `e2e` job'una taşımaya
+        # gerek yok.
+        run: pnpm run type-check:e2e
+
       - name: Unit tests (coverage)
         run: pnpm run test:coverage
 
@@ -200,6 +211,38 @@ jobs:
         # calistiriliyor: RLS kirilmissa job build/E2E'ye hic girmeden,
         # erken ve net bir mesajla dussun.
         run: pnpm run test:rls
+
+      - name: DB tipleri drift kontrolü (B-047)
+        # `pnpm run db:types` = `supabase gen types typescript --local ...` — YEREL,
+        # AYAKTA bir Supabase yığını gerektirir. Bu yığını ayağa kaldıran CI'daki TEK
+        # job burasıdır ("Start local Supabase stack" + "Reset database" adımları
+        # yukarıda); `frontend` job'unda yığın YOK, bu adım oraya konsaydı kesin patlardı.
+        # "Reset database" SONRASI çalıştırılıyor ki migration'lar şemaya işlenmiş olsun.
+        #
+        # Amaç (AC-1.4): `packages/types/src/database.ts` her zaman DB şemasıyla birebir
+        # aynı kalsın. Biri bir migration ekleyip `pnpm run db:types`'ı çalıştırıp
+        # commit'lemeyi UNUTURSA burada KIRMIZI olmalı — sessiz kırılma yerine, ne
+        # yapılması gerektiğini ve tam farkı açıkça log'a yazar.
+        #
+        # Windows/LF notu: `supabase gen types` LF üretir ve bu üretim `>` ile doğrudan
+        # dosyaya yazılır (git'in checkout/commit smudge-clean filtreleri devreye
+        # GİRMEZ) — yani `core.autocrlf`/`.gitattributes` (`* text=auto`) burada
+        # devreye girmiyor, dosya zaten hem index'te hem çalışma kopyasında LF (ölçüldü:
+        # `git ls-files --eol` → `i/lf w/lf`). Ayrıca bu job zaten `ubuntu-latest`
+        # üzerinde koşuyor (autocrlf konusu Windows'a özgü, CI runner'ını etkilemiyor).
+        # Dolayısıyla aşağıdaki `git diff`, satır-sonu farkından kaynaklı yanlış bir
+        # alarm ÜRETEMEZ — yalnızca gerçek içerik driftini yakalar.
+        run: |
+          pnpm run db:types
+          if ! git diff --exit-code -- packages/types/src/database.ts; then
+            echo "::error::packages/types/src/database.ts, veritabanı şemasıyla senkron değil (drift tespit edildi)."
+            echo "Bir migration eklendi/değiştirildi ama 'pnpm run db:types' çalıştırılıp çıktısı commit'lenmemiş görünüyor."
+            echo "Düzeltmek için: yerel Supabase yığını ayaktayken 'pnpm run db:types' çalıştırın,"
+            echo "ardından 'packages/types/src/database.ts' dosyasındaki değişikliği commit'leyin."
+            echo "Yukarıdaki diff, tam olarak neyin değiştiği gösteriyor."
+            exit 1
+          fi
+          echo "packages/types/src/database.ts güncel — drift yok."
 
       - name: Capture local Supabase connection info
         # Yerel anon key, Supabase CLI'nin tüm kurulumlarında sabit ve

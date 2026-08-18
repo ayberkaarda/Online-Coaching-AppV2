@@ -31,6 +31,13 @@ Faz 4.5 başladığında yürütücü ajanın tahmin yürütmesini önlemek içi
 pnpm workspaces + Turborepo. Paket yerleşimi: `apps/web`, `apps/mobile`, `packages/types`,
 `packages/api-client`, `packages/config` (paylaşılan tsconfig/eslint).
 
+> **Düzeltme (2026-08-18, commit 5 öncesi):** Bu liste **dört** paket olacak. `packages/logger`
+> [`0024`'ün uygulama sözleşmesi ekiyle](0024-api-client-supabase-enjeksiyonu.md) eklendi:
+> `logger.ts`'in platformdan bağımsız çekirdeği (`Logger` arayüzü, `REDACT_PATHS`,
+> `maskForConsole`, `createConsoleLogger`) oraya taşınır; pino dallanması, gerçek tüketicileri
+> (`proxy.ts`, `response.ts`, sign-in route) orada olduğu için `apps/web`'de KALIR.
+> Bu ADR yazılırken `logger.ts`'in evi hiç ele alınmamıştı.
+
 ### 2. Neyin taşınMAdığı da karar maddesidir
 
 - **`ai_backend/` kökte kalır.** Python/uv ile yönetilir, pnpm workspace üyesi **değildir**;
