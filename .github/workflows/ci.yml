@@ -39,7 +39,7 @@ jobs:
     name: Frontend (lint / type-check / test / build)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # pnpm, setup-node'dan ÖNCE kurulmalı: `cache: 'pnpm'` setup-node'un pnpm store
       # yolunu `pnpm store path` ile sorgulaması demektir, pnpm o anda PATH'te yoksa adım
@@ -47,9 +47,9 @@ jobs:
       # alanını okuyup sürümü oradan sabitler (tek doğruluk kaynağı).
       - uses: pnpm/action-setup@v4
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 24
           cache: 'pnpm'
 
       - name: Install dependencies
@@ -102,7 +102,7 @@ jobs:
       run:
         working-directory: ai_backend
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install uv
         uses: astral-sh/setup-uv@v5
@@ -157,14 +157,14 @@ jobs:
     env:
       NEXT_PUBLIC_APP_URL: http://localhost:3000
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # pnpm, setup-node'dan ÖNCE (bkz. `frontend` job'undaki aynı notu).
       - uses: pnpm/action-setup@v4
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 24
           cache: 'pnpm'
 
       - name: Install dependencies
@@ -323,12 +323,12 @@ jobs:
     needs: [frontend, backend]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: docker/setup-buildx-action@v3
 
       - name: Build web image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: ./Dockerfile
@@ -339,7 +339,7 @@ jobs:
             NEXT_PUBLIC_APP_URL=${{ env.NEXT_PUBLIC_APP_URL }}
 
       - name: Build ai-backend image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ./ai_backend
           push: false
@@ -356,7 +356,7 @@ jobs:
       # ihtiyaç duyar; bu yüzden fetch-depth burada — SADECE bu job'un checkout adımında —
       # 0'a çekiliyor. Diğer job'lar (frontend/backend/e2e/docker) varsayılan sığ checkout'u
       # korur.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -368,9 +368,21 @@ jobs:
       # dolayısıyla pnpm store hiç oluşmuyor. `cache: 'pnpm'` verilince setup-node yine de
       # `Post Run` adımında store'u kaydetmeye çalışıp "Path Validation Error: Path(s)
       # specified in the action for caching do(es) not exist" ile job'u kırıyordu (ölçüldü).
-      - uses: actions/setup-node@v4
+      #
+      # `package-manager-cache: false`: `setup-node` v5'ten itibaren, `cache:` input'u
+      # verilmemişse `package.json`'daki `packageManager` alanına bakıp OTOMATİK önbellekleme
+      # açıyor (bkz. actions/setup-node PR #1348) — bu repoda `packageManager: "pnpm@10.34.5"`
+      # var, yani otomatik davranış yukarıdaki tam senaryoyu (pnpm store hiç oluşmadan cache
+      # denemesi → Path Validation Error) sessizce yeniden tetikleyebilirdi. Faz 4.5 commit
+      # 7a2 notu: v6.0.0 ("Limit automatic caching to npm") bu otomatik davranışı npm'e
+      # daralttı, pnpm/yarn için varsayılan artık kapalı — yani v7'de bu satır olmasa bile
+      # aynı kırılma tekrar OLUŞMAZ (ölçüldü: değişiklik geçmişinden doğrulandı). Yine de
+      # açıkça `false` bırakıyoruz: hem niyeti belgeler hem de action'ın gelecekte pnpm için
+      # otomatik önbelleklemeyi tekrar açması ihtimaline karşı savunma sağlar.
+      - uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 24
+          package-manager-cache: false
 
       - name: Install uv
         uses: astral-sh/setup-uv@v5
