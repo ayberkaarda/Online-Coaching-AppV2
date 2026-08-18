@@ -243,6 +243,24 @@ proje doğrulaması, açık soru) hariç. Sıradaki iş: Faz 1.6 (görsel kimlik
 
 ---
 
+### Sonradan fark edilen kapanış — B-003 (`middleware` → `proxy` göçü)
+
+**2026-08-18'de eklendi.** Faz 1.5'in Grup 1–3 / Grup 4–6 düzeltme turları (`578968f`,
+`3f36048`) `src/middleware.ts`'i Next 16'nın `proxy` dosya konvansiyonuna taşıdı, ama bu
+borç tablosunda B-003 olarak **açık** kalmaya devam etti ("şu an yalnızca deprecation
+uyarısı"). Faz 4.5 öncesi durum doğrulamasında yakalandı ve satır canlı tablodan silindi.
+
+Kanıt (2026-08-18, `618801f` ağacı):
+
+| Kontrol                    | Sonuç                                                                                |
+| -------------------------- | ------------------------------------------------------------------------------------ |
+| `src/middleware.ts` var mı | Yok — dosya mevcut değil                                                             |
+| `src/proxy.ts` var mı      | Var; başlığında göç notu ve `export const config = { matcher: ['/api/:path*'] }`     |
+| `npm run build`            | Başarılı; çıktıda `ƒ Proxy (Middleware)` satırı, **deprecation uyarısı yok**         |
+| Kalan `middleware` geçişi  | Yalnızca yorum satırları (`src/lib/api/client-ip.ts`, `next.config.mjs`) — kod değil |
+
+---
+
 ## Eski §5 — güvenlik riskleri tablosu
 
 `ÇÖZÜLDÜ` işaretli satırlar kapanmıştır; kapanmayanlar canlı

@@ -18,11 +18,12 @@ onayıyla düzeltme planının **Grup 1–3'ü** (§5) uygulandı — kimlik ve 
 limiting/kaba kuvvet, sütun seviyesi sözleşmeler (bkz. §4b, "Faz 1.5 düzeltme turu"). Aynı gün
 ikinci bir turda **Grup 4–6** de uygulandı — girdi doğrulama/gövde sınırları, yapılandırma
 sertleştirme (AC-05/A-14 hariç, kullanıcı kararıyla ertelendi), dokümantasyon/CI tarama zinciri
-(bkz. §4c, "Faz 1.5 düzeltme turu (Grup 4–6)"). **37/39 bulgu kapandı** (`fixed`/`fixed (kısmi)`/`closed`,
-bkz. §2 tablosu); kalan 2'si **açık**: A-05 (oturum token'ları `localStorage`'da), A-14 (CSP
-`unsafe-inline`) — ikisi de `@supabase/ssr` cookie+nonce geçişi bekliyor, kullanıcı kararıyla
-ayrı bir tura ertelendi. **AC-12 (hosted proje doğrulaması) 2026-08-17'de ayrı bir turda
-kapandı** — bkz. §7. Her bulgunun güncel durumu §2'deki `Durum` sütununda işaretlidir.
+(bkz. §4c, "Faz 1.5 düzeltme turu (Grup 4–6)"). **39/39 bulgu kapandı** (`fixed`/`fixed (kısmi)`/`closed`,
+bkz. §2 tablosu). **AC-12 (hosted proje doğrulaması) 2026-08-17'de ayrı bir turda
+kapandı** — bkz. §7. **A-05 (oturum token'ları) ve A-14 (CSP `unsafe-inline`) 2026-08-18'de,
+ADR-0022 kapsamında `@supabase/ssr` cookie geçişi + nonce tabanlı CSP ile kapandı** — kapsam
+sınırlıdır, bkz. §2 tablosu ve §7. Her bulgunun güncel durumu §2'deki `Durum` sütununda
+işaretlidir.
 
 Bu belge bir yönlendirme belgesidir; kanıt tekrarlanmaz. Detay için kaynak raporlara
 `docs/security/findings-*.md §x.y` biçiminde referans verilir.
@@ -84,7 +85,7 @@ severity içinde kaynak rapor sırasıyla (AC → A → T) ve ID numarasıyla.
 | AC-03 | Medium   | RLS/Yetki        | `authenticated` rolünde `TRUNCATE` yetkisi (RLS bypass)  | findings-access-control.md | **fixed** — `supabase/migrations/20260817170000_force_rls_and_grants.sql` — **severity yeniden değerlendirildi, bkz. §4c**                                                                                                    |
 | AC-04 | Medium   | RLS/Yetki        | Mesaj alıcısı gövde/`kind`/`created_at` değiştirebiliyor | findings-access-control.md | **fixed** — `supabase/migrations/20260817160200_column_guards.sql` (`messages_guard_columns()`)                                                                                                                               |
 | AC-05 | Medium   | RLS/Yetki        | Danışan koçun bildirim akışına keyfi içerik yazabiliyor  | findings-access-control.md | **fixed** — `20260817160200_column_guards.sql` (`notifications_guard_content()`) — bilinen borç: bkz. §4b                                                                                                                     |
-| A-05  | Medium   | Kimlik Doğrulama | Oturum token'ları `localStorage`'da, JS'ten okunabilir   | findings-app-surface.md    | open                                                                                                                                                                                                                          |
+| A-05  | Medium   | Kimlik Doğrulama | Oturum token'ları `localStorage`'da, JS'ten okunabilir   | findings-app-surface.md    | **ÇÖZÜLDÜ (2026-08-18, ADR-0022)** — `@supabase/ssr` ile cookie'ye taşındı; kapsam SINIRLI: token JS'ten gizlenmiyor (cookie `httpOnly` değil, bilinçli), kazanç SSR-uyumlu tek depo + `Secure`/`SameSite=Lax`, bkz. §7       |
 | A-06  | Medium   | Kimlik Doğrulama | Logout access token'ı veri düzleminde iptal etmiyor      | findings-app-surface.md    | **fixed (kısmi — kullanıcı kararı)** — `supabase/config.toml` `jwt_expiry` 3600→900, bkz. §7                                                                                                                                  |
 | A-07  | Medium   | Storage          | Dosya yüklemede magic byte doğrulaması yok               | findings-app-surface.md    | **fixed** — `src/lib/upload-validation.ts` (yeni)                                                                                                                                                                             |
 | A-08  | Medium   | Girdi Doğrulama  | İstek gövdesi sınırı yok; 10 MB'da sessiz kesme          | findings-app-surface.md    | **fixed** — `src/lib/api/proxy.ts` (`MAX_BODY_BYTES=64KB`, stream `reader.cancel()`)                                                                                                                                          |
@@ -96,25 +97,25 @@ severity içinde kaynak rapor sırasıyla (AC → A → T) ve ID numarasıyla.
 
 ### Low
 
-| ID    | Severity | Alan             | Başlık                                                                  | Kaynak rapor               | Durum                                                                                                                   |
-| ----- | -------- | ---------------- | ----------------------------------------------------------------------- | -------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| AC-06 | Low      | RLS/Yetki        | `FORCE ROW LEVEL SECURITY` hiçbir tabloda açık değil                    | findings-access-control.md | **fixed** — `supabase/migrations/20260817170000_force_rls_and_grants.sql` (13/13 tablo; bugünkü etkisi sıfır, bkz. §4c) |
-| AC-07 | Low      | RLS/Yetki        | `program_approvals.reviewed_by` istemciden geliyor                      | findings-access-control.md | **fixed** — `20260817160000_program_approval_guard.sql` (AC-01 ile aynı trigger)                                        |
-| AC-08 | Low      | RLS/Yetki        | Danışan `current_streak`/`last_checkin_at` alanlarını keyfi yazabiliyor | findings-access-control.md | **fixed** — `20260817160200_column_guards.sql` (`is_end_user_write()`)                                                  |
-| AC-09 | Low      | RLS/Yetki        | Danışan `profiles.email`'i `auth.users`'tan desenkronize edebiliyor     | findings-access-control.md | **fixed** — `20260817160200_column_guards.sql` (`is_end_user_write()`)                                                  |
-| AC-10 | Low      | RLS/Yetki        | Danışan kendi bildiriminin metnini değiştirebiliyor                     | findings-access-control.md | **fixed** — `20260817160200_column_guards.sql` (`notifications` UPDATE yalnızca `is_read`)                              |
-| AC-11 | Low      | Yapılandırma     | Sunucu env değişkeni adları istemci paketinde                           | findings-access-control.md | **fixed** — `src/env.server.ts` (yeni); kanıt: build sonrası `.next/static/` 4→0 eşleşme                                |
-| AC-12 | Low      | Yapılandırma     | Denetim yerel yığında yapıldı; hosted proje ayrı doğrulanmalı           | findings-access-control.md | **closed (2026-08-17)** — bkz. §7, `docs/adr/0020-hosted-senkronizasyon-stratejisi.md`                                  |
-| A-14  | Low      | Yapılandırma     | CSP `script-src 'unsafe-inline'` içeriyor                               | findings-app-surface.md    | open — ertelendi, kullanıcı kararı (A-05 ile birlikte, bkz. §7)                                                         |
-| A-15  | Low      | Yapılandırma     | `connect-src` içinde `https://*.supabase.co` wildcard'ı                 | findings-app-surface.md    | **fixed** — `next.config.mjs` (yalnızca yapılandırılan origin)                                                          |
-| A-16  | Low      | Loglama/Gizlilik | Hata mesajı iç mimariyi ifşa ediyor                                     | findings-app-surface.md    | **fixed** — jenerik mesaj, teknik detay yalnızca logda                                                                  |
-| A-17  | Low      | Rate Limiting    | `/api/health` hız sınırından muaf, sürüm bilgisi dönüyor                | findings-app-surface.md    | **fixed** — `/api/health` artık hız sınırına tabi, sürüm yalnızca kimlikli çağrıda                                      |
-| A-18  | Low      | Rate Limiting    | Hız sınırı anahtarı yola bağlı (route başına ayrı kova)                 | findings-app-surface.md    | **fixed** — `src/proxy.ts` (AI route'ları `${ip}:ai` ortak kovasında)                                                   |
-| A-19  | Low      | Rate Limiting    | Hız sınırlayıcı bellek içi ve tek instance                              | findings-app-surface.md    | **fixed (kısmi)** — `src/lib/rate-limit.ts` LRU tahliye; hâlâ bellek içi/tek instance, bkz. §4b                         |
-| A-20  | Low      | Girdi Doğrulama  | Yükleme boyut/tip kontrolü istemcide de yok                             | findings-app-surface.md    | **fixed** — `FormCheckTab.tsx`, `src/app/profile/page.tsx`                                                              |
-| A-21  | Low      | Storage          | Dosya adından türetilen uzantı doğrudan yola giriyor                    | findings-app-surface.md    | **fixed** — `useFormChecks.ts`/`useProfile.ts` (magic-byte sonucundan türetiliyor)                                      |
-| A-22  | Low      | Yapılandırma     | `.env.example` `.gitignore`'un `.env*` deseniyle depoya girmiyor        | findings-app-surface.md    | **fixed** — `.gitignore` (`!.env.example` + `!**/.env.example`) — bkz. §4b tutarsızlık notu                             |
-| T-04  | Low      | Bağımlılık       | `next-pwa@5.6.0` ağacı terk edilmiş, build-time zafiyetler kalıcı       | tooling-baseline.md        | **fixed (kısmi)** — `dependencies`→`devDependencies`; legacy `--webpack` yolu HÂLÂ AÇIK, bkz. §7                        |
+| ID    | Severity | Alan             | Başlık                                                                  | Kaynak rapor               | Durum                                                                                                                                                        |
+| ----- | -------- | ---------------- | ----------------------------------------------------------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| AC-06 | Low      | RLS/Yetki        | `FORCE ROW LEVEL SECURITY` hiçbir tabloda açık değil                    | findings-access-control.md | **fixed** — `supabase/migrations/20260817170000_force_rls_and_grants.sql` (13/13 tablo; bugünkü etkisi sıfır, bkz. §4c)                                      |
+| AC-07 | Low      | RLS/Yetki        | `program_approvals.reviewed_by` istemciden geliyor                      | findings-access-control.md | **fixed** — `20260817160000_program_approval_guard.sql` (AC-01 ile aynı trigger)                                                                             |
+| AC-08 | Low      | RLS/Yetki        | Danışan `current_streak`/`last_checkin_at` alanlarını keyfi yazabiliyor | findings-access-control.md | **fixed** — `20260817160200_column_guards.sql` (`is_end_user_write()`)                                                                                       |
+| AC-09 | Low      | RLS/Yetki        | Danışan `profiles.email`'i `auth.users`'tan desenkronize edebiliyor     | findings-access-control.md | **fixed** — `20260817160200_column_guards.sql` (`is_end_user_write()`)                                                                                       |
+| AC-10 | Low      | RLS/Yetki        | Danışan kendi bildiriminin metnini değiştirebiliyor                     | findings-access-control.md | **fixed** — `20260817160200_column_guards.sql` (`notifications` UPDATE yalnızca `is_read`)                                                                   |
+| AC-11 | Low      | Yapılandırma     | Sunucu env değişkeni adları istemci paketinde                           | findings-access-control.md | **fixed** — `src/env.server.ts` (yeni); kanıt: build sonrası `.next/static/` 4→0 eşleşme                                                                     |
+| AC-12 | Low      | Yapılandırma     | Denetim yerel yığında yapıldı; hosted proje ayrı doğrulanmalı           | findings-access-control.md | **closed (2026-08-17)** — bkz. §7, `docs/adr/0020-hosted-senkronizasyon-stratejisi.md`                                                                       |
+| A-14  | Low      | Yapılandırma     | CSP `script-src 'unsafe-inline'` içeriyor                               | findings-app-surface.md    | **ÇÖZÜLDÜ (2026-08-18, ADR-0022)** — nonce tabanlı `script-src`; kapsam SINIRLI, yalnızca `script-src` (`style-src 'unsafe-inline'` bilinçli kaldı), bkz. §7 |
+| A-15  | Low      | Yapılandırma     | `connect-src` içinde `https://*.supabase.co` wildcard'ı                 | findings-app-surface.md    | **fixed** — `next.config.mjs` (yalnızca yapılandırılan origin)                                                                                               |
+| A-16  | Low      | Loglama/Gizlilik | Hata mesajı iç mimariyi ifşa ediyor                                     | findings-app-surface.md    | **fixed** — jenerik mesaj, teknik detay yalnızca logda                                                                                                       |
+| A-17  | Low      | Rate Limiting    | `/api/health` hız sınırından muaf, sürüm bilgisi dönüyor                | findings-app-surface.md    | **fixed** — `/api/health` artık hız sınırına tabi, sürüm yalnızca kimlikli çağrıda                                                                           |
+| A-18  | Low      | Rate Limiting    | Hız sınırı anahtarı yola bağlı (route başına ayrı kova)                 | findings-app-surface.md    | **fixed** — `src/proxy.ts` (AI route'ları `${ip}:ai` ortak kovasında)                                                                                        |
+| A-19  | Low      | Rate Limiting    | Hız sınırlayıcı bellek içi ve tek instance                              | findings-app-surface.md    | **fixed (kısmi)** — `src/lib/rate-limit.ts` LRU tahliye; hâlâ bellek içi/tek instance, bkz. §4b                                                              |
+| A-20  | Low      | Girdi Doğrulama  | Yükleme boyut/tip kontrolü istemcide de yok                             | findings-app-surface.md    | **fixed** — `FormCheckTab.tsx`, `src/app/profile/page.tsx`                                                                                                   |
+| A-21  | Low      | Storage          | Dosya adından türetilen uzantı doğrudan yola giriyor                    | findings-app-surface.md    | **fixed** — `useFormChecks.ts`/`useProfile.ts` (magic-byte sonucundan türetiliyor)                                                                           |
+| A-22  | Low      | Yapılandırma     | `.env.example` `.gitignore`'un `.env*` deseniyle depoya girmiyor        | findings-app-surface.md    | **fixed** — `.gitignore` (`!.env.example` + `!**/.env.example`) — bkz. §4b tutarsızlık notu                                                                  |
+| T-04  | Low      | Bağımlılık       | `next-pwa@5.6.0` ağacı terk edilmiş, build-time zafiyetler kalıcı       | tooling-baseline.md        | **fixed (kısmi)** — `dependencies`→`devDependencies`; legacy `--webpack` yolu HÂLÂ AÇIK, bkz. §7                                                             |
 
 ---
 
@@ -464,6 +465,8 @@ yapılmamalı).
 - `pg_default_acl`'deki `supabase_admin` kaydı değiştirilemiyor (42501, yetki yetersiz) — pratik
   etkisi yok, senaryo 73 ile izleniyor.
 - A-05/A-14 (httpOnly cookie + nonce CSP) kullanıcı kararıyla ayrı bir tura ertelendi.
+  **ÇÖZÜLDÜ (2026-08-18, ADR-0022):** cookie geçişi (httpOnly DEĞİL, bilinçli) + nonce
+  tabanlı `script-src` uygulandı, bkz. §7.
 - `playwright.config.ts` içindeki bir yorum hâlâ `src/env.ts` diyor; A-12 kontrolü artık
   `src/env.server.ts`'te — yorum güncellenmedi. **ÇÖZÜLDÜ (2026-08-17, Faz 1.7 borç
   temizliği):** yorum `src/env.server.ts`'e ve `superRefine`'a atıf yapacak şekilde düzeltildi.
@@ -542,7 +545,7 @@ kapatıldı — kullanıcı kararı.)
   — 64 KB üstü gövdede 413; storage tarafı için G-19/G-20 ile tamamlayıcı kapsam.
 - **Efor:** M.
 
-### Grup 5 — Yapılandırma sertleştirme ve savunma derinliği — **kısmen tamamlandı (2026-08-17, bkz. §4c)**
+### Grup 5 — Yapılandırma sertleştirme ve savunma derinliği — **kısmen tamamlandı (2026-08-17, bkz. §4c); kalan iki madde ÇÖZÜLDÜ (2026-08-18, ADR-0022, bkz. §7)**
 
 **Kapatır:** AC-03, AC-06, AC-11, A-05, ~~A-06~~, A-10, A-11, ~~A-13~~, A-14, A-15, A-16,
 ~~A-22~~, T-04. (AC-12 için bkz. §7 — açık soru, bu grupta düzeltme maddesi yok. Üstü çizili
@@ -550,10 +553,13 @@ kapatıldı — kullanıcı kararı.)
 kapandı, bkz. §4b; bu grup için kalan gerçek iş AC-03, AC-06 tam çözümü, AC-11, A-05, A-10,
 A-11, A-14, A-15, A-16, T-04'tür.)
 
-**Kalan iki madde — bilinçli olarak bu turun kapsamı dışında bırakıldı (kullanıcı kararı):**
+**Kalan iki madde — bu turda bilinçli olarak kapsam dışı bırakıldı (kullanıcı kararı):**
 **A-05** (oturum token'ları `localStorage`'da) ve **A-14** (CSP `unsafe-inline`) —
 `@supabase/ssr` httpOnly cookie geçişi + nonce tabanlı CSP tek işlem olarak ayrı bir tura
-ertelendi. Bu ikisi dışındaki her madde (AC-03, AC-06, AC-11, A-10 kısmi, A-11, A-15, A-16,
+ertelendi. **ÇÖZÜLDÜ (2026-08-18, ADR-0022 uygulaması):** ikisi de kapandı, kapsamı dar —
+A-05 token'ı JS'ten gizlemiyor (cookie `httpOnly` değil, ADR-0022 Karar 1'in bilinçli
+sonucu), A-14 yalnızca `script-src`'ı kapsıyor (`style-src 'unsafe-inline'` bilinçli kaldı).
+Detay: `docs/archive/progress-a05-a14-cookie-nonce-csp.md`. Bu ikisi dışındaki her madde (AC-03, AC-06, AC-11, A-10 kısmi, A-11, A-15, A-16,
 T-04 kısmi) bu turda kapandı.
 
 - **Dosya/migration:** `revoke truncate, references, trigger on all tables in schema public from
@@ -641,11 +647,38 @@ requirements>` adımları eklensin; high+ bulguda job kırılsın.
   §2)? **Hâlâ açık.** T-04'ün paket taşıma kısmı (§4c, `dependencies`→`devDependencies`) bunu
   **kapatmadı** — ikisini karıştırmayın: `npm audit` artık temiz ama build hâlâ `--webpack` ile
   yapılıyor.
-- **A-05 / A-14 — ertelendi (2026-08-17, kullanıcı kararı).** Oturum token'larının
-  `localStorage`'dan httpOnly cookie'ye taşınması (`@supabase/ssr`) ve CSP'nin nonce tabanlı hale
-  getirilmesi (`unsafe-inline`'ın kaldırılması) tek bir işlem olarak ayrı bir tura ertelendi —
-  Grup 5'in geri kalanı (AC-03, AC-06, AC-11, A-10 kısmi, A-11, A-15, A-16, T-04 kısmi) bu turda
-  kapandı, bu ikisi kapanmadı. Bkz. §4c.
+- **A-05 / A-14 — ÇÖZÜLDÜ (2026-08-18, ADR-0022 uygulaması).** 2026-08-17'de ertelenmişti
+  (bkz. aşağıdaki orijinal kayıt): oturum token'larının `localStorage`'dan cookie'ye taşınması
+  (`@supabase/ssr`) ve CSP'nin nonce tabanlı hale getirilmesi tek bir işlem olarak uygulandı.
+  **Kapsam sınırı açıkça kayda geçirilmelidir — ikisi de "tam" kapanmadı:**
+  - **A-05**, "token'ı JS'ten gizleme" hedefiyle DEĞİL, "SSR-uyumlu tek oturum deposu +
+    `Secure`/`SameSite=Lax` + XSS yüzeyinin CSP ile daraltılması" kapsamıyla kapandı. Cookie'ler
+    bilinçli olarak `httpOnly` DEĞİL (ADR-0022 Karar 1) — uygulama tarayıcıdan doğrudan
+    `supabase.from(...)` çağırdığı ve `useMessages` realtime `.channel(...)` kurduğu için
+    `httpOnly` olsaydı `getSession()` istemcide `null` döner, RLS altındaki tüm istemci
+    sorguları çökerdi. XSS hâlâ oturumu okuyabilir; bu tasarımın kabul edilmiş sonucudur, bir
+    eksiklik değil.
+  - **A-14** yalnızca `script-src`'ı kapsıyor. `style-src 'unsafe-inline'` bilinçli olarak
+    duruyor (ADR-0022 Karar 4): nonce'lar inline `style="..."` niteliklerine uygulanmaz —
+    kod tabanında 17 yerde `style={{}}` + `recharts`'ın çalışma anında yazdığı stiller bu
+    direktifi `'unsafe-inline'`'da tutmayı zorunlu kılıyor. Bu kalan boşluk ayrı bir borç
+    olarak izleniyor.
+
+  Uygulama sırasında iki bulgu daha ortaya çıktı (ayrı borç değil, gelecekteki oturumların
+  tekrar düşmemesi gereken tuzaklar): istemci bileşeni dosyalarında `export const dynamic =
+'force-dynamic'` Next 16'da sessizce yok sayılıyor (çözüm kök layout'ta `await
+connection()`, bedeli öngörülenden geniş — beş sayfa değil tüm rota ağacı dinamikleşti) ve
+  `next-themes`'in tema-flash önleyici inline script'i nonce almadan CSP tarafından
+  bloklanıyordu (çözüm: kütüphanenin resmi `nonce` prop'u). Detay:
+  `docs/archive/progress-a05-a14-cookie-nonce-csp.md`,
+  `docs/adr/0022-oturum-depolamasi-cookie-ve-nonce-csp.md`.
+
+  **Orijinal erteleme kaydı (2026-08-17, kullanıcı kararı, değiştirilmeden bırakıldı):**
+  Oturum token'larının `localStorage`'dan httpOnly cookie'ye taşınması (`@supabase/ssr`) ve
+  CSP'nin nonce tabanlı hale getirilmesi (`unsafe-inline`'ın kaldırılması) tek bir işlem
+  olarak ayrı bir tura ertelendi — Grup 5'in geri kalanı (AC-03, AC-06, AC-11, A-10 kısmi,
+  A-11, A-15, A-16, T-04 kısmi) bu turda kapandı, bu ikisi kapanmadı. Bkz. §4c.
+
 - **`playwright.config.ts` yorum tutarsızlığı (yeni, 2026-08-17). GEÇERSİZ (2026-08-17
   doğrulandı, Faz 1.7 borç temizliği).** Dosyadaki bir yorum hâlâ A-12 kontrolünü `src/env.ts`'e
   bağlıyordu; AC-11 düzeltmesi (§4c) sunucu şemasını `src/env.server.ts`'e taşımıştı, yorum

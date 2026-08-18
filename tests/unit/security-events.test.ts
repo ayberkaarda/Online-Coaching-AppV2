@@ -13,8 +13,11 @@ import { NextRequest } from 'next/server'
 // auth-sign-in-rate-limit.test.ts'teki aynı desen).
 vi.mock('server-only', () => ({}))
 
+// A-05 (B-006): `sign-in/route.ts` artık cookie'ye bağlı istemciyi kullanıyor. Bu dosyanın
+// konusu güvenlik olayı LOGLAMASI; cookie yazımı `tests/unit/auth-cookie-session.test.ts`
+// içinde ayrıca doğrulanır.
 vi.mock('@/lib/supabase/server', () => ({
-  createServerSupabaseClient: vi.fn(),
+  createCookieBoundServerClient: vi.fn(),
 }))
 
 // Tek paylaşılan sahte logger — hem `src/proxy.ts`'in doğrudan kullandığı `logger`, hem
@@ -40,7 +43,7 @@ import { POST } from '@/app/api/auth/sign-in/route'
 import { resetServerEnvCache } from '@/env.server'
 import { logger } from '@/lib/logger'
 import { resetRateLimit } from '@/lib/rate-limit'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createCookieBoundServerClient } from '@/lib/supabase/server'
 import { proxy } from '@/proxy'
 
 const warnMock = vi.mocked(logger.warn)
@@ -87,9 +90,10 @@ describe('güvenlik olayı loglaması (A-10)', () => {
     resetServerEnvCache()
     warnMock.mockClear()
     signInWithPassword.mockReset()
-    vi.mocked(createServerSupabaseClient).mockReturnValue({
-      auth: { signInWithPassword },
-    } as unknown as ReturnType<typeof createServerSupabaseClient>)
+    vi.mocked(createCookieBoundServerClient).mockReturnValue({
+      supabase: { auth: { signInWithPassword } },
+      applyCookies: vi.fn(),
+    } as unknown as ReturnType<typeof createCookieBoundServerClient>)
     setSignInResult(INVALID_CREDENTIALS)
   })
 

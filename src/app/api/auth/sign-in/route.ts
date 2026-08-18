@@ -42,7 +42,7 @@ import {
 import { resolveTrustedClientIp } from '@/lib/api/client-ip'
 import { errorResponse } from '@/lib/api/response'
 import { createRequestLogger } from '@/lib/logger'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createCookieBoundServerClient } from '@/lib/supabase/server'
 import { formatZodError } from '@/lib/validation/schemas'
 
 export const runtime = 'nodejs'
@@ -150,7 +150,9 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
 
   // 4) Supabase'e karşı doğrula — ANON key ile (service_role KULLANILMAZ).
-  const supabase = createServerSupabaseClient()
+  // A-05 (B-006): istemci COOKIE'ye bağlıdır; başarılı girişte oturum cookie'leri
+  // `applyCookies` ile yanıta yazılır (aşağıda, 6. adım).
+  const { supabase, applyCookies } = createCookieBoundServerClient(request)
   const { data, error } = await supabase.auth.signInWithPassword({ email, password })
 
   // 5) Başarısız: sayaçları artır, JENERİK hata dön
@@ -171,23 +173,24 @@ export async function POST(request: Request): Promise<NextResponse> {
   clearLoginFailures(email)
   log.info({ event: 'login_success', userId: data.session.user.id }, 'Giriş başarılı')
 
-  // İstemci bu token'larla `supabase.auth.setSession(...)` çağırır; mevcut istemci oturum
-  // yönetimi (onAuthStateChange, TanStack Query invalidation, realtime abonelikleri) aynen
-  // çalışmaya devam eder.
+  // A-05 (B-006): token'lar artık JSON GÖVDESİNDE TAŞINMAZ. `signInWithPassword` başarılı
+  // olduğunda cookie'ye bağlı istemci oturumu depolamaya yazar; `applyCookies` bu yazımları
+  // `Set-Cookie` başlıklarına çevirir. İstemci (`useSignIn`) yanıt döndükten sonra
+  // `supabase.auth.getSession()` ile oturumu bu cookie'den hidrat eder.
   //
-  // A-05 (Grup 5, `@supabase/ssr` httpOnly cookie geçişi) yapıldığında bu gövde BOŞALIR:
-  // token'lar JSON yerine `Set-Cookie` ile httpOnly+Secure+SameSite olarak yazılacak ve
-  // istemci hiç token görmeyecek. Bu route'un geri kalanı (doğrulama, hız sınırı, jenerik
-  // hata) aynen kalır — sadece 6. adımın yanıt şekli değişir.
-  return NextResponse.json(
-    {
-      access_token: data.session.access_token,
-      refresh_token: data.session.refresh_token,
-      expires_at: data.session.expires_at ?? null,
-    },
+  // DÜZELTME (eski not yanlıştı): cookie'ler `httpOnly` DEĞİLDİR ve istemci token'ı görür.
+  // Zorunludur: tarayıcı `supabase.from(...)` ve realtime `.channel(...)` çağrıları RLS
+  // altında access token'a ihtiyaç duyar (ayrıntılı gerekçe: `src/lib/supabase/client.ts`).
+  //
+  // 204 DÖNÜLMEZ: `apiFetch` 204'te `undefined` döndürür ve çağıran tarafta gereksiz
+  // dallanma doğar. Minimal ama gerçek bir JSON gövdesi dönülür.
+  const response = NextResponse.json(
+    { ok: true },
     {
       status: 200,
       headers: { 'X-Request-ID': requestId, 'Cache-Control': 'no-store' },
     }
   )
+  applyCookies(response)
+  return response
 }

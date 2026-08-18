@@ -65,11 +65,15 @@ export interface SignInInput {
   password: string
 }
 
-/** `/api/auth/sign-in` başarı yanıtı (bkz. `src/app/api/auth/sign-in/route.ts`). */
+/**
+ * `/api/auth/sign-in` başarı yanıtı (bkz. `src/app/api/auth/sign-in/route.ts`).
+ *
+ * A-05 (B-006): gövde artık TOKEN TAŞIMAZ — oturum `Set-Cookie` ile gelir. Gövde yalnızca
+ * "işlem başarılı" sinyalidir (204 yerine gerçek bir JSON: `apiFetch` 204'te `undefined`
+ * döndürüp çağıran tarafta gereksiz dallanma yaratırdı).
+ */
 interface SignInResponse {
-  access_token: string
-  refresh_token: string
-  expires_at: number | null
+  ok: true
 }
 
 export function useSignIn() {
@@ -81,24 +85,26 @@ export function useSignIn() {
     // katmanı kaba kuvvet sınırı (e-posta başına 10 başarısız deneme / 15 dk) araya girebilir.
     // Supabase'in kendi hız sınırı fiilen uygulanmıyor (upstream hatası — bkz. route.ts).
     //
-    // Dönen token'larla `setSession` çağrılır: bu, `onAuthStateChange` olayını tetikler,
-    // dolayısıyla mevcut istemci oturum yönetimi (TanStack Query invalidation, realtime
-    // abonelikleri, `useSession` tüketicileri) HİÇ DEĞİŞMEDEN çalışmaya devam eder.
-    // Hook'un dışa dönük imzası ve dönüş şekli de aynı kaldı.
+    // A-05 (B-006): oturum artık `localStorage`'da değil COOKIE'de saklanıyor. Sunucu
+    // başarılı girişte oturum cookie'lerini `Set-Cookie` ile yazar; istemcinin yapması
+    // gereken tek şey o cookie'yi OKUMAKTIR. Bu yüzden `setSession(tokens)` çağrısı
+    // KALDIRILDI — token istemciye artık JSON gövdesiyle gelmiyor.
+    //
+    // `getSession()` cookie deposundan okur, oturumu belleğe alır ve `onAuthStateChange`
+    // olayını tetikler; dolayısıyla mevcut istemci oturum yönetimi (TanStack Query
+    // invalidation, realtime abonelikleri, `useSession` tüketicileri) HİÇ DEĞİŞMEDEN
+    // çalışmaya devam eder. Hook'un dışa dönük imzası ve dönüş şekli de aynı kaldı.
     mutationFn: async ({ email, password }: SignInInput): Promise<Session> => {
       // `apiFetch` başarısız yanıtı `ApiError`a çevirir; `ApiError.message` sunucunun
       // Türkçe mesajıdır (401 için jenerik "E-posta veya şifre hatalı!", 429 için ne
       // yapılacağını söyleyen kilit mesajı). `ApiError extends Error` olduğundan
       // `onError`/`signIn.error` tüketicileri değişmez.
-      const tokens = await apiFetch<SignInResponse>('/api/auth/sign-in', {
+      await apiFetch<SignInResponse>('/api/auth/sign-in', {
         method: 'POST',
         json: { email, password },
       })
 
-      const { data, error } = await supabase.auth.setSession({
-        access_token: tokens.access_token,
-        refresh_token: tokens.refresh_token,
-      })
+      const { data, error } = await supabase.auth.getSession()
       if (error) throw new Error(error.message)
       if (!data.session) throw new Error('Oturum başlatılamadı. Lütfen tekrar deneyin.')
       return data.session

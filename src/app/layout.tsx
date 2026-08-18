@@ -2,6 +2,8 @@
 // ve genel <html>/<body> iskeleti.
 
 import { Archivo, Hanken_Grotesk, IBM_Plex_Mono } from 'next/font/google'
+import { headers } from 'next/headers'
+import { connection } from 'next/server'
 
 import type { Metadata, Viewport } from 'next'
 import type { JSX, ReactNode } from 'react'
@@ -62,7 +64,42 @@ export const viewport: Viewport = {
   initialScale: 1,
 }
 
-export default function RootLayout({ children }: { children: ReactNode }): JSX.Element {
+// A-14 (borç B-007) — NONCE TABANLI CSP DİNAMİK RENDER ZORUNLU KILAR.
+//
+// Nonce yalnızca SUNUCUDA render edilen sayfalara uygulanabilir: build zamanında üretilmiş
+// statik HTML'in bootstrap script'inde nonce olmaz ve `script-src 'self' 'nonce-<n>'` onu
+// bloklar — sonuç beyaz ekrandır (kaynak:
+// node_modules/next/dist/docs/01-app/02-guides/content-security-policy.md, "Static vs Dynamic
+// Rendering with CSP": "When you use nonces in your CSP, all pages must be dynamically
+// rendered"). Bu geçişten önce `/`, `/login`, `/profile`, `/users` ve `/_not-found` statik (○)
+// üretiliyordu.
+//
+// NEDEN SAYFA BAŞINA DEĞİL DE KÖK LAYOUT'TA: dört sayfanın dördü de `'use client'`. Next 16
+// route segment config'ini (`export const dynamic = 'force-dynamic'`) bir istemci bileşeni
+// dosyasından SESSİZCE YOK SAYAR — denendi, build route tablosunda dört sayfa da `○` kaldı
+// (yalnızca sunucu bileşeni olan `not-found.tsx` `ƒ`ye döndü). Dokümanın önerdiği
+// `await connection()` ise yalnızca sunucu bileşenlerinde çalışır; bu ağaçtaki tek sunucu
+// bileşeni kök layout'tur ve her rotanın parçasıdır — burada beklemek tüm ağacı dinamikleştirir.
+//
+// Bedeli ADR-0022 Karar 5'te kabul edildi: bu sayfalar zaten auth-gated, veriyi TanStack Query
+// ile istemcide çeken kabuklar; build'de anlamlı içerik prerender edilmiyordu, ISR/CDN kenar
+// önbelleği ve PPR hâlihazırda kullanılmıyordu.
+export default async function RootLayout({
+  children,
+}: {
+  children: ReactNode
+}): Promise<JSX.Element> {
+  // Gelen isteği bekle — bu segment (dolayısıyla tüm rota) artık istek anında render edilir.
+  await connection()
+
+  // A-14: `next-themes` tema-flash önleyici bir INLINE `<script>` render ediyor. `script-src`
+  // artık `'unsafe-inline'` içermediği için o script nonce almazsa BLOKLANIR (her sayfada bir
+  // CSP ihlali + karanlık modda FOUC). Nonce'u `src/proxy.ts` üretip `x-nonce` İSTEK başlığına
+  // yazıyor; Next aynı nonce'u istek başlığındaki CSP'den ayrıştırıp kendi script'lerine zaten
+  // uyguluyor, burada okunan değer onunla AYNI olandır. Proxy'nin çalışmadığı bir yol olursa
+  // `undefined` iner ve `next-themes` nonce'suz (bugünkü) davranışına düşer.
+  const nonce = (await headers()).get('x-nonce') ?? undefined
+
   return (
     <html
       lang="tr"
@@ -78,7 +115,7 @@ export default function RootLayout({ children }: { children: ReactNode }): JSX.E
         >
           İçeriğe geç
         </a>
-        <Providers>{children}</Providers>
+        <Providers nonce={nonce}>{children}</Providers>
       </body>
     </html>
   )

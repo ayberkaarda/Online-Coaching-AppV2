@@ -80,3 +80,4 @@ ama karar metni silinmez — tarihsel bağlam korunur.
 | [0019](0019-laboratuvar-yorumlama-motoru-kapsam-disi.md)            | Laboratuvar yorumlama motorunun kapsam dışı bırakılması                  | Reddedildi                          | 2026-08-17 |
 | [0020](0020-hosted-senkronizasyon-stratejisi.md)                    | Barındırılan Supabase projesinin temiz baseline ile senkronlanması       | Önerildi                            | 2026-08-17 |
 | [0021](0021-yemek-fotografi-makro-tahmininin-ertelenmesi.md)        | Yemek fotoğrafı makro tahmininin (Faz 3) ertelenmesi                     | Ertelendi                           | 2026-08-17 |
+| [0022](0022-oturum-depolamasi-cookie-ve-nonce-csp.md)               | Oturum depolamasının cookie'ye ve CSP'nin nonce tabanlı hale getirilmesi | Kabul edildi (uygulama ayrı turda)  | 2026-08-18 |

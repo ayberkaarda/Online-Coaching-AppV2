@@ -14,8 +14,12 @@ buradadır; canlı dosyada kısaltılmış hâli durur.
 > Kaynak: arşivleme öncesi `docs/PROGRESS.md` satır 1538–1626, 1680–1701, 1728–1733 —
 > 2026-08-17'de taşındı.
 >
-> **Hâlâ açık:** §6a'dan devreden `src/middleware.ts` → Next 16 `proxy` göçü, canlı borç
-> tablosunda izlenir.
+> **Kapandı (2026-08-18'de doğrulandı):** §6a'dan devreden `src/middleware.ts` → Next 16
+> `proxy` göçü aslında Faz 1.5 düzeltme turunda yapılmıştı (`578968f`/`3f36048`); borç
+> tablosundaki B-003 satırı bunu fark etmeden açık kalmıştı ve 2026-08-18'de silindi.
+> Kapanış kanıtı: [`progress-faz-1.5-guvenlik.md`](progress-faz-1.5-guvenlik.md).
+> Aşağıdaki §8'de bu göçün "ertelenenler" arasında sayılması arşivin **birebir korunan**
+> tarihsel metnidir; güncel değildir.
 
 ---
 

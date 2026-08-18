@@ -19,7 +19,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 vi.mock('server-only', () => ({}))
 
 vi.mock('@/lib/supabase/server', () => ({
-  createServerSupabaseClient: vi.fn(),
+  createCookieBoundServerClient: vi.fn(),
 }))
 
 vi.mock('@/lib/logger', () => {
@@ -42,7 +42,7 @@ import { POST } from '@/app/api/auth/sign-in/route'
 import { resetServerEnvCache } from '@/env.server'
 import { LOGIN_FAILURE_LIMIT, normalizeEmail } from '@/lib/api/auth-rate-limit'
 import { resetRateLimit } from '@/lib/rate-limit'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createCookieBoundServerClient } from '@/lib/supabase/server'
 
 // ---------------------------------------------------------------------------
 // Yardımcılar
@@ -85,6 +85,7 @@ const SUCCESS: SignInResult = {
 }
 
 const signInWithPassword = vi.fn<(credentials: unknown) => Promise<SignInResult>>()
+const applyCookies = vi.fn()
 
 function setSignInResult(result: SignInResult): void {
   signInWithPassword.mockResolvedValue(result)
@@ -135,9 +136,14 @@ describe('POST /api/auth/sign-in — kaba kuvvet koruması (A-01)', () => {
     resetRateLimit()
     resetServerEnvCache()
     signInWithPassword.mockReset()
-    vi.mocked(createServerSupabaseClient).mockReturnValue({
-      auth: { signInWithPassword },
-    } as unknown as ReturnType<typeof createServerSupabaseClient>)
+    applyCookies.mockReset()
+    // A-05 (B-006): route artık cookie'ye bağlı istemciyi kullanıyor. Bu dosya hız sınırını
+    // ölçer, cookie yazımını DEĞİL — gerçek `Set-Cookie` üretimi
+    // `tests/unit/auth-cookie-session.test.ts` içinde, kütüphane mock'lanmadan doğrulanır.
+    vi.mocked(createCookieBoundServerClient).mockReturnValue({
+      supabase: { auth: { signInWithPassword } },
+      applyCookies,
+    } as unknown as ReturnType<typeof createCookieBoundServerClient>)
     setSignInResult(INVALID_CREDENTIALS)
   })
 
@@ -211,14 +217,18 @@ describe('POST /api/auth/sign-in — kaba kuvvet koruması (A-01)', () => {
     expect((await attempt(email, WRONG_PASSWORD)).status).toBe(429)
   })
 
-  it('başarılı giriş 200 ile access_token + refresh_token döner (istemci setSession için)', async () => {
+  it('başarılı giriş 200 döner; token GÖVDEDE TAŞINMAZ, oturum cookie olarak yazılır (A-05)', async () => {
     setSignInResult(SUCCESS)
     const response = await POST(buildRequest({ email: 'ok@example.com', password: VALID_PASSWORD }))
     const body = (await response.json()) as Record<string, unknown>
 
     expect(response.status).toBe(200)
-    expect(body.access_token).toBe('access-token-123')
-    expect(body.refresh_token).toBe('refresh-token-456')
+    expect(body).toEqual({ ok: true })
+    // A-05 (B-006) regresyonu: token'lar `Set-Cookie`'ye taşındı, JSON gövdesinde OLMAMALI.
+    expect(body.access_token).toBeUndefined()
+    expect(body.refresh_token).toBeUndefined()
+    // Cookie'ler yanıta gerçekten uygulanmalı (aksi halde tarayıcı oturumu hiç kurulmaz).
+    expect(applyCookies).toHaveBeenCalledTimes(1)
     expect(response.headers.get('Cache-Control')).toBe('no-store')
   })
 

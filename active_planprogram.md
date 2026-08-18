@@ -1046,6 +1046,48 @@ yürütülür; dönüşüm ancak elde çalışan ve test edilmiş bir ürün var
 
 ---
 
+## 7a. Faz 4.6 — Güvenlik Tamamlama: KVKK Hesap Silme + AI Kota
+
+Bu bölüm `security_hardening_prompt_v2.md`'nin (artık
+`docs/security/hardening-prompt-v2.md`) 23 maddesinden geriye kalan gerçek işi
+toplar. Maddelerin çoğu Faz 1.5 güvenlik denetiminde (§3a) zaten kapandı; ayrı
+bir denetim fazı açmak o turun tekrarı olurdu. **Sıralama: Faz 4.5'ten SONRA,
+Faz 5'ten önce; mutlak kapı ise hosted'da ilk gerçek danışan verisinin
+oluşması.** Gerekçe: hesap silme akışı `src/hooks` ve auth yüzeyine dokunuyor,
+Faz 4.5 tam da o dosyaları `packages/api-client`'a taşıyor — akışı son
+mimaride bir kez yazmak, iki kez yazmaktan ucuz (ADR-0022'nin A-05'i Faz
+4.5 öncesine alan gerekçesinin simetriği).
+
+### İş kalemleri
+
+- Hesap silme akışı (v2 #21): auth kullanıcısı + 14 tablodaki ilişkili
+  satırlar + storage bucket'larındaki nesneler; idempotent tek akış.
+  `service_role`'ün çalışma zamanında ilk kez kullanılacağı sunucu yolunu
+  gerektirir — bunun için ayrı bir ADR yazılır.
+- AI harcama kotası (v2 #22, küçültülmüş): mevcut AI uçlarına
+  (`workout`/`nutrition`/`recommendations`) env'den ayarlanabilir kullanıcı
+  başına günlük kota. Not: v2'nin gerekçesindeki "yemek fotoğrafı → makro"
+  yüzeyi ADR-0021 ile ertelendi; kota mevcut uçlar için tanımlanır.
+- Yol arkadaşı borçlar (aynı tema, zaten kütükte): **B-028**
+  (`message-attachments` için storage/sunucu tarafı magic-byte doğrulaması)
+  ve **B-008** (imzalı adreste `Content-Disposition: attachment`).
+
+### Kabul kriterleri (AC)
+
+- AC-4.6.1: Danışan kendi hesabını silebilir; silme auth kullanıcısını, tüm
+  ilişkili tablo satırlarını ve storage nesnelerini kapsar, idempotenttir
+  (tekrar çağrı hata üretmez).
+- AC-4.6.2: Silme sonrası eski JWT ile hiçbir veriye erişilemez (RLS + E2E
+  kanıtı); denetim kaydına kişisel veri içermeyen "silindi" satırı yazılır ve
+  loglar mevcut redaction testinden geçer.
+- AC-4.6.3: AI uçlarında kullanıcı başına günlük kota uygulanır; aşımda
+  Türkçe mesajlı 429 döner; kotanın yarışla aşılamadığı testle gösterilir.
+- AC-4.6.4: B-028 kapanır (sahte MIME negatif testiyle) ve B-008 kapanır.
+- AC-4.6.5: §0.2 kapı komutlarının tamamı yeşil (o noktada Faz 4.5 sonrası
+  turbo eşdeğerleri).
+
+---
+
 ## 8. Faz 5 — Sağlık Verisi Senkronizasyonu
 
 - Mobil: iOS HealthKit + Android Health Connect (uygun Expo modülü/config
