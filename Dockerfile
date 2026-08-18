@@ -10,9 +10,13 @@ WORKDIR /app
 # dağıtımdan çıkarıldı. Sürüm, package.json'daki `packageManager` alanıyla BİREBİR aynı
 # tutulmalıdır — ikisi ayrışırsa imaj CI/yerelden farklı bir çözümleme üretir.
 RUN npm i -g pnpm@10.34.5
-# `.npmrc` de kopyalanır: `auto-install-peers` ayarı next-pwa'nın hayalet `webpack`
-# bağımlılığını çözen şeydir, dosya olmadan build aşaması kırılır.
-COPY package.json pnpm-lock.yaml .npmrc ./
+# Faz 4.5 (monorepo): `pnpm install --frozen-lockfile` workspace'in TÜM üyelerinin
+# manifest'ini görmek zorunda — `pnpm-workspace.yaml` + `apps/web/package.json` olmadan
+# pnpm kilidi eksik/uyumsuz sayar ve düşer. `.npmrc` de kopyalanır: `auto-install-peers`
+# ayarı next-pwa'nın hayalet `webpack` bağımlılığını çözen şeydir, dosya olmadan build
+# aşaması kırılır.
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
+COPY apps/web/package.json ./apps/web/package.json
 RUN pnpm install --frozen-lockfile
 
 # ---- builder: build the Next.js standalone output ----
@@ -22,8 +26,11 @@ WORKDIR /app
 # `runner` aşamasına BİLEREK eklenmiyor — orada yalnızca `node server.js` çalışır.
 RUN npm i -g pnpm@10.34.5
 # pnpm'in node_modules'ü symlink'lidir; bağlantılar node_modules/.pnpm içine GÖRELİ
-# olarak işaret ettiği için dizin bir bütün olarak kopyalandığında bozulmaz.
+# olarak işaret ettiği için dizinler bir bütün olarak kopyalandığında bozulmaz.
+# İKİ dizin de gerekli: sanal depo kökte (`/app/node_modules/.pnpm`), pakete özel
+# symlink'ler ise `/app/apps/web/node_modules` altında durur.
 COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/apps/web/node_modules ./apps/web/node_modules
 COPY . .
 
 # Build-time public env vars (baked into the client bundle).
@@ -36,7 +43,7 @@ ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY
 ENV NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL
 ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN pnpm run build
+RUN pnpm --filter web run build
 
 # ---- runner: minimal production image ----
 FROM base AS runner
@@ -48,11 +55,23 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN addgroup --system --gid 1001 nodejs \
   && adduser --system --uid 1001 nextjs
 
-COPY --from=builder /app/public ./public
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+# ÖLÇÜLDÜ (Faz 4.5 commit 2): `outputFileTracingRoot` workspace köküne çekildiği için
+# standalone çıktısı MONOREPO AĞACINI aynen yeniden üretir —
+#   .next/standalone/node_modules/.pnpm/**   (sanal depo)
+#   .next/standalone/apps/web/server.js      (giriş noktası)
+#   .next/standalone/apps/web/node_modules/  (göreli symlink'ler)
+# Bu yüzden standalone `/app`'in köküne açılır ve çalışma dizini `/app/apps/web` olur.
+# İzleme kökü `apps/web` bırakılsaydı `node_modules/.pnpm` çıktının DIŞINDA kalır,
+# imaj ilk istekte `Cannot find module` ile düşerdi.
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/standalone ./
+# `public` ve `.next/static` standalone çıktısına BİLEREK dahil edilmez (Next dokümantasyonu,
+# output.md) — elle kopyalanır; yolları da yeni yerleşime göre `apps/web` altındadır.
+COPY --from=builder /app/apps/web/public ./apps/web/public
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/static ./apps/web/.next/static
 
 USER nextjs
+
+WORKDIR /app/apps/web
 
 EXPOSE 3000
 ENV PORT=3000

@@ -1,11 +1,14 @@
-node_modules
-.next
+# Faz 4.5 (monorepo): desenler `**/` ile derinlikten bağımsız hale getirildi — aksi halde
+# `apps/web/node_modules`, `apps/web/.next` ve özellikle `apps/web/.env.local` build
+# bağlamına GİRER (sonuncusu gerçek sırları imaja taşırdı).
+**/node_modules
+**/.next
 .git
-coverage
-playwright-report
-test-results
+**/coverage
+**/playwright-report
+**/test-results
 ai_backend
 supabase
 data/exercises.csv
-*.md
-.env*
+**/*.md
+**/.env*

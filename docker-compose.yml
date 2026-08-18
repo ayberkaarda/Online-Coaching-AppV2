@@ -17,7 +17,8 @@ services:
     ports:
       - '3000:3000'
     env_file:
-      - .env.local
+      # Faz 4.5: Next uygulaması (ve `.env` dosyaları) `apps/web` altında.
+      - ./apps/web/.env.local
     environment:
       AI_BACKEND_URL: http://ai-backend:8000
       # ai-backend'in API_KEY'iyle BİREBİR AYNI olmalı (bkz. A-04/A-12). Kök `.env`

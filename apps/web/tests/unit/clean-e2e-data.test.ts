@@ -16,7 +16,7 @@ import {
   parseArgs,
   selectRows,
   startsWithMarker,
-} from '../../scripts/clean-e2e-data.mjs'
+} from '../../../../scripts/clean-e2e-data.mjs'
 
 // `scripts/clean-e2e-data.mjs`'in SAF çekirdeğini test eder — ne dosya sistemine
 // ne veritabanına dokunulur; tüm "satırlar" bellekte kurulmuş nesnelerdir.

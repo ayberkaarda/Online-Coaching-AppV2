@@ -8,27 +8,27 @@
     "pnpm": ">=10"
   },
   "scripts": {
-    "dev": "next dev --webpack",
-    "build": "next build --webpack",
-    "start": "next start",
-    "dev:hosted": "dotenv -e .env.hosted.local -- next dev --webpack",
-    "build:hosted": "dotenv -e .env.hosted.local -- next build --webpack",
-    "start:hosted": "dotenv -e .env.hosted.local -- next start",
-    "lint": "eslint .",
-    "lint:fix": "eslint . --fix",
-    "type-check": "tsc --noEmit",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage",
-    "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui",
+    "dev": "pnpm --filter web run dev",
+    "build": "pnpm --filter web run build",
+    "start": "pnpm --filter web run start",
+    "dev:hosted": "pnpm --filter web run dev:hosted",
+    "build:hosted": "pnpm --filter web run build:hosted",
+    "start:hosted": "pnpm --filter web run start:hosted",
+    "lint": "pnpm --filter web run lint",
+    "lint:fix": "pnpm --filter web run lint:fix",
+    "type-check": "pnpm --filter web run type-check",
+    "test": "pnpm --filter web run test",
+    "test:watch": "pnpm --filter web run test:watch",
+    "test:coverage": "pnpm --filter web run test:coverage",
+    "test:e2e": "pnpm --filter web run test:e2e",
+    "test:e2e:ui": "pnpm --filter web run test:e2e:ui",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "db:types": "supabase gen types typescript --local --schema public > src/types/database.ts",
+    "db:types": "supabase gen types typescript --local --schema public > apps/web/src/types/database.ts",
     "db:migrate": "supabase db push",
     "clean:foods": "node scripts/clean-foods.mjs",
     "db:import-catalog": "node scripts/import-catalog.mjs",
-    "db:clean-e2e": "dotenv -e .env.local -- node scripts/clean-e2e-data.mjs",
+    "db:clean-e2e": "dotenv -e apps/web/.env.local -- node scripts/clean-e2e-data.mjs",
     "test:rls": "docker exec -i supabase_db_my-coaching-app psql -U postgres -d postgres -v ON_ERROR_STOP=1 -f - < supabase/tests/rls.test.sql",
     "test:transform": "docker exec -i supabase_db_my-coaching-app psql -U postgres -d postgres -v ON_ERROR_STOP=1 -f - < supabase/tests/transform.test.sql",
     "ratchet": "node scripts/identity-ratchet.mjs",
@@ -38,51 +38,20 @@
     "onlyBuiltDependencies": [
       "esbuild",
       "unrs-resolver"
-    ]
-  },
-  "dependencies": {
-    "@hookform/resolvers": "^3.10.0",
-    "@supabase/ssr": "^0.12.4",
-    "@supabase/supabase-js": "^2.110.0",
-    "@tanstack/react-query": "^5.62.11",
-    "html2canvas": "^1.4.1",
-    "lucide-react": "^1.31.0",
-    "next": "16.3.1",
-    "next-themes": "^0.4.6",
-    "pino": "^9.6.0",
-    "react": "19.2.4",
-    "react-dom": "19.2.4",
-    "react-hook-form": "^7.54.2",
-    "recharts": "^3.9.1",
-    "server-only": "^0.0.1",
-    "sonner": "^1.7.2",
-    "zod": "^3.24.1"
+    ],
+    "packageExtensions": {
+      "eslint-config-next": {
+        "peerDependencies": {
+          "next": "*"
+        }
+      }
+    }
   },
   "devDependencies": {
-    "@playwright/test": "^1.49.1",
-    "@tanstack/react-query-devtools": "^5.62.11",
-    "@testing-library/dom": "^10.4.0",
-    "@testing-library/jest-dom": "^6.6.3",
-    "@testing-library/react": "^16.1.0",
-    "@testing-library/user-event": "^14.5.2",
-    "@types/node": "^22.10.5",
-    "@types/react": "^19.0.7",
-    "@types/react-dom": "^19.0.3",
-    "@vitejs/plugin-react": "^4.3.4",
-    "@vitest/coverage-v8": "^2.1.8",
-    "autoprefixer": "^10.5.2",
+    "@supabase/supabase-js": "^2.110.0",
     "dotenv-cli": "^11.0.0",
-    "eslint": "^9",
-    "eslint-config-next": "16.3.1",
-    "jsdom": "^25.0.1",
-    "next-pwa": "^5.6.0",
-    "pino-pretty": "^13.0.0",
-    "postcss": "^8.5.16",
     "prettier": "^3.4.2",
     "prettier-plugin-tailwindcss": "^0.6.9",
-    "supabase": "^2.2.1",
-    "tailwindcss": "^3.4.19",
-    "typescript": "^5.7.2",
-    "vitest": "^2.1.8"
+    "supabase": "^2.2.1"
   }
 }

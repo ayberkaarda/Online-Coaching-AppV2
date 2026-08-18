@@ -1,7 +1,7 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # dependencies
-/node_modules
+node_modules/
 /.pnp
 .pnp.*
 .yarn/*
@@ -11,24 +11,24 @@
 !.yarn/versions
 
 # testing
-/coverage
-/playwright-report
-/test-results
-/.vitest
+coverage/
+playwright-report/
+test-results/
+.vitest/
 
 # next.js
-/.next/
-/out/
+.next/
+out/
 
 # next-pwa tarafından build sırasında üretilir — commit edilmez
-public/sw.js
-public/sw.js.map
-public/workbox-*.js
-public/workbox-*.js.map
-public/fallback-*.js
+**/public/sw.js
+**/public/sw.js.map
+**/public/workbox-*.js
+**/public/workbox-*.js.map
+**/public/fallback-*.js
 
 # production
-/build
+build/
 
 # misc
 .DS_Store

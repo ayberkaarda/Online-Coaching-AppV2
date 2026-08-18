@@ -67,7 +67,8 @@ jobs:
         if: always()
         with:
           name: coverage-report
-          path: coverage/
+          # Faz 4.5: vitest artık `apps/web` içinde koşuyor, coverage çıktısı da orada.
+          path: apps/web/coverage/
           retention-days: 14
 
       - name: Build
@@ -199,7 +200,10 @@ jobs:
           supabase status -o env | sed -E 's/^([A-Z_]+)="(.*)"$/\1=\2/' >> "$GITHUB_ENV"
 
       - name: Install Playwright browsers
-        run: pnpm exec playwright install --with-deps chromium
+        # Faz 4.5: `@playwright/test` artık `web` paketinin devDependency'si; kök
+        # `node_modules/.bin` altında YOK. Çıplak `pnpm exec playwright` bu yüzden
+        # "Command not found" ile düşer (ölçüldü) — çağrı pakete yönlendirilmeli.
+        run: pnpm --filter web exec playwright install --with-deps chromium
 
       - name: Build
         env:
@@ -242,7 +246,9 @@ jobs:
         if: always()
         with:
           name: playwright-report
-          path: playwright-report/
+          # Faz 4.5: playwright.config.ts `apps/web` altında; reporter çıktısını
+          # kendi dizinine yazar.
+          path: apps/web/playwright-report/
           retention-days: 14
 
       - name: Upload test results
@@ -250,7 +256,7 @@ jobs:
         if: always()
         with:
           name: test-results
-          path: test-results/
+          path: apps/web/test-results/
           retention-days: 14
 
   docker:
@@ -324,7 +330,7 @@ jobs:
       - name: semgrep — frontend (TypeScript / React)
         run: >-
           uvx semgrep --config p/owasp-top-ten --config p/typescript --config p/react
-          --error --severity=ERROR --metrics=off src/
+          --error --severity=ERROR --metrics=off apps/web/src/
 
       - name: semgrep — backend (Python)
         run: >-

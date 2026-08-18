@@ -9,7 +9,7 @@ public/
 supabase/
 docs/security/raw/
 # `pnpm run db:types` ile üretilir — formatı Supabase CLI belirler.
-src/types/database.ts
+**/src/types/database.ts
 
 # pnpm tarafından üretilir; biçimi kilidin kendi formatı belirler. Prettier bunu yeniden
 # biçimlendirirse `--frozen-lockfile` doğrulaması gereksiz yere kırılgan hale gelir.

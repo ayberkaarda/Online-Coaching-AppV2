@@ -6,7 +6,7 @@ import {
   countPatterns,
   evaluateRatchet,
   stripComments,
-} from '../../scripts/identity-ratchet.mjs'
+} from '../../../../scripts/identity-ratchet.mjs'
 
 // ADR-0018 / active_planprogram.md §3b.4: CI ratchet (tek yönlü mandal). Bu dosya
 // scripts/identity-ratchet.mjs'in dışa aktardığı SAF fonksiyonları test eder —

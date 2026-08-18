@@ -4,6 +4,14 @@ import { fileURLToPath } from 'node:url'
 import withPWA from 'next-pwa'
 
 const projectRoot = path.dirname(fileURLToPath(import.meta.url))
+// Faz 4.5 commit 2 (ADR-0023 madde 12b): uygulama artık `apps/web` altında.
+// pnpm workspace'te bağımlılıklar REPO KÖKÜNDEKİ `node_modules/.pnpm` deposunda durur ve
+// `apps/web/node_modules/*` oraya GÖRELİ symlink'lerle işaret eder. İzleme kökü `apps/web`
+// bırakılırsa @vercel/nft symlink hedeflerini kökün DIŞINDA görüp standalone çıktısına
+// kopyalamaz; imaj `Cannot find module` ile düşer. Bu yüzden kök, workspace kökü
+// (iki dizin yukarısı) olarak sabitlenir — Next dokümantasyonundaki monorepo deseni
+// (`path.join(__dirname, '../../')`, next.config `output.md` "Caveats") birebir budur.
+const workspaceRoot = path.resolve(projectRoot, '..', '..')
 
 // A-14 (borç B-007): CSP ARTIK BURADA ÜRETİLMİYOR. Nonce her istekte taze üretilmek zorunda
 // olduğu için statik `headers()` yapılandırmasında üretilemez; `Content-Security-Policy`
@@ -87,8 +95,9 @@ const nextConfig = {
   // `npm run lint` (eslint .) ile ve CI'da çalıştırılıyor.
   // Ev dizinindeki başıboş bir lockfile yüzünden Next workspace kökünü yanlış
   // çıkarıyordu; standalone çıktısının doğru dosyaları toplaması için kök sabitlendi.
-  outputFileTracingRoot: projectRoot,
-  turbopack: { root: projectRoot },
+  // Faz 4.5'ten beri bu kök `apps/web` değil MONOREPO KÖKÜ (yukarıdaki `workspaceRoot`).
+  outputFileTracingRoot: workspaceRoot,
+  turbopack: { root: workspaceRoot },
   async headers() {
     return [
       {

@@ -1,0 +1,6 @@
+# pnpm workspace kökü (Faz 4.5 commit 2, ADR-0023 madde 1/10).
+# `packages/*` bugün BOŞ — commit 3-5'te (config/types/api-client) doldurulacak;
+# desen şimdiden yazılır ki o commit'ler workspace tanımına dokunmak zorunda kalmasın.
+packages:
+  - 'apps/*'
+  - 'packages/*'

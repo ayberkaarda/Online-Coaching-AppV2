@@ -8,7 +8,7 @@ import {
   SOURCES,
   toRecords,
   transformRecords,
-} from '../../scripts/import-catalog.mjs'
+} from '../../../../scripts/import-catalog.mjs'
 
 // Faz 1.7 katalog import borç temizliği: bu dosya scripts/import-catalog.mjs'in
 // dışa aktardığı SAF ayrıştırma/dönüştürme fonksiyonlarını test eder — dosya

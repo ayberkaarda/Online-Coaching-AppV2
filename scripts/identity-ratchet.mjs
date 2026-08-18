@@ -24,7 +24,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT_DIR = path.resolve(__dirname, '..')
-const SRC_DIR = path.resolve(ROOT_DIR, 'src')
+// Faz 4.5 (ADR-0023): uygulama kaynağı `apps/web/src`e taşındı; script kökte kaldı.
+const SRC_DIR = path.resolve(ROOT_DIR, 'apps', 'web', 'src')
 
 // Taranan uzantılar — ADR-0018 kapsamı `src/**/*.{ts,tsx,css}`.
 const SCANNED_EXTENSIONS = new Set(['.ts', '.tsx', '.css'])
