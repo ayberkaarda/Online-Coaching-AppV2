@@ -1,31 +1,9 @@
 {
+  // Paylaşılan katı derleyici tabanı @repo/config'ten gelir (ADR-0023 madde 1, Faz 4.5
+  // commit 3). `paths`/`include`/`exclude` BURADA KALIR: TypeScript bunları bildiren
+  // dosyanın konumuna göre çözer — paylaşılan config'e taşınsaydı `@/*` kırılırdı.
+  "extends": "@repo/config/tsconfig/next.json",
   "compilerOptions": {
-    "target": "ES2022",
-    "lib": ["dom", "dom.iterable", "esnext"],
-    "allowJs": false,
-    "skipLibCheck": true,
-    "strict": true,
-    "noUncheckedIndexedAccess": true,
-    "noImplicitOverride": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "noFallthroughCasesInSwitch": true,
-    "exactOptionalPropertyTypes": false,
-    "forceConsistentCasingInFileNames": true,
-    "noEmit": true,
-    "esModuleInterop": true,
-    "module": "esnext",
-    "moduleResolution": "bundler",
-    "resolveJsonModule": true,
-    "isolatedModules": true,
-    "jsx": "react-jsx",
-    "incremental": true,
-    "types": ["node", "vitest/globals", "@testing-library/jest-dom"],
-    "plugins": [
-      {
-        "name": "next"
-      }
-    ],
     "paths": {
       "@/*": ["./src/*"]
     }

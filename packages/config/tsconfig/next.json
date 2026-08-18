@@ -1,0 +1,19 @@
+{
+  // base.json'ı genişletir; Next.js/React'e özgü ayarları ekler. `paths`/`include`/`exclude`
+  // BURADA TANIMLANMAZ — TypeScript bunları bildiren dosyanın konumuna göre çözer, bu yüzden
+  // her uygulama kendi tsconfig.json'ında tutar (ADR-0023 madde 6, Faz 4.5 commit 3).
+  "extends": "./base.json",
+  "compilerOptions": {
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "jsx": "react-jsx",
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "incremental": true,
+    "allowJs": false,
+    "exactOptionalPropertyTypes": false,
+    "types": ["node", "vitest/globals", "@testing-library/jest-dom"]
+  }
+}

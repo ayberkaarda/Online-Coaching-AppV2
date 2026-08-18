@@ -1,5 +1,9 @@
 import { defineConfig, globalIgnores } from 'eslint/config'
 import nextVitals from 'eslint-config-next/core-web-vitals'
+// Paylaşılan, dile/ortama özgü genel kurallar @repo/config'ten gelir (ADR-0023 madde 1,
+// Faz 4.5 commit 3). Next'e özgü uzantı (yukarıdaki nextVitals) ve proje-yerleşimine özgü
+// ignore'lar burada, apps/web'de kalır.
+import baseConfig from '@repo/config/eslint/base.mjs'
 
 const eslintConfig = defineConfig([
   ...nextVitals,
@@ -20,15 +24,7 @@ const eslintConfig = defineConfig([
     'coverage/**',
     'playwright-report/**',
   ]),
-  {
-    files: ['**/*.ts', '**/*.tsx'],
-    rules: {
-      'no-console': ['warn', { allow: ['warn', 'error'] }],
-      eqeqeq: 'error',
-      'no-var': 'error',
-      'prefer-const': 'error',
-    },
-  },
+  ...baseConfig,
 ])
 
 export default eslintConfig

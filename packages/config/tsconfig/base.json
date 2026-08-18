@@ -1,0 +1,23 @@
+{
+  // Tüm workspace paketlerinde ortak olacak katı derleyici tabanı — DOM'suz (ortama özgü
+  // lib'ler tüketen config'te eklenir, bkz. next.json/e2e.json). ADR-0023 madde 1,
+  // Faz 4.5 commit 3.
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "forceConsistentCasingInFileNames": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "noEmit": true
+  }
+}
