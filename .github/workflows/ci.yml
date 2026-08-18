@@ -47,7 +47,7 @@ jobs:
       # alanını okuyup sürümü oradan sabitler (tek doğruluk kaynağı).
       - uses: pnpm/action-setup@v4
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 20
           cache: 'pnpm'
@@ -151,7 +151,7 @@ jobs:
       # pnpm, setup-node'dan ÖNCE (bkz. `frontend` job'undaki aynı notu).
       - uses: pnpm/action-setup@v4
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 20
           cache: 'pnpm'
@@ -325,7 +325,7 @@ jobs:
       # dolayısıyla pnpm store hiç oluşmuyor. `cache: 'pnpm'` verilince setup-node yine de
       # `Post Run` adımında store'u kaydetmeye çalışıp "Path Validation Error: Path(s)
       # specified in the action for caching do(es) not exist" ile job'u kırıyordu (ölçüldü).
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 20
 
