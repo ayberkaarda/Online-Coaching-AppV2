@@ -3,17 +3,20 @@
 // Uygulama genelindeki istemci sağlayıcıları: React Query, tema, bildirim (toast) ve hata sınırı.
 
 import { SupabaseClientProvider } from '@repo/api-client/context'
+import { NotifierProvider } from '@repo/api-client/notify'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { ThemeProvider } from 'next-themes'
 import dynamic from 'next/dynamic'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { JSX, ReactNode } from 'react'
 import { Toaster } from 'sonner'
 
 import { getQueryClient } from '@repo/api-client/query/queryClient'
 
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
+import { clearLegacySupabaseAuthStorage } from '@/lib/legacy-auth-cleanup'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
+import { sonnerNotifier } from '@/lib/notifier'
 
 // Devtools yalnızca geliştirme ortamında render edilir; ayrı chunk olduğu için
 // production paketine yüklenmez.
@@ -55,15 +58,27 @@ export function Providers({
   // katmanlı. Kanıt: `tests/unit/supabase-client-context.test.tsx`.
   const [supabaseClient] = useState(createBrowserSupabaseClient)
 
+  // B-045: A-05 ile oturum deposu cookie'ye taşındı ama önceden giriş yapmış tarayıcılarda
+  // eski `sb-*-auth-token` localStorage artıkları (JWT + refresh token) hiç temizlenmiyordu —
+  // mount'ta bir kez, tek seferlik temizlik.
+  useEffect(() => {
+    clearLegacySupabaseAuthStorage()
+  }, [])
+
   return (
     <SupabaseClientProvider client={supabaseClient}>
-      <QueryClientProvider client={queryClient}>
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem nonce={nonce}>
-          <ErrorBoundary>{children}</ErrorBoundary>
-          <Toaster richColors closeButton position="top-right" />
-          {process.env.NODE_ENV === 'development' && <ReactQueryDevtools initialIsOpen={false} />}
-        </ThemeProvider>
-      </QueryClientProvider>
+      {/* Borç B-050: `@repo/api-client` hook'ları toast'ı da enjeksiyonla alır — paket
+          web'e özgü DOM toast kütüphanesine bağlı kalmasın diye. `sonnerNotifier` modül
+          seviyesinde sabittir, bu yüzden burada `useState`/`useMemo` gerekmez. */}
+      <NotifierProvider notifier={sonnerNotifier}>
+        <QueryClientProvider client={queryClient}>
+          <ThemeProvider attribute="class" defaultTheme="system" enableSystem nonce={nonce}>
+            <ErrorBoundary>{children}</ErrorBoundary>
+            <Toaster richColors closeButton position="top-right" />
+            {process.env.NODE_ENV === 'development' && <ReactQueryDevtools initialIsOpen={false} />}
+          </ThemeProvider>
+        </QueryClientProvider>
+      </NotifierProvider>
     </SupabaseClientProvider>
   )
 }

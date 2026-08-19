@@ -19,12 +19,12 @@
 // gerçeğin YALNIZCA kozmetik yansımasıdır, tek savunma katmanı DEĞİLDİR.
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { toast } from 'sonner'
 
 import { queryKeys } from '../query/keys'
 import { wrapSupabaseError } from '../query/supabase-error'
 import { SIGNED_URL_STALE_TIME_MS, createSignedUrls, removeStoredObject } from '../storage'
 import { useSupabaseClient } from '../context'
+import { useNotifier } from '../notify'
 import { assertValidImageFile } from '../upload-validation'
 import type { Enums, Tables } from '@repo/types'
 
@@ -107,6 +107,7 @@ export interface UploadProgressPhotoInput {
 
 export function useUploadProgressPhoto() {
   const supabase = useSupabaseClient()
+  const notify = useNotifier()
   const queryClient = useQueryClient()
 
   return useMutation({
@@ -148,10 +149,10 @@ export function useUploadProgressPhoto() {
     },
     onSuccess: (_data, { clientId }) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.progressPhotos(clientId) })
-      toast.success('Fotoğraf yüklendi.')
+      notify.success('Fotoğraf yüklendi.')
     },
     onError: (error: Error) => {
-      toast.error(`Fotoğraf yüklenemedi: ${error.message}`)
+      notify.error(`Fotoğraf yüklenemedi: ${error.message}`)
     },
   })
 }
@@ -173,6 +174,7 @@ export interface DeleteProgressPhotoInput {
  */
 export function useDeleteProgressPhoto() {
   const supabase = useSupabaseClient()
+  const notify = useNotifier()
   const queryClient = useQueryClient()
 
   return useMutation({
@@ -184,10 +186,10 @@ export function useDeleteProgressPhoto() {
     },
     onSuccess: (_void, { clientId }) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.progressPhotos(clientId) })
-      toast.success('Fotoğraf silindi.')
+      notify.success('Fotoğraf silindi.')
     },
     onError: (error: Error) => {
-      toast.error(`Fotoğraf silinemedi: ${error.message}`)
+      notify.error(`Fotoğraf silinemedi: ${error.message}`)
     },
   })
 }

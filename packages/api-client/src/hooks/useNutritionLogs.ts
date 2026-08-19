@@ -29,11 +29,11 @@
 // ŞABLONU) ile FARKLI köklerdir, birbirlerini süpürmezler.
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { toast } from 'sonner'
 
 import { queryKeys } from '../query/keys'
 import { wrapSupabaseError } from '../query/supabase-error'
 import { useSupabaseClient } from '../context'
+import { useNotifier } from '../notify'
 import type { Tables } from '@repo/types'
 
 export type NutritionLog = Tables<'nutrition_logs'>
@@ -115,6 +115,7 @@ export interface SetNutritionTargetsInput {
  */
 export function useSetNutritionTargets() {
   const supabase = useSupabaseClient()
+  const notify = useNotifier()
   const queryClient = useQueryClient()
 
   return useMutation({
@@ -152,10 +153,10 @@ export function useSetNutritionTargets() {
     },
     onSuccess: (_result, { clientId }) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.nutritionTargets(clientId) })
-      toast.success('Günlük makro hedefi kaydedildi.')
+      notify.success('Günlük makro hedefi kaydedildi.')
     },
     onError: (error: Error) => {
-      toast.error(`Hedef kaydedilemedi: ${error.message}`)
+      notify.error(`Hedef kaydedilemedi: ${error.message}`)
     },
   })
 }
@@ -220,6 +221,7 @@ export interface CreateNutritionLogInput {
 
 export function useCreateNutritionLog() {
   const supabase = useSupabaseClient()
+  const notify = useNotifier()
   const queryClient = useQueryClient()
 
   return useMutation({
@@ -243,10 +245,10 @@ export function useCreateNutritionLog() {
     },
     onSuccess: (_log, { clientId }) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.nutritionLogs(clientId) })
-      toast.success('Öğün eklendi.')
+      notify.success('Öğün eklendi.')
     },
     onError: (error: Error) => {
-      toast.error(`Öğün eklenemedi: ${error.message}`)
+      notify.error(`Öğün eklenemedi: ${error.message}`)
     },
   })
 }
@@ -259,6 +261,7 @@ export interface DeleteNutritionLogInput {
 
 export function useDeleteNutritionLog() {
   const supabase = useSupabaseClient()
+  const notify = useNotifier()
   const queryClient = useQueryClient()
 
   return useMutation({
@@ -268,10 +271,10 @@ export function useDeleteNutritionLog() {
     },
     onSuccess: (_result, { clientId }) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.nutritionLogs(clientId) })
-      toast.success('Öğün silindi.')
+      notify.success('Öğün silindi.')
     },
     onError: (error: Error) => {
-      toast.error(`Öğün silinemedi: ${error.message}`)
+      notify.error(`Öğün silinemedi: ${error.message}`)
     },
   })
 }

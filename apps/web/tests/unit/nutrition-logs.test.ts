@@ -33,6 +33,10 @@ const { insertMock, insertSelectSingleMock, deleteEqMock, fromMock } = vi.hoiste
 // onu `<SupabaseClientProvider>`'dan alıyor. Bu yüzden `vi.mock('@/lib/supabase/client', ...)`
 // KALKTI; sahte istemci sıradan bir nesne olarak kurulup sarmalayıcıyla enjekte ediliyor.
 
+// `sonner` mock'u yalnızca Bölüm C'nin bileşeni (`NutritionTab`) için duruyor — o hâlâ
+// toast'ı DOĞRUDAN çağırıyor. HOOK'lar artık sonner'ı tanımıyor: bildirimi
+// `<NotifierProvider>`'dan alıyorlar (borç B-050), bu yüzden hook iddiaları aşağıdaki
+// `notifier` sahtesine bakar.
 vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }))
@@ -58,8 +62,6 @@ vi.mock('@repo/api-client', async (importOriginal) => {
   }
 })
 
-import { toast } from 'sonner'
-
 import NutritionTab from '@/components/tabs/NutritionTab'
 import {
   useCreateNutritionLog as useCreateNutritionLogBarrel,
@@ -79,10 +81,12 @@ import {
   type NutritionLog,
 } from '@repo/api-client/hooks/useNutritionLogs'
 import { SupabaseClientProvider } from '@repo/api-client/context'
+import { NotifierProvider, type Notifier } from '@repo/api-client/notify'
 
 import { asSupabaseClient } from './test-utils'
 
 const supabase = asSupabaseClient({ from: fromMock })
+const notifier: Notifier = { success: vi.fn(), error: vi.fn(), info: vi.fn() }
 // `todayIsoDate` ARTIK bu hook dosyasında DEĞİL, ``@repo/api-client/date``te — dört
 // yazma yolunun da paylaştığı tek kaynak (bkz. o dosyanın başı ve
 // tests/unit/local-date-consistency.test.ts).
@@ -109,7 +113,11 @@ function createWrapper() {
     return createElement(
       SupabaseClientProvider,
       { client: supabase },
-      createElement(QueryClientProvider, { client: queryClient }, children)
+      createElement(
+        NotifierProvider,
+        { notifier },
+        createElement(QueryClientProvider, { client: queryClient }, children)
+      )
     )
   }
 }
@@ -223,7 +231,7 @@ describe('useCreateNutritionLog', () => {
       fat_g: 15,
       log_date: '2026-08-17',
     })
-    expect(toast.success).toHaveBeenCalledWith('Öğün eklendi.')
+    expect(notifier.success).toHaveBeenCalledWith('Öğün eklendi.')
   })
 
   it('opsiyonel makro alanları NULL gönderilebilir (boş bırakma = "girilmedi", 0 DEĞİL)', async () => {
@@ -269,7 +277,7 @@ describe('useCreateNutritionLog', () => {
     })
 
     await waitFor(() => expect(result.current.isError).toBe(true))
-    expect(toast.error).toHaveBeenCalled()
+    expect(notifier.error).toHaveBeenCalled()
   })
 })
 
@@ -283,7 +291,7 @@ describe('useDeleteNutritionLog', () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
     expect(deleteEqMock).toHaveBeenCalledWith('id', 'log-1')
-    expect(toast.success).toHaveBeenCalledWith('Öğün silindi.')
+    expect(notifier.success).toHaveBeenCalledWith('Öğün silindi.')
   })
 
   it('silme başkasının kaydında RLS tarafından reddedilirse hata olarak yansır', async () => {
@@ -296,7 +304,7 @@ describe('useDeleteNutritionLog', () => {
     result.current.mutate({ id: 'log-2', clientId: 'client-1' })
 
     await waitFor(() => expect(result.current.isError).toBe(true))
-    expect(toast.error).toHaveBeenCalled()
+    expect(notifier.error).toHaveBeenCalled()
   })
 })
 

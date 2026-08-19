@@ -699,6 +699,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      approve_program: {
+        Args: { p_approval_id: string; p_client_id: string; p_plan: Json }
+        Returns: undefined
+      }
       avatar_object_owner: { Args: { p_name: string }; Returns: string }
       backfill_form_check_review: {
         Args: never

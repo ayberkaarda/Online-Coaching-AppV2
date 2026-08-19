@@ -1,8 +1,19 @@
 version: 2
 
 updates:
+  # Faz 4.5'te pnpm workspace monorepo'ya geçildi (apps/web, apps/mobile,
+  # packages/{config,types,api-client,logger}); npm ekosistemi artık tek bir
+  # kök package.json değil, bu dört ağaçta bağımlılık taşıyor (B-055).
+  # `directories` (çoğul) glob destekler ve tek npm entry altında birden çok
+  # dizini tarar — `directory` (tekil) glob desteklemediği için burada uygun
+  # değil (bkz. dependabot-options-reference: "directories key supports
+  # globbing and the wildcard character *").
   - package-ecosystem: npm
-    directory: '/'
+    directories:
+      - '/'
+      - '/apps/web'
+      - '/apps/mobile'
+      - '/packages/*'
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
@@ -26,6 +37,38 @@ updates:
         update-types:
           - minor
           - patch
+    ignore:
+      # apps/mobile: Expo SDK 57'ye kilitli (ADR-0023 madde 10, Faz 4.5 commit 6).
+      # expo/react-native paketlerinin major/minor bump'ı SADECE `expo install`
+      # ile elle yapılır — dependabot'un bağımsız önerdiği sürümler SDK uyumunu
+      # bozabilir. Patch güncellemeleri serbest.
+      - dependency-name: 'expo'
+        update-types:
+          - 'version-update:semver-major'
+          - 'version-update:semver-minor'
+      - dependency-name: 'expo-*'
+        update-types:
+          - 'version-update:semver-major'
+          - 'version-update:semver-minor'
+      - dependency-name: 'react-native'
+        update-types:
+          - 'version-update:semver-major'
+          - 'version-update:semver-minor'
+      - dependency-name: 'react-native-*'
+        update-types:
+          - 'version-update:semver-major'
+          - 'version-update:semver-minor'
+      # Tek React kuralı: react/react-dom tüm workspace'te (web, mobile,
+      # @repo/api-client peerDependency) 19.2.4'e pinli; major/minor bump'lar
+      # elle ve tüm ağaçlarda birlikte yapılır.
+      - dependency-name: 'react'
+        update-types:
+          - 'version-update:semver-major'
+          - 'version-update:semver-minor'
+      - dependency-name: 'react-dom'
+        update-types:
+          - 'version-update:semver-major'
+          - 'version-update:semver-minor'
 
   - package-ecosystem: pip
     directory: '/ai_backend'
@@ -50,6 +93,13 @@ updates:
     open-pull-requests-limit: 5
     commit-message:
       prefix: 'chore(deps)'
+    ignore:
+      # Kök Dockerfile Node 24 LTS'e bilinçli pinlendi (Faz 4.5 commit 7a2).
+      # Sonraki LTS'e (ör. 26-alpine) geçiş yalnız elle, ayrı bir fazda yapılır;
+      # dependabot'un major bump önerisi (bkz. eski PR #2) burada istenmiyor.
+      - dependency-name: 'node'
+        update-types:
+          - 'version-update:semver-major'
 
   - package-ecosystem: docker
     directory: '/ai_backend'

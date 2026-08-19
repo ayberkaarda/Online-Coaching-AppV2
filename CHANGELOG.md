@@ -4,7 +4,34 @@ Bu dosya, projedeki önemli değişiklikleri belgeler. Biçim [Keep a Changelog]
 
 ## [Unreleased]
 
-_Şu an yayınlanmamış, üzerinde çalışılan değişiklik yok._
+### Eklendi
+
+- **Faz 4.5 — Monorepo ve Mobil Temel (tamamen kapandı):** pnpm workspaces + Turborepo 2.10.11 tabanlı monorepo yerleşimi — `apps/web`, `apps/mobile` ve dört paylaşılan paket (`packages/config`, `packages/types`, `packages/api-client`, `packages/logger`). Mobil çalışma zamanı Android emülatöründe (Pixel 8 AVD, Expo Go SDK 57.0.0) doğrulandı: temiz bundle, beş sekmede gezinme, çift-React "invalid hook call" yok — iOS Expo Go yolu App Store'daki SDK 54 kilidi yüzünden kullanılamadı.
+- `apps/mobile`: Expo SDK 57 (React Native 0.86.2, React 19.2.4) iskeleti — `expo-router` ile 5 sekmeli tab navigasyonu (Panel · Antrenman · Beslenme · İlerleme · Sohbet) ve placeholder auth ekranı.
+- Ayrı, paralel `mobile` CI job'u (`tsc`, lint, `expo-doctor`, `expo export` smoke).
+- `scripts/backup-hosted.mjs` + `docs/ops/hosted-backup.md`: hosted Supabase yedekleme script'i (varsayılan dry-run) ve yordamı (restore dahil).
+- `packages/api-client`'a `Notifier`/`NotifierProvider`/`useNotifier()` bildirim soyutlaması.
+
+### Değiştirildi
+
+- Paket yöneticisi npm'den **pnpm**'e geçti; kök `package.json` `packageManager: "pnpm@10.34.5"`.
+- `src/types` ve `src/lib/validation/schemas.ts` → `packages/types`; `db:types` üretim yolu `packages/types/src/database.ts` oldu.
+- Supabase istemcisi ve ilgili veri katmanı (`src/lib/api`, `src/hooks`) `packages/api-client`'a taşındı; istemci artık React Context (`SupabaseClientProvider`/`useSupabaseClient()`) ile enjekte ediliyor, modül düzeyi singleton kaldırıldı.
+- Yapılandırılmış loglama `packages/logger`'a çıkarıldı.
+- Paylaşılan tsconfig/eslint yapılandırmaları `packages/config`'e taşındı.
+- Runtime Node 20 → **Node 24 LTS**'e ("Krypton") hizalandı (Node 20 bakım süresi dolmuştu); TypeScript tek majöre (**6.0.3**) tekleştirildi (`apps/web` `^5.7.2` → `~6.0.3`).
+- `.github/workflows/ci.yml` kapı komutları `turbo run <görev>` eşdeğerlerine geçti; `pnpm/action-setup`, `actions/checkout`, `actions/setup-node`, `docker/build-push-action`, `actions/upload-artifact`, `supabase/setup-cli`, `astral-sh/setup-uv` sürümleri güncellendi.
+- `.github/dependabot.yml` monorepo yerleşimine taşındı (`/`, `/apps/web`, `/apps/mobile`, `/packages/*`).
+- `packages/api-client` bildirim katmanı `sonner`'dan bağımsızlaştı: 13 hook `notify.*`'a geçti, web tarafında `sonner` implementasyonuyla enjekte ediliyor; paket artık platform-nötr.
+- Coverage eşiği (`lines`/`statements`) 52 → 60'a geri çıkarıldı; `MessagesTab`/`FormCheckTab` için 29 yeni davranış testi.
+- Koç program onayı (`useApproveProgram`) tek bir Postgres fonksiyonuna (`approve_program`, `SECURITY INVOKER`) indirgendi; önceki üç atomik olmayan çağrı kaldırıldı.
+- Cookie tabanlı oturuma geçişten kalan eski `sb-*-auth-token` `localStorage` artıkları mount'ta bir kez temizleniyor.
+
+### Düzeltildi
+
+- CI `security` job'u: `@typescript-eslint/parser`'ın `packages/config`'te yanlışlıkla `dependencies` altında tutulması, `pnpm audit --prod`'un eslint zafiyetlerini production grafiğinde görmesine neden oluyordu; `devDependencies`'e taşındı.
+- CI `e2e` job'u: Playwright tarayıcı kurulumunun apt aynası yavaşlığı yüzünden zaman aşımına uğraması — tarayıcı önbelleklemesi eklendi, `timeout-minutes` 20 → 30.
+- `docker/setup-buildx-action` v3 → v4 (Node 20 deprecation uyarısı gideriliyor).
 
 ## [1.0.0] - 2026-08-16
 

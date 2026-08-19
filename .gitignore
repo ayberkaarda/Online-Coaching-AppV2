@@ -82,3 +82,6 @@ supabase/.branches/
 
 # turbo (Faz 4.5 commit 7b) — yerel görev önbelleği ve daemon log/soket dosyaları
 .turbo/
+
+# hosted Supabase yedekleri (B-030) — kişisel veri taşır, KVKK gereği repoya asla girmez, bkz. docs/ops/hosted-backup.md
+backups/

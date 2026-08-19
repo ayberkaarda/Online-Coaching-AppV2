@@ -10,7 +10,7 @@
     "./eslint/base.mjs": "./eslint/base.mjs",
     "./eslint/package.mjs": "./eslint/package.mjs"
   },
-  "dependencies": {
+  "devDependencies": {
     "@typescript-eslint/parser": "^8.62.1"
   }
 }

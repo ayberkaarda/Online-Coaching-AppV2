@@ -19,7 +19,7 @@ import { SupabaseQueryError } from './supabase-error'
 // noktadan kullanılıyor — her sorgu/mutasyon hatası buradan geçer. Hook'ların tek değişikliği
 // `throw new Error(error.message)` yerine `throw wrapSupabaseError(error, { table, op })`
 // kullanmaları (bkz. `./supabase-error.ts`) — bu, düz `Error`'ın attığı `.code` alanını taşır;
-// `.message` birebir aynı kaldığı için mevcut `toast.error` metinleri DEĞİŞMEZ.
+// `.message` birebir aynı kaldığı için mevcut `notify.error` metinleri DEĞİŞMEZ.
 //
 // Tarayıcı-sunucu tuzağı için `./security-event.ts`'e bakın: `apps/web/src/lib/api/response.ts`'teki
 // `logSecurityEvent()` burada KASITLI OLARAK kullanılmıyor (o modül `next/server` içe aktarıyor).

@@ -1006,12 +1006,27 @@ kütüphanesi kalır (`grep -r "chart.js\|react-chartjs-2" src/` boş döner).
 
 ---
 
-## 7. Faz 4.5 — Monorepo ve Mobil Temel
+## 7. Faz 4.5 — Monorepo ve Mobil Temel (TAMAMLANDI)
 
 Bu faz v1.0'da Faz 0 idi; buraya taşındı. Gerekçe: monorepo'nun tek amacı kod
 paylaşımı, kod paylaşımının tek tüketicisi mobil uygulama ve mobil ilk kez
 Faz 5'te (sağlık verisi) zorunlu hâle geliyor. Faz 1–4 tek repo + npm ile
 yürütülür; dönüşüm ancak elde çalışan ve test edilmiş bir ürün varken yapılır.
+
+**Durum — TAMAMEN KAPANDI (2026-08-18/19).** Sekiz dilim (commit 1, 3, 4, CI
+kapı turu, 5, 6, 7a1, 7a2, 7b) yürütüldü; kod tarafı bitti ve commit'lendi
+(HEAD `05af580`). Çıkan yerleşim: `apps/web` + `apps/mobile` +
+`packages/config` + `packages/types` + `packages/api-client` +
+`packages/logger` — iki app, dört paket; pnpm 10 + Turborepo 2.10.11 + Node
+24 LTS + TypeScript 6.0.3. AC-4.5.3 **KARŞILANDI** (2026-08-19) — iOS Expo Go
+yolu kapalıydı (kullanıcının güncel iPhone'unda Expo Go App Store'da SDK 54'e
+takılı kaldı, Apple onay sürecinden ötürü; kaynak: Expo changelog "Expo Go
+and the App Store, May 2026"), bunun yerine **Android emülatöründe** (Pixel 8
+AVD) gerçek smoke koşuldu: `expo start --android`, bundle temiz (1405 modül),
+uygulama içi SDK version 57.0.0 doğrulandı, beş sekmenin tümünde gezinme
+kanıtlandı, çift-React "invalid hook call" YOK. Ayrıntı: `docs/
+archive/progress-faz-4.5-monorepo-mobil-temel.md` "Mobil smoke sonucu". AC-4.5.6
+**kapsam dışı** bırakıldı (B-052), mobil veri katmanı turuna kapsamlandı.
 
 ### İş kalemleri
 
@@ -1032,17 +1047,28 @@ yürütülür; dönüşüm ancak elde çalışan ve test edilmiş bir ürün var
 ### Kabul kriterleri (AC)
 
 - AC-4.5.1: `pnpm turbo build` kök dizinden tüm paketleri derler, sıfır TS hatası.
+  **KARŞILANDI** — Turborepo 2.10.11 (c7b), build 10/10 `ƒ`, type-check temiz.
 - AC-4.5.2: `apps/web` eski davranışıyla ayağa kalkar (manuel smoke: login →
   dashboard → mevcut sekmeler) ve mevcut Playwright paketi taşıma sonrası da
-  tamamen yeşil.
+  tamamen yeşil. **KARŞILANDI** — E2E paralel 52/54, seri 14/14 (B-037
+  düşüşü taşımadan bağımsız kanıtlandı).
 - AC-4.5.3: `apps/mobile` Expo Go'da açılır, tab'lar arası gezinme çalışır.
+  **KARŞILANDI** (2026-08-19) — Android emülatöründe (Pixel 8 AVD) gerçek
+  smoke koşuldu: SDK 57.0.0 doğrulandı, beş sekmenin tümünde gezinme
+  kanıtlandı, çift-React "invalid hook call" yok. iOS Expo Go App Store'da
+  SDK 54'e takılı kaldığı için (Apple onay süreci) Android kullanıldı.
 - AC-4.5.4: `packages/types` Supabase'den üretilmiş DB tiplerini export eder
   (`supabase gen types typescript`); AC-1.4'teki drift check'i buraya taşınır.
+  **KARŞILANDI** — `db:types` c7b'de `packages/types`'a taşındı, CI drift
+  check (B-047) korundu.
 - AC-4.5.5: Hiçbir paket bir diğerinin `src/` içine relative path ile uzanmaz;
   yalnızca workspace import. `supabase.from(` çağrısı yalnızca
   `packages/api-client` içinde geçer (AC-2.4'ün sıkılaştırılmış hâli).
+  **KARŞILANDI** — c5'te ölçüldü, `apps/web/src`'te gerçek `supabase.from(`
+  çağrısı sıfır.
 - AC-4.5.6: Faz 2'nin uçtan uca akışı mobilde manuel checklist ile doğrulanır
   (`docs/mobile-smoke.md`) — AC-2.1'in ertelenen mobil yarısı burada kapanır.
+  **KAPSAM DIŞI (B-052)** — mobil veri katmanı turuna kapsamlandı.
 
 ---
 

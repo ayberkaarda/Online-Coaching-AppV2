@@ -3,11 +3,11 @@
 // Yapay zeka üretimleri. İstekler kendi /api/ai/* proxy route'larımıza gider.
 
 import { useMutation } from '@tanstack/react-query'
-import { toast } from 'sonner'
 
 import { generateDietPlan, generateWorkoutPlan, getRecommendations } from '../api/ai'
 import { ApiError } from '../api/client'
 import { useSupabaseClient } from '../context'
+import { useNotifier } from '../notify'
 import type {
   DietGenerateInput,
   DietGenerateResult,
@@ -25,42 +25,45 @@ function toUserMessage(error: unknown): string {
 
 export function useGenerateWorkout() {
   const supabase = useSupabaseClient()
+  const notify = useNotifier()
 
   return useMutation<WorkoutGenerateResult, Error, WorkoutGenerateInput>({
     mutationFn: (input) => generateWorkoutPlan(supabase, input),
     onSuccess: () => {
-      toast.success('Yapay zeka antrenman programını oluşturdu.')
+      notify.success('Yapay zeka antrenman programını oluşturdu.')
     },
     onError: (error) => {
-      toast.error(`Program oluşturulamadı: ${toUserMessage(error)}`)
+      notify.error(`Program oluşturulamadı: ${toUserMessage(error)}`)
     },
   })
 }
 
 export function useGenerateDiet() {
   const supabase = useSupabaseClient()
+  const notify = useNotifier()
 
   return useMutation<DietGenerateResult, Error, DietGenerateInput>({
     mutationFn: (input) => generateDietPlan(supabase, input),
     onSuccess: () => {
-      toast.success('Yapay zeka beslenme programını oluşturdu.')
+      notify.success('Yapay zeka beslenme programını oluşturdu.')
     },
     onError: (error) => {
-      toast.error(`Beslenme programı oluşturulamadı: ${toUserMessage(error)}`)
+      notify.error(`Beslenme programı oluşturulamadı: ${toUserMessage(error)}`)
     },
   })
 }
 
 export function useRecommendations() {
   const supabase = useSupabaseClient()
+  const notify = useNotifier()
 
   return useMutation<RecommendationResult, Error, RecommendationInput>({
     mutationFn: (input) => getRecommendations(supabase, input),
     onSuccess: () => {
-      toast.success('Öneriler güncellendi.')
+      notify.success('Öneriler güncellendi.')
     },
     onError: (error) => {
-      toast.error(`Öneriler alınamadı: ${toUserMessage(error)}`)
+      notify.error(`Öneriler alınamadı: ${toUserMessage(error)}`)
     },
   })
 }

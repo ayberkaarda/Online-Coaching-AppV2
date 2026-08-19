@@ -34,6 +34,9 @@ const { fromMock, upsertMock, insertMock } = vi.hoisted(() => ({
 // onu `<SupabaseClientProvider>`'dan alıyor. Bu yüzden `vi.mock('@/lib/supabase/client', ...)`
 // KALKTI; sahte istemci sıradan bir nesne olarak kurulup sarmalayıcıyla enjekte ediliyor.
 
+// `sonner` mock'u Bölüm D'nin bileşeni (`StatsTab`) için duruyor — o hâlâ toast'ı DOĞRUDAN
+// çağırıyor. HOOK'lar artık sonner'ı tanımıyor: bildirimi `<NotifierProvider>`'dan alıyorlar
+// (borç B-050), bu yüzden Bölüm C'nin iddiası aşağıdaki `notifier` sahtesine bakar.
 vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }))
@@ -62,10 +65,12 @@ import {
 } from '@repo/api-client/hooks/useProgressEntries'
 import { SupabaseQueryError } from '@repo/api-client/query/supabase-error'
 import { SupabaseClientProvider } from '@repo/api-client/context'
+import { NotifierProvider, type Notifier } from '@repo/api-client/notify'
 
 import { asSupabaseClient } from './test-utils'
 
 const supabase = asSupabaseClient({ from: fromMock })
+const notifier: Notifier = { success: vi.fn(), error: vi.fn(), info: vi.fn() }
 
 function createWrapper() {
   const queryClient = new QueryClient({
@@ -75,7 +80,11 @@ function createWrapper() {
     return createElement(
       SupabaseClientProvider,
       { client: supabase },
-      createElement(QueryClientProvider, { client: queryClient }, children)
+      createElement(
+        NotifierProvider,
+        { notifier },
+        createElement(QueryClientProvider, { client: queryClient }, children)
+      )
     )
   }
 }
@@ -330,7 +339,7 @@ describe('useUpsertProgressEntry — hata yolu', () => {
     expect((error as SupabaseQueryError).code).toBe('42501')
     expect((error as SupabaseQueryError).table).toBe('progress_entries')
     expect((error as SupabaseQueryError).op).toBe('upsert')
-    expect(toast.error).toHaveBeenCalled()
+    expect(notifier.error).toHaveBeenCalled()
   })
 
   it('CHECK ihlali (23514) sunucudan gelirse de sarmalanır — mesaj kaybolmaz', async () => {

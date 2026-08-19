@@ -33,6 +33,7 @@
     "clean:foods": "node scripts/clean-foods.mjs",
     "db:import-catalog": "node scripts/import-catalog.mjs",
     "db:clean-e2e": "dotenv -e apps/web/.env.local -- node scripts/clean-e2e-data.mjs",
+    "db:backup-hosted": "node scripts/backup-hosted.mjs",
     "test:rls": "docker exec -i supabase_db_my-coaching-app psql -U postgres -d postgres -v ON_ERROR_STOP=1 -f - < supabase/tests/rls.test.sql",
     "test:transform": "docker exec -i supabase_db_my-coaching-app psql -U postgres -d postgres -v ON_ERROR_STOP=1 -f - < supabase/tests/transform.test.sql",
     "ratchet": "node scripts/identity-ratchet.mjs",

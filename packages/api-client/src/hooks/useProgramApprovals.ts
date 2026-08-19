@@ -3,12 +3,12 @@
 // Danışanın koç onayına sunduğu antrenman programları.
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { toast } from 'sonner'
 
 import { planToRpcPayload } from './usePlans'
 import { queryKeyRoots, queryKeys } from '../query/keys'
 import { wrapSupabaseError } from '../query/supabase-error'
 import { useSupabaseClient } from '../context'
+import { useNotifier } from '../notify'
 import type { Json, ProgramApproval, WorkoutPlan } from '@repo/types'
 
 /** WorkoutPlan bir arayüz/mapped tip olduğu için Json'a açıkça daraltılır. */
@@ -41,6 +41,7 @@ export interface SubmitProgramForApprovalInput {
 
 export function useSubmitProgramForApproval() {
   const supabase = useSupabaseClient()
+  const notify = useNotifier()
   const queryClient = useQueryClient()
 
   return useMutation({
@@ -72,10 +73,10 @@ export function useSubmitProgramForApproval() {
     onSuccess: (_approval, { clientId }) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.programApprovals(clientId) })
       void queryClient.invalidateQueries({ queryKey: queryKeyRoots.notifications })
-      toast.success('Program taslağı koçuna gönderildi.')
+      notify.success('Program taslağı koçuna gönderildi.')
     },
     onError: (error: Error) => {
-      toast.error(`Program gönderilemedi: ${error.message}`)
+      notify.error(`Program gönderilemedi: ${error.message}`)
     },
   })
 }
@@ -88,54 +89,43 @@ export interface ApproveProgramInput {
 
 export function useApproveProgram() {
   const supabase = useSupabaseClient()
+  const notify = useNotifier()
   const queryClient = useQueryClient()
 
   return useMutation({
     mutationFn: async ({ approvalId, clientId, plan }: ApproveProgramInput): Promise<void> => {
-      // SIRA KRİTİK: önce plan yazılır, sonra onay 'approved' işaretlenir.
-      // Plan yazımı başarısız olursa onay 'pending' kalır — "onaylandı ama plan
-      // işlenmedi" tutarsızlığı oluşmaz.
+      // TEK ÇAĞRI, ATOMİK (B-019): plan yazımı + onayın 'approved' işaretlenmesi
+      // + danışana giden bildirim aynı sunucu fonksiyonunun gövdesinde, yani TEK
+      // TRANSAKSİYONDA olur. Eskiden bu üç iş üç ayrı ağ çağrısıydı ve ikincisi
+      // ya da üçüncüsü düştüğünde yarım durum KALICI oluyordu ("plan yazıldı ama
+      // onay hâlâ pending", "onaylandı ama danışan habersiz"). İstemcinin geri
+      // alabileceği bir yol da yoktu.
+      //
+      // Bildirim metni ARTIK BURADA YOK — tek sahibi RPC gövdesindeki
+      // `c_client_notification` sabitidir. `reviewed_by`/`reviewed_at` de
+      // gönderilmez: sunucuda `program_approvals_guard_review()` trigger'ı
+      // (20260817160000) bu iki alanı `auth.uid()`/`now()` ile doldurur (AC-07).
+      // RPC `SECURITY INVOKER`dır: yetki modeli değişmedi, üç yazma da koçun
+      // kimliğiyle ve RLS açıkken yapılır.
       //
       // `plan` bileşende `program_approvals.workout_data` jsonb'sinden
       // `parseWorkoutPlan` ile normalize edilerek gelir; `planToRpcPayload`
       // ayrıca yalnızca 7 geçerli gün anahtarını göndermeyi garanti eder.
-      const { error: planError } = await supabase.rpc('save_workout_plan', {
-        p_client_ids: [clientId],
+      const { error } = await supabase.rpc('approve_program', {
+        p_approval_id: approvalId,
+        p_client_id: clientId,
         p_plan: planToRpcPayload(plan),
       })
-      if (planError) throw wrapSupabaseError(planError, { table: 'save_workout_plan', op: 'rpc' })
-
-      // `reviewed_by` / `reviewed_at` artık burada GÖNDERİLMİYOR: sunucuda
-      // `program_approvals_guard_review()` trigger'ı (supabase/migrations/
-      // 20260817160000_program_approval_guard.sql) bu iki alanı `auth.uid()` /
-      // `now()` ile dolduruyor ve istemciden gelen HER değeri EZİYOR (AC-07).
-      // Onları yine de göndermek kodu okuyanı "denetim izi istemciden geliyor"
-      // diye yanıltırdı. `status: 'approved'` gönderimi KALIYOR — trigger hangi
-      // dalın çalışacağına bunun eski/yeni değerine bakarak karar veriyor.
-      const { error: approvalError } = await supabase
-        .from('program_approvals')
-        .update({
-          status: 'approved',
-        })
-        .eq('id', approvalId)
-      if (approvalError)
-        throw wrapSupabaseError(approvalError, { table: 'program_approvals', op: 'update' })
-
-      const { error: notifyError } = await supabase.from('notifications').insert({
-        client_id: clientId,
-        message: 'Koçun yeni antrenman programını onayladı. Artık kullanabilirsin.',
-      })
-      if (notifyError)
-        throw wrapSupabaseError(notifyError, { table: 'notifications', op: 'insert' })
+      if (error) throw wrapSupabaseError(error, { table: 'approve_program', op: 'rpc' })
     },
     onSuccess: (_result, { clientId }) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.programApprovals(clientId) })
       void queryClient.invalidateQueries({ queryKey: queryKeys.workoutPlan(clientId) })
       void queryClient.invalidateQueries({ queryKey: queryKeyRoots.notifications })
-      toast.success('Program onaylandı ve danışanın profiline işlendi.')
+      notify.success('Program onaylandı ve danışanın profiline işlendi.')
     },
     onError: (error: Error) => {
-      toast.error(`Program onaylanamadı: ${error.message}`)
+      notify.error(`Program onaylanamadı: ${error.message}`)
     },
   })
 }

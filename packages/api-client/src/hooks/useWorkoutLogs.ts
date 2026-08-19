@@ -13,11 +13,11 @@
 //     `(client_id, completed_at)` çiftinden kayıpsız geri üretilir.
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { toast } from 'sonner'
 
 import { queryKeys } from '../query/keys'
 import { wrapSupabaseError } from '../query/supabase-error'
 import { useSupabaseClient } from '../context'
+import { useNotifier } from '../notify'
 import type { TablesInsert, WorkoutLog } from '@repo/types'
 
 export function useWorkoutLogs(clientId?: string) {
@@ -47,6 +47,7 @@ export interface CreateWorkoutLogInput {
 
 export function useCreateWorkoutLog() {
   const supabase = useSupabaseClient()
+  const notify = useNotifier()
   const queryClient = useQueryClient()
 
   return useMutation({
@@ -73,10 +74,10 @@ export function useCreateWorkoutLog() {
     },
     onSuccess: (_log, { clientId }) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.workoutLogs(clientId) })
-      toast.success('Set kaydedildi.')
+      notify.success('Set kaydedildi.')
     },
     onError: (error: Error) => {
-      toast.error(`Set kaydedilemedi: ${error.message}`)
+      notify.error(`Set kaydedilemedi: ${error.message}`)
     },
   })
 }
@@ -203,6 +204,7 @@ export function groupLogsIntoSessions(logs: readonly WorkoutLog[] | null | undef
 /** Toplu set kaydı — tek sorguda insert eder. */
 export function useCreateWorkoutLogs() {
   const supabase = useSupabaseClient()
+  const notify = useNotifier()
   const queryClient = useQueryClient()
 
   return useMutation({
@@ -217,10 +219,10 @@ export function useCreateWorkoutLogs() {
     },
     onSuccess: (count, { clientId }) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.workoutLogs(clientId) })
-      if (count > 0) toast.success('Antrenmanın başarıyla kaydedildi.')
+      if (count > 0) notify.success('Antrenmanın başarıyla kaydedildi.')
     },
     onError: (error: Error) => {
-      toast.error(`Antrenman kaydedilemedi: ${error.message}`)
+      notify.error(`Antrenman kaydedilemedi: ${error.message}`)
     },
   })
 }

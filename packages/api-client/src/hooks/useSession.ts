@@ -6,12 +6,12 @@
 import type { Session } from '@supabase/supabase-js'
 import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query'
 import { useEffect } from 'react'
-import { toast } from 'sonner'
 
 import { apiFetch } from '../api/client'
 import { logger } from '@repo/logger'
 import { queryKeyRoots, queryKeys } from '../query/keys'
 import { useSupabaseClient } from '../context'
+import { useNotifier } from '../notify'
 
 /**
  * Service worker'ın (`next-pwa`/workbox) tuttuğu çevrimdışı önbellekleri temizler.
@@ -79,6 +79,7 @@ interface SignInResponse {
 
 export function useSignIn() {
   const supabase = useSupabaseClient()
+  const notify = useNotifier()
   const queryClient = useQueryClient()
 
   return useMutation({
@@ -114,16 +115,17 @@ export function useSignIn() {
     onSuccess: (session) => {
       queryClient.setQueryData(queryKeys.session(), session)
       void queryClient.invalidateQueries({ queryKey: queryKeyRoots.profile })
-      toast.success('Giriş başarılı.')
+      notify.success('Giriş başarılı.')
     },
     onError: (error: Error) => {
-      toast.error(`Giriş yapılamadı: ${error.message}`)
+      notify.error(`Giriş yapılamadı: ${error.message}`)
     },
   })
 }
 
 export function useSignOut() {
   const supabase = useSupabaseClient()
+  const notify = useNotifier()
   const queryClient = useQueryClient()
 
   return useMutation({
@@ -139,26 +141,27 @@ export function useSignOut() {
       // önbellekleri de temizlenir (paylaşılan cihazda sonraki kullanıcıya
       // veri sızmasın diye).
       await clearOfflineCaches()
-      toast.success('Çıkış yapıldı.')
+      notify.success('Çıkış yapıldı.')
     },
     onError: (error: Error) => {
-      toast.error(`Çıkış yapılamadı: ${error.message}`)
+      notify.error(`Çıkış yapılamadı: ${error.message}`)
     },
   })
 }
 
 export function useUpdatePassword() {
   const supabase = useSupabaseClient()
+  const notify = useNotifier()
   return useMutation({
     mutationFn: async (password: string): Promise<void> => {
       const { error } = await supabase.auth.updateUser({ password })
       if (error) throw new Error(error.message)
     },
     onSuccess: () => {
-      toast.success('Şifreniz başarıyla değiştirildi.')
+      notify.success('Şifreniz başarıyla değiştirildi.')
     },
     onError: (error: Error) => {
-      toast.error(`Şifre güncellenemedi: ${error.message}`)
+      notify.error(`Şifre güncellenemedi: ${error.message}`)
     },
   })
 }

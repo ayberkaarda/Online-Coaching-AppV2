@@ -248,7 +248,15 @@ jobs:
     # güvenlik taraması için var, E2E'ye ihtiyacı yok. Üst üste push'larda E2E'nin
     # birikmesi `concurrency: cancel-in-progress: true` (yukarıda) ile zaten kesiliyor.
     if: github.event_name != 'schedule'
-    timeout-minutes: 20
+    # 20 -> 30 (B-055): run 32218286151'de job `cancelled` oldu — asıl E2E testleri
+    # KIRIK DEĞİLDİ, `Install Playwright browsers` adımı apt aynası (azure.archive.ubuntu.com
+    # -> archive.ubuntu.com) takıldığı için 20 dakikalık bütçe `Build` ve `Run E2E tests`
+    # adımlarına hiç sıra gelmeden tükendi. Bu job zaten Supabase yığını + tarayıcı kurulumu +
+    # iki build (bkz. aşağıdaki NOT) + testleri TEK bütçede sığdırıyor; 20 dk ölçülen en kötü
+    # hâli karşılamıyor. Aşağıdaki tarayıcı önbelleği bu riski azaltır ama apt bağımlılık
+    # kurulumu (`install-deps`) önbellek isabetinde bile HER koşumda taze VM'de tekrar çalışır,
+    # o yüzden bütçe de ayrıca büyütüldü.
+    timeout-minutes: 30
     # NOT: playwright.config.ts'deki webServer bloğu `pnpm run build && pnpm run
     # start` çalıştırıyor ve CI'da (process.env.CI true olduğu için)
     # reuseExistingServer: false oluyor — yani `pnpm run test:e2e` adımı
@@ -395,11 +403,40 @@ jobs:
         run: |
           supabase status -o env | sed -E 's/^([A-Z_]+)="(.*)"$/\1=\2/' >> "$GITHUB_ENV"
 
+      - name: Cache Playwright browsers
+        # B-055: run 32218286151'de bu adımdan hemen SONRAKİ apt indirmesi ağ aynası
+        # takılınca job'un 20 dk bütçesini komple yedi (bkz. yukarıdaki `timeout-minutes`
+        # notu). Anahtar `apps/web/package.json`daki `^1.49.1` ARALIĞINDAN değil,
+        # `pnpm-lock.yaml` hash'inden türetiliyor: caret aralığı zaman içinde farklı
+        # patch/minor sürümlere çözülebilir ama lockfile HER ZAMAN o an gerçekten kurulan
+        # TAM sürümü sabitler — tarayıcı ikili revizyonu Playwright'ın tam sürümüne sıkı
+        # bağlı olduğundan, yanlış sürüme ait bir önbelleği geri yüklemek testleri sessizce
+        # kırar. `restore-keys` BİLEREK YOK: kısmi (OS-only) bir eşleşme yanlış tarayıcı
+        # sürümü geri yükleyebilir; anahtar tutmazsa aşağıdaki adım zaten tam kuruluma düşer.
+        id: playwright-cache
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
+
       - name: Install Playwright browsers
         # Faz 4.5: `@playwright/test` artık `web` paketinin devDependency'si; kök
         # `node_modules/.bin` altında YOK. Çıplak `pnpm exec playwright` bu yüzden
         # "Command not found" ile düşer (ölçüldü) — çağrı pakete yönlendirilmeli.
+        # Önbellek ISABET ETMEDİYSE (`--with-deps`): hem tarayıcı ikilisini indirir hem
+        # apt sistem bağımlılıklarını kurar (`playwright install --help` çıktısı).
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: pnpm --filter web exec playwright install --with-deps chromium
+
+      - name: Install Playwright system dependencies (önbellek isabeti)
+        # Önbellek YALNIZCA indirilen tarayıcı ikililerini (~/.cache/ms-playwright) tutar;
+        # apt paketleri runner'a özgüdür ve her koşumda taze VM'de yeniden kurulmak
+        # ZORUNDADIR — bu yüzden isabet olsa da atlanamaz. `install-deps`, `install`'dan
+        # AYRI bir alt komuttur ve YALNIZCA sistem bağımlılıklarını kurar, tarayıcı
+        # indirmez (`playwright install-deps --help` ile doğrulandı) — böylece önbellek
+        # isabetinde gereksiz tarayıcı indirmesi atlanmış olur.
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: pnpm --filter web exec playwright install-deps chromium
 
       - name: Build
         env:
@@ -462,7 +499,11 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: docker/setup-buildx-action@v3
+      # v3 -> v4: Faz 4.5 c7a2'de diğer Actions hizalanırken bu unutulmuş; CI'da
+      # "Node.js 20 is deprecated" uyarısı düştü (v3 hâlâ node20 hedefliyordu). v4 serisi
+      # `using: node24` kullanıyor (ölçüm v4.2.0 üzerinde yapıldı) (B-055), diğer Actions
+      # ile aynı hizaya geldi.
+      - uses: docker/setup-buildx-action@v4
 
       - name: Build web image
         uses: docker/build-push-action@v7

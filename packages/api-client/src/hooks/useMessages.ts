@@ -5,12 +5,12 @@
 import type { RealtimePresenceState, SupabaseClient } from '@supabase/supabase-js'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useState } from 'react'
-import { toast } from 'sonner'
 
 import { queryKeyRoots, queryKeys } from '../query/keys'
 import { wrapSupabaseError } from '../query/supabase-error'
 import { MESSAGE_ATTACHMENT_BUCKET, SIGNED_URL_STALE_TIME_MS, createSignedUrl } from '../storage'
 import { useSupabaseClient } from '../context'
+import { useNotifier } from '../notify'
 import { assertValidImageFile } from '../upload-validation'
 import type { Database, Message } from '@repo/types'
 
@@ -224,6 +224,7 @@ interface SendMessageContext {
 
 export function useSendMessage() {
   const supabase = useSupabaseClient()
+  const notify = useNotifier()
   const queryClient = useQueryClient()
 
   return useMutation<Message, Error, SendMessageInput, SendMessageContext>({
@@ -318,7 +319,7 @@ export function useSendMessage() {
       if (context) {
         queryClient.setQueryData(context.key, context.previous)
       }
-      toast.error(`Mesaj gönderilemedi: ${error.message}`)
+      notify.error(`Mesaj gönderilemedi: ${error.message}`)
     },
     onSettled: (_data, _error, { senderId, receiverId }) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.messages(senderId, receiverId) })
@@ -340,6 +341,7 @@ export function useSendMessage() {
  */
 export function useMarkConversationRead(clientId?: string) {
   const supabase = useSupabaseClient()
+  const notify = useNotifier()
   const queryClient = useQueryClient()
   const { data: session } = useSession()
   const viewerId = session?.user.id
@@ -369,7 +371,7 @@ export function useMarkConversationRead(clientId?: string) {
       void queryClient.invalidateQueries({ queryKey: queryKeys.unreadCount(clientId, viewerId) })
     },
     onError: (error) => {
-      toast.error(`Mesajlar okundu işaretlenemedi: ${error.message}`)
+      notify.error(`Mesajlar okundu işaretlenemedi: ${error.message}`)
     },
   })
 }

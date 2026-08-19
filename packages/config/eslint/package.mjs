@@ -8,9 +8,11 @@
 // yalnızca Next'i/Expo'yu tanımayan, çıplak TS paketleri içindir.
 //
 // Parser AÇIKÇA verilmek ZORUNDA: parser'sız ESLint her tip anotasyonunda "Parsing error"
-// ile düşer. `@typescript-eslint/parser` bu paketin (@repo/config) KENDİ dependency'sidir —
+// ile düşer. `@typescript-eslint/parser` bu paketin (@repo/config) KENDİ bağımlılığıdır —
 // böylece tüketen her paket yalnızca `eslint` + `@repo/config` bildirmekle yetinir, parser
-// sürümü tek yerden yönetilir.
+// sürümü tek yerden yönetilir. `devDependencies` altında durur (`dependencies` DEĞİL): lint
+// salt geliştirme aracıdır ve `dependencies`'te kaldığında bütün eslint ağacı
+// (eslint > minimatch > brace-expansion) `pnpm audit --prod` grafiğine girip CI'ı düşürür.
 //
 // Düz dizi olarak dışa aktarılır (tıpkı base.mjs gibi); `defineConfig` çağrılmaz ki
 // @repo/config'in `eslint` paketine bağımlı olması gerekmesin.

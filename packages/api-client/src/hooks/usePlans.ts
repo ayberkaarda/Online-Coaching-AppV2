@@ -23,11 +23,11 @@
 //   birebir aynı girdiyi alır ve aynı toast metinlerini üretir.
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { toast } from 'sonner'
 
 import { queryKeys } from '../query/keys'
 import { wrapSupabaseError } from '../query/supabase-error'
 import { useSupabaseClient } from '../context'
+import { useNotifier } from '../notify'
 import {
   DAY_NAMES,
   EMPTY_WORKOUT_PLAN,
@@ -212,6 +212,7 @@ export interface SaveWorkoutPlanInput {
 
 export function useSaveWorkoutPlan() {
   const supabase = useSupabaseClient()
+  const notify = useNotifier()
   const queryClient = useQueryClient()
 
   return useMutation({
@@ -232,14 +233,14 @@ export function useSaveWorkoutPlan() {
       for (const id of clientIds) {
         void queryClient.invalidateQueries({ queryKey: queryKeys.workoutPlan(id) })
       }
-      toast.success(
+      notify.success(
         count > 1
           ? `Antrenman programı ${count} danışana kaydedildi.`
           : 'Antrenman programı kaydedildi.'
       )
     },
     onError: (error: Error) => {
-      toast.error(`Antrenman programı kaydedilemedi: ${error.message}`)
+      notify.error(`Antrenman programı kaydedilemedi: ${error.message}`)
     },
   })
 }
@@ -251,6 +252,7 @@ export interface SaveNutritionPlanInput {
 
 export function useSaveNutritionPlan() {
   const supabase = useSupabaseClient()
+  const notify = useNotifier()
   const queryClient = useQueryClient()
 
   return useMutation({
@@ -271,14 +273,14 @@ export function useSaveNutritionPlan() {
       for (const id of clientIds) {
         void queryClient.invalidateQueries({ queryKey: queryKeys.nutritionPlan(id) })
       }
-      toast.success(
+      notify.success(
         count > 1
           ? `Beslenme programı ${count} danışana kaydedildi.`
           : 'Beslenme programı kaydedildi.'
       )
     },
     onError: (error: Error) => {
-      toast.error(`Beslenme programı kaydedilemedi: ${error.message}`)
+      notify.error(`Beslenme programı kaydedilemedi: ${error.message}`)
     },
   })
 }

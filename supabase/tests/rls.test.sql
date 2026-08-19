@@ -6134,8 +6134,460 @@ rollback;
 
 
 -- =============================================================================
+-- PROGRAM ONAYI (ATOMIK) — 114) POZİTİF: `approve_program()` ÜÇ ETKİYİ DE
+-- yapar — plan yazılır + onay 'approved' olur + danışana bildirim düşer
+--
+-- `useApproveProgram` (packages/api-client/src/hooks/useProgramApprovals.ts)
+-- artık TAM OLARAK bu tek çağrıyı yapar (B-019). Eskiden aynı iş üç ayrı ağ
+-- çağrısıydı ve aradan kopan bağlantı yarım durum bırakıyordu.
+--
+-- Payload istemcinin gönderdiğiyle BİREBİR aynıdır: `planToRpcPayload()` 7 günün
+-- HEPSİNİ gönderir, dolu olmayanlar boş string'dir.
+-- =============================================================================
+begin;
+
+-- KURULUM (postgres) — kendi onay satırımızı üretiyoruz; seed'in `pending`
+-- satırını TÜKETMİYORUZ (bkz. dosya başındaki "KENDİ KURULUMUNU YAPMA KURALI").
+insert into public.program_approvals (id, client_id, workout_data, status)
+values (
+  'b0000000-0000-0000-0000-000000000114'::uuid,
+  '22222222-2222-2222-2222-222222222222',
+  '{"Pazartesi":"1. zz-114 Approve Squat - 5x5"}'::jsonb,
+  'pending'::public.approval_status
+);
+
+create temp table zz_notify_base_114 as
+select count(*) as n
+  from public.notifications
+ where client_id = '22222222-2222-2222-2222-222222222222'
+   and message   = 'Koçun yeni antrenman programını onayladı. Artık kullanabilirsin.';
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+
+do $$
+declare
+  v_status public.approval_status;
+  v_by     uuid;
+  v_at     timestamptz;
+  v_rows   int;
+begin
+  perform public.approve_program(
+    'b0000000-0000-0000-0000-000000000114'::uuid,
+    '22222222-2222-2222-2222-222222222222'::uuid,
+    '{"Pazartesi":"1. zz-114 Approve Squat - 5x5","Salı":"","Çarşamba":"","Perşembe":"","Cuma":"","Cumartesi":"","Pazar":""}'::jsonb
+  );
+
+  -- --- ETKİ 1: PLAN YAZILDI -------------------------------------------------
+  select count(*) into v_rows
+    from public.workout_plan_exercises wpe
+    join public.workout_plans wp on wp.id = wpe.plan_id
+   where wp.client_id = '22222222-2222-2222-2222-222222222222'
+     and wp.is_active;
+  if v_rows is distinct from 1 then
+    raise exception 'BASARISIZ [114 plan]: aktif planda beklenen 1 satir, gelen % -- save_workout_plan cagrilmadi ya da eski satirlar kalmis', v_rows;
+  end if;
+
+  select count(*) into v_rows
+    from public.workout_plan_exercises wpe
+    join public.workout_plans wp on wp.id = wpe.plan_id
+   where wp.client_id = '22222222-2222-2222-2222-222222222222'
+     and wp.is_active
+     and wpe.day      = 'Pazartesi'
+     and wpe.raw_line = '1. zz-114 Approve Squat - 5x5';
+  if v_rows is distinct from 1 then
+    raise exception 'BASARISIZ [114 plan icerigi]: onaylanan program danisanin aktif planina ISLENMEDI';
+  end if;
+
+  -- --- ETKİ 2: ONAY 'approved' + DENETİM İZİ SUNUCUDAN ----------------------
+  select status, reviewed_by, reviewed_at into v_status, v_by, v_at
+    from public.program_approvals
+   where id = 'b0000000-0000-0000-0000-000000000114'::uuid;
+
+  if v_status is distinct from 'approved'::public.approval_status then
+    raise exception 'BASARISIZ [114 onay]: beklenen approved, gelen % -- plan yazildi ama onay kuyrukta kaldi', v_status;
+  end if;
+  if v_by is distinct from '11111111-1111-1111-1111-111111111111'::uuid then
+    raise exception 'BASARISIZ [114 reviewed_by]: beklenen koc, gelen % -- guard trigger ATLANMIS olabilir', v_by;
+  end if;
+  if v_at is null then
+    raise exception 'BASARISIZ [114 reviewed_at]: NULL -- guard trigger ATLANMIS olabilir';
+  end if;
+
+  raise notice '  [114] plan yazildi + onay approved + denetim izi sunucudan doldu';
+end $$;
+
+-- --- ETKİ 3: DANIŞANA BİLDİRİM (fark ölçümü) --------------------------------
+--     Ölçüm postgres ile yapılır: taban değeri tutan temp tablo `authenticated`
+--     rolüne AÇIK DEĞİLDİR (senaryo 77 ile aynı düzen).
+reset role;
+do $$
+declare
+  v_base int;
+  v_now  int;
+begin
+  select n into v_base from zz_notify_base_114;
+  select count(*) into v_now
+    from public.notifications
+   where client_id = '22222222-2222-2222-2222-222222222222'
+     and message   = 'Koçun yeni antrenman programını onayladı. Artık kullanabilirsin.';
+
+  if (v_now - v_base) is distinct from 1 then
+    raise exception 'BASARISIZ [114 bildirim]: beklenen +1 satir, gelen +% -- danisan onaydan HABERSIZ kalir', (v_now - v_base);
+  end if;
+
+  raise notice 'GECTI [114 approve_program() plan + onay + bildirimi TEK cagrida yazar]';
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- PROGRAM ONAYI (ATOMIK) — 115) [AC-01] DANIŞAN kendi onayını `approve_program`
+-- ile ONAYLAYAMAZ — ve denemesinden GERİYE HİÇBİR ŞEY KALMAZ
+--
+-- ############################################################################
+-- # BU SENARYONUN VAR OLMA SEBEBİ                                            #
+-- # Onay yolu bir RPC'ye taşındı. "RPC" kelimesi tek başına yetki kazandırmaz #
+-- # ama YANLIŞ yazılırsa kazandırır: fonksiyon `SECURITY DEFINER` olsaydı     #
+-- # `postgres` (rolbypassrls) kimliğiyle koşar ve `program_approvals_update_coach`
+-- # politikası DEVREDE OLMAZDI -> danışan kendi programını kendi onaylardı.   #
+-- # Fonksiyon bilerek `SECURITY INVOKER`dır; bu senaryo bunun SONUCUNU ölçer. #
+-- #                                                                           #
+-- # AYRICA: danışan `save_workout_plan()` adımını GEÇEBİLİR (workout_plans_insert
+-- # politikası `client_id = auth.uid()` dalını içerir), yani plan GERÇEKTEN   #
+-- # yazılır ve ancak ONDAN SONRA onay adımı reddedilir. Reddin ardından planın #
+-- # ORTADA OLMAMASI, gövdenin tek transaksiyon olduğunun kanıtıdır.           #
+-- ############################################################################
+-- =============================================================================
+begin;
+
+insert into public.program_approvals (id, client_id, workout_data, status)
+values (
+  'b0000000-0000-0000-0000-000000000115'::uuid,
+  '22222222-2222-2222-2222-222222222222',
+  '{"Pazartesi":"1. zz-115 kendi kendine onay"}'::jsonb,
+  'pending'::public.approval_status
+);
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+
+do $$
+declare
+  v_caught boolean := false;
+  v_state  text;
+begin
+  begin
+    perform public.approve_program(
+      'b0000000-0000-0000-0000-000000000115'::uuid,
+      '22222222-2222-2222-2222-222222222222'::uuid,
+      '{"Pazartesi":"1. zz-115 kendi kendine onay","Salı":"","Çarşamba":"","Perşembe":"","Cuma":"","Cumartesi":"","Pazar":""}'::jsonb
+    );
+  exception when insufficient_privilege then
+    v_caught := true;
+    get stacked diagnostics v_state = returned_sqlstate;
+  end;
+
+  if not v_caught then
+    raise exception 'BASARISIZ [115]: DANISAN kendi programini ONAYLADI -- AC-01 YENIDEN ACIK!';
+  end if;
+  if v_state is distinct from '42501' then
+    raise exception 'BASARISIZ [115 hata kodu]: beklenen 42501, gelen %', v_state;
+  end if;
+end $$;
+
+-- Yan etki denetimi postgres ile: danışanın kendi RLS'i ölçümü daraltmasın.
+reset role;
+do $$
+declare
+  v_status public.approval_status;
+  v_rows   int;
+begin
+  select status into v_status from public.program_approvals
+   where id = 'b0000000-0000-0000-0000-000000000115'::uuid;
+  if v_status is distinct from 'pending'::public.approval_status then
+    raise exception 'BASARISIZ [115 onay durumu]: % oldu (pending kalmaliydi)', v_status;
+  end if;
+
+  select count(*) into v_rows
+    from public.workout_plan_exercises
+   where raw_line = '1. zz-115 kendi kendine onay';
+  if v_rows is distinct from 0 then
+    raise exception 'BASARISIZ [115 ATOMIKLIK]: red edilen cagridan GERIYE % plan satiri kaldi -- govde tek transaksiyon DEGIL', v_rows;
+  end if;
+
+  raise notice 'GECTI [115 Danisan approve_program() ile kendi programini onaylayamaz (42501) ve denemesinden yan etki KALMAZ]';
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- PROGRAM ONAYI (ATOMIK) — 116) ÇAPRAZ ERİŞİM İKİ YÖNDEN DE KAPALI
+--   (a) BAŞKA BİR DANIŞAN (B) A'nın onayını `approve_program` ile işleyemez
+--   (b) KOÇ dahi EŞLEŞMEYEN çift gönderemez: onay A'nınken plan B'ye YAZILAMAZ
+--
+-- ############################################################################
+-- # "BAŞKA KOÇ" SENARYOSU NEDEN BURADA YOK — DÜRÜST NOT                       #
+-- # Bu üründe koç-danışan ATAMA tablosu YOKTUR; yetki ROL tabanlıdır          #
+-- # (`is_coach()`) ve `program_approvals_update_coach` / `workout_plans_insert`#
+-- # politikaları HER koça tüm danışanları açar (`submit_program_for_approval` #
+-- # de bildirimi "role='coach' olan TÜM profillere" yazar). Yani "ikinci bir  #
+-- # koç başkasının danışanını onaylayamaz" iddiası BUGÜN DOĞRU DEĞİLDİR ve    #
+-- # onu test etmek yeşil veremezdi. Çok koçlu modele geçilirse kural ÖNCE     #
+-- # politikalara girer, senaryo ONDAN SONRA buraya eklenir.                   #
+-- #                                                                           #
+-- # Onun yerine GERÇEKTEN var olan iki kapı ölçülür: danışan izolasyonu (a) ve #
+-- # RPC'nin kendi eşleşme kapısı (b). (b) olmadan iki uuid'nin yer değiştirmesi#
+-- # SESSİZCE yanlış danışanın planını ezerdi.                                  #
+-- ############################################################################
+-- =============================================================================
+begin;
+
+insert into public.program_approvals (id, client_id, workout_data, status)
+values (
+  'b0000000-0000-0000-0000-000000000116'::uuid,
+  '22222222-2222-2222-2222-222222222222',   -- Danışan A'nın onayı
+  '{"Pazartesi":"1. zz-116 caprazlama"}'::jsonb,
+  'pending'::public.approval_status
+);
+
+-- --- (a) Danışan B, A'nın onayını işlemeye çalışır ---------------------------
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"33333333-3333-3333-3333-333333333333","role":"authenticated"}';
+do $$
+declare
+  v_caught boolean := false;
+begin
+  begin
+    perform public.approve_program(
+      'b0000000-0000-0000-0000-000000000116'::uuid,
+      '22222222-2222-2222-2222-222222222222'::uuid,   -- A'nın planına yazmayı dener
+      '{"Pazartesi":"1. zz-116a B den A ya","Salı":"","Çarşamba":"","Perşembe":"","Cuma":"","Cumartesi":"","Pazar":""}'::jsonb
+    );
+  exception when others then
+    v_caught := true;
+  end;
+
+  if not v_caught then
+    raise exception 'BASARISIZ [116a]: Danisan B, Danisan A nin programini ONAYLADI -- danisan izolasyonu KIRIK!';
+  end if;
+end $$;
+
+-- --- (b) KOÇ, eşleşmeyen (onay A'nın / danışan B) çifti gönderir -------------
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+do $$
+declare
+  v_caught boolean := false;
+  v_state  text;
+begin
+  begin
+    perform public.approve_program(
+      'b0000000-0000-0000-0000-000000000116'::uuid,   -- A'nın onayı
+      '33333333-3333-3333-3333-333333333333'::uuid,   -- ama B'nin planına
+      '{"Pazartesi":"1. zz-116b yanlis danisana","Salı":"","Çarşamba":"","Perşembe":"","Cuma":"","Cumartesi":"","Pazar":""}'::jsonb
+    );
+  exception when others then
+    v_caught := true;
+    get stacked diagnostics v_state = returned_sqlstate;
+  end;
+
+  if not v_caught then
+    raise exception 'BASARISIZ [116b]: onay A ya aitken plan B ye YAZILDI -- eslesme kapisi YOK, sessiz veri bozulmasi';
+  end if;
+  if v_state is distinct from '22023' then
+    raise exception 'BASARISIZ [116b hata kodu]: beklenen 22023 (eslesme kapisi), gelen % -- red BASKA bir sebepten gelmis olabilir', v_state;
+  end if;
+end $$;
+
+reset role;
+do $$
+declare
+  v_status public.approval_status;
+  v_rows   int;
+begin
+  select status into v_status from public.program_approvals
+   where id = 'b0000000-0000-0000-0000-000000000116'::uuid;
+  if v_status is distinct from 'pending'::public.approval_status then
+    raise exception 'BASARISIZ [116 onay durumu]: % oldu (pending kalmaliydi)', v_status;
+  end if;
+
+  select count(*) into v_rows
+    from public.workout_plan_exercises
+   where raw_line in ('1. zz-116a B den A ya', '1. zz-116b yanlis danisana');
+  if v_rows is distinct from 0 then
+    raise exception 'BASARISIZ [116 ATOMIKLIK]: reddedilen cagrilardan GERIYE % plan satiri kaldi', v_rows;
+  end if;
+
+  raise notice 'GECTI [116 caprazlama iki yonden de kapali: danisan izolasyonu + onay/danisan eslesme kapisi, yan etki YOK]';
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- PROGRAM ONAYI (ATOMIK) — 117) *** ATOMİKLİK KANITI *** — B-019'un ÖZÜ
+--
+-- ############################################################################
+-- # ÖLÇÜLEN ŞEY                                                              #
+-- # `approve_program()` gövdesinde plan yazımı ONAY ADIMINDAN ÖNCE gelir      #
+-- # (sıra bilinçli korundu, bkz. 20260819090000 §1b). Var olmayan bir         #
+-- # `p_approval_id` ile çağrıldığında:                                        #
+-- #   1) `save_workout_plan()` GERÇEKTEN çalışır ve plan satırlarını YAZAR,    #
+-- #   2) ardından onay probu satırı bulamaz ve P0002 ile PATLAR.               #
+-- # Eğer gövde tek transaksiyon DEĞİLSE 1. adımın yazdığı satırlar ORTADA      #
+-- # KALIR — tam olarak eski üç-çağrılı akışın bıraktığı yarım durum.          #
+-- #                                                                           #
+-- # Bu yüzden "hiçbir yan etki yok" iddiası burada BOŞ BİR YEŞİL DEĞİLDİR:     #
+-- # başarısız adım, yazma adımından SONRA gelir.                              #
+-- #                                                                           #
+-- # Üç eksende ölçülür: plan satırı, AKTİF PLAN VERSİYONU (yayınlama sayacı   #
+-- # şişmemeli) ve bildirim sayısı.                                             #
+-- ############################################################################
+-- =============================================================================
+begin;
+
+create temp table zz_base_117 as
+select
+  (select coalesce(max(wp.version), 0)
+     from public.workout_plans wp
+    where wp.client_id = '22222222-2222-2222-2222-222222222222')      as max_version,
+  (select count(*)
+     from public.workout_plans wp
+    where wp.client_id = '22222222-2222-2222-2222-222222222222')      as n_plans,
+  (select count(*)
+     from public.notifications
+    where client_id = '22222222-2222-2222-2222-222222222222'
+      and message   = 'Koçun yeni antrenman programını onayladı. Artık kullanabilirsin.') as n_notify;
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+
+do $$
+declare
+  v_caught boolean := false;
+  v_state  text;
+begin
+  begin
+    perform public.approve_program(
+      'b0000000-0000-0000-0000-000000000117'::uuid,   -- BOYLE BIR SATIR YOK
+      '22222222-2222-2222-2222-222222222222'::uuid,
+      '{"Pazartesi":"1. zz-117 hayalet onay","Salı":"","Çarşamba":"","Perşembe":"","Cuma":"","Cumartesi":"","Pazar":""}'::jsonb
+    );
+  exception when no_data_found then
+    v_caught := true;
+    get stacked diagnostics v_state = returned_sqlstate;
+  end;
+
+  if not v_caught then
+    raise exception 'BASARISIZ [117]: var olmayan onay id si ile cagri BASARILI dondu -- sessizce basarili donmek en kotu davranistir';
+  end if;
+  if v_state is distinct from 'P0002' then
+    raise exception 'BASARISIZ [117 hata kodu]: beklenen P0002, gelen %', v_state;
+  end if;
+end $$;
+
+reset role;
+do $$
+declare
+  v_base zz_base_117;
+  v_v    integer;
+  v_n    bigint;
+  v_rows bigint;
+begin
+  select * into v_base from zz_base_117;
+
+  -- (1) Plan SATIRI kalmamalı
+  select count(*) into v_rows
+    from public.workout_plan_exercises
+   where raw_line = '1. zz-117 hayalet onay';
+  if v_rows is distinct from 0 then
+    raise exception 'BASARISIZ [117 ATOMIKLIK/plan]: hata sonrasi GERIYE % plan satiri kaldi -- plan yazildi ama onay pending kaldi (B-019 ACIK)', v_rows;
+  end if;
+
+  -- (2) AKTİF PLAN VERSİYONU şişmemeli (yayınlama dalı da geri sarılmalı)
+  select coalesce(max(wp.version), 0), count(*) into v_v, v_n
+    from public.workout_plans wp
+   where wp.client_id = '22222222-2222-2222-2222-222222222222';
+  if v_v is distinct from v_base.max_version or v_n is distinct from v_base.n_plans then
+    raise exception 'BASARISIZ [117 ATOMIKLIK/versiyon]: plan sayaci geri sarilmadi (versiyon % -> %, satir % -> %)',
+      v_base.max_version, v_v, v_base.n_plans, v_n;
+  end if;
+
+  -- (3) Bildirim yazılmamalı
+  select count(*) into v_n
+    from public.notifications
+   where client_id = '22222222-2222-2222-2222-222222222222'
+     and message   = 'Koçun yeni antrenman programını onayladı. Artık kullanabilirsin.';
+  if (v_n - v_base.n_notify) is distinct from 0 then
+    raise exception 'BASARISIZ [117 ATOMIKLIK/bildirim]: hata sonrasi +% bildirim kaldi', (v_n - v_base.n_notify);
+  end if;
+
+  raise notice 'GECTI [117 ATOMIKLIK: basarisiz approve_program() cagrisindan plan/versiyon/bildirim ekseninde HICBIR yan etki kalmaz]';
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- PROGRAM ONAYI (ATOMIK) — 118) `approve_program` YETKİ YÜZEYİ SÜRÜKLENME TESTİ
+--   * `prosecdef = false` -> SECURITY INVOKER (yetki modeli DEĞİŞMEDİ)
+--   * `search_path` PİNLİ (arama yolu ele geçirmesine kapalı)
+--   * EXECUTE: authenticated + service_role VAR; anon ve PUBLIC YOK
+--
+-- Senaryo 71-76 (yetki sökümü) ile aynı felsefe: yeni yazma yüzeyi eklendiğinde
+-- sertleştirme kuralları TAHMİN edilmez, ÖLÇÜLÜR. `SECURITY DEFINER`a çevirmek
+-- tek satırlık ve masum görünen bir değişikliktir; bedeli senaryo 115'in
+-- düşmesidir ve bu senaryo o değişikliği DAHA ÖNCE yakalar.
+-- =============================================================================
+begin;
+do $$
+declare
+  v_secdef boolean;
+  v_config text[];
+begin
+  select p.prosecdef, p.proconfig into v_secdef, v_config
+    from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public' and p.proname = 'approve_program';
+
+  if v_secdef is null then
+    raise exception 'BASARISIZ [118]: public.approve_program YOK -- koc onayi (useApproveProgram) PGRST202 alir';
+  end if;
+  if v_secdef then
+    raise exception 'BASARISIZ [118 SECURITY]: approve_program SECURITY DEFINER olmus -- RLS baypasi, danisan kendi programini onaylayabilir';
+  end if;
+  if v_config is null or not (v_config @> array['search_path=public, pg_temp']) then
+    raise exception 'BASARISIZ [118 search_path]: arama yolu pinlenmemis (%)', v_config;
+  end if;
+
+  if not has_function_privilege('authenticated', 'public.approve_program(uuid, uuid, jsonb)', 'EXECUTE') then
+    raise exception 'BASARISIZ [118 grant]: authenticated rolu approve_program u CALISTIRAMIYOR -- koc onayi kirilir';
+  end if;
+  if not has_function_privilege('service_role', 'public.approve_program(uuid, uuid, jsonb)', 'EXECUTE') then
+    raise exception 'BASARISIZ [118 grant]: service_role approve_program u CALISTIRAMIYOR';
+  end if;
+  if has_function_privilege('anon', 'public.approve_program(uuid, uuid, jsonb)', 'EXECUTE') then
+    raise exception 'BASARISIZ [118 grant]: approve_program ANON rolune ACIK';
+  end if;
+  if exists (
+    select 1
+      from pg_proc p
+      join pg_namespace n on n.oid = p.pronamespace,
+           lateral aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a
+     where n.nspname = 'public' and p.proname = 'approve_program'
+       and a.grantee = 0                       -- PUBLIC
+       and a.privilege_type = 'EXECUTE'
+  ) then
+    raise exception 'BASARISIZ [118 grant]: approve_program PUBLIC a ACIK (revoke all ... from public dusmus)';
+  end if;
+
+  raise notice 'GECTI [118 approve_program SECURITY INVOKER, search_path pinli, EXECUTE yalnizca authenticated + service_role]';
+end $$;
+rollback;
+
+
+-- =============================================================================
 -- TOPLAM ÖZET
--- Bu noktaya yalnızca YUKARIDAKİ 113 senaryonun HEPSİ GECTI verdiyse ulaşılır --
+-- Bu noktaya yalnızca YUKARIDAKİ 118 senaryonun HEPSİ GECTI verdiyse ulaşılır --
 -- herhangi biri BASARISIZ olsaydı raise exception + ON_ERROR_STOP psql'i
 -- daha önce sıfırdan farklı çıkış koduyla durdururdu.
 --   * 1–19  : Faz 1a ve öncesi (profiles, notifications, form_checks, daily_logs,
@@ -6200,6 +6652,16 @@ rollback;
 --             `weight_kg` NULL ise dolar, diğer kolonlara dokunulmaz,
 --             duplicate satır oluşmaz (112); backfill aynı günde EN YENİ form
 --             check'i seçer, var olan satırı ezmez ve IDEMPOTENTTİR (113)
+--   * 114–118: Faz 4 / B-019 — koç onay yolunun ATOMİKLEŞTİRİLMESİ
+--             (20260819090000_approve_program_atomic.sql): `approve_program()`
+--             planı + onayı + bildirimi TEK çağrıda ve TEK transaksiyonda
+--             yazar (114); danışan kendi programını bu yolla ONAYLAYAMAZ ve
+--             denemesinden yan etki kalmaz (115); çaprazlama iki yönden de
+--             kapalı — danışan izolasyonu + onay/danışan eşleşme kapısı (116);
+--             *** ATOMİKLİK KANITI ***: başarısız çağrıdan plan satırı, plan
+--             versiyonu ve bildirim ekseninde HİÇBİR yan etki kalmaz (117);
+--             yeni RPC'nin yetki yüzeyi sürüklenme testi — SECURITY INVOKER,
+--             pinli `search_path`, anon/PUBLIC kapalı (118)
 --
 -- NOT: `nutrition_logs`, `progress_entries` ve `progress_photos` ayrıca senaryo
 -- 73 (yetki) ve 74 (RLS+FORCE) tarafından DİNAMİK olarak kapsanır — o iki
@@ -6207,5 +6669,5 @@ rollback;
 -- =============================================================================
 do $$
 begin
-  raise notice 'TUM RLS TESTLERI GECTI (113 senaryo)';
+  raise notice 'TUM RLS TESTLERI GECTI (118 senaryo)';
 end $$;

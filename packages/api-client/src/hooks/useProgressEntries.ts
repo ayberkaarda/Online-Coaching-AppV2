@@ -34,12 +34,12 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { toast } from 'sonner'
 
 import { todayIsoDate } from '../date'
 import { queryKeyRoots, queryKeys } from '../query/keys'
 import { wrapSupabaseError } from '../query/supabase-error'
 import { useSupabaseClient } from '../context'
+import { useNotifier } from '../notify'
 import type { Database, Tables } from '@repo/types'
 
 export type ProgressEntry = Tables<'progress_entries'>
@@ -394,6 +394,7 @@ export interface UpsertProgressEntryInput extends ProgressEntryValues {
  */
 export function useUpsertProgressEntry() {
   const supabase = useSupabaseClient()
+  const notify = useNotifier()
   const queryClient = useQueryClient()
 
   return useMutation({
@@ -425,10 +426,10 @@ export function useUpsertProgressEntry() {
       // ve yeni ölçüm ÜÇÜNÜ de etkiler. Tek tek invalidate etmek, kullanıcı
       // aralığı değiştirdiğinde bayat seri göstermek demekti.
       void queryClient.invalidateQueries({ queryKey: queryKeyRoots.progressEntries })
-      toast.success('Ölçüm kaydedildi.')
+      notify.success('Ölçüm kaydedildi.')
     },
     onError: (error: Error) => {
-      toast.error(`Ölçüm kaydedilemedi: ${error.message}`)
+      notify.error(`Ölçüm kaydedilemedi: ${error.message}`)
     },
   })
 }

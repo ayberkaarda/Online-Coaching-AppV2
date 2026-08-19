@@ -4,11 +4,11 @@
 // `macros` alanı Json olarak saklanır; okurken `parseMacros` ile daraltılır.
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { toast } from 'sonner'
 
 import { queryKeys } from '../query/keys'
 import { wrapSupabaseError } from '../query/supabase-error'
 import { useSupabaseClient } from '../context'
+import { useNotifier } from '../notify'
 import { parseMacros, type DailyLog, type Macros } from '@repo/types'
 
 export function useDailyLogs(clientId?: string) {
@@ -54,6 +54,7 @@ export interface CreateDailyLogInput {
  */
 export function useCreateDailyLog() {
   const supabase = useSupabaseClient()
+  const notify = useNotifier()
   const queryClient = useQueryClient()
 
   return useMutation({
@@ -84,10 +85,10 @@ export function useCreateDailyLog() {
     },
     onSuccess: (_log, { clientId }) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.dailyLogs(clientId) })
-      toast.success('Günlük veriler kaydedildi.')
+      notify.success('Günlük veriler kaydedildi.')
     },
     onError: (error: Error) => {
-      toast.error(`Günlük veriler kaydedilemedi: ${error.message}`)
+      notify.error(`Günlük veriler kaydedilemedi: ${error.message}`)
     },
   })
 }

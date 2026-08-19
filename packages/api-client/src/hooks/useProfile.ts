@@ -6,7 +6,6 @@
 // YOL saklar; okuma anında süreli imzalı adres üretilir (bkz. `@repo/api-client/storage`).
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { toast } from 'sonner'
 
 import { queryKeyRoots, queryKeys } from '../query/keys'
 import { wrapSupabaseError } from '../query/supabase-error'
@@ -18,6 +17,7 @@ import {
   removeStoredObject,
 } from '../storage'
 import { useSupabaseClient } from '../context'
+import { useNotifier } from '../notify'
 import { assertValidImageFile } from '../upload-validation'
 import type { Profile } from '@repo/types'
 
@@ -101,6 +101,7 @@ export interface UploadAvatarInput {
  */
 export function useUploadAvatar() {
   const supabase = useSupabaseClient()
+  const notify = useNotifier()
   const queryClient = useQueryClient()
 
   return useMutation({
@@ -146,10 +147,10 @@ export function useUploadAvatar() {
     onSuccess: (_avatarPath, { userId }) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.profile(userId) })
       void queryClient.invalidateQueries({ queryKey: queryKeyRoots.profiles })
-      toast.success('Profil fotoğrafı güncellendi.')
+      notify.success('Profil fotoğrafı güncellendi.')
     },
     onError: (error: Error) => {
-      toast.error(`Fotoğraf yüklenemedi: ${error.message}`)
+      notify.error(`Fotoğraf yüklenemedi: ${error.message}`)
     },
   })
 }

@@ -6,7 +6,7 @@
 // `42501`) SESSİZCE ATIYORDU. `@repo/api-client/query/queryClient` içindeki merkezi
 // `QueryCache`/`MutationCache` `onError` kancası `42501`'i tespit edebilsin diye, hook'lar artık
 // `throw new Error(error.message)` yerine `throw wrapSupabaseError(error, { table, op })`
-// kullanır. `.message` BİREBİR AYNI kalır (bkz. constructor) — bu yüzden mevcut `toast.error`
+// kullanır. `.message` BİREBİR AYNI kalır (bkz. constructor) — bu yüzden mevcut `notify.error`
 // metinleri DEĞİŞMEZ, yalnızca hatanın taşıdığı bilgi zenginleşir.
 export class SupabaseQueryError extends Error {
   /** PostgREST/Postgres hata kodu (ör. `42501` = insufficient_privilege / RLS reddi). */

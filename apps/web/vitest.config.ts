@@ -48,7 +48,12 @@ export default defineConfig({
       // yakalamıyordu — kırmızı bir kapı, kapı değildir. `functions: 60` (ölçülen %64.2)
       // ve `branches: 55` (ölçülen %80.4) zaten geçiyor, DOKUNULMADI. 60'a dönüş borç
       // olarak izleniyor; MessagesTab/FormCheckTab/WorkoutTab testleri yazılınca kapanır.
-      thresholds: { lines: 52, functions: 60, branches: 55, statements: 52 },
+      //
+      // GERİ ÇIKARILDI (B-046 kapanışı): `MessagesTab`/`FormCheckTab` için davranış testleri
+      // yazıldı (bkz. tests/unit/messages-tab.test.tsx, tests/unit/form-check-tab.test.tsx) —
+      // `WorkoutTab`'e gerek KALMADI, iki dosya tek başına eşiği aşırdı. Ölçülen gerçek değer
+      // %61.21 (5443/8892) — 52'nin geçici mandalı 60'a geri çekildi.
+      thresholds: { lines: 60, functions: 60, branches: 55, statements: 60 },
     },
   },
   resolve: { alias: { '@': path.resolve(__dirname, './src') } },

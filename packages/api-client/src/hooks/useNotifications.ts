@@ -3,11 +3,11 @@
 // Bildirim (duyuru) okuma, okundu işaretleme ve gönderme hook'ları.
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { toast } from 'sonner'
 
 import { queryKeyRoots, queryKeys, type NotificationQueryOptions } from '../query/keys'
 import { wrapSupabaseError } from '../query/supabase-error'
 import { useSupabaseClient } from '../context'
+import { useNotifier } from '../notify'
 import type { Notification, TablesInsert } from '@repo/types'
 
 export type { NotificationQueryOptions }
@@ -49,6 +49,7 @@ export interface MarkNotificationReadInput {
 
 export function useMarkNotificationRead() {
   const supabase = useSupabaseClient()
+  const notify = useNotifier()
   const queryClient = useQueryClient()
 
   return useMutation({
@@ -60,7 +61,7 @@ export function useMarkNotificationRead() {
       void queryClient.invalidateQueries({ queryKey: queryKeyRoots.notifications })
     },
     onError: (error: Error) => {
-      toast.error(`Bildirim güncellenemedi: ${error.message}`)
+      notify.error(`Bildirim güncellenemedi: ${error.message}`)
     },
   })
 }
@@ -74,6 +75,7 @@ export interface SendNotificationInput {
 
 export function useSendNotification() {
   const supabase = useSupabaseClient()
+  const notify = useNotifier()
   const queryClient = useQueryClient()
 
   return useMutation({
@@ -94,12 +96,12 @@ export function useSendNotification() {
     },
     onSuccess: (count) => {
       void queryClient.invalidateQueries({ queryKey: queryKeyRoots.notifications })
-      toast.success(
+      notify.success(
         count > 1 ? `Duyuru ${count} kişiye gönderildi.` : 'Bildirim başarıyla gönderildi.'
       )
     },
     onError: (error: Error) => {
-      toast.error(`Bildirim gönderilemedi: ${error.message}`)
+      notify.error(`Bildirim gönderilemedi: ${error.message}`)
     },
   })
 }

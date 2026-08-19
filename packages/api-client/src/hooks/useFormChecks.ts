@@ -10,13 +10,13 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { toast } from 'sonner'
 
 import { logger } from '@repo/logger'
 import { queryKeyRoots, queryKeys } from '../query/keys'
 import { wrapSupabaseError } from '../query/supabase-error'
 import { FORM_CHECK_BUCKET, SIGNED_URL_STALE_TIME_MS, createSignedUrls } from '../storage'
 import { useSupabaseClient } from '../context'
+import { useNotifier, type Notifier } from '../notify'
 import { assertValidImageFile } from '../upload-validation'
 import type { Database, FormCheck } from '@repo/types'
 
@@ -113,6 +113,7 @@ async function uploadPose(
 
 export function useSubmitFormCheck() {
   const supabase = useSupabaseClient()
+  const notify = useNotifier()
   const queryClient = useQueryClient()
 
   return useMutation({
@@ -155,10 +156,10 @@ export function useSubmitFormCheck() {
       void queryClient.invalidateQueries({ queryKey: queryKeys.formChecks(clientId) })
       void queryClient.invalidateQueries({ queryKey: queryKeys.profile(clientId) })
       void queryClient.invalidateQueries({ queryKey: queryKeyRoots.lastCheckins })
-      toast.success('Formunuz koçunuza iletildi.')
+      notify.success('Formunuz koçunuza iletildi.')
     },
     onError: (error: Error) => {
-      toast.error(`Form gönderilemedi: ${error.message}`)
+      notify.error(`Form gönderilemedi: ${error.message}`)
     },
   })
 }
@@ -227,6 +228,9 @@ export function usePendingFormChecks() {
  */
 async function publishFormCheckReviewedEvent(
   client: SupabaseClient<Database>,
+  // Hook DEĞİL, dolayısıyla `useNotifier()` çağıramaz — bildirim portu, `client` gibi
+  // AÇIK PARAMETRE olarak çağıran hook'tan geçer (koşullu hook çağrısı yasak).
+  notifier: Notifier,
   {
     formCheckId,
     clientId,
@@ -257,7 +261,7 @@ async function publishFormCheckReviewedEvent(
       { err: messageError.message, clientId, formCheckId },
       'Form check sistem mesajı (post_system_message RPC) yazılamadı'
     )
-    toast.error('Danışana sistem mesajı gönderilemedi (geri bildirim yine de kaydedildi).')
+    notifier.error('Danışana sistem mesajı gönderilemedi (geri bildirim yine de kaydedildi).')
   }
 
   const { error: notificationError } = await client.from('notifications').insert({
@@ -289,12 +293,13 @@ export interface ReviewFormCheckInput {
  * `onError` "Geri bildirim gönderilemedi" derdi ama geri bildirim ZATEN
  * kaydedilmişti — koç muhtemelen TEKRAR denerdi (zararsız ama kafa karıştırıcı).
  * Bunun yerine hata `publishFormCheckReviewedEvent` içinde loglanır VE ayrı,
- * görünür bir `toast.error` ile bildirilir (artık 42501 BEKLENMEDİĞİ için
+ * görünür bir `notify.error` ile bildirilir (artık 42501 BEKLENMEDİĞİ için
  * sessizce yutulmaz) — koç gerçek durumu (inceleme kaydedildi, bildirim
  * gitmedi) doğru öğrenir.
  */
 export function useReviewFormCheck() {
   const supabase = useSupabaseClient()
+  const notify = useNotifier()
   const queryClient = useQueryClient()
 
   return useMutation({
@@ -311,7 +316,7 @@ export function useReviewFormCheck() {
         .single()
       if (error) throw wrapSupabaseError(error, { table: 'form_checks', op: 'update' })
 
-      await publishFormCheckReviewedEvent(supabase, {
+      await publishFormCheckReviewedEvent(supabase, notify, {
         formCheckId,
         clientId,
         feedback: coachFeedback,
@@ -322,10 +327,10 @@ export function useReviewFormCheck() {
     onSuccess: (_data, { clientId }) => {
       void queryClient.invalidateQueries({ queryKey: PENDING_FORM_CHECKS_KEY })
       void queryClient.invalidateQueries({ queryKey: queryKeys.formChecks(clientId) })
-      toast.success('Geri bildirim danışana iletildi.')
+      notify.success('Geri bildirim danışana iletildi.')
     },
     onError: (error: Error) => {
-      toast.error(`Geri bildirim gönderilemedi: ${error.message}`)
+      notify.error(`Geri bildirim gönderilemedi: ${error.message}`)
     },
   })
 }
