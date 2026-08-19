@@ -44,7 +44,7 @@
     "@repo/config": "workspace:*",
     "@typescript-eslint/parser": "^8.62.1",
     "@types/react": "~19.2.2",
-    "eslint": "^9",
+    "eslint": "^10",
     "typescript": "~6.0.3"
   }
 }
