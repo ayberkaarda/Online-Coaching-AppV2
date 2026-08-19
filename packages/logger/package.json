@@ -12,6 +12,6 @@
   },
   "devDependencies": {
     "@repo/config": "workspace:*",
-    "eslint": "^9"
+    "eslint": "^10"
   }
 }
