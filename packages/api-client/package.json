@@ -37,6 +37,6 @@
   "devDependencies": {
     "@repo/config": "workspace:*",
     "@types/react": "^19.0.7",
-    "eslint": "^9"
+    "eslint": "^10"
   }
 }
