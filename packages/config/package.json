@@ -11,6 +11,6 @@
     "./eslint/package.mjs": "./eslint/package.mjs"
   },
   "devDependencies": {
-    "@typescript-eslint/parser": "^8.62.1"
+    "@typescript-eslint/parser": "^8.67.0"
   }
 }
