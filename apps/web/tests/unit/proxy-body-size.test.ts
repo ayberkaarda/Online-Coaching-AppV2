@@ -34,8 +34,9 @@ vi.mock('@/lib/logger', () => {
   }
 })
 
-import { getServerEnv } from '@/env.server'
+import { getServerEnv, resetServerEnvCache } from '@/env.server'
 import { handleAiProxy, MAX_BODY_BYTES } from '@/lib/api/proxy'
+import { resetRateLimit } from '@/lib/rate-limit'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { aiWorkoutSchema } from '@repo/types/schemas'
 
@@ -111,13 +112,25 @@ function buildRequest(opts: {
 describe('handleAiProxy — gövde boyutu sınırı (A-08)', () => {
   beforeEach(() => {
     vi.stubGlobal('fetch', vi.fn())
+    // B-043 / AC-4.6.3: `handleAiProxy` artık auth başarılı olur olmaz `checkAndConsumeAiQuota`
+    // çağırır, o da `getServerEnv()` kullanır — `typeof window !== 'undefined'` iken (jsdom'da
+    // HER ZAMAN) fırlatır. Bu dosyanın HER testi `setSupabaseAuthResult(VALID_USER_RESULT)` ile
+    // auth'u başarılı kıldığı için (aşağıdaki satır), stub outer `beforeEach`'e taşındı (eskiden
+    // yalnızca "normal akış" alt bloğundaydı).
+    vi.stubGlobal('window', undefined)
     setSupabaseAuthResult(VALID_USER_RESULT)
+    // Kota sayacı `src/lib/rate-limit.ts`'teki PAYLAŞILAN Map'te tutulur; testler arasında
+    // sızmasın diye sıfırlanır.
+    resetRateLimit()
+    resetServerEnvCache()
   })
 
   afterEach(() => {
     vi.restoreAllMocks()
     vi.unstubAllGlobals()
     vi.clearAllMocks()
+    resetRateLimit()
+    resetServerEnvCache()
   })
 
   // -------------------------------------------------------------------------
@@ -249,10 +262,8 @@ describe('handleAiProxy — gövde boyutu sınırı (A-08)', () => {
   // -------------------------------------------------------------------------
 
   describe('normal akış (sınırın çok altında, geçerli gövde)', () => {
-    beforeEach(() => {
-      // `getServerEnv()` tarayıcı dışı ortamda çağrılabilsin diye (bkz. proxy-auth.test.ts).
-      vi.stubGlobal('window', undefined)
-    })
+    // `window` stub'ı artık outer `beforeEach`'te (kota kontrolü de `getServerEnv()`
+    // gerektiriyor — bkz. yukarısı); burada AYRICA tekrarlanmıyor.
 
     it('küçük geçerli gövde upstream’e ulaşır ve 200 döner', async () => {
       const env = getServerEnv()

@@ -39,8 +39,9 @@ vi.mock('@/lib/logger', () => {
   }
 })
 
-import { getServerEnv } from '@/env.server'
+import { getServerEnv, resetServerEnvCache } from '@/env.server'
 import { handleAiProxy } from '@/lib/api/proxy'
+import { resetRateLimit } from '@/lib/rate-limit'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { aiWorkoutSchema } from '@repo/types/schemas'
 
@@ -119,12 +120,25 @@ const UPSTREAM_PATH = '/analyze/workout'
 describe('handleAiProxy — oturum doğrulama', () => {
   beforeEach(() => {
     vi.stubGlobal('fetch', vi.fn())
+    // B-043 / AC-4.6.3: `handleAiProxy` artık auth başarılı olur olmaz `checkAndConsumeAiQuota`
+    // çağırır, o da `getServerEnv()` kullanır — `typeof window !== 'undefined'` iken (jsdom'da
+    // HER ZAMAN) fırlatır. Bu dosyanın "geçerli token" senaryoları (auth adımını geçen HER test)
+    // artık bu yola girdiği için stub outer `beforeEach`'e taşındı (eskiden yalnızca "upstream
+    // çağrısı gerektiren senaryolar" alt bloğundaydı).
+    vi.stubGlobal('window', undefined)
+    // Kota sayacı `src/lib/rate-limit.ts`'teki PAYLAŞILAN Map'te tutulur; testler arasında
+    // sızmasın diye sıfırlanır (varsayılan limit 20, bu dosyadaki auth-başarılı test sayısı
+    // çok altında olsa da açıkça izole etmek daha sağlamdır).
+    resetRateLimit()
+    resetServerEnvCache()
   })
 
   afterEach(() => {
     vi.restoreAllMocks()
     vi.unstubAllGlobals()
     vi.clearAllMocks()
+    resetRateLimit()
+    resetServerEnvCache()
   })
 
   // -------------------------------------------------------------------------
@@ -224,12 +238,8 @@ describe('handleAiProxy — oturum doğrulama', () => {
   // -------------------------------------------------------------------------
 
   describe('geçerli token + geçerli gövde (upstream çağrısı gerektiren senaryolar)', () => {
-    // `getServerEnv()` `typeof window !== 'undefined'` iken hata fırlatır (bkz. src/env.ts).
-    // Test ortamı `jsdom` olduğundan `window` her zaman tanımlıdır; proxy.ts'in upstream'e
-    // ulaştığı adımı (adım 3) test edebilmek için gerçek sunucu ortamını simüle ediyoruz.
-    beforeEach(() => {
-      vi.stubGlobal('window', undefined)
-    })
+    // `window` stub'ı artık outer `beforeEach`'te (kota kontrolü de `getServerEnv()` gerektiriyor
+    // — bkz. yukarısı); burada AYRICA tekrarlanmıyor.
 
     it('upstream başarılı yanıt dönerse: doğru URL, X-Request-ID başlığı, gövdede user_id/userId YOK, yanıt aynen iletilir', async () => {
       setSupabaseAuthResult(VALID_USER_RESULT)

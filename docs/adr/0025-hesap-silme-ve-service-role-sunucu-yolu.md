@@ -1,0 +1,294 @@
+# ADR-0025 — Hesap silme akışı ve `service_role`'ün ilk çalışma zamanı sunucu yolu
+
+- **Durum:** Kabul edildi
+- **Tarih:** 2026-08-19
+- **Karar verenler:** Faz 4.6 dilim 1 (KVKK hesap silme) turu
+- **İlgili:** `active_planprogram.md` §7a (AC-4.6.1, AC-4.6.2) · `docs/security/hardening-prompt-v2.md` #21 ·
+  borç **B-042** · ADR-0007 (tek koçlu model) · ADR-0022 (oturum depolaması) ·
+  ADR-0024 (`@repo/api-client` enjeksiyonu) · B-010 (denetim izi borcu)
+- **Uygulama:** `supabase/migrations/20260819100000_account_deletion.sql` ·
+  `apps/web/src/app/api/account/delete/route.ts` ·
+  `apps/web/src/app/api/account/deletion-core.ts` ·
+  `packages/api-client/src/hooks/useAccount.ts` · `apps/web/src/app/profile/page.tsx`
+- **Kanıt:** `supabase/tests/rls.test.sql` senaryo 119–124 ·
+  `apps/web/tests/unit/account-deletion.test.ts` · `apps/web/tests/e2e/account-deletion.spec.ts`
+
+---
+
+## Bağlam
+
+Uygulamada hesap silme diye bir yol yoktu. Bir danışan "hesabımı ve verilerimi silin" dediğinde
+yapılabilecek tek şey elle SQL yazmaktı; KVKK m.7 ve GDPR m.17 ("unutulma hakkı") karşılanmıyordu.
+Borç kütüğünde **B-042** olarak izleniyordu ve tetikleyicisi açıktı: _hosted ortamda ilk gerçek
+danışan verisi oluşmadan kapanmalı._
+
+Bu iş, projede bir ilki gerektiriyor: **`service_role` anahtarının çalışma zamanında,
+uygulama süreci içinde kullanılması.** Bugüne kadar `SUPABASE_SERVICE_ROLE_KEY` yalnızca depo
+dışı bakım script'lerinde (`scripts/import-catalog.mjs`, `scripts/clean-e2e-data.mjs`)
+kullanılıyordu; Next.js süreci onu hiç okumuyordu. `service_role` RLS'i **tamamen** baypas ettiği
+için, onu bir HTTP ucunun arkasına koymak bu kod tabanındaki en yüksek riskli tek adımdır ve
+`active_planprogram.md` §7a bu yüzden ayrı bir ADR şart koştu.
+
+### Ölçülen gerçekler (varsayım değil)
+
+Kararlar aşağıdaki dört ölçüme dayanıyor; hepsi yerel yığında bu tur sırasında yapıldı.
+
+1. **Danışan verisi taşıyan tablo sayısı: 14.** `public` şemasında 16 tablo vardı; ikisi
+   (`exercises`, `food_database`) kullanıcı kolonu taşımayan **katalogdur**. §7a'daki "14 tablo"
+   ifadesi ölçümle birebir tutuyor:
+   - doğrudan `client_id`/`id` (12): `profiles`, `notifications`, `messages`, `form_checks`,
+     `daily_logs`, `workout_logs`, `nutrition_logs`, `program_approvals`, `workout_plans`,
+     `nutrition_plans`, `progress_entries`, `progress_photos`
+   - plan üzerinden dolaylı (2): `workout_plan_exercises`, `nutrition_plan_meals`
+
+   (Bu tur eklenen `account_deletions` denetim tablosu 17. tablodur ama danışan verisi taşımaz;
+   sayıma girmez.)
+
+2. **Cascade zinciri hazır.** `public.profiles.id → auth.users(id) ON DELETE CASCADE` ve diğer 13
+   tablonun tamamı `profiles`'a (ya da bir plana) `ON DELETE CASCADE` ile bağlı. Yani
+   `delete from auth.users where id = ?` tek ifadesi 14 tablonun tamamını süpürüyor.
+   `form_checks.reviewed_by`, `program_approvals.reviewed_by` ve `workout_logs.plan_exercise_id`
+   `SET NULL`'dır — bunlar koç/plan referanslarıdır, danışan silmesinde tetiklenmez.
+
+3. **`storage.objects`'ten SQL ile satır silmek PLATFORM TARAFINDAN YASAK.** İlk taslakta
+   denendi ve canlı olarak şu hatayı verdi:
+
+   ```
+   ERROR:  Direct deletion from storage tables is not allowed. Use the Storage API instead.
+   HINT:   This prevents accidental data loss from orphaned objects.
+   CONTEXT: PL/pgSQL function storage.protect_delete()
+   ```
+
+   Trigger (`protect_objects_delete`) tam olarak bizim de kaçınmak istediğimiz şeyi yasaklıyor:
+   satırı silip diskteki/S3'teki baytı bırakmak. Bir kaçış kapısı var
+   (`set local storage.allow_delete_query = 'true'`) ve **kullanılmadı**.
+
+4. **Danışan kendi storage nesnelerinin tamamını silemiyor.** `message-attachments`
+   politikası (`message_attachments_delete_own_or_coach`) danışana yalnızca **kendi yüklediği**
+   nesneyi sildiriyor. Koçun o konuşmaya yüklediği ekleri danışan silemez; mesaj satırları
+   cascade ile giderken dosya yetim kalırdı.
+
+---
+
+## Karar
+
+### 1) İş bölümü: sunucu route handler'ı **artı** Postgres fonksiyonu — ikisi de, farklı işler için
+
+| Adım                                        | Nerede çalışır                | Hangi yetkiyle                                  | Neden orada                                                                                                  |
+| ------------------------------------------- | ----------------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Kimlik doğrulama (Bearer JWT → uid)         | Next.js route handler         | `anon` key + GoTrue `getUser()`                 | Kimlik istemciden **alınmaz**; uid yalnızca doğrulanmış token'dan türetilir                                  |
+| Onay cümlesinin doğrulanması                | Next.js route handler         | —                                               | Arayüz doğrulaması güvenlik sınırı değildir; `fetch` ile atlanabilir                                         |
+| Silinecek storage nesnelerinin listelenmesi | Postgres (`..._manifest()`)   | `SECURITY DEFINER`, EXECUTE: `service_role`     | Ad sözleşmeleri dört bucket'ta farklı ve zaten politikalarda yazılı; ikinci bir ayrıştırıcı ayrışırdı        |
+| **Fiziksel dosyaların silinmesi**           | Next.js route handler         | **`service_role`** + Storage API                | SQL'den yapılamaz (ölçüm 3); danışanın kendi yetkisi yetmez (ölçüm 4)                                        |
+| **`auth.users` satırının silinmesi**        | Postgres (`delete_account()`) | **`SECURITY DEFINER`**, EXECUTE: `service_role` | `authenticated` `auth.users`'a DELETE edemez; ayrıca 14 tablo + denetim satırı tek transaksiyonda olsun diye |
+| 14 tablodaki satırların silinmesi           | Postgres — **FK CASCADE**     | Fonksiyon sahibinin (`postgres`) hakkıyla       | Elle 14 `delete` yazmak, 15. tablo eklendiğinde sessizce eksik silerdi                                       |
+| Silme sonrası eksiksizlik kanıtı            | Postgres (`delete_account()`) | aynı transaksiyon                               | "Sildim" demeden önce sayım; kalan satır varsa `raise` → tüm işlem geri sarılır                              |
+| Denetim satırı                              | Postgres (`delete_account()`) | aynı transaksiyon                               | Silme geri sarılırsa denetim satırı da geri sarılır; "sildim" diyen ama silmeyen kayıt oluşamaz              |
+
+**Özet kural:** _Veritabanında yapılabilen her şey veritabanında ve tek transaksiyonda yapılır;
+sunucu yalnızca (a) kimlik/onay kapısı ve (b) veritabanının yapamayacağı tek iş olan fiziksel
+dosya silme için vardır._
+
+### 2) Sıra: **önce dosyalar, sonra veritabanı** — ve bu şema seviyesinde dayatılır
+
+Fiziksel dosya silme, veritabanı transaksiyonunun dışında kalan tek adımdır. Bu yüzden **önce**
+çalışır: yarıda kalırsa hesap hâlâ ayaktadır, kullanıcı tekrar dener, hiçbir şey kaybolmamıştır.
+Ters sırada yarıda kalan bir koşu, sahibi artık var olmayan ve hiçbir sorgunun bulamayacağı
+**yetim fotoğraflar** bırakırdı.
+
+`delete_account()` bu sözleşmeye güvenmez, **dayatır**: çağrıldığında geriye storage nesnesi
+kalmışsa `raise` eder ve hiçbir şey silinmez (fail-closed). Yarım silme — "auth kullanıcısı gitti
+ama vücut fotoğrafı duruyor" — şema seviyesinde imkânsızdır. Route, storage temizliğini en fazla
+3 tur dener (`MAX_STORAGE_PASSES`); yarışta yüklenen yeni bir nesne ikinci turda yakalanır,
+sonsuz döngü yoktur.
+
+### 3) `service_role` anahtarının disiplini
+
+- **Nerede yaşar:** yalnızca sunucu ortam değişkeni `SUPABASE_SERVICE_ROLE_KEY`.
+  `NEXT_PUBLIC_` öneki **yoktur**; `apps/web/src/env.server.ts` içinde tanımlıdır ve o dosya
+  `import 'server-only'` taşır (AC-11) — adı bile istemci paketine girmez.
+- **Route da `server-only`'dir:** `api/account/delete/route.ts` ilk satırında
+  `import 'server-only'` bulunur. Yanlışlıkla bir istemci bileşeninden import edilirse
+  **build-time** hatası verir, çalışma zamanında sızmaz.
+- **Yapılandırılmamışsa fail-closed:** anahtar yoksa uç `503 ACCOUNT_DELETION_UNAVAILABLE`
+  döner. **Sessizce "sildim" demek en kötü davranıştır** — kullanıcı hesabının gittiğini sanır,
+  veri yerinde durur.
+- **Loglara asla yazılmaz.** Bu yolun ürettiği hiçbir log satırı anahtarı, token'ı ya da hata
+  gövdesini taşımaz; yalnızca `event` + sayı alanları loglanır. Mevcut redaction katmanı
+  (`REDACT_PATHS`, `tests/unit/logger-redact.test.ts`) ikinci bir savunma olarak yerindedir ama
+  bu yol **ona güvenmez**: hassas alan log'a hiç konulmaz.
+- **Ne kadar yüzey açar:** `service_role` yalnızca **iki** fonksiyonu çalıştırabilir
+  (`account_deletion_manifest`, `delete_account`) ve Storage API'yi kullanır. `account_deletions`
+  denetim tablosunda **doğrudan tablo yetkisi bile yoktur** (bkz. §5).
+
+### 4) Yetki modeli: `EXECUTE` yalnızca `service_role`'de
+
+Her iki fonksiyon da `SECURITY DEFINER` + pinli `search_path = public, pg_temp`; `PUBLIC`, `anon`
+ve `authenticated` rollerinden `revoke all`, yalnızca `service_role`'e `grant execute`.
+
+Sonuç: **danışan bu fonksiyonları hiç çağıramaz** — ne başkası ne de kendisi için. "Danışan
+başkasının hesabını silemez" iddiasının dayanağı bir RLS politikası değil, EXECUTE yetkisidir; tek
+meşru yol sunucu ucudur ve o uç uid'yi gövdeden değil doğrulanmış Bearer token'dan alır.
+
+**Koç hesabı bu yoldan silinemez.** Tek koçlu modelde (ADR-0007) koç silinirse `is_coach()` hiç
+kimseye `TRUE` dönmez; tüm danışanların onay/mesaj/plan yolları ölür ve `reviewed_by` alanları
+`SET NULL` ile tüm inceleme denetim izi silinir. Kapı sunucuda değil **fonksiyonun içinde**
+durur: route bypass edilse bile geçilemez (`42501`).
+
+### 5) İdempotanslık sözleşmesi
+
+- `delete_account(uid)` var olmayan bir kullanıcı için **hata üretmez**;
+  `{"already_deleted": true, "row_total": 0, ...}` döner.
+- **İkinci bir denetim satırı yazılmaz** — yazsaydı "kaç hesap silindi" istatistiği yeniden
+  denemelerle şişerdi.
+- HTTP katmanında ikinci çağrı `401` alır (token'ın arkasındaki kullanıcı yok); sunucu **5xx
+  üretmez**, patlamaz.
+- Manifest turu da idempotenttir: kullanıcı arada silinmişse akış sessizce silme adımına düşer.
+
+### 6) Denetim kaydı: `public.account_deletions` — kişisel veri **içermez**
+
+| Kolon                     | İçerik                                                        |
+| ------------------------- | ------------------------------------------------------------- |
+| `id`                      | `gen_random_uuid()`                                           |
+| `deleted_at`              | zaman damgası                                                 |
+| `subject_role`            | `client` / `coach` (iki değerli enum)                         |
+| `rows_deleted`            | `{"messages": 12, "workout_logs": 40, …}` — tablo başına adet |
+| `storage_objects_deleted` | silinen fiziksel nesne sayısı                                 |
+| `request_id`              | sunucu logunun korelasyon anahtarı (rastgele üretilir)        |
+
+**uid yok, e-posta yok, ad yok, IP yok.** Silinen kişinin uid'sini saklamak takma adlı veri olurdu
+ve KVKK anlamında hâlâ kişisel veridir — silme kaydının kendisi silinen kişiyi işaret ediyorsa
+unutulma hakkı yerine gelmemiş olur.
+
+Aynı disiplin **sunucu logunda da** geçerlidir: AI proxy'si log'a `userId` eklerken bu yol
+**eklemez**. Korelasyon `requestId` üzerinden yapılır ve o değer denetim satırına da yazılır, yani
+"hangi log satırı hangi silmeye ait" sorusu uid olmadan cevaplanabilir.
+
+Tablo `authenticated`'a da `service_role`'e de kapalıdır: RLS + FORCE açık, **sıfır politika**
+(grant var, politika yok → her işlem reddedilir) ve `service_role`'ün doğrudan tablo yetkisi
+yoktur. Tek yazan, `SECURITY DEFINER` olan `delete_account()`tir; operatör kaydı doğrudan
+veritabanı erişimiyle okur.
+
+**B-010 ile ilişkisi:** B-010 ("plan tablolarında satırı kimin yazdığı tutulmuyor", ADR-0014'ün
+kabul edilen bedeli) bu tabloyla **kapanmaz** ve kapanmaya çalışılmadı. B-010 _yazma_ denetimi
+ister ("kim yazdı"); buradaki kayıt _silme_ denetimidir ve tam tersine "kim" bilgisini bilerek
+tutmaz. İki gereksinim zıt yönlüdür, aynı mekanizmayla çözülemez. **B-010 açık kalır.**
+
+### 7) Arayüz: çift onay
+
+1. **Niyet:** "Hesabımı Sil" düğmesi hiçbir şey silmez, yalnızca uyarı panelini açar. Yanlış
+   tıklamanın bedeli sıfırdır.
+2. **Yazarak doğrulama:** kullanıcı `HESABIMI SİL` cümlesini birebir yazmadan son düğme
+   etkinleşmez. Bu, "onaylıyor musunuz? [Evet]" tipi bir diyalogdan bilerek daha zordur; geri
+   dönüşü olmayan bir işlemde kas hafızasıyla tıklanabilen bir onay, onay değildir.
+
+Cümle **sunucuda tekrar doğrulanır** — arayüz doğrulaması yalnızca kazayı önler, kötü niyeti
+değil.
+
+**Türkçe İ/ı tuzağı:** cümle noktalı büyük İ (U+0130) içerir ve üzerinde hiçbir
+`toUpperCase()`/`toLowerCase()` çağrılmaz. JS'in katlaması Türkçe İ/ı eşlemesini bilmez ve
+kullanıcının ekranda gördüğü metni yazmasına rağmen reddedilmesine yol açardı (aynı tuzak
+`tests/e2e/fixtures.ts` ve `normalizeEmail`'de daha önce iki kez ısırdı). Karşılaştırma yalnızca
+`trim()` sonrası bayt bayt eşitliktir; giriş alanında `autoCapitalize`/`autoCorrect` kapalıdır.
+
+### 8) Kimlik doğrulama: cookie değil **Bearer**
+
+Uç, oturumu `Authorization: Bearer <access_token>` başlığından okur. `src/lib/supabase/server.ts`
+başındaki not bunu zaten karara bağlamıştı: cookie yalnızca depolama ortamıdır, kimlik doğrulama
+ortamı değil — cookie'ye dayanan bir uç CSRF yüzeyi açar. Tarayıcı üçüncü taraf bir sayfadan
+`Authorization` başlığı gönderemez; uygulamanın en yıkıcı ucu için doğru seçim budur. Aynı desen
+`/api/ai/*`'te zaten kullanılıyor.
+
+---
+
+## Kalan risk (dürüstçe kayda geçirilir)
+
+**Supabase erişim token'ı durumsuzdur:** imzası doğrulanır, veritabanına bakılmaz. Silme
+sonrasında `auth.sessions` ve `auth.refresh_tokens` `CASCADE` ile gider — yani oturum
+**yenilenemez** ve şifreyle yeniden giriş yapılamaz — ama elde duran access token `exp`ine kadar
+biçimsel olarak geçerli kalır. Supabase'de bir token kara listesi yoktur.
+
+Bunun **pratik etkisi ölçüldü ve sıfıra yakındır**, çünkü token'ın arkasında okunacak ya da
+yazılacak hiçbir şey kalmaz:
+
+- kendi satırlarının hepsi gitmiştir → RLS 0 satır döner,
+- yazma denemeleri `profiles` satırı olmadığı için FK/RLS ile reddedilir,
+- `/auth/v1/user` kullanıcıyı tanımaz,
+- token yenilenemez, yeniden giriş yapılamaz.
+
+Okunabilir kalan tek şey, `profiles_select` politikasının **tüm** authenticated kullanıcılara açtığı
+koç profil satırıdır (ADR-0010, bilinçli karar) — kişisel veri değil, uygulamanın kamuya açık
+kabul ettiği koç kartıdır.
+
+Azaltıcılar: `jwt_expiry = 900` (15 dk, `supabase/config.toml`) ve istemcinin silme sonrası
+`signOut()` + `queryClient.clear()` yapması. Bu artık risk **kabul edilmiştir**; kapatmanın tek
+yolu her istekte veritabanına bakan bir token kara listesi kurmaktır ve o, tüm uygulamanın okuma
+yoluna sabit bir maliyet ekler.
+
+İkinci artık risk: `storage.protect_delete()` yerinde bırakıldığı için, Storage API üç turda da
+başarısız olursa silme **tamamlanmaz** (fail-closed). Kullanıcı anlaşılır bir hata alır ve tekrar
+dener. Bu, yetim dosya bırakmaya tercih edilmiştir: KVKK açısından yetim bir vücut fotoğrafı,
+silinmemiş bir satır kadar ağır bir kusurdur.
+
+---
+
+## Reddedilen alternatifler
+
+**(A) Her şeyi route handler'da yapmak (`auth.admin.deleteUser()` + 14 tablo için ayrı
+`delete` çağrıları).** Reddedildi: HTTP istekleri transaksiyonel değildir. Ağ kopması ya da
+sekmenin kapanması, yarısı silinmiş bir hesap bırakırdı ve telafisi yazılamazdı — B-019'un
+(koç onay yolu) tam olarak bu sebeple atomikleştirildiği ders hâlâ tazedir.
+
+**(B) Her şeyi Postgres'te yapmak.** Reddedildi: fiziksel dosya SQL'den silinemez (ölçüm 3).
+`storage.allow_delete_query` kaçış kapısını kullanmak satırı silip baytı bırakırdı — platformun
+yasakladığı şeyi bilerek yapmak, hiçbir şey kazandırmadan yetim dosya riskini geri açardı.
+
+**(C) `SECURITY DEFINER` + `grant execute to authenticated`, gövdede `auth.uid()` kullanmak
+(`service_role`'e hiç dokunmamak).** Cazipti: "başkasının hesabını silemez" iddiası yapısal
+olurdu (parametre yok). Reddedildi çünkü fiziksel dosya sorununu **çözmüyor** ve danışanın kendi
+yetkisi koçun yüklediği ekleri silmeye yetmiyor (ölçüm 4). Ayrıca silmeyi tek bir RPC çağrısına
+indirger; onay cümlesi, hız sınırı ve denetim korelasyonu için sunucu katmanı yine gerekirdi.
+
+**(D) Yumuşak silme (soft delete: `profiles.deleted_at`, satırlar yerinde).** Reddedildi:
+KVKK/GDPR "unutulma hakkı" **gerçek** silme ister. Yumuşak silme veriyi yerinde tutar, yalnızca
+görünmez yapar; ilk denetimde kusur olarak döner. Ayrıca her okuma yoluna bir `where deleted_at
+is null` koşulu ekler ve unutulan tek bir sorgu sessiz bir sızıntıdır.
+
+**(E) Denetim satırında silinen kullanıcının uid'sini saklamak.** Reddedildi: takma adlı veri
+hâlâ kişisel veridir. "Hangi kullanıcıydı" sorusunun cevabı, tam da silinmesi istenen şeydir.
+İstatistik (rol + tablo başına sayı) hiçbir kişisel veri saklamadan aynı operasyonel soruyu
+cevaplıyor.
+
+**(F) 14 tablo için elle `delete` yazmak (cascade'e güvenmemek).** Reddedildi: yarın 15. tablo
+eklenip listeye yazılmazsa silme **sessizce** eksik kalırdı. Cascade zinciri şemanın kendisinden
+gelir. Güven yerine **ölçüm** konuldu: migration FK'lerin gerçekten `CASCADE` olduğunu doğrular ve
+`delete_account()` silme sonrası yeniden sayarak kalan satır varsa patlar.
+
+**(G) Kullanıcıya "verilerimi indir" (data export) adımı eklemek.** Bu turun kapsamı dışında
+bırakıldı — KVKK m.11 "erişim hakkı" ayrı bir gereksinimdir ve silme akışını bloklamamalıdır.
+Ayrı bir borç olarak açılması önerilir.
+
+---
+
+## Sonuçlar
+
+**Kazanımlar**
+
+- B-042 kapandı: danışan kendi hesabını arayüzden, çift onayla, geri dönüşsüz olarak silebiliyor.
+- Silme eksiksiz ve **kanıtlı**: 14 tablo + auth kullanıcısı + oturum/refresh token'ları +
+  fiziksel storage nesneleri. Eksiklik sessizce geçemez (silme sonrası sayım + `raise`).
+- Yarım silme şema seviyesinde imkânsız; idempotanslık sözleşmesi yazılı ve testli.
+- Denetim izi var ama kişisel veri yok — KVKK açısından ikinci bir kusur üretmiyor.
+
+**Bedeller**
+
+- Uygulama süreci artık `service_role` anahtarını okuyor. Yüzey iki fonksiyon + Storage API ile
+  sınırlı ve bu ADR'nin §3/§4'ü o sınırı yazılı hâle getiriyor, ama sınır **artık var**.
+  Bu yüzeye yeni bir uç eklenmesi bu ADR'nin güncellenmesini gerektirir.
+- CI'ın E2E job'ında `SUPABASE_SERVICE_ROLE_KEY` tanımlı olmadığı sürece (`supabase status -o env`
+  değişkeni `SERVICE_ROLE_KEY` adıyla veriyor) hesap silme spec'i **atlanır**. Spec sessizce yeşil
+  vermez; atlama gerekçesini raporlar.
+- Koç hesabı bu yoldan silinemiyor; koç için silme, elle yürütülen ayrı bir işlem olarak açık
+  kalıyor.
+- Access token'ın `exp`ine kadar biçimsel geçerliliği kabul edilen bir artık risktir
+  (bkz. "Kalan risk").

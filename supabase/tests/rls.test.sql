@@ -3934,6 +3934,22 @@ rollback;
 --   (d) YOL yerine TAM URL (I-4 ihlali)                          -> 23514
 -- =============================================================================
 begin;
+
+-- KURULUM (2026-08-19, B-028): (a) dalı artık YALNIZCA yol sözleşmesini değil,
+-- SUNUCU TARAFI MAGIC-BYTE DOĞRULAMASINI da geçmek zorunda
+-- (20260819110000_attachment_magic_byte_verification.sql). Nesne ve doğrulama
+-- damgası burada, `postgres` kimliğiyle üretilir — ölçülen şey yine rol taklidinden
+-- SONRAKİ INSERT'tir ("kendi kurulumunu yap" kuralı, dosya başı).
+insert into storage.objects (bucket_id, name, metadata)
+values ('message-attachments',
+        '22222222-2222-2222-2222-222222222222/22222222-2222-2222-2222-222222222222-aaaaaaaa-1111-2222-3333-444444444444.jpg',
+        jsonb_build_object('eTag', '"e89aaaa"', 'size', 68, 'mimetype', 'image/jpeg'));
+
+insert into public.message_attachment_verifications (bucket, path, mime, object_etag)
+values ('message-attachments',
+        '22222222-2222-2222-2222-222222222222/22222222-2222-2222-2222-222222222222-aaaaaaaa-1111-2222-3333-444444444444.jpg',
+        'image/jpeg', 'e89aaaa');
+
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
 do $$
@@ -6586,8 +6602,981 @@ rollback;
 
 
 -- =============================================================================
+-- HESAP SILME (KVKK) — 119) *** TAM SÜPÜRME KANITI *** — B-042'nin ÖZÜ
+--
+-- ############################################################################
+-- # ÖLÇÜLEN ŞEY                                                              #
+-- # `delete_account()` çağrıldıktan sonra silinen kullanıcıya ait satır 14    #
+-- # TABLONUN HİÇBİRİNDE KALMAMALI. Sayım TABLO TABLO yapılır; toplam bir      #
+-- # `row_total = 0` iddiası, listeden düşmüş bir tabloyu yakalayamazdı.       #
+-- #                                                                          #
+-- # Fikstür KENDİ İŞLEMİNDE üretilir (paket kuralı, dosya başlığı): iki taze  #
+-- # kullanıcı açılır, birine 14 tablonun tamamına dokunan veri yazılır.       #
+-- # Seed satırlarına DOKUNULMAZ.                                              #
+-- #                                                                          #
+-- # AYRICA ÖLÇÜLÜR — STORAGE KAPISI FAIL-CLOSED:                              #
+-- # Storage nesnesi DURURKEN yapılan çağrı REDDEDİLİR ve HİÇBİR ŞEY silinmez  #
+-- # (yarım silme imkânsız). Ancak nesne Storage API ile gittikten sonra silme  #
+-- # geçer. Bu, "önce dosyalar, sonra veritabanı" sözleşmesinin (ADR-0025)      #
+-- # şema seviyesindeki dayatmasıdır.                                          #
+-- ############################################################################
+-- =============================================================================
+begin;
+
+-- --- KURULUM (postgres kimliğiyle; rol taklidi HENÜZ YOK) --------------------
+insert into auth.users (
+  instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
+  raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
+  confirmation_token, email_change, email_change_token_new, recovery_token
+)
+values
+  ('00000000-0000-0000-0000-000000000000', 'c0000000-0000-0000-0000-000000000119',
+   'authenticated', 'authenticated', 'zz-119-silinecek@example.com', 'x', now(),
+   '{"provider":"email","providers":["email"]}'::jsonb, '{"full_name":"zz-119 Silinecek"}'::jsonb,
+   now(), now(), '', '', '', ''),
+  ('00000000-0000-0000-0000-000000000000', 'c0000000-0000-0000-0000-000000000120',
+   'authenticated', 'authenticated', 'zz-119-taniksiz@example.com', 'x', now(),
+   '{"provider":"email","providers":["email"]}'::jsonb, '{"full_name":"zz-119 Tanik"}'::jsonb,
+   now(), now(), '', '', '', '');
+
+-- Silinecek kullanıcının 14 tablodaki izi.
+insert into public.notifications (client_id, message)
+  values ('c0000000-0000-0000-0000-000000000119', 'zz-119 bildirim');
+insert into public.messages (client_id, sender_id, receiver_id, message)
+  values ('c0000000-0000-0000-0000-000000000119', 'c0000000-0000-0000-0000-000000000119',
+          '11111111-1111-1111-1111-111111111111', 'zz-119 danisandan koca');
+-- Koçun DANIŞANA yazdığı mesaj da gitmeli (konuşmanın tamamı silinir).
+insert into public.messages (client_id, sender_id, receiver_id, message)
+  values ('c0000000-0000-0000-0000-000000000119', '11111111-1111-1111-1111-111111111111',
+          'c0000000-0000-0000-0000-000000000119', 'zz-119 koctan danisana');
+insert into public.form_checks (client_id, current_weight, notes)
+  values ('c0000000-0000-0000-0000-000000000119', 80.5, 'zz-119 form check');
+insert into public.daily_logs (client_id, log_date, water_lt)
+  values ('c0000000-0000-0000-0000-000000000119', current_date, 2.5);
+insert into public.workout_logs (client_id, exercise_name, weight_kg, reps)
+  values ('c0000000-0000-0000-0000-000000000119', 'zz-119 squat', 100, 5);
+insert into public.nutrition_logs (client_id, description, kcal)
+  values ('c0000000-0000-0000-0000-000000000119', 'zz-119 ogun', 500);
+insert into public.program_approvals (client_id, workout_data)
+  values ('c0000000-0000-0000-0000-000000000119', '{"Pazartesi":"zz-119"}'::jsonb);
+insert into public.workout_plans (id, client_id, version, is_active)
+  values ('d0000000-0000-0000-0000-000000000119', 'c0000000-0000-0000-0000-000000000119', 1, true);
+insert into public.workout_plan_exercises (plan_id, day, position, raw_line)
+  values ('d0000000-0000-0000-0000-000000000119', 'Pazartesi', 1, '1. zz-119 hareket');
+insert into public.nutrition_plans (id, client_id, version, is_active)
+  values ('e0000000-0000-0000-0000-000000000119', 'c0000000-0000-0000-0000-000000000119', 1, true);
+insert into public.nutrition_plan_meals (plan_id, day, position, description)
+  values ('e0000000-0000-0000-0000-000000000119', 'Pazartesi', 1, 'zz-119 ogun');
+insert into public.progress_entries (client_id, entry_date, weight_kg)
+  values ('c0000000-0000-0000-0000-000000000119', current_date - 1, 81);
+insert into public.progress_photos (client_id, taken_on, angle, photo_path)
+  values ('c0000000-0000-0000-0000-000000000119', current_date, 'front',
+          'c0000000-0000-0000-0000-000000000119/f0000000-0000-0000-0000-000000000119.png');
+insert into storage.objects (bucket_id, name, owner_id)
+  values ('avatars', 'c0000000-0000-0000-0000-000000000119-zz.png',
+          'c0000000-0000-0000-0000-000000000119');
+
+-- Tanık kullanıcının verisi (senaryo 120 bunu ölçer; burada da kurulur ki
+-- silme sırasında yanlışlıkla süpürülüp süpürülmediği aynı işlemde görülsün).
+insert into public.notifications (client_id, message)
+  values ('c0000000-0000-0000-0000-000000000120', 'zz-119 tanik bildirim');
+insert into public.progress_entries (client_id, entry_date, weight_kg)
+  values ('c0000000-0000-0000-0000-000000000120', current_date, 70);
+
+-- --- (a) STORAGE KAPISI: nesne dururken silme REDDEDİLMELİ ------------------
+set local role service_role;
+do $$
+declare
+  v_caught boolean := false;
+  v_state  text;
+begin
+  begin
+    perform public.delete_account('c0000000-0000-0000-0000-000000000119'::uuid);
+  exception when others then
+    v_caught := true;
+    get stacked diagnostics v_state = returned_sqlstate;
+  end;
+
+  if not v_caught then
+    raise exception 'BASARISIZ [119 storage kapisi]: storage nesnesi DURURKEN silme GECTI -- fiziksel dosya yetim kalirdi';
+  end if;
+  if v_state is distinct from 'P0001' then
+    raise exception 'BASARISIZ [119 storage kapisi hata kodu]: beklenen P0001, gelen %', v_state;
+  end if;
+end $$;
+reset role;
+
+-- Reddedilen çağrıdan HİÇBİR yan etki kalmamalı: kullanıcı hâlâ yerinde.
+do $$
+begin
+  if not exists (select 1 from auth.users where id = 'c0000000-0000-0000-0000-000000000119') then
+    raise exception 'BASARISIZ [119 ATOMIKLIK]: reddedilen cagri auth kullanicisini YINE DE sildi';
+  end if;
+  if (select count(*) from public.notifications where client_id = 'c0000000-0000-0000-0000-000000000119') <> 1 then
+    raise exception 'BASARISIZ [119 ATOMIKLIK]: reddedilen cagri tablo satirlarini YINE DE sildi';
+  end if;
+end $$;
+
+-- --- (b) Storage API taklidi: fiziksel dosya (ve satırı) gider --------------
+--     Gerçek akışta bunu sunucu yolu `admin.storage.from(b).remove(paths)` ile
+--     yapar. SQL'den doğrudan `delete from storage.objects` PLATFORM TARAFINDAN
+--     YASAKTIR (`storage.protect_delete()`); testte kaçış kapısı AÇIKÇA açılır,
+--     çünkü ölçülmek istenen şey Storage API değil, ONDAN SONRAKİ davranıştır.
+set local storage.allow_delete_query = 'true';
+delete from storage.objects where owner_id = 'c0000000-0000-0000-0000-000000000119';
+reset storage.allow_delete_query;
+
+-- --- (c) ASIL SİLME --------------------------------------------------------
+set local role service_role;
+do $$
+declare
+  v_result jsonb;
+begin
+  v_result := public.delete_account(
+    'c0000000-0000-0000-0000-000000000119'::uuid,
+    'a0000000-0000-0000-0000-000000000119'::uuid,   -- request_id (korelasyon)
+    1                                               -- Storage API'nin sildigi nesne sayisi
+  );
+
+  if (v_result ->> 'already_deleted')::boolean then
+    raise exception 'BASARISIZ [119]: var olan kullanici icin already_deleted=true dondu';
+  end if;
+  if (v_result ->> 'row_total')::bigint <= 0 then
+    raise exception 'BASARISIZ [119]: row_total=% -- fikstur yazilmamis olabilir', v_result ->> 'row_total';
+  end if;
+end $$;
+reset role;
+
+-- --- (d) TABLO TABLO SAYIM: hepsi 0 olmalı ---------------------------------
+do $$
+declare
+  v_uid  constant uuid := 'c0000000-0000-0000-0000-000000000119';
+  v_left text;
+  v_n    bigint;
+begin
+  if exists (select 1 from auth.users where id = v_uid) then
+    raise exception 'BASARISIZ [119 auth]: auth.users satiri KALDI';
+  end if;
+
+  v_left := '';
+  select count(*) into v_n from public.profiles               where id        = v_uid;                 if v_n > 0 then v_left := v_left || format('profiles=%s ', v_n); end if;
+  select count(*) into v_n from public.notifications          where client_id = v_uid;                 if v_n > 0 then v_left := v_left || format('notifications=%s ', v_n); end if;
+  select count(*) into v_n from public.messages               where client_id = v_uid or sender_id = v_uid or receiver_id = v_uid;
+                                                                                                       if v_n > 0 then v_left := v_left || format('messages=%s ', v_n); end if;
+  select count(*) into v_n from public.form_checks            where client_id = v_uid;                 if v_n > 0 then v_left := v_left || format('form_checks=%s ', v_n); end if;
+  select count(*) into v_n from public.daily_logs             where client_id = v_uid;                 if v_n > 0 then v_left := v_left || format('daily_logs=%s ', v_n); end if;
+  select count(*) into v_n from public.workout_logs           where client_id = v_uid;                 if v_n > 0 then v_left := v_left || format('workout_logs=%s ', v_n); end if;
+  select count(*) into v_n from public.nutrition_logs         where client_id = v_uid;                 if v_n > 0 then v_left := v_left || format('nutrition_logs=%s ', v_n); end if;
+  select count(*) into v_n from public.program_approvals      where client_id = v_uid;                 if v_n > 0 then v_left := v_left || format('program_approvals=%s ', v_n); end if;
+  select count(*) into v_n from public.workout_plans          where client_id = v_uid;                 if v_n > 0 then v_left := v_left || format('workout_plans=%s ', v_n); end if;
+  select count(*) into v_n from public.workout_plan_exercises where plan_id = 'd0000000-0000-0000-0000-000000000119';
+                                                                                                       if v_n > 0 then v_left := v_left || format('workout_plan_exercises=%s ', v_n); end if;
+  select count(*) into v_n from public.nutrition_plans        where client_id = v_uid;                 if v_n > 0 then v_left := v_left || format('nutrition_plans=%s ', v_n); end if;
+  select count(*) into v_n from public.nutrition_plan_meals   where plan_id = 'e0000000-0000-0000-0000-000000000119';
+                                                                                                       if v_n > 0 then v_left := v_left || format('nutrition_plan_meals=%s ', v_n); end if;
+  select count(*) into v_n from public.progress_entries       where client_id = v_uid;                 if v_n > 0 then v_left := v_left || format('progress_entries=%s ', v_n); end if;
+  select count(*) into v_n from public.progress_photos        where client_id = v_uid;                 if v_n > 0 then v_left := v_left || format('progress_photos=%s ', v_n); end if;
+  select count(*) into v_n from storage.objects               where owner_id  = v_uid::text;           if v_n > 0 then v_left := v_left || format('storage.objects=%s ', v_n); end if;
+
+  if v_left <> '' then
+    raise exception 'BASARISIZ [119 EKSIK SILME]: geriye satir kaldi -> %', v_left;
+  end if;
+
+  raise notice 'GECTI [119 TAM SUPURME: 14 tablo + auth kullanicisi + storage kapisi; fail-closed reddin yan etkisi YOK]';
+end $$;
+
+-- --- (e) DENETİM SATIRI: yazıldı, kişisel veri YOK -------------------------
+do $$
+declare
+  v_role    public.user_role;
+  v_rows    jsonb;
+  v_storage integer;
+  v_req     uuid;
+  v_n       int;
+begin
+  select count(*) into v_n from public.account_deletions
+   where request_id = 'a0000000-0000-0000-0000-000000000119';
+  if v_n <> 1 then
+    raise exception 'BASARISIZ [119 denetim]: beklenen 1 denetim satiri, gelen %', v_n;
+  end if;
+
+  select subject_role, rows_deleted, storage_objects_deleted, request_id
+    into v_role, v_rows, v_storage, v_req
+    from public.account_deletions
+   where request_id = 'a0000000-0000-0000-0000-000000000119';
+
+  if v_role is distinct from 'client'::public.user_role then
+    raise exception 'BASARISIZ [119 denetim rol]: beklenen client, gelen %', v_role;
+  end if;
+  if (v_rows ->> 'notifications')::int <> 1 then
+    raise exception 'BASARISIZ [119 denetim sayim]: notifications=% (beklenen 1)', v_rows ->> 'notifications';
+  end if;
+  if (v_rows ->> 'messages')::int <> 2 then
+    raise exception 'BASARISIZ [119 denetim sayim]: messages=% (beklenen 2 -- koctan gelen mesaj da sayilmali)', v_rows ->> 'messages';
+  end if;
+  if v_storage <> 1 then
+    raise exception 'BASARISIZ [119 denetim storage]: beklenen 1, gelen %', v_storage;
+  end if;
+
+  -- KİŞİSEL VERİ SIZINTISI KONTROLÜ: denetim satırının HİÇBİR alanı silinen
+  -- kullanıcının uid'sini ya da e-postasını İÇERMEMELİ.
+  if (select account_deletions::text from public.account_deletions
+       where request_id = 'a0000000-0000-0000-0000-000000000119') like '%c0000000-0000-0000-0000-000000000119%' then
+    raise exception 'BASARISIZ [119 KISISEL VERI]: denetim satiri silinen kullanicinin uid sini TASIYOR';
+  end if;
+  if (select account_deletions::text from public.account_deletions
+       where request_id = 'a0000000-0000-0000-0000-000000000119') like '%zz-119-silinecek@example.com%' then
+    raise exception 'BASARISIZ [119 KISISEL VERI]: denetim satiri silinen kullanicinin E-POSTASINI TASIYOR';
+  end if;
+
+  raise notice 'GECTI [119 denetim satiri yazildi: rol + tablo bazli sayim + storage sayisi + request_id; uid/e-posta YOK]';
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- HESAP SILME (KVKK) — 120) BAŞKA KULLANICININ VERİSİ ETKİLENMEZ
+--
+-- Silme "her şeyi süpüren" bir işlemdir; en tehlikeli kusuru fazla silmesidir.
+-- Bu senaryo silmeden ÖNCE ve SONRA hem TANIK KULLANICININ hem de TÜM SEED
+-- verisinin sayımlarını alır ve tek bir satırın bile kaybolmadığını ölçer.
+-- Sayımlar KODA GÖMÜLMEZ (aynı işlemde ölçülür): E2E koşusu ya da elle kullanım
+-- veritabanını büyütmüş olsa da test geçerli kalır.
+-- =============================================================================
+begin;
+
+insert into auth.users (
+  instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
+  raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
+  confirmation_token, email_change, email_change_token_new, recovery_token
+)
+values
+  ('00000000-0000-0000-0000-000000000000', 'c0000000-0000-0000-0000-000000000121',
+   'authenticated', 'authenticated', 'zz-120-silinecek@example.com', 'x', now(),
+   '{"provider":"email","providers":["email"]}'::jsonb, '{"full_name":"zz-120 Silinecek"}'::jsonb,
+   now(), now(), '', '', '', ''),
+  ('00000000-0000-0000-0000-000000000000', 'c0000000-0000-0000-0000-000000000122',
+   'authenticated', 'authenticated', 'zz-120-tanik@example.com', 'x', now(),
+   '{"provider":"email","providers":["email"]}'::jsonb, '{"full_name":"zz-120 Tanik"}'::jsonb,
+   now(), now(), '', '', '', '');
+
+insert into public.notifications (client_id, message) values
+  ('c0000000-0000-0000-0000-000000000121', 'zz-120 silinecek bildirim'),
+  ('c0000000-0000-0000-0000-000000000122', 'zz-120 tanik bildirim');
+insert into public.workout_logs (client_id, exercise_name, reps) values
+  ('c0000000-0000-0000-0000-000000000121', 'zz-120 silinecek', 5),
+  ('c0000000-0000-0000-0000-000000000122', 'zz-120 tanik', 5);
+insert into public.messages (client_id, sender_id, receiver_id, message) values
+  ('c0000000-0000-0000-0000-000000000122', 'c0000000-0000-0000-0000-000000000122',
+   '11111111-1111-1111-1111-111111111111', 'zz-120 tanik mesaji');
+
+create temp table zz_base_120 as
+select
+  (select count(*) from public.profiles)                                                as n_profiles,
+  (select count(*) from public.notifications)                                           as n_notifications,
+  (select count(*) from public.messages)                                                as n_messages,
+  (select count(*) from public.workout_logs)                                            as n_workout_logs,
+  (select count(*) from public.progress_entries)                                        as n_progress_entries,
+  (select count(*) from auth.users)                                                     as n_users,
+  (select count(*) from public.notifications where client_id = 'c0000000-0000-0000-0000-000000000121') as n_target_notif;
+
+set local role service_role;
+do $$
+begin
+  perform public.delete_account('c0000000-0000-0000-0000-000000000121'::uuid,
+                                'a0000000-0000-0000-0000-000000000120'::uuid, 0);
+end $$;
+reset role;
+
+do $$
+declare
+  v_base zz_base_120;
+  v_n    bigint;
+begin
+  select * into v_base from zz_base_120;
+
+  -- Silinen kullanıcı: -1 profil, -1 auth kullanıcısı, -1 bildirim, -1 log.
+  select count(*) into v_n from public.profiles;
+  if v_n is distinct from v_base.n_profiles - 1 then
+    raise exception 'BASARISIZ [120 profiles]: % -> % (beklenen -1)', v_base.n_profiles, v_n;
+  end if;
+  select count(*) into v_n from auth.users;
+  if v_n is distinct from v_base.n_users - 1 then
+    raise exception 'BASARISIZ [120 auth.users]: % -> % (beklenen -1)', v_base.n_users, v_n;
+  end if;
+  select count(*) into v_n from public.notifications;
+  if v_n is distinct from v_base.n_notifications - v_base.n_target_notif then
+    raise exception 'BASARISIZ [120 notifications]: % -> % (beklenen -%)', v_base.n_notifications, v_n, v_base.n_target_notif;
+  end if;
+  select count(*) into v_n from public.workout_logs;
+  if v_n is distinct from v_base.n_workout_logs - 1 then
+    raise exception 'BASARISIZ [120 workout_logs]: % -> % (beklenen -1)', v_base.n_workout_logs, v_n;
+  end if;
+
+  -- TANIĞIN verisi BİREBİR durmalı.
+  if (select count(*) from public.profiles where id = 'c0000000-0000-0000-0000-000000000122') <> 1 then
+    raise exception 'BASARISIZ [120 TANIK]: tanik kullanicinin PROFILI silindi -- fazla silme!';
+  end if;
+  if (select count(*) from public.notifications where client_id = 'c0000000-0000-0000-0000-000000000122') <> 1 then
+    raise exception 'BASARISIZ [120 TANIK]: tanik kullanicinin bildirimi silindi';
+  end if;
+  if (select count(*) from public.workout_logs where client_id = 'c0000000-0000-0000-0000-000000000122') <> 1 then
+    raise exception 'BASARISIZ [120 TANIK]: tanik kullanicinin antrenman logu silindi';
+  end if;
+  if (select count(*) from public.messages where client_id = 'c0000000-0000-0000-0000-000000000122') <> 1 then
+    raise exception 'BASARISIZ [120 TANIK]: tanik kullanicinin mesaji silindi';
+  end if;
+
+  -- SEED verisi de yerinde: koç ve iki seed danışanı.
+  if (select count(*) from public.profiles
+       where id in ('11111111-1111-1111-1111-111111111111',
+                    '22222222-2222-2222-2222-222222222222',
+                    '33333333-3333-3333-3333-333333333333')) <> 3 then
+    raise exception 'BASARISIZ [120 SEED]: seed profillerinden biri silindi -- KATASTROFIK fazla silme';
+  end if;
+
+  -- Katalog tablolarına HİÇ dokunulmamalı (silme onlari kapsamaz).
+  if (select count(*) from public.exercises) = 0 then
+    raise exception 'BASARISIZ [120 KATALOG]: exercises bosaldi';
+  end if;
+
+  raise notice 'GECTI [120 IZOLASYON: silme yalnizca hedefi kapsar; tanik kullanici, seed profilleri ve katalog ETKILENMEZ]';
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- HESAP SILME (KVKK) — 121) IDEMPOTANSLIK: İKİNCİ ÇAĞRI HATA ÜRETMEZ (AC-4.6.1)
+--
+-- Sözleşme: `delete_account()` var olmayan bir kullanıcı için `raise` ETMEZ;
+-- `already_deleted: true` + sıfır sayımla döner ve İKİNCİ BİR DENETİM SATIRI
+-- YAZMAZ (yazsaydı "kaç hesap silindi" istatistiği yeniden denemelerle şişerdi).
+-- Ağ kopmasında/yeniden denemede güvenli tekrar edilebilirlik buna dayanır.
+-- =============================================================================
+begin;
+
+insert into auth.users (
+  instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
+  raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
+  confirmation_token, email_change, email_change_token_new, recovery_token
+)
+values ('00000000-0000-0000-0000-000000000000', 'c0000000-0000-0000-0000-000000000123',
+   'authenticated', 'authenticated', 'zz-121@example.com', 'x', now(),
+   '{"provider":"email","providers":["email"]}'::jsonb, '{"full_name":"zz-121"}'::jsonb,
+   now(), now(), '', '', '', '');
+insert into public.notifications (client_id, message)
+  values ('c0000000-0000-0000-0000-000000000123', 'zz-121 bildirim');
+
+set local role service_role;
+do $$
+declare
+  v_first  jsonb;
+  v_second jsonb;
+  v_third  jsonb;
+begin
+  v_first := public.delete_account('c0000000-0000-0000-0000-000000000123'::uuid,
+                                   'a0000000-0000-0000-0000-000000000121'::uuid, 0);
+  if (v_first ->> 'already_deleted')::boolean then
+    raise exception 'BASARISIZ [121]: ILK cagri already_deleted=true dondu';
+  end if;
+
+  -- İKİNCİ çağrı: hata YOK.
+  v_second := public.delete_account('c0000000-0000-0000-0000-000000000123'::uuid,
+                                    'a0000000-0000-0000-0000-000000000122'::uuid, 0);
+  if not (v_second ->> 'already_deleted')::boolean then
+    raise exception 'BASARISIZ [121]: IKINCI cagri already_deleted=false dondu';
+  end if;
+  if (v_second ->> 'row_total')::bigint <> 0 then
+    raise exception 'BASARISIZ [121]: IKINCI cagri row_total=% dondu (beklenen 0)', v_second ->> 'row_total';
+  end if;
+
+  -- ÜÇÜNCÜ çağrı (hiç var olmamış bir uid) da hata üretmemeli.
+  v_third := public.delete_account('c0000000-0000-0000-0000-000000000199'::uuid);
+  if not (v_third ->> 'already_deleted')::boolean then
+    raise exception 'BASARISIZ [121]: hic var olmamis uid icin already_deleted=false dondu';
+  end if;
+end $$;
+reset role;
+
+-- Denetim satırı sayımı `postgres` kimliğiyle yapılır: `service_role`ün
+-- `account_deletions` üzerinde DOĞRUDAN tablo yetkisi YOKTUR (bilinçli — bkz.
+-- migration §1 ve senaryo 123). Tabloya tek yazan, SECURITY DEFINER olan
+-- `delete_account()`tir.
+do $$
+declare
+  v_audit int;
+begin
+  select count(*) into v_audit from public.account_deletions
+   where request_id in ('a0000000-0000-0000-0000-000000000121',
+                        'a0000000-0000-0000-0000-000000000122');
+  if v_audit <> 1 then
+    raise exception 'BASARISIZ [121 denetim]: % denetim satiri yazildi (beklenen 1) -- tekrar cagrilar istatistigi sisiriyor', v_audit;
+  end if;
+
+  raise notice 'GECTI [121 IDEMPOTANSLIK: ikinci/ucuncu cagri hata uretmez, already_deleted=true doner, ikinci denetim satiri YAZILMAZ]';
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- HESAP SILME (KVKK) — 122) DANIŞAN BAŞKASININ (VE KENDİ) HESABINI SQL'DEN
+-- SİLEMEZ
+--
+-- ############################################################################
+-- # "Danisan baskasinin hesabini silemez" iddiasinin dayanagi bir RLS         #
+-- # POLITIKASI DEGIL, EXECUTE YETKISIDIR: `delete_account` ve                  #
+-- # `account_deletion_manifest` YALNIZCA `service_role`e verilmistir.          #
+-- # Yani danisan fonksiyonu HIC CAGIRAMAZ -- ne baskasi ne de KENDISI icin.    #
+-- # Tek mesru yol sunucu ucudur ve o uc silinecek uid'yi GOVDEDEN DEGIL,       #
+-- # dogrulanmis Bearer token'dan alir.                                         #
+-- #                                                                           #
+-- # Ayrica `auth.users`a DOGRUDAN DELETE de kapalidir (yetki yok) -- yani      #
+-- # RPC'yi atlayip ayni sonuca ulasmanin SQL tarafinda bir yolu yoktur.        #
+-- ############################################################################
+-- =============================================================================
+begin;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+do $$
+declare
+  v_caught boolean;
+  v_state  text;
+begin
+  -- (a) BAŞKASININ hesabı
+  v_caught := false;
+  begin
+    perform public.delete_account('33333333-3333-3333-3333-333333333333'::uuid);
+  exception when insufficient_privilege then
+    v_caught := true;
+    get stacked diagnostics v_state = returned_sqlstate;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [122a]: danisan BASKASININ hesabini silebildi -- KATASTROFIK';
+  end if;
+  if v_state is distinct from '42501' then
+    raise exception 'BASARISIZ [122a hata kodu]: beklenen 42501, gelen %', v_state;
+  end if;
+
+  -- (b) KENDİ hesabı da SQL'den silinemez (tek yol sunucu ucudur)
+  v_caught := false;
+  begin
+    perform public.delete_account('22222222-2222-2222-2222-222222222222'::uuid);
+  exception when insufficient_privilege then
+    v_caught := true;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [122b]: danisan RPC yi dogrudan cagirabildi -- sunucu ucundaki onay adimi ATLANABILIR';
+  end if;
+
+  -- (c) MANIFEST de kapalı: baskasinin veri hacmi sayilamaz
+  v_caught := false;
+  begin
+    perform public.account_deletion_manifest('33333333-3333-3333-3333-333333333333'::uuid);
+  exception when insufficient_privilege then
+    v_caught := true;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [122c]: danisan baskasinin manifestosunu okuyabildi (kac mesaji/fotografi oldugu sizar)';
+  end if;
+
+  -- (d) `auth.users`a DOGRUDAN DELETE de kapali olmali
+  v_caught := false;
+  begin
+    execute 'delete from auth.users where id = ''33333333-3333-3333-3333-333333333333''';
+  exception when insufficient_privilege then
+    v_caught := true;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [122d]: authenticated auth.users tan DOGRUDAN satir silebildi';
+  end if;
+
+  raise notice 'GECTI [122 danisan ne baskasinin ne kendi hesabini SQL den silebilir; manifest ve auth.users DELETE de kapali]';
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- HESAP SILME (KVKK) — 123) DENETİM TABLOSU KİLİTLİ VE KİŞİSEL VERİ TAŞIMAZ
+--
+-- İki ayrı iddia:
+--   (a) KOLON SÖZLEŞMESİ: `account_deletions` yalnızca beklenen 6 kolonu taşır.
+--       Biri ileride "hangi kullanıcıydı" diye bir `user_id`/`email` kolonu
+--       eklerse AC-4.6.2 sessizce ihlal edilir; bu senaryo o eklemeyi yakalar.
+--   (b) ERİŞİM: `authenticated` (koç dahil) tabloyu OKUYAMAZ ve YAZAMAZ.
+--       Kilit ACL'de değil RLS'tedir (grant var, politika YOK — gerekçe
+--       migration §1'de), o yüzden dört işlemin dördü de ölçülür.
+-- =============================================================================
+begin;
+do $$
+declare
+  v_cols text;
+begin
+  select string_agg(column_name, ',' order by column_name) into v_cols
+    from information_schema.columns
+   where table_schema = 'public' and table_name = 'account_deletions';
+
+  if v_cols is distinct from 'deleted_at,id,request_id,rows_deleted,storage_objects_deleted,subject_role' then
+    raise exception 'BASARISIZ [123 KOLON SOZLESMESI]: account_deletions kolonlari degismis -> % . Yeni bir kolon KISISEL VERI tasiyorsa AC-4.6.2 ihlal edilir; degisiklik bilincliyse bu senaryo ve ADR-0025 guncellenmelidir.', v_cols;
+  end if;
+
+  if (select count(*) from pg_policies where schemaname = 'public' and tablename = 'account_deletions') <> 0 then
+    raise exception 'BASARISIZ [123 POLITIKA]: account_deletions uzerine politika eklenmis -- denetim kaydi authenticated a acilmis olabilir';
+  end if;
+
+  -- `service_role`un DOGRUDAN tablo yetkisi de YOKTUR: tabloya tek yazan,
+  -- SECURITY DEFINER olan `delete_account()`tir. Boylece denetim kaydi
+  -- PostgREST uzerinden HICBIR rol tarafindan okunamaz/yazilamaz -- silinen
+  -- kayitlarin istatistigi yalnizca dogrudan veritabani erisimiyle gorulur.
+  if has_table_privilege('service_role', 'public.account_deletions', 'SELECT')
+     or has_table_privilege('service_role', 'public.account_deletions', 'INSERT')
+     or has_table_privilege('service_role', 'public.account_deletions', 'UPDATE')
+     or has_table_privilege('service_role', 'public.account_deletions', 'DELETE') then
+    raise exception 'BASARISIZ [123 service_role]: denetim tablosu service_role a DOGRUDAN acilmis -- PostgREST uzerinden okunabilir/yazilabilir hale gelmis';
+  end if;
+end $$;
+
+-- Kurulum: okunacak bir satır OLSUN ki "0 satır göründü" iddiası boş bir yeşil olmasın.
+insert into public.account_deletions (subject_role, rows_deleted, storage_objects_deleted, request_id)
+values ('client', '{"profiles":1}'::jsonb, 0, 'a0000000-0000-0000-0000-000000000123');
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+do $$
+declare
+  v_n      bigint;
+  v_caught boolean;
+  v_rows   int;
+begin
+  -- (b1) KOÇ bile HİÇBİR satır göremez.
+  select count(*) into v_n from public.account_deletions;
+  if v_n <> 0 then
+    raise exception 'BASARISIZ [123 SELECT]: koc denetim kaydinda % satir gordu (beklenen 0)', v_n;
+  end if;
+
+  -- (b2) INSERT reddedilmeli (RLS ihlali -> 42501).
+  v_caught := false;
+  begin
+    insert into public.account_deletions (subject_role) values ('client');
+  exception when insufficient_privilege then
+    v_caught := true;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [123 INSERT]: authenticated denetim kaydina satir YAZABILDI -- sahte silme kaydi uretilebilir';
+  end if;
+
+  -- (b3) UPDATE / DELETE: politika olmadigi icin HICBIR SATIRA ULASAMAZ
+  --      (42501 degil, 0 satir -- RLS gorunurluk katmani zaten bosaltiyor).
+  update public.account_deletions set storage_objects_deleted = 999;
+  get diagnostics v_rows = row_count;
+  if v_rows <> 0 then
+    raise exception 'BASARISIZ [123 UPDATE]: authenticated % denetim satirini GUNCELLEDI', v_rows;
+  end if;
+
+  delete from public.account_deletions;
+  get diagnostics v_rows = row_count;
+  if v_rows <> 0 then
+    raise exception 'BASARISIZ [123 DELETE]: authenticated % denetim satirini SILDI -- denetim izi silinebilir', v_rows;
+  end if;
+
+  raise notice 'GECTI [123 denetim tablosu: 6 kolonluk sozlesme korunuyor, kisisel veri kolonu YOK; authenticated okuyamaz/yazamaz/silemez]';
+end $$;
+reset role;
+
+-- Satır GERÇEKTEN yerinde mi (yani UPDATE/DELETE'i RLS mi engelledi, yoksa
+-- satır hiç var mıydı) — pozitif kontrol.
+do $$
+begin
+  if (select storage_objects_deleted from public.account_deletions
+       where request_id = 'a0000000-0000-0000-0000-000000000123') <> 0 then
+    raise exception 'BASARISIZ [123 POZITIF]: denetim satiri authenticated tarafindan DEGISTIRILMIS';
+  end if;
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- HESAP SILME (KVKK) — 124) YETKİ YÜZEYİ SÜRÜKLENME TESTİ + KOÇ KAPISI
+--
+-- Senaryo 118 ile aynı felsefe: yeni yazma yüzeyi eklendiğinde sertleştirme
+-- kuralları TAHMİN edilmez, ÖLÇÜLÜR.
+--   * `prosecdef = true`  -> SECURITY DEFINER (auth.users silmek icin ZORUNLU)
+--   * `search_path` PİNLİ -> arama yolu ele gecirmesine kapali
+--   * EXECUTE: yalnizca `service_role`; authenticated/anon/PUBLIC YOK
+--   * KOÇ KAPISI: `service_role` ile bile bir KOÇ hesabi silinemez (ADR-0007)
+-- =============================================================================
+begin;
+do $$
+declare
+  v_secdef boolean;
+  v_config text[];
+  v_fn     text;
+  v_sig    text;
+begin
+  foreach v_fn in array array['account_deletion_manifest', 'delete_account'] loop
+    v_sig := case v_fn
+               when 'delete_account' then 'public.delete_account(uuid, uuid, integer)'
+               else 'public.account_deletion_manifest(uuid)'
+             end;
+
+    select p.prosecdef, p.proconfig into v_secdef, v_config
+      from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public' and p.proname = v_fn;
+
+    if v_secdef is null then
+      raise exception 'BASARISIZ [124]: public.% YOK -- hesap silme ucu PGRST202 alir', v_fn;
+    end if;
+    if not v_secdef then
+      raise exception 'BASARISIZ [124 SECURITY / %]: SECURITY INVOKER olmus -- auth.users silinemez, KVKK akisi olu', v_fn;
+    end if;
+    if v_config is null or not (v_config @> array['search_path=public, pg_temp']) then
+      raise exception 'BASARISIZ [124 search_path / %]: arama yolu pinlenmemis (%)', v_fn, v_config;
+    end if;
+
+    if has_function_privilege('authenticated', v_sig, 'EXECUTE') then
+      raise exception 'BASARISIZ [124 grant / %]: AUTHENTICATED rolune ACIK -- danisan sunucu ucundaki onayi ATLAYABILIR', v_fn;
+    end if;
+    if has_function_privilege('anon', v_sig, 'EXECUTE') then
+      raise exception 'BASARISIZ [124 grant / %]: ANON rolune ACIK', v_fn;
+    end if;
+    if not has_function_privilege('service_role', v_sig, 'EXECUTE') then
+      raise exception 'BASARISIZ [124 grant / %]: service_role CALISTIRAMIYOR -- sunucu yolu kirilir', v_fn;
+    end if;
+  end loop;
+
+  if exists (
+    select 1
+      from pg_proc p
+      join pg_namespace n on n.oid = p.pronamespace,
+           lateral aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a
+     where n.nspname = 'public'
+       and p.proname in ('delete_account', 'account_deletion_manifest')
+       and a.grantee = 0                       -- PUBLIC
+       and a.privilege_type = 'EXECUTE'
+  ) then
+    raise exception 'BASARISIZ [124 grant]: silme fonksiyonlari PUBLIC a ACIK (revoke all ... from public dusmus)';
+  end if;
+end $$;
+
+-- KOÇ KAPISI: kendi kocumuzu uretip service_role ile silmeyi DENERIZ.
+insert into auth.users (
+  instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
+  raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
+  confirmation_token, email_change, email_change_token_new, recovery_token
+)
+values ('00000000-0000-0000-0000-000000000000', 'c0000000-0000-0000-0000-000000000124',
+   'authenticated', 'authenticated', 'zz-124-koc@example.com', 'x', now(),
+   '{"provider":"email","providers":["email"]}'::jsonb, '{"full_name":"zz-124 Koc"}'::jsonb,
+   now(), now(), '', '', '', '');
+update public.profiles set role = 'coach'
+ where id = 'c0000000-0000-0000-0000-000000000124';
+
+set local role service_role;
+do $$
+declare
+  v_caught boolean := false;
+  v_state  text;
+begin
+  begin
+    perform public.delete_account('c0000000-0000-0000-0000-000000000124'::uuid);
+  exception when insufficient_privilege then
+    v_caught := true;
+    get stacked diagnostics v_state = returned_sqlstate;
+  end;
+
+  if not v_caught then
+    raise exception 'BASARISIZ [124 KOC KAPISI]: koc hesabi silinebildi -- is_coach() kimseye TRUE donmez, tum danisanlarin onay/mesaj/plan yollari OLURDU';
+  end if;
+  if v_state is distinct from '42501' then
+    raise exception 'BASARISIZ [124 KOC KAPISI hata kodu]: beklenen 42501, gelen %', v_state;
+  end if;
+end $$;
+reset role;
+
+do $$
+begin
+  if not exists (select 1 from auth.users where id = 'c0000000-0000-0000-0000-000000000124') then
+    raise exception 'BASARISIZ [124 KOC KAPISI]: reddedilen cagri koc kullanicisini YINE DE sildi';
+  end if;
+  raise notice 'GECTI [124 delete_account/account_deletion_manifest SECURITY DEFINER + pinli search_path + EXECUTE yalnizca service_role; koc hesabi service_role ile bile silinemez]';
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- EK DOĞRULAMA — 125) [B-028 / AC-4.6.4] SUNUCU DOĞRULAMASI OLMADAN EK YAZILAMAZ
+--
+-- BU SENARYONUN VARLIK SEBEBİ: `apps/web/src/app/api/attachments/verify` ucu tek
+-- başına bir güvenlik sınırı DEĞİLDİR — istemci onu ATLAYABİLİR. Sınır burada,
+-- veritabanındadır: ek içeren bir mesaj satırı, o ek için SUNUCUNUN bıraktığı
+-- damga olmadan GİREMEZ (`messages_require_verified_attachment`).
+--
+--   (a) damgasız ek                       -> 42501
+--   (b) POZİTİF: damgalı ek               -> GEÇER
+--   (c) damga TEK KULLANIMLIK             -> aynı ek ikinci mesaja iliştirilemez
+--   (d) TOCTOU: damgadan SONRA içerik değişti (eTag) -> 42501
+--   (e) BAYAT damga (>15 dk)              -> 42501
+--   (f) BAŞKASININ yüklediği nesnenin damgası tüketilemez -> 42501
+--   (g) SUNUCU bağlamı (seed/migration/service_role) kapıdan ETKİLENMEZ
+-- =============================================================================
+begin;
+
+-- KURULUM — hepsi `postgres` kimliğiyle (RLS bypass), rol taklidinden ÖNCE.
+insert into storage.objects (bucket_id, name, metadata) values
+  ('message-attachments', '22222222-2222-2222-2222-222222222222/22222222-2222-2222-2222-222222222222-125a.jpg',
+   jsonb_build_object('eTag', '"e125a"', 'size', 68, 'mimetype', 'image/jpeg')),
+  ('message-attachments', '22222222-2222-2222-2222-222222222222/22222222-2222-2222-2222-222222222222-125b.jpg',
+   jsonb_build_object('eTag', '"e125b"', 'size', 68, 'mimetype', 'image/jpeg')),
+  ('message-attachments', '22222222-2222-2222-2222-222222222222/22222222-2222-2222-2222-222222222222-125c.jpg',
+   jsonb_build_object('eTag', '"e125c"', 'size', 68, 'mimetype', 'image/jpeg')),
+  ('message-attachments', '22222222-2222-2222-2222-222222222222/22222222-2222-2222-2222-222222222222-125d.jpg',
+   jsonb_build_object('eTag', '"e125d"', 'size', 68, 'mimetype', 'image/jpeg')),
+  ('message-attachments', '22222222-2222-2222-2222-222222222222/11111111-1111-1111-1111-111111111111-125k.jpg',
+   jsonb_build_object('eTag', '"e125k"', 'size', 68, 'mimetype', 'image/jpeg'));
+
+--   (a) 125a BİLEREK damgasız bırakılır.
+insert into public.message_attachment_verifications (bucket, path, mime, object_etag, verified_at) values
+  ('message-attachments', '22222222-2222-2222-2222-222222222222/22222222-2222-2222-2222-222222222222-125b.jpg',
+   'image/jpeg', 'e125b', now()),
+  ('message-attachments', '22222222-2222-2222-2222-222222222222/22222222-2222-2222-2222-222222222222-125c.jpg',
+   'image/jpeg', 'e125c', now()),
+  ('message-attachments', '22222222-2222-2222-2222-222222222222/22222222-2222-2222-2222-222222222222-125d.jpg',
+   'image/jpeg', 'e125d', now() - interval '16 minutes'),
+  ('message-attachments', '22222222-2222-2222-2222-222222222222/11111111-1111-1111-1111-111111111111-125k.jpg',
+   'image/jpeg', 'e125k', now());
+
+--   (d) TOCTOU KURULUMU: damga yazıldıktan SONRA nesnenin içeriği değişiyor.
+--   Gerçek dünyada bu, aynı yola ikinci bir yükleme (ya da sil + yeniden yükle)
+--   demektir; storage her ikisinde de yeni bir eTag üretir.
+update storage.objects
+   set metadata = jsonb_set(metadata, '{eTag}', '"\"e125c-degisti\""')
+ where bucket_id = 'message-attachments'
+   and name = '22222222-2222-2222-2222-222222222222/22222222-2222-2222-2222-222222222222-125c.jpg';
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+do $$
+declare
+  v_caught boolean;
+  v_state  text;
+  v_dir    text;
+  v_spec   text[];
+begin
+  -- (b) POZİTİF ÖNCE: kapının meşru akışı GERÇEKTEN geçirdiği gösterilmeden
+  --     redlerin bir anlamı olmazdı ("güvenli ama çalışmayan" veritabanı).
+  insert into public.messages (sender_id, receiver_id, client_id, message, attachment_path)
+  values ('22222222-2222-2222-2222-222222222222'::uuid,
+          '11111111-1111-1111-1111-111111111111'::uuid,
+          '22222222-2222-2222-2222-222222222222'::uuid,
+          'zz-125 dogrulanmis ek',
+          '22222222-2222-2222-2222-222222222222/22222222-2222-2222-2222-222222222222-125b.jpg');
+
+  -- Damga TÜKETİLDİ mi? (tek kullanımlık olmasının kanıtı)
+  if exists (
+    select 1 from public.message_attachment_verifications
+     where path = '22222222-2222-2222-2222-222222222222/22222222-2222-2222-2222-222222222222-125b.jpg'
+  ) then
+    raise exception 'BASARISIZ [125b]: damga TUKETILMEDI -- ayni nesne sonsuza dek onayli kalir';
+  end if;
+
+  -- (a) damgasız, (c) tüketilmiş damga, (d) TOCTOU, (e) bayat, (f) başkasının nesnesi
+  foreach v_spec slice 1 in array array[
+    ['125a', '22222222-2222-2222-2222-222222222222/22222222-2222-2222-2222-222222222222-125a.jpg'],
+    ['125c-tuketilmis', '22222222-2222-2222-2222-222222222222/22222222-2222-2222-2222-222222222222-125b.jpg'],
+    ['125d-toctou', '22222222-2222-2222-2222-222222222222/22222222-2222-2222-2222-222222222222-125c.jpg'],
+    ['125e-bayat', '22222222-2222-2222-2222-222222222222/22222222-2222-2222-2222-222222222222-125d.jpg'],
+    ['125f-baskasinin', '22222222-2222-2222-2222-222222222222/11111111-1111-1111-1111-111111111111-125k.jpg']
+  ] loop
+    v_caught := false;
+    begin
+      insert into public.messages (sender_id, receiver_id, client_id, message, attachment_path)
+      values ('22222222-2222-2222-2222-222222222222'::uuid,
+              '11111111-1111-1111-1111-111111111111'::uuid,
+              '22222222-2222-2222-2222-222222222222'::uuid,
+              'zz-125 ' || v_spec[1],
+              v_spec[2]);
+    exception when insufficient_privilege then
+      v_caught := true; get stacked diagnostics v_state = returned_sqlstate;
+    end;
+
+    if not v_caught then
+      raise exception 'BASARISIZ [%]: DOGRULANMAMIS ek iceren mesaj YAZILABILDI -- B-028 kapisi ACIK', v_spec[1];
+    end if;
+    if v_state is distinct from '42501' then
+      raise exception 'BASARISIZ [% hata kodu]: beklenen 42501, gelen %', v_spec[1], v_state;
+    end if;
+  end loop;
+
+  -- Sağlamlık: EKSİZ mesaj kapıdan hiç geçmez (kapı yalnızca eke bakar).
+  insert into public.messages (sender_id, receiver_id, client_id, message)
+  values ('22222222-2222-2222-2222-222222222222'::uuid,
+          '11111111-1111-1111-1111-111111111111'::uuid,
+          '22222222-2222-2222-2222-222222222222'::uuid,
+          'zz-125 eksiz mesaj');
+
+  raise notice 'GECTI [125a-f Damgasiz/tuketilmis/degismis/bayat/baskasinin eki RED (42501); damgali ek GECER ve damga TUKETILIR]';
+end $$;
+
+-- (g) SUNUCU BAĞLAMI: seed / migration / service_role yolu kapıdan etkilenmez.
+--     `is_end_user_write()` false olduğu için damga ARANMAZ — aksi hâlde bu
+--     migration'dan sonra hiçbir seed/bakım script'i ek yazamazdı.
+reset role;
+do $$
+begin
+  insert into public.messages (sender_id, receiver_id, client_id, message, attachment_path)
+  values ('22222222-2222-2222-2222-222222222222'::uuid,
+          '11111111-1111-1111-1111-111111111111'::uuid,
+          '22222222-2222-2222-2222-222222222222'::uuid,
+          'zz-125g sunucu baglami',
+          '22222222-2222-2222-2222-222222222222/22222222-2222-2222-2222-222222222222-125a.jpg');
+  raise notice 'GECTI [125g Sunucu baglami (postgres) damgasiz ek yazabilir -- kapi YALNIZCA son kullaniciya bakar]';
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- EK DOĞRULAMA — 126) [B-028] YETKİ YÜZEYİ SÜRÜKLENME TESTİ
+--
+-- Kapının GÜCÜ üç şeye dayanıyor; üçü de burada ÖLÇÜLÜR, varsayılmaz:
+--   (a) Damga tablosu istemciye KAPALI (RLS + FORCE + SIFIR politika). Grant
+--       vardır (senaryo 73 pozitif kontrolü) ama okuma 0 satır, yazma REDdir.
+--   (b) `record_attachment_verification` EXECUTE'u YALNIZCA `service_role`de —
+--       aksi hâlde danışan kendini "doğrulanmış" ilan ederdi.
+--   (c) `messages_require_verified_attachment` SECURITY INVOKER OLMAK ZORUNDA.
+--       DEFINER olsaydı içeride `current_user = 'postgres'` olur,
+--       `is_end_user_write()` HER ZAMAN false döner ve kapı SESSİZCE AÇILIRDI.
+--       Bu, kaybı en sinsi olan gerileme; testin asıl hedefi budur.
+-- =============================================================================
+begin;
+do $$
+declare
+  v_rls    boolean;
+  v_force  boolean;
+  v_pol    int;
+  v_secdef boolean;
+  v_config text[];
+begin
+  -- (a)
+  select c.relrowsecurity, c.relforcerowsecurity into v_rls, v_force
+    from pg_class c join pg_namespace n on n.oid = c.relnamespace
+   where n.nspname = 'public' and c.relname = 'message_attachment_verifications';
+
+  if v_rls is null then
+    raise exception 'BASARISIZ [126a]: message_attachment_verifications tablosu YOK -- B-028 kapisi kurulamaz';
+  end if;
+  if not v_rls or not v_force then
+    raise exception 'BASARISIZ [126a]: damga tablosunda RLS/FORCE kapali (rls=%, force=%)', v_rls, v_force;
+  end if;
+
+  select count(*) into v_pol
+    from pg_policies
+   where schemaname = 'public' and tablename = 'message_attachment_verifications';
+  if v_pol <> 0 then
+    raise exception 'BASARISIZ [126a]: damga tablosunda % politika var -- istemciye kapi acilmis', v_pol;
+  end if;
+
+  -- (b)
+  if has_function_privilege('authenticated', 'public.record_attachment_verification(text,text,text,text)', 'EXECUTE') then
+    raise exception 'BASARISIZ [126b]: record_attachment_verification AUTHENTICATED a ACIK -- kullanici kendini dogrulanmis ilan edebilir';
+  end if;
+  if has_function_privilege('anon', 'public.record_attachment_verification(text,text,text,text)', 'EXECUTE') then
+    raise exception 'BASARISIZ [126b]: record_attachment_verification ANON a ACIK';
+  end if;
+  if not has_function_privilege('service_role', 'public.record_attachment_verification(text,text,text,text)', 'EXECUTE') then
+    raise exception 'BASARISIZ [126b]: service_role CALISTIRAMIYOR -- dogrulama ucu kirik, ek gonderilemez';
+  end if;
+
+  -- (c) — EN KRİTİK DAL
+  select p.prosecdef, p.proconfig into v_secdef, v_config
+    from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public' and p.proname = 'messages_require_verified_attachment';
+
+  if v_secdef is null then
+    raise exception 'BASARISIZ [126c]: messages_require_verified_attachment YOK -- kapi kaldirilmis';
+  end if;
+  if v_secdef then
+    raise exception 'BASARISIZ [126c]: tetikleyici SECURITY DEFINER olmus -- is_end_user_write() her zaman false doner, KAPI SESSIZCE ACIK';
+  end if;
+  if v_config is null or not (v_config @> array['search_path=public, pg_temp']) then
+    raise exception 'BASARISIZ [126c search_path]: tetikleyicinin arama yolu pinlenmemis (%)', v_config;
+  end if;
+
+  -- Yardımcı DEFINER olmak ZORUNDA (damga tablosu ve storage.objects okur).
+  select p.prosecdef, p.proconfig into v_secdef, v_config
+    from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public' and p.proname = 'consume_attachment_verification';
+
+  if v_secdef is null then
+    raise exception 'BASARISIZ [126c]: consume_attachment_verification YOK';
+  end if;
+  if not v_secdef then
+    raise exception 'BASARISIZ [126c]: consume_attachment_verification SECURITY INVOKER olmus -- damga tablosunu okuyamaz, her ek REDDEDILIR';
+  end if;
+  if v_config is null or not (v_config @> array['search_path=public, pg_temp']) then
+    raise exception 'BASARISIZ [126c search_path]: consume_attachment_verification arama yolu pinlenmemis (%)', v_config;
+  end if;
+
+  -- Tetikleyici GERÇEKTEN bağlı mı? (fonksiyon dursa da tetikleyici düşmüş olabilir)
+  if not exists (
+    select 1 from pg_trigger
+     where tgrelid = 'public.messages'::regclass
+       and tgname  = 'messages_require_verified_attachment'
+       and not tgisinternal
+  ) then
+    raise exception 'BASARISIZ [126c]: tetikleyici public.messages e BAGLI DEGIL -- kapi yok';
+  end if;
+
+  raise notice 'GECTI [126 Damga tablosu RLS+FORCE+sifir politika; record_* yalnizca service_role; tetikleyici INVOKER + pinli search_path + messages e bagli]';
+end $$;
+
+-- Aynı senaryonun CANLI yarısı: danışan damga tablosunu ne OKUYABİLİR ne YAZABİLİR,
+-- ve `record_attachment_verification`ı ÇAĞIRAMAZ.
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+do $$
+declare
+  v_n      bigint;
+  v_caught boolean;
+  v_state  text;
+begin
+  select count(*) into v_n from public.message_attachment_verifications;
+  if v_n <> 0 then
+    raise exception 'BASARISIZ [126 okuma]: danisan damga tablosunda % satir GORDU', v_n;
+  end if;
+
+  v_caught := false;
+  begin
+    insert into public.message_attachment_verifications (bucket, path, mime, object_etag)
+    values ('message-attachments',
+            '22222222-2222-2222-2222-222222222222/22222222-2222-2222-2222-222222222222-126x.jpg',
+            'image/png', 'sahte');
+  exception when insufficient_privilege then
+    v_caught := true; get stacked diagnostics v_state = returned_sqlstate;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [126 yazma]: danisan KENDI damgasini yazabildi -- B-028 kapisi anlamsiz';
+  end if;
+
+  v_caught := false;
+  begin
+    perform public.record_attachment_verification(
+      'message-attachments',
+      '22222222-2222-2222-2222-222222222222/22222222-2222-2222-2222-222222222222-126x.jpg',
+      'image/png', 'sahte');
+  exception when insufficient_privilege then
+    v_caught := true;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [126 RPC]: danisan record_attachment_verification i CAGIRABILDI';
+  end if;
+
+  raise notice 'GECTI [126 Danisan damga tablosunu okuyamaz/yazamaz ve record_attachment_verification i cagiramaz]';
+end $$;
+rollback;
+
+
+-- =============================================================================
 -- TOPLAM ÖZET
--- Bu noktaya yalnızca YUKARIDAKİ 118 senaryonun HEPSİ GECTI verdiyse ulaşılır --
+-- Bu noktaya yalnızca YUKARIDAKİ 126 senaryonun HEPSİ GECTI verdiyse ulaşılır --
 -- herhangi biri BASARISIZ olsaydı raise exception + ON_ERROR_STOP psql'i
 -- daha önce sıfırdan farklı çıkış koduyla durdururdu.
 --   * 1–19  : Faz 1a ve öncesi (profiles, notifications, form_checks, daily_logs,
@@ -6662,6 +7651,36 @@ rollback;
 --             versiyonu ve bildirim ekseninde HİÇBİR yan etki kalmaz (117);
 --             yeni RPC'nin yetki yüzeyi sürüklenme testi — SECURITY INVOKER,
 --             pinli `search_path`, anon/PUBLIC kapalı (118)
+--   * 119–124: Faz 4.6 / B-042 — KVKK HESAP SİLME
+--             (20260819100000_account_deletion.sql): *** TAM SÜPÜRME ***
+--             `delete_account()` sonrası 14 tablonun HİÇBİRİNDE satır kalmaz,
+--             auth kullanıcısı gider, denetim satırı yazılır ve o satır silinen
+--             kişinin uid'sini/e-postasını TAŞIMAZ; storage nesnesi dururken
+--             çağrı fail-closed REDDEDİLİR ve reddin yan etkisi YOKTUR (119);
+--             İZOLASYON — tanık kullanıcı, seed profilleri ve katalog
+--             etkilenmez, fazla silme yoktur (120); IDEMPOTANSLIK — ikinci ve
+--             üçüncü çağrı hata üretmez, `already_deleted:true` döner ve İKİNCİ
+--             denetim satırı yazılmaz (121); danışan ne başkasının ne KENDİ
+--             hesabını SQL'den silebilir (EXECUTE yalnızca `service_role`de),
+--             manifest ve `auth.users` DELETE de kapalı (122); denetim
+--             tablosunun 6 kolonluk sözleşmesi korunur (kişisel veri kolonu
+--             eklenirse test kırılır) ve tablo authenticated'a da
+--             `service_role`e de KAPALIDIR (123); yetki yüzeyi sürüklenme
+--             testi — SECURITY DEFINER, pinli `search_path`, EXECUTE yalnızca
+--             `service_role`, ve KOÇ hesabı `service_role` ile bile silinemez
+--             (124)
+--   * 125-126: Faz 4.6 / B-028 — MESAJ EKİNDE SUNUCU TARAFI MAGIC-BYTE
+--             DOĞRULAMASI (20260819110000_attachment_magic_byte_verification.sql):
+--             ek içeren bir mesaj, o ek için SUNUCUNUN bıraktığı damga olmadan
+--             GİREMEZ — damgasız, tüketilmiş, içeriği değişmiş (TOCTOU/eTag),
+--             bayat (>15 dk) ve BAŞKASININ yüklediği nesnenin damgası hep 42501
+--             ile reddedilir; damgalı ek geçer ve damga TÜKETİLİR; sunucu
+--             bağlamı (seed/migration) kapıdan etkilenmez (125). Yetki yüzeyi:
+--             damga tablosu RLS+FORCE+SIFIR politika (danışan ne okur ne yazar),
+--             `record_attachment_verification` EXECUTE yalnızca `service_role`,
+--             tetikleyici SECURITY **INVOKER** + pinli `search_path` (DEFINER
+--             olsaydı `is_end_user_write()` hep false döner, kapı sessizce
+--             açılırdı) ve tetikleyici gerçekten `messages`e bağlı (126)
 --
 -- NOT: `nutrition_logs`, `progress_entries` ve `progress_photos` ayrıca senaryo
 -- 73 (yetki) ve 74 (RLS+FORCE) tarafından DİNAMİK olarak kapsanır — o iki
@@ -6669,5 +7688,5 @@ rollback;
 -- =============================================================================
 do $$
 begin
-  raise notice 'TUM RLS TESTLERI GECTI (118 senaryo)';
+  raise notice 'TUM RLS TESTLERI GECTI (126 senaryo)';
 end $$;

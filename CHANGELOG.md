@@ -6,6 +6,10 @@ Bu dosya, projedeki önemli değişiklikleri belgeler. Biçim [Keep a Changelog]
 
 ### Eklendi
 
+- **Faz 4.6 — Güvenlik Tamamlama (tamamen kapandı):** KVKK/GDPR "unutulma hakkı" hesap silme akışı (ADR-0025) — danışan kendi hesabını kalıcı olarak silebiliyor: auth kullanıcısı + 14 ilişkili tablo + storage nesneleri, idempotent, `service_role` ile sunucu tarafında (`SECURITY DEFINER` `delete_account()`/`account_deletion_manifest()`, fail-closed — storage'da nesne kalırsa hiçbir şey silinmez), denetim kaydında kişisel veri yok.
+- AI uçlarına (antrenman/beslenme/öneri) kullanıcı başına günlük kota — aşımda Türkçe mesajlı 429 + `Retry-After`; eşzamanlı isteklerde kotanın yarışla aşılamadığı testle kanıtlandı.
+- Mesaj eklerinde (`message-attachments`) sunucu tarafı magic-byte doğrulaması: `POST /api/attachments/verify` ilk 32 baytı okuyup uyuşmazsa nesneyi siler; asıl kapı veritabanında — `messages` üzerindeki `AFTER INSERT` tetikleyicisi yalnızca sunucunun yazdığı, TOCTOU'ya kapalı eTag damgası varsa ek içeren satırı kabul ediyor. Magic-byte doğrulaması istemci ve sunucu arasında tek kaynağa (`packages/api-client/src/upload-validation.ts`) taşındı.
+- İndirilebilir imzalı adresler için `createSignedDownloadUrl` — yalnızca "İndir" bağlantılarında `Content-Disposition: attachment` üretiyor; `<img src>` gösterimleri (`createSignedUrl`) inline kalmaya devam ediyor.
 - **Faz 4.5 — Monorepo ve Mobil Temel (tamamen kapandı):** pnpm workspaces + Turborepo 2.10.11 tabanlı monorepo yerleşimi — `apps/web`, `apps/mobile` ve dört paylaşılan paket (`packages/config`, `packages/types`, `packages/api-client`, `packages/logger`). Mobil çalışma zamanı Android emülatöründe (Pixel 8 AVD, Expo Go SDK 57.0.0) doğrulandı: temiz bundle, beş sekmede gezinme, çift-React "invalid hook call" yok — iOS Expo Go yolu App Store'daki SDK 54 kilidi yüzünden kullanılamadı.
 - `apps/mobile`: Expo SDK 57 (React Native 0.86.2, React 19.2.4) iskeleti — `expo-router` ile 5 sekmeli tab navigasyonu (Panel · Antrenman · Beslenme · İlerleme · Sohbet) ve placeholder auth ekranı.
 - Ayrı, paralel `mobile` CI job'u (`tsc`, lint, `expo-doctor`, `expo export` smoke).
@@ -26,6 +30,8 @@ Bu dosya, projedeki önemli değişiklikleri belgeler. Biçim [Keep a Changelog]
 - Coverage eşiği (`lines`/`statements`) 52 → 60'a geri çıkarıldı; `MessagesTab`/`FormCheckTab` için 29 yeni davranış testi.
 - Koç program onayı (`useApproveProgram`) tek bir Postgres fonksiyonuna (`approve_program`, `SECURITY INVOKER`) indirgendi; önceki üç atomik olmayan çağrı kaldırıldı.
 - Cookie tabanlı oturuma geçişten kalan eski `sb-*-auth-token` `localStorage` artıkları mount'ta bir kez temizleniyor.
+- AI antrenman üretimi artık sabit `age: 20, goal: 'bulk', weight: 75` göndermiyor; `NutritionTab` deseniyle form üzerinden alınıyor, kilo son ölçümden ön dolduruluyor.
+- E2E `plans.spec.ts` artık akışın sonunda kendi `pending` onay fikstürünü üretiyor; `seed.sql` demo verisi E2E koşularıyla tükenmiyor.
 
 ### Düzeltildi
 

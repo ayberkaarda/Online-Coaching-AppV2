@@ -1,4 +1,8 @@
 // Beslenme planı proxy'si: /api/ai/nutrition -> AI_BACKEND_URL/analyze/nutrition
+//
+// B-043 / AC-4.6.3: kullanıcı başına GÜNLÜK AI kotası burada DEĞİL, `handleAiProxy` içinde
+// (auth adımından hemen sonra) uygulanır — bkz. `src/lib/api/proxy.ts` ve
+// `src/lib/api/ai-quota.ts`. Üç AI route'u tek bir paylaşılan günlük kovayı paylaşır.
 
 import { handleAiProxy } from '@/lib/api/proxy'
 import { aiDietSchema } from '@repo/types/schemas'

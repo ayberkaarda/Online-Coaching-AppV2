@@ -34,6 +34,15 @@ const serverSchema = z
     // (güvenli varsayılan): sahte başlıkla sınırsız kova üretmek, aşırı sıkı paylaşılan bir
     // kovadan daha kötüdür. Tek-hop güvenilir bir edge'in (ör. Vercel) arkasında 1 yapın.
     TRUSTED_PROXY_COUNT: z.coerce.number().int().nonnegative().default(0),
+    // B-043 (borç; active_planprogram.md §7a "AI harcama kotası"; hardening-prompt-v2.md #22;
+    // Faz 4.6 dilim 2, AC-4.6.3): AI proxy uçlarına (`/api/ai/workout`, `/api/ai/nutrition`,
+    // `/api/ai/recommendations`) KULLANICI BAŞINA GÜNLÜK istek kotası — `RATE_LIMIT_*`'in
+    // (dakikalık, IP bazlı) ÜZERİNE, tek bir kullanıcının gün boyunca ne kadar AI çağrısı
+    // harcayabileceğini sınırlayan ayrı bir katman (bkz. `src/lib/api/ai-quota.ts`). Aynı
+    // desen: `.default(20)` yalnızca değer TANIMSIZKEN devreye girer; sayısal olmayan/negatif
+    // bir değer verilirse (RATE_LIMIT_MAX_REQUESTS'te olduğu gibi) fail-fast — sessizce
+    // "sınırsız"a düşülmez.
+    AI_QUOTA_DAILY_LIMIT: z.coerce.number().int().positive().default(20),
   })
   .superRefine((env, ctx) => {
     // A-12 (güvenlik denetimi, findings-app-surface.md §3.4/§7 Grup 1): `AI_BACKEND_API_KEY`
@@ -150,6 +159,7 @@ export function getServerEnv(): ServerEnv {
     RATE_LIMIT_WINDOW_MS: process.env.RATE_LIMIT_WINDOW_MS,
     RATE_LIMIT_MAX_REQUESTS: process.env.RATE_LIMIT_MAX_REQUESTS,
     TRUSTED_PROXY_COUNT: process.env.TRUSTED_PROXY_COUNT,
+    AI_QUOTA_DAILY_LIMIT: process.env.AI_QUOTA_DAILY_LIMIT,
   })
 
   if (!parsed.success) {

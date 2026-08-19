@@ -9,6 +9,33 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      account_deletions: {
+        Row: {
+          deleted_at: string
+          id: string
+          request_id: string | null
+          rows_deleted: Json
+          storage_objects_deleted: number
+          subject_role: Database["public"]["Enums"]["user_role"]
+        }
+        Insert: {
+          deleted_at?: string
+          id?: string
+          request_id?: string | null
+          rows_deleted?: Json
+          storage_objects_deleted?: number
+          subject_role: Database["public"]["Enums"]["user_role"]
+        }
+        Update: {
+          deleted_at?: string
+          id?: string
+          request_id?: string | null
+          rows_deleted?: Json
+          storage_objects_deleted?: number
+          subject_role?: Database["public"]["Enums"]["user_role"]
+        }
+        Relationships: []
+      }
       daily_logs: {
         Row: {
           client_id: string
@@ -151,6 +178,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      message_attachment_verifications: {
+        Row: {
+          bucket: string
+          mime: string
+          object_etag: string
+          path: string
+          verified_at: string
+        }
+        Insert: {
+          bucket: string
+          mime: string
+          object_etag: string
+          path: string
+          verified_at?: string
+        }
+        Update: {
+          bucket?: string
+          mime?: string
+          object_etag?: string
+          path?: string
+          verified_at?: string
+        }
+        Relationships: []
       }
       messages: {
         Row: {
@@ -699,10 +750,12 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      account_deletion_manifest: { Args: { p_user_id: string }; Returns: Json }
       approve_program: {
         Args: { p_approval_id: string; p_client_id: string; p_plan: Json }
         Returns: undefined
       }
+      attachment_normalize_etag: { Args: { p_etag: string }; Returns: string }
       avatar_object_owner: { Args: { p_name: string }; Returns: string }
       backfill_form_check_review: {
         Args: never
@@ -739,6 +792,18 @@ export type Database = {
           rows_demoted: number
           rows_pending: number
         }[]
+      }
+      consume_attachment_verification: {
+        Args: { p_bucket: string; p_path: string }
+        Returns: boolean
+      }
+      delete_account: {
+        Args: {
+          p_request_id?: string
+          p_storage_objects_deleted?: number
+          p_user_id: string
+        }
+        Returns: Json
       }
       explode_nutrition_day: {
         Args: { p_day: string; p_entry: Json; p_plan_id: string }
@@ -798,6 +863,15 @@ export type Database = {
         Returns: Database["public"]["Enums"]["user_role"]
       }
       progress_photo_owner: { Args: { p_name: string }; Returns: string }
+      record_attachment_verification: {
+        Args: {
+          p_bucket: string
+          p_etag: string
+          p_mime: string
+          p_path: string
+        }
+        Returns: undefined
+      }
       save_nutrition_plan: {
         Args: { p_client_ids: string[]; p_plan: Json }
         Returns: number

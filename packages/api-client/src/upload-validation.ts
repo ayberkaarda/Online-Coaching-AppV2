@@ -12,12 +12,39 @@
 // KAYNAK OTORİTE: `file.type` yalnızca hızlı bir ön elemedir (A-20). Kabul/ret kararı ve dönen
 // `mime`/`extension` her zaman magic byte tespitinden gelir, tarayıcının bildirdiği `file.type`'dan
 // değil.
+//
+// ─────────────────────────────────────────────────────────────────────────────
+// B-028 — BU DOSYA ARTIK SUNUCUNUN DA TEK KAYNAĞIDIR
+// ─────────────────────────────────────────────────────────────────────────────
+// Faz 4.6 / AC-4.6.4'e kadar bu modül YALNIZCA tarayıcıda çalışıyordu; `message-attachments`
+// bucket'ına giden dosyanın içeriğini sunucu tarafında HİÇBİR ŞEY doğrulamıyordu (bucket'ın
+// `allowed_mime_types` listesi bile istemcinin BİLDİRDİĞİ Content-Type'a bakar — sahtelenebilir).
+// `apps/web/src/app/api/attachments/verify/route.ts` artık yüklenen nesnenin İLK BAYTLARINI
+// sunucuda okuyup aynı kararı bir kez daha veriyor.
+//
+// SİHİRLİ BAYT TABLOSU TEK YERDE DURUR (`detectImageMime`): istemci ve sunucu AYNI
+// fonksiyonu çağırır. İkinci bir tablo yazmak, iki tablonun zamanla ayrışması demekti —
+// ayrıştıkları gün "istemci kabul etti, sunucu reddetti" (ya da tersi) sessiz bir bozulma
+// üretirdi. Bu yüzden aşağıdaki `validateImageBytes` ÇEVRE BAĞIMSIZDIR: ne `File`, ne `Blob`,
+// ne `FileReader` bilir — yalnızca `Uint8Array` + bildirilen tür alır. `validateImageFile`
+// (tarayıcı yolu) onun üzerine boyut kontrolü ve bayt okuma ekleyen ince bir sarmalayıcıdır.
 
 export const ALLOWED_IMAGE_MIME = ['image/jpeg', 'image/png', 'image/webp', 'image/avif'] as const
 export type AllowedImageMime = (typeof ALLOWED_IMAGE_MIME)[number]
 
 /** Storage bucket sınırıyla aynı: 5 MB. */
 export const MAX_UPLOAD_BYTES = 5 * 1024 * 1024
+
+/**
+ * Tespit için okunan baş bayt sayısı.
+ *
+ * En uzun imza AVIF'inkidir (4..12. baytlar: `ftyp` + marka), yani 12 bayt yeterdi; 32
+ * seçilmesinin sebebi sunucu yolunun bu değeri HTTP `Range: bytes=0-31` başlığına birebir
+ * çevirmesi ve ileride imza tablosu büyürse (ör. daha uzak ofsette duran bir format) tek
+ * sabitin değişmesinin yetmesidir. İstemci de aynı sabitle `file.slice(0, N)` yapar —
+ * iki taraf AYNI pencereye bakar.
+ */
+export const MAGIC_BYTE_SNIFF_LENGTH = 32
 
 /** MIME -> kanonik uzantı. Uzantı ASLA dosya adından türetilmez (A-21). */
 export const MIME_EXTENSION: Record<AllowedImageMime, string> = {
@@ -98,7 +125,42 @@ function normalizeReportedMime(type: string): AllowedImageMime | null {
   return null
 }
 
-/** Tam doğrulama: boyut -> bildirilen MIME allowlist -> magic byte -> ikisinin tutarlılığı. */
+/**
+ * ÇEVRE BAĞIMSIZ ÇEKİRDEK — B-028'in istemci ve sunucu tarafından PAYLAŞILAN kararı.
+ *
+ * `File`/`Blob`/`FileReader` bilmez; yalnızca dosyanın İLK BAYTLARINI ve karşı tarafın
+ * BİLDİRDİĞİ türü alır. Tarayıcıda bildirilen tür `file.type`, sunucuda ise depolanmış
+ * nesnenin servis edilen `Content-Type` başlığıdır — ikisi de İSTEMCİ KAYNAKLIDIR ve
+ * bu yüzden ikisi de yalnızca ÖN ELEMEDİR. Kabul kararı her zaman `detectImageMime`ten gelir.
+ *
+ * `head` en az `MAGIC_BYTE_SNIFF_LENGTH` bayt OLMAK ZORUNDA DEĞİLDİR: kısa gelirse
+ * `matchesSignature` uzunluk kontrolüyle zaten `false` döner ve karar redde düşer
+ * (fail-closed).
+ */
+export function validateImageBytes(
+  head: Uint8Array,
+  reportedType: string | null | undefined
+): UploadValidationResult {
+  if (head.length === 0) {
+    return { ok: false, code: 'EMPTY', message: REJECTION_MESSAGES.EMPTY }
+  }
+
+  const reportedMime = normalizeReportedMime(reportedType ?? '')
+  if (!reportedMime) {
+    return { ok: false, code: 'UNSUPPORTED_TYPE', message: REJECTION_MESSAGES.UNSUPPORTED_TYPE }
+  }
+
+  // KAYNAK OTORİTE magic byte'tır: tespit edilemeyen VEYA bildirilenle çelişen içerik reddedilir,
+  // ve başarı durumunda dönen mime/extension her zaman buradan (reportedMime'dan değil) gelir.
+  const detectedMime = detectImageMime(head)
+  if (!detectedMime || detectedMime !== reportedMime) {
+    return { ok: false, code: 'CONTENT_MISMATCH', message: REJECTION_MESSAGES.CONTENT_MISMATCH }
+  }
+
+  return { ok: true, mime: detectedMime, extension: MIME_EXTENSION[detectedMime] }
+}
+
+/** Tam doğrulama (tarayıcı yolu): boyut -> baş baytları oku -> `validateImageBytes`. */
 export async function validateImageFile(file: File): Promise<UploadValidationResult> {
   if (file.size === 0) {
     return { ok: false, code: 'EMPTY', message: REJECTION_MESSAGES.EMPTY }
@@ -107,26 +169,14 @@ export async function validateImageFile(file: File): Promise<UploadValidationRes
     return { ok: false, code: 'TOO_LARGE', message: REJECTION_MESSAGES.TOO_LARGE }
   }
 
-  const reportedMime = normalizeReportedMime(file.type)
-  if (!reportedMime) {
-    return { ok: false, code: 'UNSUPPORTED_TYPE', message: REJECTION_MESSAGES.UNSUPPORTED_TYPE }
-  }
-
   let bytes: Uint8Array
   try {
-    bytes = await readBytes(file.slice(0, 32))
+    bytes = await readBytes(file.slice(0, MAGIC_BYTE_SNIFF_LENGTH))
   } catch {
     return { ok: false, code: 'UNREADABLE', message: REJECTION_MESSAGES.UNREADABLE }
   }
 
-  // KAYNAK OTORİTE magic byte'tır: tespit edilemeyen VEYA bildirilenle çelişen içerik reddedilir,
-  // ve başarı durumunda dönen mime/extension her zaman buradan (reportedMime'dan değil) gelir.
-  const detectedMime = detectImageMime(bytes)
-  if (!detectedMime || detectedMime !== reportedMime) {
-    return { ok: false, code: 'CONTENT_MISMATCH', message: REJECTION_MESSAGES.CONTENT_MISMATCH }
-  }
-
-  return { ok: true, mime: detectedMime, extension: MIME_EXTENSION[detectedMime] }
+  return validateImageBytes(bytes, file.type)
 }
 
 /** Doğrulama başarısızsa fırlatılır; `code` alanı `UploadRejectionCode`. */

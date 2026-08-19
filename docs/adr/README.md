@@ -83,3 +83,4 @@ ama karar metni silinmez — tarihsel bağlam korunur.
 | [0022](0022-oturum-depolamasi-cookie-ve-nonce-csp.md)               | Oturum depolamasının cookie'ye ve CSP'nin nonce tabanlı hale getirilmesi | Kabul edildi (uygulama ayrı turda)          | 2026-08-18 |
 | [0023](0023-monorepo-kesim-plani.md)                                | Monorepo kesim planı (pnpm + Turborepo, `apps/*`/`packages/*`)           | Kabul edildi (uygulama Faz 4.5'te)          | 2026-08-18 |
 | [0024](0024-api-client-supabase-enjeksiyonu.md)                     | `packages/api-client`'ın Supabase istemcisini enjeksiyonla alması        | Kabul edildi (uygulama Faz 4.5 commit 5'te) | 2026-08-18 |
+| [0025](0025-hesap-silme-ve-service-role-sunucu-yolu.md)             | KVKK hesap silme akışı ve `service_role`'ün ilk sunucu yolu              | Kabul edildi                                | 2026-08-19 |

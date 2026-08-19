@@ -52,6 +52,8 @@ başlatmaz**, açık Türkçe hatayla `exit 1` verir):
 Bu üç değişken **hiçbir `.env*` dosyasına eklenmez** — script bilerek hiçbir
 `.env` dosyasını okumaz (repo geneli kural, bkz. `scripts/import-catalog.mjs`,
 `scripts/clean-e2e-data.mjs`: "hedef her çalıştırmada AÇIKÇA belirtilir").
+Bu üç değişkenin sözleşmesi (nerede yaşar, kim döndürür) reponun genel sır
+yönetimi kuralının bir parçasıdır — bkz. `docs/ops/sir-yonetimi.md` §a/§b.
 Kabuk oturumunda geçici olarak set edin:
 
 ```powershell
@@ -76,14 +78,17 @@ pnpm run db:backup-hosted
 
 # 2) Çıktı mantıklı görünüyorsa (üç komut, üç hedef dosya, doğru proje ref)
 #    gerçek yedeği alın. AYIRICISIZ — pnpm `--`'yi script'e OLDUĞU GİBİ iletir,
-#    npm gibi davranmaz (bkz. docs/PROGRESS.md §4):
-pnpm run db:backup-hosted --confirm
+#    npm gibi davranmaz (bkz. docs/PROGRESS.md §4). Repo OneDrive altındayken
+#    --out-dir ZORUNLU (bkz. §f'deki uyarı ve docs/ops/sir-yonetimi.md §c):
+pnpm run db:backup-hosted --confirm --out-dir C:\Users\Ayber\backups\hosted
 ```
 
-Başarılı bir koşu şunu üretir:
+Başarılı bir koşu şunu üretir (varsayılan `--out-dir` yoksa repo köküne göre
+`backups/hosted/...`; yukarıdaki OneDrive uyarısı gereği `--out-dir
+C:\Users\Ayber\backups\hosted` verildiyse aynı yapı o kök altında oluşur):
 
 ```
-backups/hosted/<UTC-tarih-saat>/
+<out-dir>/<UTC-tarih-saat>/
   schema.sql   # public + internal-olmayan şemaların YAPISI (--schema-only eşdeğeri)
   data.sql     # tüm satır verisi — auth.users/sessions/identities DAHİL
   roles.sql    # Postgres cluster rolleri (CREATE ROLE/GRANT — auth.users TABLOSU DEĞİL)
@@ -196,9 +201,34 @@ Restore denemesi sonrası **kullanılan yerel Postgres/Docker verisini silin**
 bildirimleri). KVKK kapsamında bu veri sürüm kontrolüne veya herhangi bir
 paylaşılan/genel depoya ASLA girmemelidir.
 
-- `backups/` dizini `.gitignore`'a eklenmelidir (bu script'in dosyası
-  değildir, bu turda eklenmedi — bkz. görev raporundaki not).
+- `backups/` dizini `.gitignore`'dadır (ölçüldü: `.gitignore:87`, yorum satırı
+  "hosted Supabase yedekleri (B-030) — kişisel veri taşır"; `git check-ignore -v
+backups/x` → `.gitignore:87:backups/` döner). Git bu dizini hiçbir zaman
+  izlemeyecek — script'in kendisi `.gitignore`'a dokunmaz, gereken satır zaten
+  orada.
 - Yedek dosyalarını e-posta, Slack, genel bulut paylaşımı gibi kanallarla
   PAYLAŞMAYIN; yalnızca şifreli/erişimi kısıtlı depolamaya taşıyın.
 - Bir yedeği sildiğinizde diskten GERÇEKTEN silindiğinden emin olun (çöp
   kutusu/sürüm geçmişi olan depolama sistemlerinde ek bir adım gerekebilir).
+
+> **UYARI — repo OneDrive altındayken `--out-dir` ZORUNLU.** Bu repo
+> `C:\Users\Ayber\OneDrive\Masaüstü\...` altında yaşıyor. `.gitignore`
+> yalnızca Git'in `backups/`'ı izlemesini engeller — OneDrive'ın kendi bulut
+> senkronunu ve sürüm geçmişini DURDURMAZ; `backups/hosted/` bu repo ağacının
+> altına yazılırsa, içindeki gerçek `auth.users` e-postaları (KVKK kapsamında
+> kişisel veri, bkz. yukarıdaki paragraf) OneDrive'a senkronlanır — bu da bu
+> bölümün ("yedekler asla commit edilmez/paylaşılmaz") kendi yasağını fiilen
+> çiğner, git'e girmese bile. Bu yüzden repo OneDrive'dan taşınana kadar
+> (bkz. `docs/ops/sir-yonetimi.md` §c) **ilk gerçek hosted yedeği ve
+> sonrasındaki tüm gerçek koşular** `--out-dir` ile OneDrive dışına
+> yönlendirilmelidir:
+>
+> ```powershell
+> pnpm run db:backup-hosted --confirm --out-dir C:\Users\Ayber\backups\hosted
+> ```
+>
+> `--out-dir` script tarafından desteklenir (`scripts/backup-hosted.mjs`
+> `parseArgs`, `--out-dir <yol>`; varsayılan `backups/hosted`, repo köküne
+> göredir). Dry-run çıktısındaki "Çıktı dizini" satırının gerçekten
+> `C:\Users\Ayber\backups\hosted\...` altını gösterdiğini `--confirm`'den ÖNCE
+> doğrulayın.

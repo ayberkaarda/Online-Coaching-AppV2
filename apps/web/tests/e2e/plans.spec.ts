@@ -320,6 +320,14 @@ test.describe('Plan Akışları (karakterizasyon)', () => {
       // hiç başlayamaz. Testin tekrar tekrar koşabilmesi için kuyruk önce
       // boşaltılır. `toPass` ile döngü: birden fazla bekleyen kayıt varsa (önceki
       // yarım kalmış bir koşumdan) hepsi onaylanana kadar tekrarlanır.
+      //
+      // B-040 DÜZELTMESİ: bu adım eskiden seed'in DEMO `pending` kaydını kalıcı
+      // olarak tüketiyordu (onaylayıp bir daha asla geri koymuyordu) — koçun demo
+      // kuyruğu bu test bir kez koşunca sonsuza dek boşalıyordu. `supabase/seed.sql`'e
+      // DOKUNULMADI; bunun yerine testin SONUNDA (adım 5) danışan AYNI akışla yeni
+      // bir 'pending' kayıt üretir, yani kuyruk test biterken yine 1 bekleyen kayıtla
+      // kalır — ister seed'in ilk kaydı ister bu testin önceki koşusunun bıraktığı
+      // kayıt olsun, davranış aynı: testi kendi ürettiği fikstürle "kendi temizler".
       await expect(async () => {
         if ((await approveButton.count()) > 0) await approveButton.first().click()
         await expect(approveButton).toHaveCount(0)
@@ -387,12 +395,20 @@ test.describe('Plan Akışları (karakterizasyon)', () => {
         const clientFieldAfter = workoutDayField(clientPage, day)
         await expect(clientFieldAfter).toHaveValue(uniquePlan)
         await expect(clientFieldAfter).toBeEnabled()
-        await expect(
-          clientPage.getByRole('button', { name: /Bu Programı Koça Onaya Gönder/ })
-        ).toBeEnabled()
-        await expect(
-          clientPage.getByRole('button', { name: /Koçun Onayı Bekleniyor/ })
-        ).toHaveCount(0)
+        await expect(submitButton).toBeEnabled()
+        await expect(waitingButton).toHaveCount(0)
+
+        // --- 5) B-040: demo kuyruğunu test SONUNDA yeniden doldur ---
+        // Adım 0 seed'in (veya önceki bir koşunun) `pending` kaydını onaylayarak
+        // tüketti. Kuyruğu kalıcı boş bırakmamak için danışan onaylanmış planını
+        // (ekranda hâlâ dolu duran `clientFieldAfter`) AYNI akışla yeniden koça
+        // onaya gönderir — test biterken client2 için tekrar TAM OLARAK 1 `pending`
+        // kayıt vardır, tıpkı seed'in bıraktığı gibi. Bir sonraki koşunun adım 0'ı
+        // bu kaydı tüketip aynı döngüyü tekrarlar — self-sustaining fikstür.
+        await submitButton.click()
+        await expect(clientPage.getByText(/Program taslağı koçuna gönderildi\./)).toBeVisible()
+        await expect(waitingButton).toBeVisible()
+        await expect(clientFieldAfter).toBeDisabled()
       } finally {
         await clientContext.close()
       }

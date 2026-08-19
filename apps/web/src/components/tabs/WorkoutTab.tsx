@@ -18,6 +18,7 @@
 // NOT: ratchet sayaçları ham alt-dize sayar, bu yüzden eski sınıf adları bu
 // yorumda bilerek LİTERAL olarak yazılmaz (yorumda geçse bile sayaca girerdi).
 
+import { zodResolver } from '@hookform/resolvers/zod'
 import {
   BookOpen,
   Bot,
@@ -34,6 +35,7 @@ import {
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import type { DragEvent, JSX } from 'react'
+import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 
 import { QueryState, SkeletonTable } from '@/components/ui'
@@ -46,6 +48,7 @@ import {
   useExercises,
   useGenerateWorkout,
   usePendingApprovals,
+  useProgressEntries,
   useSaveWorkoutPlan,
   useSubmitProgramForApproval,
   useWorkoutLogs,
@@ -58,8 +61,8 @@ import {
   useWorkoutPlanExercises,
   type SessionExercise,
 } from '@repo/api-client/hooks/useWorkoutSession'
-import type { SplitType } from '@repo/api-client/api/types'
 import { DAYS, getTodayName } from '@/lib/utils'
+import { aiWorkoutSchema, type AiWorkoutInput } from '@repo/types/schemas'
 import {
   DAY_NAMES,
   parseWorkoutPlan,
@@ -192,30 +195,52 @@ export default function WorkoutTab({
   const sessions = useMemo(() => groupLogsIntoSessions(logsQuery.data), [logsQuery.data])
 
   // --- AI antrenör ------------------------------------------------------------
-  const [smartSplit, setSmartSplit] = useState('')
-  const [aiPrompt, setAiPrompt] = useState('')
+  // B-056: yaş/hedef/kilo ARTIK SABİT DEĞİL — beslenme sekmesindeki
+  // (`NutritionTab.tsx` "AI diyetisyen" bölümü) `useForm` + `zodResolver` +
+  // `@repo/types/schemas` deseni birebir kopyalanır. `profiles` tablosunda
+  // yaş/hedef sütunu OLMADIĞI için (bkz. görev notu) bu alanlar her üretimde
+  // formdan istenir; şema zaten `@repo/types/schemas` içinde vardı (`aiWorkoutSchema`).
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    formState: { errors },
+  } = useForm<AiWorkoutInput>({
+    resolver: zodResolver(aiWorkoutSchema),
+    defaultValues: { user_prompt: '' },
+  })
 
-  const generateSmartWorkout = async (): Promise<void> => {
-    if (!smartSplit) {
-      toast.error('Lütfen bir şablon seçin!')
-      return
+  // Kilo alanı için makul varsayılan: danışanın (`targetId`) EN SON progress_entries
+  // kaydı. Kayıt yoksa alan BOŞ bırakılır — sahte bir varsayılan (ör. 75kg) KONMAZ.
+  const progressQuery = useProgressEntries(targetId, 90)
+  const latestWeightKg = useMemo(() => {
+    const entries = progressQuery.data ?? []
+    for (let i = entries.length - 1; i >= 0; i--) {
+      const weight = entries[i]?.weight_kg
+      if (weight !== null && weight !== undefined) return weight
     }
+    return null
+  }, [progressQuery.data])
 
-    // TODO: yaş / hedef / kilo danışanın profilinden okunmalı (şimdilik sabit).
-    const result = await generateWorkout.mutateAsync({
-      split_type: smartSplit as SplitType,
-      user_prompt: aiPrompt,
-      age: 20,
-      goal: 'bulk',
-      weight: 75,
-    })
+  // Aynı "render sırasında setState" kalıbı (bkz. `workoutData` senkronu yukarıda):
+  // `targetId` değiştiğinde veya kayıt sorgusu tamamlandığında EN FAZLA BİR KEZ
+  // kilo alanı doldurulur; kullanıcının kendi girdiği değer daha sonra EZİLMEZ.
+  const weightDefaultKey = targetId ? `${targetId}:${progressQuery.isFetched ? '1' : '0'}` : 'none'
+  const [loadedWeightDefaultKey, setLoadedWeightDefaultKey] = useState(weightDefaultKey)
+  if (weightDefaultKey !== loadedWeightDefaultKey) {
+    setLoadedWeightDefaultKey(weightDefaultKey)
+    if (latestWeightKg !== null) setValue('weight', latestWeightKg)
+  }
+
+  const onGenerateSmartWorkout = handleSubmit(async (values) => {
+    const result = await generateWorkout.mutateAsync(values)
 
     const next = emptyWorkoutPlan()
     for (const day of DAY_NAMES) {
       next[day] = result.workout_plan[day] ?? ''
     }
     setWorkoutData(next)
-  }
+  })
 
   // --- Onay akışı -------------------------------------------------------------
   const sendToCoachForApproval = (): void => {
@@ -518,27 +543,97 @@ export default function WorkoutTab({
       {/* isWaitingMyApproval yalnızca userRole === 'client' iken true olabilir (bkz. tanım),
           bu yüzden ek bir 'coach' kontrolü gereksizdir — koç için bu blok zaten görünür. */}
       {!isWaitingMyApproval && (
-        <div className="mb-6 flex flex-col items-start gap-4 rounded-panel border border-border bg-surface p-5 md:flex-row">
+        <form
+          onSubmit={onGenerateSmartWorkout}
+          noValidate
+          className="mb-6 flex flex-col items-start gap-4 rounded-panel border border-border bg-surface p-5 md:flex-row"
+        >
           <Bot aria-hidden="true" className="mt-2 h-10 w-10 shrink-0 text-accent" />
           <div className="w-full flex-1 space-y-3">
-            <div>
-              <label
-                htmlFor="ai-split"
-                className="mb-1 block text-xs font-bold uppercase tracking-wide text-accent"
-              >
-                AKILLI ANTRENÖR (AI)
-              </label>
-              <select
-                id="ai-split"
-                value={smartSplit}
-                onChange={(e) => setSmartSplit(e.target.value)}
-                className="w-full rounded-control border border-border bg-canvas p-3 text-sm font-semibold text-fg outline-none focus:border-accent"
-              >
-                <option value="">Şablon Seçin...</option>
-                <option value="ppl_torso_limbs">PPL + Torso + Limbs (5 Günlük)</option>
-                <option value="ppl">Push / Pull / Legs (3 Günlük)</option>
-                <option value="upper_lower">Upper / Lower (4 Günlük)</option>
-              </select>
+            <p className="mb-1 block text-xs font-bold uppercase tracking-wide text-accent">
+              AKILLI ANTRENÖR (AI)
+            </p>
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+              <div>
+                <label htmlFor="ai-workout-split" className="sr-only">
+                  Antrenman şablonu
+                </label>
+                <select
+                  id="ai-workout-split"
+                  {...register('split_type')}
+                  defaultValue=""
+                  aria-invalid={errors.split_type ? 'true' : 'false'}
+                  className="w-full rounded-control border border-border bg-canvas p-3 text-sm font-semibold text-fg outline-none focus:border-accent"
+                >
+                  <option value="">Şablon Seçin...</option>
+                  <option value="ppl_torso_limbs">PPL + Torso + Limbs (5 Günlük)</option>
+                  <option value="ppl">Push / Pull / Legs (3 Günlük)</option>
+                  <option value="upper_lower">Upper / Lower (4 Günlük)</option>
+                </select>
+                {errors.split_type ? (
+                  <p role="alert" className="mt-1 text-[10px] font-bold text-danger">
+                    {errors.split_type.message}
+                  </p>
+                ) : null}
+              </div>
+              <div>
+                <label htmlFor="ai-workout-age" className="sr-only">
+                  Yaş
+                </label>
+                <input
+                  id="ai-workout-age"
+                  type="number"
+                  placeholder="Yaş"
+                  {...register('age')}
+                  aria-invalid={errors.age ? 'true' : 'false'}
+                  className="w-full rounded-control border border-border bg-canvas p-3 text-sm text-fg outline-none focus:border-accent"
+                />
+                {errors.age ? (
+                  <p role="alert" className="mt-1 text-[10px] font-bold text-danger">
+                    {errors.age.message}
+                  </p>
+                ) : null}
+              </div>
+              <div>
+                <label htmlFor="ai-workout-weight" className="sr-only">
+                  Kilo (kg)
+                </label>
+                <input
+                  id="ai-workout-weight"
+                  type="number"
+                  placeholder="Kilo (kg)"
+                  {...register('weight')}
+                  aria-invalid={errors.weight ? 'true' : 'false'}
+                  className="w-full rounded-control border border-border bg-canvas p-3 text-sm text-fg outline-none focus:border-accent"
+                />
+                {errors.weight ? (
+                  <p role="alert" className="mt-1 text-[10px] font-bold text-danger">
+                    {errors.weight.message}
+                  </p>
+                ) : null}
+              </div>
+              <div>
+                <label htmlFor="ai-workout-goal" className="sr-only">
+                  Hedef
+                </label>
+                <select
+                  id="ai-workout-goal"
+                  {...register('goal')}
+                  defaultValue=""
+                  aria-invalid={errors.goal ? 'true' : 'false'}
+                  className="w-full rounded-control border border-warning/40 bg-warning/10 p-3 text-xs font-bold text-warning outline-none focus:border-warning"
+                >
+                  <option value="">Hedef Seçin...</option>
+                  <option value="maintain">Koruma</option>
+                  <option value="cut">Definasyon (Yağ Yakımı)</option>
+                  <option value="bulk">Bulk (Kas Kütlesi)</option>
+                </select>
+                {errors.goal ? (
+                  <p role="alert" className="mt-1 text-[10px] font-bold text-danger">
+                    {errors.goal.message}
+                  </p>
+                ) : null}
+              </div>
             </div>
             <div>
               <label
@@ -549,16 +644,14 @@ export default function WorkoutTab({
               </label>
               <textarea
                 id="ai-workout-prompt"
-                value={aiPrompt}
-                onChange={(e) => setAiPrompt(e.target.value)}
+                {...register('user_prompt')}
                 placeholder="Örn: Çarşamba dinlenme. Sadece dumbell kullanacağım..."
                 className="min-h-[60px] w-full rounded-control border border-border bg-canvas p-3 text-xs text-fg outline-none focus:border-accent"
               />
             </div>
           </div>
           <button
-            type="button"
-            onClick={() => void generateSmartWorkout()}
+            type="submit"
             disabled={generateWorkout.isPending}
             aria-busy={generateWorkout.isPending}
             className="flex h-full w-full items-center justify-center gap-1.5 rounded-control bg-accent px-8 py-4 text-sm font-bold text-accent-fg disabled:opacity-50 md:w-auto"
@@ -572,7 +665,7 @@ export default function WorkoutTab({
               </>
             )}
           </button>
-        </div>
+        </form>
       )}
 
       <div className="flex flex-col gap-6 lg:flex-row">

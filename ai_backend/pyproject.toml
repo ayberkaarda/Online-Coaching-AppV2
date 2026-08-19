@@ -32,7 +32,7 @@ default-groups = ["dev"]
 # 100 yerine 120: Türkçe kullanıcı mesajları (ör. öneri metinleri) çoğunlukla
 # 100-120 karakter aralığında ve cümle ortasından bölmek okunabilirliği bozuyor.
 line-length = 120
-target-version = "py312"
+target-version = "py314"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "UP", "B", "A", "C4", "SIM", "RUF", "ANN", "S", "PT"]
@@ -45,7 +45,7 @@ ignore = ["S101", "RUF001", "RUF002", "RUF003"]
 "tests/*" = ["S101", "ANN201", "ANN001", "S106", "S311"]
 
 [tool.mypy]
-python_version = "3.12"
+python_version = "3.14"
 strict = true
 plugins = ["pydantic.mypy"]
 disallow_untyped_defs = true

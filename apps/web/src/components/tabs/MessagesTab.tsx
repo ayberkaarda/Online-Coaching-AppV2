@@ -6,7 +6,7 @@
 // doğrudan Supabase sorgu çağrısı bu dosyada YOKTUR — hepsi `@repo/api-client/hooks/useMessages`
 // içinde).
 
-import { Check, CheckCheck, ImageOff, Info, Paperclip, X } from 'lucide-react'
+import { Check, CheckCheck, Download, ImageOff, Info, Paperclip, X } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ChangeEvent, FormEvent, JSX } from 'react'
 import { toast } from 'sonner'
@@ -16,6 +16,7 @@ import {
   resolveConversationClientId,
   useCoachId,
   useMarkConversationRead,
+  useMessageAttachmentDownloadUrl,
   useMessageAttachmentUrl,
   useMessages,
   usePresence,
@@ -39,6 +40,18 @@ export interface MessagesTabProps {
  * her mesaj için ayrı çağrılmalı, bu da `.map()` gövdesinde DOĞRUDAN
  * çağrılamaz (koşullu/döngüsel hook çağrısı yasak). Bucket PRIVATE olduğu için
  * `getPublicUrl` yerine imzalı adres kullanılır (I-4).
+ *
+ * ###########################################################################
+ * # B-008 — İKİ ADRES, İKİ İŞ                                                #
+ * #   `<img src>`  -> `useMessageAttachmentUrl`         (inline; download YOK)#
+ * #   "İndir" bağı -> `useMessageAttachmentDownloadUrl` (?download= ->        #
+ * #                    `Content-Disposition: attachment`)                     #
+ * #                                                                          #
+ * # Kullanıcının dosyaya GİTTİĞİ tek yer indirme bağlantısıdır ve o bağlantı  #
+ * # artık tarayıcıya "bu bir indirmedir" der. Görsel gösterimi bozmamak için  #
+ * # `<img>` adresi DEĞİŞMEDİ. İndirme imzası, görsel gerçekten görünür        #
+ * # olduğunda üretilir — görünmeyen bir ek için ikinci bir imza istenmez.     #
+ * ###########################################################################
  */
 function MessageAttachmentImage({
   path,
@@ -48,6 +61,7 @@ function MessageAttachmentImage({
   senderLabel: string
 }): JSX.Element {
   const { data: url, isLoading } = useMessageAttachmentUrl(path)
+  const { data: downloadUrl } = useMessageAttachmentDownloadUrl(path, Boolean(url))
 
   if (isLoading) {
     return (
@@ -70,12 +84,27 @@ function MessageAttachmentImage({
   }
 
   return (
-    // eslint-disable-next-line @next/next/no-img-element -- imzalı adres kısa ömürlü (TTL 3600 sn), next/image önbelleği bu süreyle çakışır.
-    <img
-      src={url}
-      alt={`${senderLabel} tarafından gönderilen fotoğraf`}
-      className="max-h-64 w-full max-w-[220px] rounded-card object-cover"
-    />
+    <div className="flex flex-col gap-1">
+      {/* eslint-disable-next-line @next/next/no-img-element -- imzalı adres kısa ömürlü (TTL 3600 sn), next/image önbelleği bu süreyle çakışır. */}
+      <img
+        src={url}
+        alt={`${senderLabel} tarafından gönderilen fotoğraf`}
+        className="max-h-64 w-full max-w-[220px] rounded-card object-cover"
+      />
+      {downloadUrl && (
+        <a
+          href={downloadUrl}
+          // `rel` sızıntı kapatır; `download` özniteliği YALNIZCA bir ipucudur —
+          // gerçek zorlama sunucudan gelen `Content-Disposition: attachment`tır
+          // (imzalı adresteki `?download=`), B-008'in kapanış koşulu budur.
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 text-xs underline underline-offset-2 opacity-80 hover:opacity-100"
+        >
+          <Download className="h-3 w-3" aria-hidden="true" />
+          İndir
+        </a>
+      )}
+    </div>
   )
 }
 

@@ -3,14 +3,16 @@
 // Profil sayfası: avatar yükleme, şifre değiştirme, beslenme/antrenman programı görüntüleme.
 
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Dumbbell, Salad, User } from 'lucide-react'
+import { AlertTriangle, Dumbbell, Salad, Trash2, User } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import type { ChangeEvent, JSX } from 'react'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 
 import {
+  DELETE_ACCOUNT_CONFIRMATION,
+  useDeleteAccount,
   useNutritionPlan,
   useProfile,
   useSession,
@@ -96,6 +98,148 @@ function NutritionPlanView({ plan }: { plan: NutritionPlan }): JSX.Element {
         )
       })}
     </ul>
+  )
+}
+
+/**
+ * KVKK / GDPR "unutulma hakkı" — hesap silme bölümü (AC-4.6.1).
+ *
+ * ###########################################################################
+ * # ÇİFT ONAY, VE İKİSİ DE GERÇEK BİR ENGEL                                 #
+ * #                                                                         #
+ * # 1. ADIM — NİYET: "Hesabımı Sil" düğmesi hiçbir şey silmez, yalnızca     #
+ * #    uyarı panelini açar. Yanlış tıklamanın bedeli sıfırdır.              #
+ * # 2. ADIM — YAZARAK DOĞRULAMA: kullanıcı `HESABIMI SİL` cümlesini BİREBİR #
+ * #    yazmadan son düğme etkinleşmez. Bu, "onaylıyor musunuz? [Evet]" tipi #
+ * #    bir diyalogdan bilerek daha zordur: geri dönüşü OLMAYAN bir işlemde  #
+ * #    kas hafızasıyla tıklanabilen bir onay, onay değildir.                #
+ * #                                                                         #
+ * # ARAYÜZ DOĞRULAMASI BİR GÜVENLİK SINIRI DEĞİLDİR: cümle sunucuda da      #
+ * # (`api/account/deletion-core.ts`) doğrulanır. Buradaki kontrol yalnızca  #
+ * # KAZAYI önler, kötü niyeti değil.                                        #
+ * #                                                                         #
+ * # TÜRKÇE İ/ı TUZAĞI: cümle noktalı büyük İ (U+0130) içerir ve üzerinde    #
+ * # HİÇBİR büyük/küçük harf katlaması yapılmaz (gerekçe:                     #
+ * # `@repo/api-client`'taki `DELETE_ACCOUNT_CONFIRMATION` doc-comment'i).   #
+ * #    Yalnızca `trim()` + birebir eşitlik.                                  #
+ * ###########################################################################
+ */
+function DeleteAccountSection(): JSX.Element {
+  const router = useRouter()
+  const deleteAccount = useDeleteAccount()
+
+  const [isArmed, setIsArmed] = useState(false)
+  const [confirmation, setConfirmation] = useState('')
+
+  const isPhraseCorrect = confirmation.trim() === DELETE_ACCOUNT_CONFIRMATION
+  const canSubmit = isPhraseCorrect && !deleteAccount.isPending
+
+  function handleDelete(): void {
+    if (!canSubmit) return
+    deleteAccount.mutate(
+      { confirmation: confirmation.trim() },
+      {
+        onSuccess: () => {
+          // Oturum artık yok; `useDeleteAccount` önbelleği temizledi. Yönlendirme
+          // BİLEREK burada yapılır — hook navigasyon bilmez (mobil de aynı hook'u
+          // tüketecek).
+          router.replace('/login')
+        },
+      }
+    )
+  }
+
+  return (
+    <section
+      aria-labelledby="delete-account-heading"
+      className="mt-8 rounded-3xl border-2 border-red-200 bg-red-50/60 p-6 dark:border-red-900/60 dark:bg-red-950/20"
+    >
+      <h2
+        id="delete-account-heading"
+        className="mb-3 flex items-center gap-2 text-lg font-black text-red-700 dark:text-red-400"
+      >
+        <AlertTriangle aria-hidden="true" className="h-5 w-5 shrink-0" />
+        Hesabımı Sil
+      </h2>
+
+      <p className="text-sm font-medium leading-relaxed text-red-900/90 dark:text-red-200/90">
+        Hesabınızı sildiğinizde <strong>geri dönüşü yoktur</strong>. Şunların tamamı kalıcı olarak
+        silinir: profiliniz, antrenman ve beslenme programlarınız, antrenman ve öğün kayıtlarınız,
+        günlük takipleriniz, ilerleme ölçümleriniz, form check ve ilerleme fotoğraflarınız,
+        koçunuzla olan tüm yazışmalarınız ve bildirimleriniz. Silme işleminden sonra bu verilerin
+        hiçbiri kurtarılamaz.
+      </p>
+
+      {!isArmed ? (
+        <button
+          type="button"
+          onClick={() => setIsArmed(true)}
+          className="mt-4 inline-flex items-center gap-2 rounded-xl border-2 border-red-600 px-5 py-3 text-sm font-bold text-red-700 transition-colors hover:bg-red-600 hover:text-white dark:border-red-500 dark:text-red-400 dark:hover:bg-red-600 dark:hover:text-white"
+        >
+          <Trash2 aria-hidden="true" className="h-4 w-4 shrink-0" />
+          Hesabımı Sil
+        </button>
+      ) : (
+        <div className="mt-4 space-y-3">
+          <label
+            htmlFor="delete-confirmation"
+            className="block text-sm font-bold text-red-900 dark:text-red-200"
+          >
+            Onaylamak için aşağıdaki kutuya{' '}
+            <code className="rounded bg-red-100 px-1.5 py-0.5 font-mono text-red-800 dark:bg-red-900/60 dark:text-red-100">
+              {DELETE_ACCOUNT_CONFIRMATION}
+            </code>{' '}
+            yazın
+          </label>
+          <input
+            id="delete-confirmation"
+            type="text"
+            value={confirmation}
+            onChange={(event) => setConfirmation(event.target.value)}
+            autoComplete="off"
+            // Tarayıcı otomatik büyük harfe çevirme/düzeltme, Türkçe İ/ı katlamasıyla
+            // birleşince kullanıcının doğru yazdığı cümleyi bozabilir — kapatılır.
+            autoCapitalize="off"
+            autoCorrect="off"
+            spellCheck={false}
+            aria-describedby="delete-confirmation-hint"
+            className="w-full max-w-sm rounded-xl border-2 border-red-300 bg-white p-3 text-sm font-medium focus:border-red-600 focus:outline-none dark:border-red-900 dark:bg-zinc-950"
+          />
+          <p
+            id="delete-confirmation-hint"
+            className="text-xs font-medium text-red-800/80 dark:text-red-300/80"
+          >
+            {isPhraseCorrect
+              ? 'Onay metni doğru. Aşağıdaki düğmeye bastığınızda hesabınız kalıcı olarak silinecek.'
+              : 'Silme düğmesi, onay metnini birebir yazana kadar etkinleşmez.'}
+          </p>
+
+          <div className="flex flex-wrap gap-3 pt-1">
+            <button
+              type="button"
+              onClick={handleDelete}
+              disabled={!canSubmit}
+              aria-busy={deleteAccount.isPending}
+              className="inline-flex items-center gap-2 rounded-xl bg-red-600 px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <Trash2 aria-hidden="true" className="h-4 w-4 shrink-0" />
+              {deleteAccount.isPending ? 'Siliniyor...' : 'Hesabımı kalıcı olarak sil'}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setIsArmed(false)
+                setConfirmation('')
+              }}
+              disabled={deleteAccount.isPending}
+              className="rounded-xl border px-5 py-3 text-sm font-bold text-gray-700 transition-colors hover:bg-gray-100 disabled:opacity-40 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
+            >
+              Vazgeç
+            </button>
+          </div>
+        </div>
+      )}
+    </section>
   )
 }
 
@@ -289,6 +433,10 @@ export default function ProfilePage(): JSX.Element {
           </QueryState>
         </div>
       </div>
+
+      {/* KVKK hesap silme — sayfanın EN ALTINDA ve görsel olarak ayrılmış ("tehlikeli
+          bölge" deseni): yanlışlıkla karşılaşılması zor, arayan için bulunması kolay. */}
+      <DeleteAccountSection />
     </main>
   )
 }

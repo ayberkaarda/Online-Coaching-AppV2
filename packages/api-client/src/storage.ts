@@ -63,7 +63,33 @@ function isStoragePath(path: string): boolean {
 }
 
 /**
+ * Nesnenin bucket içindeki yolundan indirme için önerilecek dosya adını üretir.
+ * (`a/b/c-uuid.png` -> `c-uuid.png`). Saf fonksiyondur, boş sonuç `null` döner.
+ */
+export function attachmentFileNameFromPath(path: string | null | undefined): string | null {
+  const normalized = normalizePath(path)
+  if (!normalized) return null
+  const last = normalized.split('/').pop()?.trim()
+  return last && last.length > 0 ? last : null
+}
+
+/**
  * Tek bir yol için imzalı adres üretir.
+ *
+ * ###########################################################################
+ * # B-008 — SATIR İÇİ (INLINE) GÖSTERİM YOLU. BİLEREK `download` YOK.       #
+ * #                                                                         #
+ * # Bu fonksiyonun ürettiği adres `<img src>` içinde kullanılır (avatar,     #
+ * # form check pozları, ilerleme fotoğrafları, sohbet eki). Storage bu       #
+ * # adreste `Content-Disposition` GÖNDERMEZ, yani görsel sayfada çizilir.    #
+ * # İNDİRME davranışı gereken yer için AYRI bir fonksiyon vardır:            #
+ * # `createSignedDownloadUrl` (aşağıda). İkisinin ayrı olmasının sebebi      #
+ * # B-008'in kapanış koşuluyla `<img>` gösteriminin ÇELİŞMESİDİR: aynı       #
+ * # adrese `download` eklenirse tarayıcı için hâlâ görsel olabilir ama       #
+ * # davranış tarayıcı/sürüm bağımlı hâle gelir; ölçülebilir tek tasarım      #
+ * # "hangi adres nereye gidiyor"un AÇIKÇA ayrılmasıdır.                      #
+ * ###########################################################################
+ *
  * @returns İmzalı adres, ya da yol boşsa / dosya yoksa / yetki yoksa `null`.
  */
 export async function createSignedUrl(
@@ -89,6 +115,70 @@ export async function createSignedUrl(
     logger.warn(
       { bucket, path: normalized, err: err instanceof Error ? err.message : String(err) },
       'İmzalı adres üretimi beklenmedik şekilde başarısız oldu'
+    )
+    return null
+  }
+}
+
+/**
+ * B-008 — İNDİRME adresi: imzalı adrese `download` seçeneği eklenir.
+ *
+ * ###########################################################################
+ * # API GERÇEĞİ (UYDURULMADI, İKİ KAYNAKTAN DOĞRULANDI)                     #
+ * #                                                                         #
+ * # 1) Tip tanımı — @supabase/storage-js@2.112.3                            #
+ * #    `createSignedUrl(path, expiresIn, options?: {                        #
+ * #        download?: string | boolean; transform?: …; cacheNonce?: … })`   #
+ * #    Uygulaması (`src/packages/StorageFileApi.ts`):                        #
+ * #      if (options?.download)                                             #
+ * #        query.set('download', options.download === true ? '' : …)        #
+ * #    Yani `download: true` -> `?download=`, `download: 'ad.png'` ->       #
+ * #    `?download=ad.png`. DİKKAT: değer FALSY olursa parametre HİÇ         #
+ * #    EKLENMEZ (`download: ''` sessizce inline'a düşer) — bu yüzden        #
+ * #    aşağıda dosya adı boşsa `true`'ya düşülür, boş string'e DEĞİL.        #
+ * #                                                                         #
+ * # 2) Canlı ölçüm (yerel storage-api v1.69.0, aynı imzalı adres):          #
+ * #      GET …/object/sign/<b>/<p>?token=…            -> (disposition YOK)  #
+ * #      GET …/object/sign/<b>/<p>?token=…&download=  -> content-disposition:#
+ * #                                                      attachment;        #
+ * #    B-008'in "inline servis ediliyor" iddiası da bu ölçümle doğrulandı.  #
+ * ###########################################################################
+ *
+ * Dosya adı verilirse `Content-Disposition: attachment; filename=…` olur; verilmezse
+ * yalnızca `attachment` gelir ve tarayıcı adı adresten türetir.
+ */
+export async function createSignedDownloadUrl(
+  client: SupabaseClient<Database>,
+  bucket: string,
+  path: string | null | undefined,
+  fileName?: string | null
+): Promise<string | null> {
+  const normalized = normalizePath(path)
+  if (!normalized) return null
+
+  // Boş/whitespace ad `download: ''` üretip parametreyi SESSİZCE düşürürdü (yukarıdaki
+  // falsy tuzağı) -> indirme yerine inline'a dönerdi. Bu yüzden `true`'ya düşülür.
+  const suggested =
+    typeof fileName === 'string' && fileName.trim().length > 0 ? fileName.trim() : null
+
+  try {
+    const { data, error } = await client.storage
+      .from(bucket)
+      .createSignedUrl(normalized, SIGNED_URL_TTL_SECONDS, { download: suggested ?? true })
+
+    if (error || !data?.signedUrl) {
+      logger.warn(
+        { bucket, path: normalized, err: error?.message },
+        'İmzalı indirme adresi üretilemedi'
+      )
+      return null
+    }
+
+    return data.signedUrl
+  } catch (err) {
+    logger.warn(
+      { bucket, path: normalized, err: err instanceof Error ? err.message : String(err) },
+      'İmzalı indirme adresi üretimi beklenmedik şekilde başarısız oldu'
     )
     return null
   }

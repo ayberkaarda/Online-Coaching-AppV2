@@ -220,7 +220,14 @@ jobs:
         #   input'u kaldırıldı — kullanılmıyor.
         uses: astral-sh/setup-uv@v7
         with:
-          python-version: '3.12'
+          # 3.12 -> 3.14 (B-055): `ai_backend` bu turda 3.14'e çekildi (Dockerfile iki
+          # stage de `python:3.14-slim`, `.python-version` 3.14) ve kapılar (ruff/mypy/
+          # pytest, 82 test, %94.94 coverage) 3.14 altında ölçüldü. Bu job `ai_backend`'in
+          # kendi ortamını (`uv sync` + `pytest`/`ruff`/`mypy`) kurduğu için pin buradan
+          # SÜRÜKLENİRSE (3.12'de kalırsa) testler Docker imajının çalıştıracağı sürümden
+          # farklı bir Python'da geçmiş olur — sessiz bir sürüm sürüklenmesi. `security`
+          # job'undaki aynı pinin 3.12'de KALMASININ nedeni farklı: bkz. o job'daki not.
+          python-version: '3.14'
 
       - name: Sync dependencies
         run: uv sync --all-extras --dev
@@ -459,6 +466,16 @@ jobs:
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ env.API_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ env.ANON_KEY }}
+          # B-042 / Faz 4.6: `supabase status -o env` bu anahtarı `SERVICE_ROLE_KEY`
+          # adıyla veriyor (bkz. "Capture local Supabase connection info" adımı), uygulama
+          # ise çalışma zamanında `SUPABASE_SERVICE_ROLE_KEY` okuyor; ad eşleşmezse sunucu
+          # yapılandırılmamış sayılır, `account-deletion.spec.ts` gerekçeli şekilde skip
+          # eder ve AC-4.6.2 CI'da hiç kanıtlanmamış olur. Bu step'in env'i `next start`
+          # alt process'ine (`playwright.config.ts` webServer) `process.env` üzerinden zaten
+          # akıyor (playwright webServer launch: `...process.env, ...webServer.env` — ölçüldü,
+          # `playwright/lib/runner/index.js`), o yüzden webServer.env'de AYRICA tekrarlamaya
+          # gerek yok.
+          SUPABASE_SERVICE_ROLE_KEY: ${{ env.SERVICE_ROLE_KEY }}
           # A-12 (src/env.ts): bu adım `playwright.config.ts`'in `webServer`
           # bloğu üzerinden `pnpm run start` (next start, NODE_ENV=production)
           # çalıştırır; middleware her `/api/*` isteğinde AI_BACKEND_API_KEY
@@ -568,6 +585,10 @@ jobs:
         # (semgrep, pip-audit) — v6'nın kaldırdığı otomatik venv aktivasyonuna bağımlı değil.
         uses: astral-sh/setup-uv@v7
         with:
+          # `backend` job'undaki pin 3.14'e çekildi (B-055) ama BU pin bilerek 3.12'de
+          # kalıyor: bu job `ai_backend`'in kendi ortamını hiç kurmuyor, setup-uv'den sonra
+          # yalnızca `uvx` ile bağımsız araçlar (semgrep, pip-audit) çağırıyor — `ai_backend`
+          # kaynağının hangi Python'da çalıştığıyla İLİŞKİSİZ, o yüzden sürüklenme riski yok.
           python-version: '3.12'
 
       # --- semgrep (SAST) ---

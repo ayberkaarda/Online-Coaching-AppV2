@@ -7,6 +7,7 @@ import { NextResponse } from 'next/server'
 import type { z } from 'zod'
 
 import { getServerEnv } from '@/env.server'
+import { aiQuotaExceededResponse, checkAndConsumeAiQuota } from '@/lib/api/ai-quota'
 import { errorResponse } from '@/lib/api/response'
 import { createRequestLogger } from '@/lib/logger'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
@@ -72,6 +73,18 @@ export async function handleAiProxy<TOut>(
   }
 
   log = log.child({ userId: userData.user.id })
+
+  // 0.4) Kullanıcı başına GÜNLÜK AI kotası (B-043 / AC-4.6.3) — bkz. `src/lib/api/ai-quota.ts`
+  // başlığı. Doğrulanmış `userData.user.id` (yukarıda `auth.getUser` ile İMZA DOĞRULAMALI
+  // olarak elde edildi) kullanılır — JWT `sub` alanı doğrulamasız OKUNMAZ, çünkü sahte bir
+  // token'a kurbanın user_id'sini yazıp kurbanın kotasını TÜKETMEK (griefing) mümkün olurdu.
+  // Kota, gövde okuma/doğrulama (adım 0.5/1/2) ve upstream çağrısı (adım 3) BAŞLAMADAN ÖNCE
+  // kontrol edilir — aşımda maliyetli hiçbir iş yapılmaz.
+  const quota = checkAndConsumeAiQuota(userData.user.id)
+  if (!quota.allowed) {
+    log.warn({ upstreamPath, limit: quota.limit }, 'AI proxy: günlük kota aşıldı')
+    return aiQuotaExceededResponse(quota, requestId)
+  }
 
   // 0.5) Gövde boyutu — ucuz ÖN kontrol (A-08). `Content-Length` istemci tarafından bildirilir,
   // dolayısıyla GÜVENİLMEZ (sahte/eksik olabilir, chunked/streaming istekte hiç yoktur); varsa

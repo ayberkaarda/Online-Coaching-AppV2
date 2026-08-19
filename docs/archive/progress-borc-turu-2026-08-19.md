@@ -238,3 +238,27 @@ koşuldu ve kanıtlandı — SDK 57.0.0 doğrulandı, beş sekmede gezinme kanı
 `docs/archive/progress-faz-4.5-monorepo-mobil-temel.md` "Mobil smoke sonucu
 (2026-08-19)". Sırada **Faz 4.6 — Güvenlik Tamamlama** (`active_planprogram.md`
 §7a; B-042 KVKK hesap silme, B-043 AI kota). Ayrıntı: `docs/PROGRESS.md` §5.
+
+## Ek — aynı gün, ikinci tur: B-056 ve B-040 kapandı
+
+Bu turun "Yeni açılan borçlar" bölümünde açılan B-056 ve yukarıda B-023 ile birlikte
+ele alınmayan B-040, aynı gün içindeki bir sonraki turda (Faz 4.6 güvenlik turu ile
+birlikte) kapatıldı. Faz 4.6'nın kendi kapanış kaydı ayrı bir dosyadadır:
+`docs/archive/progress-faz-4.6-guvenlik-tamamlama.md`. Bu ek yalnızca bu iki borcun
+kapanış notunu, açıldıkları arşivle aynı dosyada tutmak için buraya eklenmiştir.
+
+### B-056 — AI antrenman üretimi artık gerçek kullanıcı verisi kullanıyor
+
+`apps/web/src/components/tabs/WorkoutTab.tsx`'teki sabit `age: 20, goal: 'bulk',
+weight: 75` gönderimi kaldırıldı. `NutritionTab.tsx:790`'daki desenle aynı yaklaşım
+uygulandı: `useForm` + `zodResolver` + mevcut `aiWorkoutSchema`. Kilo alanı
+`useProgressEntries` ile danışanın son ölçümünden ön dolduruluyor; kayıt yoksa alan
+boş bırakılıyor (sahte varsayılan değer yazılmadı). 3 yeni test eklendi.
+
+### B-040 — E2E artık kendi `pending` fikstürünü üretiyor
+
+`supabase/seed.sql`'e dokunulmadan çözüldü: `apps/web/tests/e2e/plans.spec.ts` akışın
+sonunda danışanla yeni bir `pending` onay kaydı üretecek şekilde genişletildi. Test artık
+kendi tükettiği fikstürü kendi yeniliyor; koçun demo kuyruğu E2E koşusundan sonra
+boşalmıyor. Bu, tur içindeki "öneri: E2E kendi `pending` satırını üretsin" notunun
+uygulanmasıdır.

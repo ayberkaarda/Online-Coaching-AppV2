@@ -30,6 +30,12 @@ export const queryKeyRoots = {
   coachId: ['coach-id'] as const,
   /** Mesaj eki (`messages.attachment_path`) için imzalı adres — bkz. `useMessages.ts::useMessageAttachmentUrl`. */
   messageAttachmentUrl: ['message-attachment-url'] as const,
+  /**
+   * Mesaj ekinin İNDİRME adresi (`?download=` -> `Content-Disposition: attachment`, B-008).
+   * Gösterim adresinden AYRI bir anahtardır: aynı yol için iki farklı adres üretilir ve
+   * biri diğerinin önbelleğini ezmemelidir.
+   */
+  messageAttachmentDownloadUrl: ['message-attachment-download-url'] as const,
   /** Günlük makro hedefi (`nutrition_plans.target_*`) — bkz. `useNutritionLogs.ts::useNutritionTargets`. */
   nutritionTargets: ['nutrition-targets'] as const,
   /** GERÇEKLEŞEN öğün kaydı (`nutrition_logs`) — bkz. `useNutritionLogs.ts::useNutritionLogs`. */
@@ -98,6 +104,10 @@ export const queryKeys = {
 
   /** Mesaj eki (`messages.attachment_path`) için imzalı adres. Yol yoksa `null` bileşeni sorguyu `enabled: false` yapar. */
   messageAttachmentUrl: (path?: string | null) => ['message-attachment-url', path ?? null] as const,
+
+  /** Mesaj ekinin İNDİRME adresi (B-008). Gösterim adresiyle AYNI önbellek girdisini paylaşmaz. */
+  messageAttachmentDownloadUrl: (path?: string | null) =>
+    ['message-attachment-download-url', path ?? null] as const,
 
   /**
    * Günlük makro hedefi (`nutrition_plans.target_*`).

@@ -6,9 +6,16 @@ import type { RealtimePresenceState, SupabaseClient } from '@supabase/supabase-j
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useState } from 'react'
 
+import { ApiError, apiFetch } from '../api/client'
 import { queryKeyRoots, queryKeys } from '../query/keys'
 import { wrapSupabaseError } from '../query/supabase-error'
-import { MESSAGE_ATTACHMENT_BUCKET, SIGNED_URL_STALE_TIME_MS, createSignedUrl } from '../storage'
+import {
+  MESSAGE_ATTACHMENT_BUCKET,
+  SIGNED_URL_STALE_TIME_MS,
+  attachmentFileNameFromPath,
+  createSignedDownloadUrl,
+  createSignedUrl,
+} from '../storage'
 import { useSupabaseClient } from '../context'
 import { useNotifier } from '../notify'
 import { assertValidImageFile } from '../upload-validation'
@@ -265,6 +272,50 @@ export function useSendMessage() {
           .from(MESSAGE_ATTACHMENT_BUCKET)
           .upload(path, file, { contentType: mime })
         if (uploadError) throw new Error(uploadError.message)
+
+        // ###################################################################
+        // # B-028 — SUNUCU TARAFI DOĞRULAMA (AC-4.6.4)                       #
+        // #                                                                  #
+        // # Yukarıdaki `assertValidImageFile` İSTEMCİ tarafı doğrulamadır ve  #
+        // # bir GÜVENLİK SINIRI DEĞİLDİR: `fetch` ile doğrudan Storage'a      #
+        // # giden bir betik onu atlar. Yükleme tamamlandıktan sonra sunucu    #
+        // # nesnenin baytlarını KENDİ okur ve kararı tekrar verir             #
+        // # (apps/web/src/app/api/attachments/verify/route.ts).               #
+        // #                                                                  #
+        // # BU ÇAĞRI "NAZİK BİR RİCA" DEĞİLDİR: veritabanındaki               #
+        // # `messages_require_verified_attachment` tetikleyicisi, sunucunun   #
+        // # bıraktığı damga olmadan EK İÇEREN SATIRI KABUL ETMEZ. Bu satır    #
+        // # silinse bile aşağıdaki INSERT 42501 ile düşerdi — kapı istemcide  #
+        // # değil, veritabanındadır.                                          #
+        // #                                                                  #
+        // # SIRA: doğrulama INSERT'ten ÖNCEDİR. Reddedilen nesneyi sunucu     #
+        // # zaten siler; burada yalnızca Türkçe hatayı yukarı taşırız ve      #
+        // # hiçbir mesaj satırı yazılmaz.                                     #
+        // ###################################################################
+        const {
+          data: { session },
+        } = await supabase.auth.getSession()
+
+        if (!session?.access_token) {
+          throw new Error('Oturumunuz sona ermiş. Lütfen tekrar giriş yapın.')
+        }
+
+        try {
+          await apiFetch<{ ok: true; mime: string }>('/api/attachments/verify', {
+            method: 'POST',
+            json: { path },
+            headers: { Authorization: `Bearer ${session.access_token}` },
+          })
+        } catch (err) {
+          // Sunucunun Türkçe mesajı kullanıcıya AYNEN gösterilir (ör. "Dosyanın
+          // içeriği bildirilen türle uyuşmuyor."); ağ hatası jenerik metne düşer.
+          throw new Error(
+            ApiError.isApiError(err)
+              ? err.message
+              : 'Fotoğraf doğrulanamadı. Lütfen tekrar deneyin.'
+          )
+        }
+
         attachmentPath = path
       }
 
@@ -475,5 +526,42 @@ export function useMessageAttachmentUrl(path: string | null | undefined) {
     enabled: Boolean(path),
     staleTime: SIGNED_URL_STALE_TIME_MS,
     queryFn: () => createSignedUrl(supabase, MESSAGE_ATTACHMENT_BUCKET, path),
+  })
+}
+
+/**
+ * B-008 — Bir mesaj ekinin İNDİRME adresi (`Content-Disposition: attachment`).
+ *
+ * ###########################################################################
+ * # İKİ AYRI ADRES, İKİ AYRI İŞ — BİLEREK                                    #
+ * #   `useMessageAttachmentUrl`         -> `<img src>` (satır içi gösterim)   #
+ * #   `useMessageAttachmentDownloadUrl` -> `<a href>`  (indirme)              #
+ * #                                                                          #
+ * # B-008 "yüklenen dosya imzalı adreste inline servis ediliyor" diyordu ve   #
+ * # bu, kullanıcının dosyaya GİTTİĞİ (navigasyon) yol için bir kusurdur:      #
+ * # tarayıcı gövdeyi kendi penceresinde açar. `<img>` için ise inline tam da  #
+ * # istenen davranıştır. Aynı adrese `download` eklemek sohbetteki fotoğraf   #
+ * # gösterimini tarayıcı davranışına bağımlı hâle getirirdi; bu yüzden yollar #
+ * # AYRIŞTIRILDI. Adresi TIKLANABİLİR yapan tek yer `MessagesTab`'daki        #
+ * # "İndir" bağlantısıdır ve o bağlantı BU hook'u kullanır.                   #
+ * ###########################################################################
+ *
+ * `enabled` VARSAYILAN OLARAK KAPALIDIR: her ekli mesaj için ikinci bir imza
+ * üretmek (liste boyunca N ek istek) yalnızca kullanıcı indirmek istediğinde
+ * gereken bir maliyettir.
+ */
+export function useMessageAttachmentDownloadUrl(path: string | null | undefined, enabled = false) {
+  const supabase = useSupabaseClient()
+  return useQuery({
+    queryKey: queryKeys.messageAttachmentDownloadUrl(path),
+    enabled: Boolean(path) && enabled,
+    staleTime: SIGNED_URL_STALE_TIME_MS,
+    queryFn: () =>
+      createSignedDownloadUrl(
+        supabase,
+        MESSAGE_ATTACHMENT_BUCKET,
+        path,
+        attachmentFileNameFromPath(path)
+      ),
   })
 }

@@ -2,6 +2,7 @@
 // (Doğrudan modül erişimi de mümkün: `@repo/api-client/hooks/useProfile`.)
 
 export * from './useSession'
+export * from './useAccount'
 export * from './useProfile'
 export * from './useNotifications'
 export * from './useFormChecks'

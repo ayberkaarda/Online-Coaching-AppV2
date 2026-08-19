@@ -29,6 +29,7 @@ vi.mock('@repo/api-client', async (importOriginal) => {
     ...actual,
     useCoachId: vi.fn(),
     useMarkConversationRead: vi.fn(),
+    useMessageAttachmentDownloadUrl: vi.fn(),
     useMessageAttachmentUrl: vi.fn(),
     useMessages: vi.fn(),
     usePresence: vi.fn(),
@@ -49,6 +50,7 @@ import MessagesTab from '@/components/tabs/MessagesTab'
 import {
   useCoachId,
   useMarkConversationRead,
+  useMessageAttachmentDownloadUrl,
   useMessageAttachmentUrl,
   useMessages,
   usePresence,
@@ -115,6 +117,11 @@ function mockMessagesHooks(
   )
   vi.mocked(useMessageAttachmentUrl).mockReturnValue(
     mockQuery({ data: undefined }) as unknown as ReturnType<typeof useMessageAttachmentUrl>
+  )
+  // B-008: indirme adresi GÖSTERİM adresinden AYRI bir hook'tan gelir; varsayılan
+  // olarak boştur (görsel görünmeden ikinci imza istenmez).
+  vi.mocked(useMessageAttachmentDownloadUrl).mockReturnValue(
+    mockQuery({ data: undefined }) as unknown as ReturnType<typeof useMessageAttachmentDownloadUrl>
   )
   vi.mocked(useMessages).mockReturnValue(
     mockQuery({ data: [], ...overrides.messages }) as unknown as ReturnType<typeof useMessages>
@@ -267,6 +274,47 @@ describe('MessagesTab — mesaj listesi', () => {
 
     const image = await screen.findByAltText('Karşı taraf tarafından gönderilen fotoğraf')
     expect(image).toHaveAttribute('src', 'https://signed/photo.jpg')
+  })
+
+  it('B-008: indirme bağlantısı GÖSTERİM adresini DEĞİL, `download` içeren adresi kullanır', async () => {
+    mockMessagesHooks({
+      messages: {
+        data: [
+          message({
+            id: 'm-att-dl',
+            sender_id: CLIENT_ID,
+            receiver_id: COACH_ID,
+            attachment_path: 'convo/1-abc.png',
+          }),
+        ],
+      },
+    })
+    vi.mocked(useMessageAttachmentUrl).mockReturnValue(
+      mockQuery({ data: 'https://signed/photo.jpg', isLoading: false }) as unknown as ReturnType<
+        typeof useMessageAttachmentUrl
+      >
+    )
+    vi.mocked(useMessageAttachmentDownloadUrl).mockReturnValue(
+      mockQuery({
+        data: 'https://signed/photo.jpg?download=photo.png',
+        isLoading: false,
+      }) as unknown as ReturnType<typeof useMessageAttachmentDownloadUrl>
+    )
+
+    renderTab({
+      targetId: CLIENT_ID,
+      currentUserId: COACH_ID,
+      userRole: 'coach',
+      selectedClientIds: [CLIENT_ID],
+    })
+
+    // `<img>` INLINE adresi korur (kırılmaması gereken yol)...
+    const image = await screen.findByAltText('Karşı taraf tarafından gönderilen fotoğraf')
+    expect(image).toHaveAttribute('src', 'https://signed/photo.jpg')
+
+    // ...bağlantı ise `download` parametreli adrese gider (Content-Disposition: attachment).
+    const link = screen.getByRole('link', { name: 'İndir' })
+    expect(link).toHaveAttribute('href', 'https://signed/photo.jpg?download=photo.png')
   })
 })
 
