@@ -137,6 +137,25 @@ function release(key: string): void {
 }
 
 /**
+ * Kilidi TEST GÖVDESİ DIŞINDAN almak için tek yol (fixture, global-setup, yardımcı).
+ *
+ * `resource(...)` anotasyonu yalnızca bir testin kendi ömrü boyunca kilit tutar;
+ * koç `aal2` oturum durumunun üretimi gibi TESTLER ARASI paylaşılan bir işlem
+ * (bkz. `fixtures.ts` -> `loginAsCoach`) o mekanizmaya sığmaz: iki worker aynı
+ * anda üretmeye kalkarsa GoTrue'nun MFA doğrulaması diğerinin oturumunu iptal
+ * eder (ölçüm: `coach-mfa.ts` başlığı). Aynı `mkdirSync` kilidi burada da
+ * kullanılır — süreçler ve projeler arası çalışan TEK mekanizma odur.
+ */
+export async function withResourceLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
+  await acquire(key)
+  try {
+    return await fn()
+  } finally {
+    release(key)
+  }
+}
+
+/**
  * Paylaşılan kaynak kilidini uygulayan otomatik fixture.
  *
  * Kaynak ilan ETMEYEN testler için tamamen no-op'tur (auth/dashboard gibi

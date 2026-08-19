@@ -20,7 +20,7 @@
 
 import { type Locator, type Page } from '@playwright/test'
 
-import { TEST_USERS, login } from './fixtures'
+import { TEST_USERS, login, loginAsCoach } from './fixtures'
 import { expect, resource, test } from './resource-lock'
 
 // supabase/seed.sql: client1 -> "Ahmet Yılmaz".
@@ -106,7 +106,7 @@ test.describe('İlerleme Takibi (§6)', () => {
       const coachContext = await browser.newContext()
       try {
         const coachPage = await coachContext.newPage()
-        await login(coachPage, TEST_USERS.coach)
+        await loginAsCoach(coachPage)
         await selectClient(coachPage, CLIENT1_FULL_NAME)
         await coachPage.getByRole('tab', { name: 'İstatistikler' }).click()
 

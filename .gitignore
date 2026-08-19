@@ -85,3 +85,7 @@ supabase/.branches/
 
 # hosted Supabase yedekleri (B-030) — kişisel veri taşır, KVKK gereği repoya asla girmez, bkz. docs/ops/hosted-backup.md
 backups/
+
+# Faz 4.7 — E2E koc TOTP secret deposu (tests/e2e/coach-mfa.ts).
+# Yerel demo hesabinin ikinci faktoru bile olsa bir MFA secret asla depoya girmez.
+apps/web/.e2e-coach-totp.json

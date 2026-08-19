@@ -123,7 +123,7 @@ rollback;
 -- =============================================================================
 begin;
 set local role authenticated;
-set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","aal":"aal2"}';
 do $$
 begin
   if (select count(*) from public.profiles) is distinct from (3) then
@@ -247,7 +247,7 @@ insert into public.daily_logs (client_id, log_date, water_lt) values
   ('33333333-3333-3333-3333-333333333333', date '2000-01-09', 2.25);
 
 set local role authenticated;
-set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","aal":"aal2"}';
 do $$
 declare
   v_fc_total   int;
@@ -670,7 +670,7 @@ insert into public.workout_plan_exercises (plan_id, day, position, raw_line) val
   ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'Pazartesi', 0, '1. Squat - 5x5');
 
 set local role authenticated;
-set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","aal":"aal2"}';
 
 do $$
 declare
@@ -1063,7 +1063,7 @@ insert into public.nutrition_plan_meals (plan_id, day, position, description, kc
   ('dddddddd-dddd-dddd-dddd-dddddddddddd', 'Pazartesi', 0, 'Yulaf 60g', 2100);
 
 set local role authenticated;
-set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","aal":"aal2"}';
 
 do $$
 declare
@@ -1439,7 +1439,7 @@ insert into public.messages (id, sender_id, receiver_id, message) values
    'zz-37 Danisan B -> koc');
 
 set local role authenticated;
-set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","aal":"aal2"}';
 do $$
 declare
   v_a     int;
@@ -1552,7 +1552,7 @@ values (
 );
 
 set local role authenticated;
-set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","aal":"aal2"}';
 
 do $$
 declare
@@ -1844,7 +1844,7 @@ values (
 );
 
 set local role authenticated;
-set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","aal":"aal2"}';
 
 do $$
 declare
@@ -1893,7 +1893,7 @@ values (
 );
 
 set local role authenticated;
-set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","aal":"aal2"}';
 
 do $$
 declare
@@ -1945,7 +1945,7 @@ values (
 );
 
 set local role authenticated;
-set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","aal":"aal2"}';
 
 do $$
 declare
@@ -2231,7 +2231,7 @@ values (
 );
 
 set local role authenticated;
-set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","aal":"aal2"}';
 
 do $$
 declare
@@ -2541,7 +2541,7 @@ rollback;
 -- =============================================================================
 begin;
 set local role authenticated;
-set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","aal":"aal2"}';
 do $$
 declare
   v_rows int;
@@ -3549,7 +3549,7 @@ rollback;
 -- =============================================================================
 begin;
 set local role authenticated;
-set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","aal":"aal2"}';
 do $$
 declare
   v_rows       int;
@@ -3839,7 +3839,7 @@ begin
 end $$;
 
 -- Koç yolu: yetki değil BÜTÜNLÜK kuralı olduğu için koç da yapamaz.
-set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","aal":"aal2"}';
 do $$
 declare
   v_log    uuid;
@@ -3896,7 +3896,7 @@ begin
   end if;
 end $$;
 
-set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","aal":"aal2"}';
 do $$
 declare
   v_n      int;
@@ -4009,7 +4009,7 @@ begin
 end $$;
 
 -- (b) ALICI (koç) eki değiştiremez
-set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","aal":"aal2"}';
 do $$
 declare
   v_caught boolean := false;
@@ -4093,7 +4093,7 @@ begin
 end $$;
 
 -- Koç: aynı bucket'ta HER konuşmayı görür (tek koçlu model).
-set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","aal":"aal2"}';
 do $$
 declare v_n int;
 begin
@@ -4162,7 +4162,7 @@ begin
   end if;
 end $$;
 
-set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","aal":"aal2"}';
 do $$
 begin
   -- (d)
@@ -4304,7 +4304,7 @@ begin
   end if;
 end $$;
 
-set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","aal":"aal2"}';
 do $$
 declare
   v_n      int;
@@ -4379,7 +4379,7 @@ insert into public.nutrition_plan_meals (plan_id, day, position, description, kc
 values ('cccccccc-0000-0000-0000-000000000094', 'Pazartesi', 0, 'Yulaf Ezmesi 80g', 1850);
 
 set local role authenticated;
-set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","aal":"aal2"}';
 do $$
 declare
   v_rows   int;
@@ -4509,7 +4509,7 @@ begin
   perform set_config('zz.fc_96', v_fc_id::text, true);
 end $$;
 
-set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","aal":"aal2"}';
 do $$
 declare
   v_fc_id uuid := current_setting('zz.fc_96')::uuid;
@@ -4572,7 +4572,7 @@ begin
   perform set_config('zz.fc_97', v_fc_id::text, true);
 end $$;
 
-set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","aal":"aal2"}';
 do $$
 declare
   v_fc_id uuid := current_setting('zz.fc_97')::uuid;
@@ -4636,7 +4636,7 @@ rollback;
 -- =============================================================================
 begin;
 set local role authenticated;
-set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","aal":"aal2"}';
 do $$
 declare
   v_caught boolean := false;
@@ -4706,7 +4706,7 @@ begin
 end $$;
 
 set local role authenticated;
-set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","aal":"aal2"}';
 do $$
 declare
   v_caught boolean;
@@ -4830,7 +4830,7 @@ begin
 end $$;
 
 -- Yayınlamayı KOÇ yapar (gerçek akış: koç planı kaydeder).
-set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","aal":"aal2"}';
 do $$
 declare
   v_old      uuid := current_setting('zz.plan_v1')::uuid;
@@ -4921,7 +4921,7 @@ begin
   perform set_config('zz.plan_101', v_plan::text, true);
 end $$;
 
-set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","aal":"aal2"}';
 do $$
 declare
   v_log   uuid := current_setting('zz.log_101')::uuid;
@@ -5003,7 +5003,7 @@ begin
   values ('22222222-2222-2222-2222-222222222222'::uuid, 'zz-102', 1, v_pe);
 end $$;
 
-set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","aal":"aal2"}';
 select public.save_workout_plan(
   array['22222222-2222-2222-2222-222222222222'::uuid],
   '{"Pazartesi": "1. Zz Aktif - 4x8"}'::jsonb
@@ -5109,7 +5109,7 @@ begin
   values ('22222222-2222-2222-2222-222222222222'::uuid, 'zz-103', 1, v_pe);
 end $$;
 
-set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","aal":"aal2"}';
 do $$
 declare
   v_a uuid := '22222222-2222-2222-2222-222222222222';
@@ -5182,7 +5182,7 @@ begin
   values ('22222222-2222-2222-2222-222222222222'::uuid, 'zz-104', 1, v_pe);
 end $$;
 
-set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","aal":"aal2"}';
 do $$
 declare
   v_a       uuid := '22222222-2222-2222-2222-222222222222';
@@ -5356,7 +5356,7 @@ begin
   end if;
 end $$;
 
-set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","aal":"aal2"}';
 do $$
 declare v_n int; v_rows int; v_caught boolean := false;
 begin
@@ -5585,7 +5585,7 @@ begin
   end if;
 end $$;
 
-set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","aal":"aal2"}';
 do $$
 declare v_n int; v_rows int; v_caught boolean := false;
 begin
@@ -5686,7 +5686,7 @@ end $$;
 --   görür (mevcut üç bucket'ta da böyledir — koç görünürlüğü ad ayrıştırmasına
 --   DEĞİL role dayanır). Bu yüzden aşağıdaki sayım KANONİK adlara daraltılmıştır;
 --   fail-closed iddiası DANIŞAN tarafında (yukarıda) sınanır.
-set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","aal":"aal2"}';
 do $$
 declare v_n int; v_bad text; v_caught boolean := false;
 begin
@@ -5931,7 +5931,7 @@ begin
   end if;
 end $$;
 
-set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","aal":"aal2"}';
 do $$
 declare v_w numeric;
 begin
@@ -6179,7 +6179,7 @@ select count(*) as n
    and message   = 'Koçun yeni antrenman programını onayladı. Artık kullanabilirsin.';
 
 set local role authenticated;
-set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","aal":"aal2"}';
 
 do $$
 declare
@@ -6391,7 +6391,7 @@ end $$;
 
 -- --- (b) KOÇ, eşleşmeyen (onay A'nın / danışan B) çifti gönderir -------------
 set local role authenticated;
-set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","aal":"aal2"}';
 do $$
 declare
   v_caught boolean := false;
@@ -6476,7 +6476,7 @@ select
       and message   = 'Koçun yeni antrenman programını onayladı. Artık kullanabilirsin.') as n_notify;
 
 set local role authenticated;
-set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","aal":"aal2"}';
 
 do $$
 declare
@@ -7140,7 +7140,7 @@ insert into public.account_deletions (subject_role, rows_deleted, storage_object
 values ('client', '{"profiles":1}'::jsonb, 0, 'a0000000-0000-0000-0000-000000000123');
 
 set local role authenticated;
-set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","aal":"aal2"}';
 do $$
 declare
   v_n      bigint;
@@ -7575,8 +7575,754 @@ rollback;
 
 
 -- =============================================================================
+-- FAZ 4.7 / DİLİM 1 — TOTP MFA ve aal2 KAPISI (127–131)
+-- Migration: supabase/migrations/20260819120000_mfa_aal2_gate.sql
+-- Karar    : docs/adr/0026-totp-mfa-ve-aal2-kapisi.md
+--
+-- ### JWT'YE `aal` CLAIM'İ NASIL ENJEKTE EDİLİYOR ###########################
+--   `auth.jwt()` Supabase'de `current_setting('request.jwt.claims', true)::jsonb`
+--   okur. Yani bu paketin zaten kullandığı `set local request.jwt.claims`
+--   deseninin JSON'una `"aal":"aal1"` / `"aal":"aal2"` eklemek YETER; ayrı bir
+--   mekanizma gerekmez.
+--
+--   BU TURDA MEVCUT 126 SENARYONUN KOÇ YARISI DEĞİŞTİ: 36 koç claim satırına
+--   `"aal":"aal2"` eklendi. Eklenmeseydi hepsi kırmızı olurdu — ve bu, kapının
+--   ÇALIŞTIĞININ kanıtıdır (fail-closed: claim yoksa koç reddedilir).
+--
+--   DANIŞAN CLAIM SATIRLARINA HİÇBİR ŞEY EKLENMEDİ (92 + 7 satır, `aal` claim'i
+--   YOK). Bu bilinçlidir: danışan yolunun `aal` claim'i OLMADAN da bugünkü gibi
+--   çalışması, "danışanı etkilemiyoruz" iddiasının EN ZOR hâlidir. Senaryo 130
+--   ayrıca AÇIK `aal1` claim'iyle aynı ölçümü tekrarlar.
+-- ###########################################################################
+
+
+-- =============================================================================
+-- 127) aal1 KOÇ — 14 TABLONUN HİÇBİRİNİ OKUYAMAZ
+--
+-- Tablo listesi dinamik değil BİLEREK SABİTTİR: `pg_policies`ten okunsaydı test
+-- politikanın kendisini kanıt olarak kullanır, yani kendi kendini doğrulardı.
+-- Liste `delete_account()` manifestiyle (ADR-0025 §Ölçülen gerçekler 1) aynıdır.
+-- =============================================================================
+begin;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","aal":"aal1"}';
+do $$
+declare
+  v_tables text[] := array[
+    'profiles', 'notifications', 'messages', 'form_checks', 'daily_logs',
+    'workout_logs', 'nutrition_logs', 'program_approvals', 'workout_plans',
+    'workout_plan_exercises', 'nutrition_plans', 'nutrition_plan_meals',
+    'progress_entries', 'progress_photos'
+  ];
+  v_table text;
+  v_n     bigint;
+  v_seen  int := 0;
+begin
+  foreach v_table in array v_tables loop
+    execute format('select count(*) from public.%I', v_table) into v_n;
+    if v_n <> 0 then
+      raise exception 'BASARISIZ [127]: aal1 koc public.% tablosunda % satir GORDU -- aal2 kapisi bu tabloda YOK veya PERMISSIVE kurulmus.', v_table, v_n;
+    end if;
+    v_seen := v_seen + 1;
+  end loop;
+
+  if v_seen <> 14 then
+    raise exception 'BASARISIZ [127]: 14 tablo beklenirken % tablo olculdu.', v_seen;
+  end if;
+
+  raise notice 'GECTI [127 aal1 koc 14 tablonun HICBIRINI okuyamaz]';
+end $$;
+
+-- Aynı oturumda KATALOG hâlâ okunabilir olmalı: kapı danışan verisini korur,
+-- koçu hareket/besin listesinden mahrum bırakmaz (ADR-0026 §Karar 2).
+do $$
+begin
+  if (select count(*) from public.exercises) = 0 then
+    raise exception 'BASARISIZ [127 katalog]: aal1 koc exercises katalogunu goremiyor -- kapi kapsamini ASMIS.';
+  end if;
+  if (select count(*) from public.food_database) = 0 then
+    raise exception 'BASARISIZ [127 katalog]: aal1 koc food_database katalogunu goremiyor -- kapi kapsamini ASMIS.';
+  end if;
+  raise notice 'GECTI [127 katalog aal1 kocta ACIK kalir]';
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- 128) aal1 KOÇ — 14 TABLONUN HİÇBİRİNE YAZAMAZ
+--
+-- "Okuyamıyorsa zaten yazamaz" DOĞRU DEĞİLDİR: INSERT yolu `with check`
+-- ifadesine bakar, `using`e değil. `for all` politikalarında Postgres `using`i
+-- kopyalar ama migration bunu AÇIKÇA da yazıyor; burada ölçülen o.
+-- =============================================================================
+begin;
+-- Kurulum `postgres` kimliğiyle (RLS bypass) — ölçüm rol taklidinden SONRA.
+insert into public.daily_logs (id, client_id, log_date, water_lt)
+values ('cccccccc-0000-0000-0000-000000000128', '22222222-2222-2222-2222-222222222222',
+        current_date - 400, 2.5)
+on conflict do nothing;
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","aal":"aal1"}';
+do $$
+declare
+  v_tables text[] := array[
+    'profiles', 'notifications', 'messages', 'form_checks', 'daily_logs',
+    'workout_logs', 'nutrition_logs', 'program_approvals', 'workout_plans',
+    'workout_plan_exercises', 'nutrition_plans', 'nutrition_plan_meals',
+    'progress_entries', 'progress_photos'
+  ];
+  v_table   text;
+  v_deleted bigint;
+  v_caught  boolean;
+begin
+  -- (a) DELETE — `using` dalı. Hiçbir tabloda TEK SATIR bile silinemez.
+  --     (Bu blok zaten `rollback` içinde; ayrıca kapı çalışıyorsa 0 satır siler.)
+  foreach v_table in array v_tables loop
+    execute format('delete from public.%I', v_table);
+    get diagnostics v_deleted = row_count;
+    if v_deleted <> 0 then
+      raise exception 'BASARISIZ [128 delete]: aal1 koc public.% tablosundan % satir SILDI.', v_table, v_deleted;
+    end if;
+  end loop;
+
+  -- (b) INSERT — `with check` dalı. Temsili üç tablo: kimlik (profiles),
+  --     iletişim (notifications) ve günlük veri (daily_logs). Üçü de üç ayrı
+  --     PERMISSIVE politika ailesine ait; RESTRICTIVE kapı üçünü de ezmeli.
+  v_caught := false;
+  begin
+    insert into public.profiles (id, full_name, role)
+    values ('cccccccc-0000-0000-0000-000000000128', 'MFA Kapi Testi', 'client');
+  exception when insufficient_privilege then
+    v_caught := true;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [128 insert profiles]: aal1 koc profiles a satir YAZABILDI.';
+  end if;
+
+  v_caught := false;
+  begin
+    insert into public.notifications (client_id, title, message)
+    values ('22222222-2222-2222-2222-222222222222', 'MFA', 'kapi testi');
+  exception when insufficient_privilege then
+    v_caught := true;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [128 insert notifications]: aal1 koc bildirim YAZABILDI.';
+  end if;
+
+  v_caught := false;
+  begin
+    insert into public.daily_logs (client_id, log_date, water_lt)
+    values ('22222222-2222-2222-2222-222222222222', current_date - 401, 2.5);
+  exception when insufficient_privilege then
+    v_caught := true;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [128 insert daily_logs]: aal1 koc danisanin gunlugune YAZABILDI.';
+  end if;
+
+  -- (c) UPDATE — var olan bir satır üzerinde; 0 satır etkilenmeli.
+  update public.daily_logs set water_lt = 9.9 where id = 'cccccccc-0000-0000-0000-000000000128';
+  get diagnostics v_deleted = row_count;
+  if v_deleted <> 0 then
+    raise exception 'BASARISIZ [128 update]: aal1 koc var olan daily_logs satirini GUNCELLEDI.';
+  end if;
+
+  raise notice 'GECTI [128 aal1 koc 14 tabloya yazamaz/silemez/guncelleyemez]';
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- 129) aal2 KOÇ — BUGÜNKÜ GİBİ ÇALIŞIR (pozitif kontrol)
+--
+-- 127/128 tek başına yanıltıcı olurdu: politika `false` sabiti olsaydı ikisi de
+-- geçerdi ve koç KALICI olarak kilitlenmiş olurdu. Bu senaryo kapının
+-- AÇILDIĞINI de ölçer.
+-- =============================================================================
+begin;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","aal":"aal2"}';
+do $$
+declare
+  v_profiles bigint;
+  v_logs     bigint;
+begin
+  select count(*) into v_profiles from public.profiles;
+  if v_profiles < 3 then
+    raise exception 'BASARISIZ [129]: aal2 koc yalnizca % profil gordu (>=3 bekleniyordu) -- kapi ACILMIYOR.', v_profiles;
+  end if;
+
+  select count(*) into v_logs from public.daily_logs;
+  if v_logs = 0 then
+    raise exception 'BASARISIZ [129]: aal2 koc hicbir daily_log goremedi -- kapi ACILMIYOR.';
+  end if;
+
+  -- Yazma yolu da açık olmalı: koçun danışana bildirim yazması.
+  insert into public.notifications (client_id, title, message)
+  values ('22222222-2222-2222-2222-222222222222', 'MFA 129', 'aal2 kocun yazma yolu acik');
+
+  raise notice 'GECTI [129 aal2 koc okur ve yazar -- kapi ACILIYOR]';
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- 130) *** REGRESYON KAPISI *** — DANIŞAN aal1 İLE BUGÜNKÜ GİBİ ÇALIŞIR
+--
+-- Bu paketin EN ÖNEMLİ senaryosudur. `not is_coach()` dalı silinir ya da
+-- yanlış yazılırsa (ör. `is_coach()` unutulup yalnızca `aal = 'aal2'` kalırsa)
+-- TÜM DANIŞANLAR kilitlenir ve bu, üretimde ancak kullanıcı şikâyetiyle
+-- görülürdü.
+--
+-- ÖLÇÜM BİÇİMİ: seed'e bağlı sabit sayılar YAZILMAZ (kırılgan olurdu). Bunun
+-- yerine AYNI transaksiyonda aynı sorgu iki claim setiyle koşulur —
+-- (a) `aal` claim'i YOK, (b) `"aal":"aal1"` — ve 14 tablonun HEPSİNDE sonuç
+-- BİREBİR aynı olmak zorundadır.
+--
+-- BOŞ GEÇME (vacuous pass) KORUMASI: "0 = 0" da eşitliktir. Bu yüzden ayrıca
+-- danışanın gerçekten veri GÖRDÜĞÜ ölçülür; her şey kilitlenmişse eşitlik
+-- sağlansa bile senaryo patlar.
+-- =============================================================================
+begin;
+set local role authenticated;
+do $$
+declare
+  v_tables text[] := array[
+    'profiles', 'notifications', 'messages', 'form_checks', 'daily_logs',
+    'workout_logs', 'nutrition_logs', 'program_approvals', 'workout_plans',
+    'workout_plan_exercises', 'nutrition_plans', 'nutrition_plan_meals',
+    'progress_entries', 'progress_photos'
+  ];
+  v_table    text;
+  v_no_claim bigint;
+  v_aal1     bigint;
+  v_nonzero  int := 0;
+begin
+  foreach v_table in array v_tables loop
+    -- (a) `aal` claim'i OLMADAN (bugünkü 99 danışan senaryosunun koştuğu hâl)
+    perform set_config('request.jwt.claims',
+      '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}', true);
+    execute format('select count(*) from public.%I', v_table) into v_no_claim;
+
+    -- (b) AÇIK `"aal":"aal1"` ile (gerçek GoTrue token'inin hali)
+    perform set_config('request.jwt.claims',
+      '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated","aal":"aal1"}', true);
+    execute format('select count(*) from public.%I', v_table) into v_aal1;
+
+    if v_no_claim is distinct from v_aal1 then
+      raise exception 'BASARISIZ [130]: public.% -- danisan claim siz % satir, aal1 ile % satir gordu. aal2 kapisi DANISANI ETKILIYOR.',
+        v_table, v_no_claim, v_aal1;
+    end if;
+
+    if v_aal1 > 0 then
+      v_nonzero := v_nonzero + 1;
+    end if;
+  end loop;
+
+  -- Boş geçme koruması: danışanın en az 5 tabloda gerçekten verisi görünmeli.
+  -- (Seed'de danışan A'nın profil, mesaj, günlük, antrenman ve plan verisi var.)
+  if v_nonzero < 5 then
+    raise exception 'BASARISIZ [130 bos gecme]: danisan yalnizca % tabloda veri gordu -- kapi danisani da KILITLEMIS olabilir, esitlik sinavi anlamsiz.', v_nonzero;
+  end if;
+
+  raise notice 'GECTI [130 REGRESYON: danisan aal1 ile de claim siz de BIREBIR ayni goruyor, % tabloda veri var]', v_nonzero;
+end $$;
+
+-- Danışanın YAZMA yolu da aal1 ile açık kalmalı (opt-in kararının ta kendisi:
+-- danışan MFA kurmasa da uygulamayı kullanmaya devam eder).
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated","aal":"aal1"}';
+do $$
+begin
+  insert into public.daily_logs (client_id, log_date, water_lt)
+  values ('22222222-2222-2222-2222-222222222222', current_date - 402, 2.5);
+
+  insert into public.progress_entries (client_id, entry_date, weight_kg)
+  values ('22222222-2222-2222-2222-222222222222', current_date - 402, 82);
+
+  raise notice 'GECTI [130 danisan aal1 ile YAZABILIYOR -- opt-in karari korunuyor]';
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- 131) POLİTİKA SÜRÜKLENME TESTİ — 14/14, RESTRICTIVE, ALL, authenticated
+--
+-- Politikanın VARLIĞI yetmez; YANLIŞ kurulmuş bir politika sessizce etkisizdir:
+--   * PERMISSIVE olsaydı mevcut politikalarla VEYA'lanır, hiçbir şeyi kısıtlamazdı;
+--   * `for select` olsaydı yazma yolu açık kalırdı;
+--   * `to public` olsaydı `postgres`/`service_role` da kapsanır görünürdü (yanıltıcı);
+--   * `with check` NULL olsaydı INSERT yolu ölçülemezdi.
+-- Ayrıca 14 tablo listesinin ŞEMAYLA ayrışmadığı da burada ölçülür.
+-- =============================================================================
+begin;
+do $$
+declare
+  v_expected text[] := array[
+    'profiles', 'notifications', 'messages', 'form_checks', 'daily_logs',
+    'workout_logs', 'nutrition_logs', 'program_approvals', 'workout_plans',
+    'workout_plan_exercises', 'nutrition_plans', 'nutrition_plan_meals',
+    'progress_entries', 'progress_photos'
+  ];
+  v_ok      int;
+  v_total   int;
+  v_missing text;
+  v_extra   text;
+begin
+  -- (a) 14 tablonun HEPSİNDE, doğru şekilde kurulmuş mu?
+  select count(*) into v_ok
+    from pg_policies p
+   where p.schemaname = 'public'
+     and p.policyname = 'mfa_aal2_gate'
+     and p.tablename  = any (v_expected)
+     and p.permissive = 'RESTRICTIVE'
+     and p.cmd        = 'ALL'
+     and p.roles      = '{authenticated}'::name[]
+     and p.qual       like '%is_coach%'
+     and p.qual       like '%aal2%'
+     and p.with_check like '%is_coach%'
+     and p.with_check like '%aal2%';
+
+  if v_ok <> 14 then
+    select string_agg(e, ', ' order by e) into v_missing
+      from unnest(v_expected) as e
+     where not exists (
+       select 1 from pg_policies p
+        where p.schemaname = 'public' and p.tablename = e
+          and p.policyname = 'mfa_aal2_gate'
+          and p.permissive = 'RESTRICTIVE' and p.cmd = 'ALL'
+          and p.roles = '{authenticated}'::name[]
+          and p.qual like '%is_coach%' and p.qual like '%aal2%'
+          and p.with_check like '%is_coach%' and p.with_check like '%aal2%'
+     );
+    raise exception 'BASARISIZ [131a]: 14 beklenirken % dogru politika var. Eksik/bozuk: %', v_ok, coalesce(v_missing, '(bilinmiyor)');
+  end if;
+
+  -- (b) `mfa_aal2_gate` adıyla BAŞKA bir tabloya politika sızmış mı?
+  select count(*) into v_total
+    from pg_policies p
+   where p.schemaname = 'public' and p.policyname = 'mfa_aal2_gate';
+  if v_total <> 14 then
+    raise exception 'BASARISIZ [131b]: mfa_aal2_gate adli politika sayisi % (14 bekleniyordu).', v_total;
+  end if;
+
+  -- (c) ŞEMA SÜRÜKLENMESİ: public'te, 14 kapılı tablo ve 4 bilinen muafiyet
+  --     DIŞINDA bir tablo varsa, ya kapıya ya muafiyet listesine girmelidir.
+  --     Yarın eklenen 15. danışan tablosu buradan GÜRÜLTÜLÜ geçer.
+  select string_agg(t.tablename, ', ' order by t.tablename) into v_extra
+    from pg_tables t
+   where t.schemaname = 'public'
+     and t.tablename <> all (v_expected)
+     and t.tablename <> all (array[
+       'exercises',                        -- katalog, kullanici kolonu yok
+       'food_database',                    -- katalog, kullanici kolonu yok
+       'account_deletions',                -- denetim, RLS+FORCE+sifir politika (ADR-0025 §6)
+       'message_attachment_verifications', -- damga, RLS+FORCE+sifir politika (B-028)
+       'coach_actions'                     -- denetim, RLS+FORCE+sifir politika (Faz 4.7)
+     ]);
+
+  if v_extra is not null then
+    raise exception 'BASARISIZ [131c]: aal2 kapisi ve muafiyet listesi DISINDA public tablo(lar) var -> %. Danisan verisi tasiyorsa migration listesine, tasimiyorsa muafiyet listesine eklenmeli.', v_extra;
+  end if;
+
+  -- (d) Politika `is_coach()`e dayanıyor; o fonksiyon INVOKER'a dönerse
+  --     `profiles` politikasi kendi kendini tetikler ve kapi SESSIZCE ACILIR.
+  if not exists (
+    select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public' and p.proname = 'is_coach' and p.prosecdef
+  ) then
+    raise exception 'BASARISIZ [131d]: public.is_coach() SECURITY DEFINER degil -- aal2 kapisi SESSIZCE ETKISIZ.';
+  end if;
+
+  raise notice 'GECTI [131 14/14 mfa_aal2_gate RESTRICTIVE+ALL+authenticated, using+with_check dolu, sema surukleme yok, is_coach DEFINER]';
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- KOÇ EYLEM DENETİMİ (Faz 4.7) — 132) YAZMA YÜZEYİ SÜRÜKLENME TESTİ
+-- (20260819130000_coach_action_audit.sql)
+--
+-- Senaryo 118/124 ile AYNI felsefe: yeni yazma yüzeyi eklendiğinde sertleştirme
+-- kuralları TAHMİN edilmez, ÖLÇÜLÜR.
+--   * `prosecdef = true`  -> SECURITY DEFINER (RLS-sıfır tabloya yazabilmek için ZORUNLU)
+--   * `search_path` PİNLİ -> arama yolu ele geçirmesine kapalı
+--   * EXECUTE: yalnızca `service_role`; authenticated/anon/PUBLIC YOK
+-- =============================================================================
+begin;
+do $$
+declare
+  v_secdef boolean;
+  v_config text[];
+  v_sig    constant text := 'public.record_coach_action(text, uuid, uuid, uuid)';
+begin
+  select p.prosecdef, p.proconfig into v_secdef, v_config
+    from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public' and p.proname = 'record_coach_action';
+
+  if v_secdef is null then
+    raise exception 'BASARISIZ [132]: public.record_coach_action YOK -- denetim ucu PGRST202 alir';
+  end if;
+  if not v_secdef then
+    raise exception 'BASARISIZ [132 SECURITY]: SECURITY INVOKER olmus -- coach_actions sifir-politikali, yazma OLMEZ';
+  end if;
+  if v_config is null or not (v_config @> array['search_path=public, pg_temp']) then
+    raise exception 'BASARISIZ [132 search_path]: arama yolu pinlenmemis (%)', v_config;
+  end if;
+
+  if has_function_privilege('authenticated', v_sig, 'EXECUTE') then
+    raise exception 'BASARISIZ [132 grant]: AUTHENTICATED rolune ACIK -- koc sahte denetim satiri uretebilir';
+  end if;
+  if has_function_privilege('anon', v_sig, 'EXECUTE') then
+    raise exception 'BASARISIZ [132 grant]: ANON rolune ACIK';
+  end if;
+  if not has_function_privilege('service_role', v_sig, 'EXECUTE') then
+    raise exception 'BASARISIZ [132 grant]: service_role CALISTIRAMIYOR -- sunucu yolu kirilir';
+  end if;
+  if exists (
+    select 1
+      from pg_proc p
+      join pg_namespace n on n.oid = p.pronamespace,
+           lateral aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a
+     where n.nspname = 'public' and p.proname = 'record_coach_action'
+       and a.grantee = 0 and a.privilege_type = 'EXECUTE'
+  ) then
+    raise exception 'BASARISIZ [132 grant]: record_coach_action PUBLIC a ACIK';
+  end if;
+
+  raise notice 'GECTI [132 record_coach_action SECURITY DEFINER + pinli search_path + EXECUTE yalnizca service_role]';
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- KOÇ EYLEM DENETİMİ (Faz 4.7) — 133) TABLO KİLİTLİ VE KİŞİSEL VERİYİ YALNIZ
+-- SERVICE_ROLE FONKSİYONU YAZABİLİR
+--
+-- İki ayrı iddia (senaryo 123 ile AYNI desen):
+--   (a) KOLON SÖZLEŞMESİ: `coach_actions` yalnızca beklenen 6 kolonu taşır.
+--   (b) ERİŞİM: `authenticated` (koç dahil) tabloyu OKUYAMAZ ve YAZAMAZ; kilit
+--       ACL'de değil RLS'tedir (grant var, politika YOK). `service_role`in de
+--       DOĞRUDAN tablo yetkisi YOKTUR — tek yazıcı record_coach_action()'dır.
+-- =============================================================================
+begin;
+do $$
+declare
+  v_cols text;
+begin
+  select string_agg(column_name, ',' order by column_name) into v_cols
+    from information_schema.columns
+   where table_schema = 'public' and table_name = 'coach_actions';
+
+  if v_cols is distinct from 'action,actor_id,id,occurred_at,request_id,target_id' then
+    raise exception 'BASARISIZ [133 KOLON SOZLESMESI]: coach_actions kolonlari degismis -> %.', v_cols;
+  end if;
+
+  if (select count(*) from pg_policies where schemaname = 'public' and tablename = 'coach_actions') <> 0 then
+    raise exception 'BASARISIZ [133 POLITIKA]: coach_actions uzerine politika eklenmis -- denetim kaydi authenticated a acilmis olabilir';
+  end if;
+
+  if has_table_privilege('service_role', 'public.coach_actions', 'SELECT')
+     or has_table_privilege('service_role', 'public.coach_actions', 'INSERT')
+     or has_table_privilege('service_role', 'public.coach_actions', 'UPDATE')
+     or has_table_privilege('service_role', 'public.coach_actions', 'DELETE') then
+    raise exception 'BASARISIZ [133 service_role]: denetim tablosu service_role a DOGRUDAN acilmis -- PostgREST uzerinden okunabilir/yazilabilir hale gelmis';
+  end if;
+end $$;
+
+-- Kurulum: okunacak bir satır OLSUN ki "0 satır göründü" iddiası boş bir yeşil olmasın.
+insert into public.coach_actions (action, actor_id, target_id) values
+  ('password_reset_requested', '11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222');
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","aal":"aal2"}';
+do $$
+declare
+  v_n      bigint;
+  v_caught boolean;
+  v_rows   int;
+begin
+  -- (b1) KOÇ bile HİÇBİR satır göremez -- kendi tetiklediği eylem dahil.
+  select count(*) into v_n from public.coach_actions;
+  if v_n <> 0 then
+    raise exception 'BASARISIZ [133 SELECT]: koc denetim kaydinda % satir gordu (beklenen 0)', v_n;
+  end if;
+
+  -- (b2) INSERT reddedilmeli (RLS ihlali -> 42501).
+  v_caught := false;
+  begin
+    insert into public.coach_actions (action, actor_id, target_id)
+    values ('password_reset_requested', '11111111-1111-1111-1111-111111111111',
+             '22222222-2222-2222-2222-222222222222');
+  exception when insufficient_privilege then
+    v_caught := true;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [133 INSERT]: authenticated denetim kaydina satir YAZABILDI -- sahte denetim uretilebilir';
+  end if;
+
+  -- (b3) UPDATE / DELETE: politika olmadığı için HİÇBİR SATIRA ULAŞAMAZ.
+  update public.coach_actions set action = action;
+  get diagnostics v_rows = row_count;
+  if v_rows <> 0 then
+    raise exception 'BASARISIZ [133 UPDATE]: authenticated % denetim satirini GUNCELLEDI', v_rows;
+  end if;
+
+  delete from public.coach_actions;
+  get diagnostics v_rows = row_count;
+  if v_rows <> 0 then
+    raise exception 'BASARISIZ [133 DELETE]: authenticated % denetim satirini SILDI -- denetim izi silinebilir', v_rows;
+  end if;
+
+  raise notice 'GECTI [133 coach_actions: 6 kolonluk sozlesme korunuyor; authenticated (koc dahil) okuyamaz/yazamaz/silemez; service_role dogrudan tablo yetkisi YOK]';
+end $$;
+reset role;
+
+-- Satır GERÇEKTEN yerinde mi (yani UPDATE/DELETE'i RLS mi engelledi, yoksa
+-- satır hiç var mıydı) — pozitif kontrol.
+do $$
+begin
+  if (select count(*) from public.coach_actions
+       where actor_id = '11111111-1111-1111-1111-111111111111'
+         and target_id = '22222222-2222-2222-2222-222222222222') <> 1 then
+    raise exception 'BASARISIZ [133 POZITIF]: denetim satiri authenticated tarafindan DEGISTIRILMIS/SILINMIS';
+  end if;
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- KOÇ EYLEM DENETİMİ (Faz 4.7) — 134) YAZMA GERÇEKTEN ÇALIŞIR + KAPALI LİSTE +
+-- DANIŞAN ÇAĞIRAMAZ
+--
+--   (a) POZİTİF KONTROL: `service_role` ile `record_coach_action()` çağrılınca
+--       satır GERÇEKTEN yazılır (kapı sadece kapatmıyor, gerçekten AÇILIYOR).
+--   (b) `action` CHECK kısıtı kapalı listedir -- tanımsız bir değer 23514 ile
+--       reddedilir.
+--   (c) `authenticated` (danışan) fonksiyonu HİÇ ÇAĞIRAMAZ (EXECUTE yok) --
+--       başkasının adına sahte denetim satırı üretemez.
+-- =============================================================================
+begin;
+set local role service_role;
+do $$
+declare
+  v_id     uuid;
+  v_caught boolean := false;
+  v_state  text;
+begin
+  -- (a) POZİTİF KONTROL — id'yi `postgres`e (aşağıda, rol değişiminden SONRA)
+  -- taşımak için `set_config` kullanılır: `service_role`ün `coach_actions`
+  -- üzerinde DOĞRUDAN SELECT yetkisi YOKTUR (§1 bilinçli tasarım, senaryo 133)
+  -- — yani doğrulama BURADA, service_role bağlamında YAPILAMAZ.
+  v_id := public.record_coach_action(
+    'password_reset_requested'::text,
+    '11111111-1111-1111-1111-111111111111'::uuid,
+    '22222222-2222-2222-2222-222222222222'::uuid,
+    'a0000000-0000-0000-0000-000000000134'::uuid
+  );
+  if v_id is null then
+    raise exception 'BASARISIZ [134a]: record_coach_action NULL id dondurdu';
+  end if;
+  perform set_config('zz.coach_action_134_id', v_id::text, true);
+
+  -- (b) KAPALI LİSTE
+  begin
+    perform public.record_coach_action(
+      'not_a_real_action'::text,
+      '11111111-1111-1111-1111-111111111111'::uuid,
+      '22222222-2222-2222-2222-222222222222'::uuid
+    );
+  exception when check_violation then
+    v_caught := true;
+    get stacked diagnostics v_state = returned_sqlstate;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [134b]: tanimsiz action degeri KABUL EDILDI -- kapali liste calismiyor';
+  end if;
+  if v_state is distinct from '23514' then
+    raise exception 'BASARISIZ [134b hata kodu]: beklenen 23514, gelen %', v_state;
+  end if;
+end $$;
+reset role;
+
+-- (a) devamı — DOĞRULAMA `postgres` kimliğiyle (senaryo 121'deki AYNI desen:
+-- `service_role`ün coach_actions'ta doğrudan tablo yetkisi yok).
+do $$
+declare
+  v_id uuid := current_setting('zz.coach_action_134_id')::uuid;
+begin
+  if (select count(*) from public.coach_actions where id = v_id) <> 1 then
+    raise exception 'BASARISIZ [134a]: donen id ile eslesen satir YOK -- yazma gercekten calismiyor';
+  end if;
+end $$;
+
+-- (c) DANIŞAN çağıramaz.
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated","aal":"aal2"}';
+do $$
+declare
+  v_caught boolean := false;
+begin
+  begin
+    perform public.record_coach_action(
+      'password_reset_requested'::text,
+      '22222222-2222-2222-2222-222222222222'::uuid,
+      '33333333-3333-3333-3333-333333333333'::uuid
+    );
+  exception when insufficient_privilege then
+    v_caught := true;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [134c]: danisan record_coach_action i CAGIRABILDI -- kendi adina sahte "koc" denetim satiri uretebilir';
+  end if;
+  raise notice 'GECTI [134 record_coach_action GERCEKTEN yazar; action kapali liste 23514 ile REDDEDER; authenticated CAGIRAMAZ]';
+end $$;
+reset role;
+rollback;
+
+
+-- =============================================================================
+-- KOÇ EYLEM DENETİMİ (Faz 4.7) — 135) HESAP SİLME (KVKK) DANIŞANI HEDEF ALAN
+-- SATIRLARI DA SÜPÜRÜR
+--
+-- `coach_actions.target_id` -> `profiles(id)` ON DELETE CASCADE. Danışan
+-- `delete_account()` ile silinince bu tablodaki satır da GİTMELİDİR (KVKK
+-- unutulma hakkı: "kime müdahale edildi" kaydı, o kişi silindiğinde anlamsız
+-- kalan bir iz olarak DURAMAZ). Manifest'in 'coach_actions' anahtarı da
+-- doğru sayıyor mu -- AYRICA ölçülür (§3 gerekçesi: manifest saymazsa fail-
+-- closed kanıt bu tabloyu hiç GÖRMEZ).
+-- =============================================================================
+begin;
+
+insert into auth.users (
+  instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
+  raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
+  confirmation_token, email_change, email_change_token_new, recovery_token
+)
+values ('00000000-0000-0000-0000-000000000000', 'c0000000-0000-0000-0000-000000000135',
+   'authenticated', 'authenticated', 'zz-135-silinecek@example.com', 'x', now(),
+   '{"provider":"email","providers":["email"]}'::jsonb, '{"full_name":"zz-135 Silinecek"}'::jsonb,
+   now(), now(), '', '', '', '');
+
+insert into public.coach_actions (action, actor_id, target_id, request_id) values
+  ('password_reset_requested', '11111111-1111-1111-1111-111111111111',
+   'c0000000-0000-0000-0000-000000000135', 'a0000000-0000-0000-0000-000000000135'),
+  ('password_reset_requested', '11111111-1111-1111-1111-111111111111',
+   'c0000000-0000-0000-0000-000000000135', 'a0000000-0000-0000-0000-000000000235');
+
+set local role service_role;
+do $$
+declare
+  v_before jsonb;
+  v_result jsonb;
+begin
+  v_before := public.account_deletion_manifest('c0000000-0000-0000-0000-000000000135'::uuid);
+  if not (v_before -> 'rows' ? 'coach_actions') then
+    raise exception 'BASARISIZ [135 manifest]: rows.coach_actions anahtari YOK';
+  end if;
+  if (v_before -> 'rows' ->> 'coach_actions')::int <> 2 then
+    raise exception 'BASARISIZ [135 manifest sayim]: coach_actions=% (beklenen 2)', v_before -> 'rows' ->> 'coach_actions';
+  end if;
+
+  v_result := public.delete_account('c0000000-0000-0000-0000-000000000135'::uuid);
+  if (v_result ->> 'already_deleted')::boolean then
+    raise exception 'BASARISIZ [135]: var olan kullanici icin already_deleted=true dondu';
+  end if;
+  if ((v_result -> 'rows_deleted') ->> 'coach_actions')::int <> 2 then
+    raise exception 'BASARISIZ [135 rows_deleted]: coach_actions=% (beklenen 2)', (v_result -> 'rows_deleted') ->> 'coach_actions';
+  end if;
+end $$;
+reset role;
+
+do $$
+declare
+  v_n bigint;
+begin
+  select count(*) into v_n from public.coach_actions
+   where target_id = 'c0000000-0000-0000-0000-000000000135';
+  if v_n <> 0 then
+    raise exception 'BASARISIZ [135 CASCADE]: silme sonrasi coach_actions da % satir kaldi (beklenen 0)', v_n;
+  end if;
+
+  -- Koçun kendi satırları (başka danışanlara yönelik) ETKİLENMEMELİ.
+  if (select count(*) from public.profiles where id = '11111111-1111-1111-1111-111111111111') <> 1 then
+    raise exception 'BASARISIZ [135 TANIK]: seed koc silindi -- KATASTROFIK fazla silme';
+  end if;
+
+  raise notice 'GECTI [135 danisan silinince coach_actions target_id CASCADE ile gider; manifest ve rows_deleted dogru sayiyor]';
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- KOÇ EYLEM DENETİMİ (Faz 4.7) — 136) KOÇ (AKTÖR) SİLİNSE BİLE İZ KAYBOLMAZ
+--
+-- `coach_actions.actor_id` -> `profiles(id)` ON DELETE SET NULL. `delete_
+-- account()` koç hesabını zaten REDDEDER (ADR-0007, senaryo 124); bu senaryo
+-- o kapının DIŞINDA kalan bir yolu ölçer -- `postgres`/`service_role` ile
+-- `auth.users`tan DOĞRUDAN silme (ör. Supabase Studio'dan elle bir koç hesabı
+-- kapatılması). Bu durumda BİLE "bu danışana müdahale edildi" izi KALICI
+-- kalmalı, yalnızca "kim yaptı" bilgisi kaybolmalı -- tıpkı `form_checks.
+-- reviewed_by` / `program_approvals.reviewed_by`nin AYNI durumda yaptığı gibi
+-- (20260819100000 §"KOÇ HESABI BU YOLDAN SİLİNEMEZ" yorumu).
+-- =============================================================================
+begin;
+
+insert into auth.users (
+  instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
+  raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
+  confirmation_token, email_change, email_change_token_new, recovery_token
+)
+values ('00000000-0000-0000-0000-000000000000', 'c0000000-0000-0000-0000-000000000136',
+   'authenticated', 'authenticated', 'zz-136-koc@example.com', 'x', now(),
+   '{"provider":"email","providers":["email"]}'::jsonb, '{"full_name":"zz-136 Koc"}'::jsonb,
+   now(), now(), '', '', '', '');
+-- `handle_new_user()` sertleştirilmiş (20260817160100): rol her zaman 'client'
+-- gelir, metadata okunmaz. Test koçu doğrudan `postgres` kimliğiyle yükseltilir
+-- (senaryo 124'teki KOÇ KAPISI kurulumuyla AYNI desen).
+update public.profiles set role = 'coach'
+ where id = 'c0000000-0000-0000-0000-000000000136';
+
+insert into public.coach_actions (action, actor_id, target_id, request_id) values
+  ('password_reset_requested', 'c0000000-0000-0000-0000-000000000136',
+   '22222222-2222-2222-2222-222222222222', 'a0000000-0000-0000-0000-000000000136');
+
+-- `postgres` (bu betiğin varsayılan bağlantı rolü) superuser'dır; `service_role`in
+-- AKSİNE `auth.users` üzerinde DOĞRUDAN DELETE yetkisine sahiptir (Supabase
+-- Studio/psql ile elle müdahale de AYNI şekilde çalışır). `delete_account()`in
+-- KOÇ KAPISI bilerek ATLANIP ham DELETE ile "elle admin müdahalesi" simüle edilir.
+delete from auth.users where id = 'c0000000-0000-0000-0000-000000000136';
+
+do $$
+declare
+  v_actor_id uuid;
+  v_n        bigint;
+begin
+  if exists (select 1 from auth.users where id = 'c0000000-0000-0000-0000-000000000136') then
+    raise exception 'BASARISIZ [136 kurulum]: test kocu silinemedi -- senaryo kosulamiyor';
+  end if;
+
+  select count(*) into v_n from public.coach_actions
+   where request_id = 'a0000000-0000-0000-0000-000000000136';
+  if v_n <> 1 then
+    raise exception 'BASARISIZ [136 IZ KAYBOLDU]: koc silindikten sonra denetim satiri KALMADI (bulunan=%) -- coach_actions.actor_id CASCADE olmus olabilir', v_n;
+  end if;
+
+  select actor_id into v_actor_id from public.coach_actions
+   where request_id = 'a0000000-0000-0000-0000-000000000136';
+  if v_actor_id is not null then
+    raise exception 'BASARISIZ [136 SET NULL]: actor_id hala % -- FK SET NULL calismiyor', v_actor_id;
+  end if;
+
+  raise notice 'GECTI [136 koc (aktor) auth.users tan dogrudan silinse bile coach_actions satiri KALIR, yalnizca actor_id NULL olur]';
+end $$;
+rollback;
+
+
+-- =============================================================================
 -- TOPLAM ÖZET
--- Bu noktaya yalnızca YUKARIDAKİ 126 senaryonun HEPSİ GECTI verdiyse ulaşılır --
+-- Bu noktaya yalnızca YUKARIDAKİ 136 senaryonun HEPSİ GECTI verdiyse ulaşılır --
 -- herhangi biri BASARISIZ olsaydı raise exception + ON_ERROR_STOP psql'i
 -- daha önce sıfırdan farklı çıkış koduyla durdururdu.
 --   * 1–19  : Faz 1a ve öncesi (profiles, notifications, form_checks, daily_logs,
@@ -7681,6 +8427,43 @@ rollback;
 --             tetikleyici SECURITY **INVOKER** + pinli `search_path` (DEFINER
 --             olsaydı `is_end_user_write()` hep false döner, kapı sessizce
 --             açılırdı) ve tetikleyici gerçekten `messages`e bağlı (126)
+--   * 127-131: Faz 4.7 dilim 1 — TOTP MFA ve aal2 KAPISI
+--             (20260819120000_mfa_aal2_gate.sql, ADR-0026): danışan verisi
+--             taşıyan 14 tablonun tamamına tek kalıplı RESTRICTIVE politika
+--             (`not is_coach() or (select auth.jwt()->>'aal') = 'aal2'`).
+--             aal1'deki koç 14 tablonun HİÇBİRİNİ okuyamaz ve katalog (2 tablo)
+--             yine de açık kalır (127); aal1'deki koç hiçbirine yazamaz,
+--             silemez, güncelleyemez — `with check` dalı INSERT'te de ölçülür
+--             (128); *** POZİTİF KONTROL *** aal2'deki koç okur ve yazar, yani
+--             kapı gerçekten AÇILIR — politika `false` sabiti değildir (129);
+--             *** REGRESYON KAPISI, BU PAKETİN EN ÖNEMLİ SENARYOSU ***
+--             danışan `aal` claim'i OLMADAN ve AÇIK `aal1` ile 14 tablonun
+--             hepsinde BİREBİR aynı sonucu görür, yazma yolu da açık kalır ve
+--             "boş geçme" (her şey 0 = 0) koruması vardır (130); politika
+--             sürüklenme testi — 14/14 politika RESTRICTIVE + ALL +
+--             `{authenticated}`, `using` ve `with_check` İKİSİ DE dolu ve iki
+--             dalı da (`is_coach` / `aal2`) taşıyor, `mfa_aal2_gate` adı 14
+--             tablo dışına sızmamış, public şemasında kapı ve muafiyet listesi
+--             dışında tablo yok, `is_coach()` hâlâ SECURITY DEFINER (131)
+--   * 132–136: Faz 4.7 — KOÇ MÜDAHALELERİ DENETİM TABLOSU
+--             (20260819130000_coach_action_audit.sql): `record_coach_action()`
+--             yetki yüzeyi sürüklenme testi — SECURITY DEFINER, pinli
+--             `search_path`, EXECUTE yalnızca `service_role`, PUBLIC'e kapalı
+--             (132); `coach_actions` 6 kolonluk sözleşmesi korunur ve tablo
+--             `authenticated`a (koç dahil) da `service_role`e de KAPALIDIR —
+--             okuma/yazma/güncelleme/silme dördü de RED, pozitif kontrol satırın
+--             gerçekten yerinde kaldığını doğrular (133); *** POZİTİF KONTROL ***
+--             `service_role` ile çağrılınca satır GERÇEKTEN yazılır, `action`
+--             kapalı liste dışı bir değeri 23514 ile REDDEDER, danışan
+--             fonksiyonu HİÇ ÇAĞIRAMAZ (134); HESAP SİLME ETKİLEŞİMİ — danışan
+--             `delete_account()` ile silinince kendisini HEDEF alan
+--             `coach_actions` satırları `target_id` CASCADE'i ile gider ve
+--             `account_deletion_manifest()`in `coach_actions` anahtarı
+--             silmeden ÖNCE doğru sayar, `rows_deleted`e de doğru yansır (135);
+--             KOÇ (AKTÖR) SİLİNSE BİLE İZ KAYBOLMAZ — `delete_account()`in koç
+--             kapısı DIŞINDaki bir yoldan (ham `auth.users` DELETE) koç
+--             hesabı silinse dahi `coach_actions` satırı KALIR, yalnızca
+--             `actor_id` NULL'a düşer (`ON DELETE SET NULL`) (136)
 --
 -- NOT: `nutrition_logs`, `progress_entries` ve `progress_photos` ayrıca senaryo
 -- 73 (yetki) ve 74 (RLS+FORCE) tarafından DİNAMİK olarak kapsanır — o iki
@@ -7688,5 +8471,5 @@ rollback;
 -- =============================================================================
 do $$
 begin
-  raise notice 'TUM RLS TESTLERI GECTI (126 senaryo)';
+  raise notice 'TUM RLS TESTLERI GECTI (136 senaryo)';
 end $$;

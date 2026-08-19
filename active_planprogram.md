@@ -1114,6 +1114,91 @@ mimaride bir kez yazmak, iki kez yazmaktan ucuz (ADR-0022'nin A-05'i Faz
 
 ---
 
+## 7b. Faz 4.7 — Kimlik Güvenliği (TAMAMLANDI)
+
+**Durum — TAMAMLANDI (2026-08-19).** Koç hesabı bu uygulamadaki tek en değerli
+kimlik olduğu için (tek koçlu model, ADR-0007 — hesabın arkasında istisnasız
+her danışanın verisi duruyor) koç girişine zorunlu TOTP çok faktörlü kimlik
+doğrulama + `aal2` RLS kapısı eklendi (ADR-0026); danışan için aynı mekanizma
+opt-in. Yöntem seçimi (TOTP, SMS reddedildi) Fable danışmasıyla alındı. Ayrıca
+koç tetiklemeli şifre sıfırlama (impersonation yok — bağlantı danışanın kendi
+e-postasına gider) ve koç müdahaleleri için KVKK m.12 hesap verebilirlik
+denetim tablosu (`coach_actions`) teslim edildi. Tam anlatı, kapsam kararları
+ve kanıtlar: `docs/archive/progress-faz-4.7-kimlik-guvenligi.md`. Bu fazın
+burada tanımlı bir AC tablosu yoktu; kapanış kaydı onun yerine "kapsam
+kararları ve kanıtları" başlığını kullanıyor.
+
+### İş kalemleri (teslim edildi)
+
+- TOTP MFA çekirdeği: kayıt (`enroll`) + doğrulama (`verify`) + kaldırma
+  (`unenroll`) akışları, `packages/api-client/src/hooks/useMfa.ts`,
+  `apps/web/src/components/security/{CoachMfaGate,SecuritySection}.tsx`.
+- `supabase/migrations/20260819120000_mfa_aal2_gate.sql`: 14 tabloya
+  `AS RESTRICTIVE FOR ALL TO authenticated` + `NOT is_coach() OR aal='aal2'`
+  kalıbı; danışan yolu hiç etkilenmiyor.
+- Koç tetiklemeli şifre sıfırlama:
+  `apps/web/src/app/api/coach/reset-client-password/route.ts` — Bearer kimlik,
+  sunucuda `is_coach()` doğrulaması, çift kovalı hız sınırı (koç+hedef 3/saat,
+  koç 20/saat), `resetPasswordForEmail` (`generateLink` DEĞİL — tip sistemiyle
+  kanıtlı gerekçe).
+- `apps/web/src/app/forgot-password/page.tsx` + `reset-password/page.tsx` +
+  `login/page.tsx` bağlantısı — danışan kendi kendine şifre sıfırlama.
+- `supabase/migrations/20260819130000_coach_action_audit.sql`: `coach_actions`
+  denetim tablosu (`account_deletions` doktrini — RLS+FORCE+sıfır politika,
+  tek yazar SECURITY DEFINER `record_coach_action()`); `delete_account()`
+  manifesti 14 → 15 tabloya çıktı.
+
+### Kapsam kararları ve kanıtları (AC tablosu yerine)
+
+Ayrıntı `docs/archive/progress-faz-4.7-kimlik-guvenligi.md`'de. Özet: RLS
+126 → **136/136** senaryo, vitest 763 → **793/793** (64 dosya), E2E **54
+passed, 4 skipped** (koç spec'leri `aal2` fixture'ıyla geçti — yeni RLS kapısı
+E2E'de de doğrulandı), `identity-ratchet.mjs` tavanla eşit, lint/type-check/
+format/build/audit hepsi temiz. Üç yeni borç açıldı (B-061, B-062, B-063 —
+`docs/PROGRESS.md` §3).
+
+---
+
+## 7c. Faz 4.8 — Etkinlik Kaydı (PLANLANDI)
+
+Koç panelinde danışan aktivitesinin (sekme görüntüleme, günlük giriş, form
+check yükleme, mesaj gönderme, AI üretimi, giriş/çıkış) **gün hassasiyetinde**
+görünür olması. Kapsam ve kararlar Fable danışmasıyla alındı.
+
+### İş kalemleri
+
+- İki yeni tablo: `activity_sessions`, `activity_events`. Kapalı olay listesi:
+  `tab_view`, `daily_log_submitted`, `form_check_uploaded`, `message_sent`,
+  `ai_generated`, `login`, `logout`. **IP/user-agent/olay içeriği TUTULMAZ.**
+- Heartbeat 60 sn, yalnızca sekme görünürken (`document.visibilityState`);
+  30 dk hareketsizlik oturumu bitirir.
+- Kapanış sinyali `sendBeacon` **DEĞİL** `fetch(keepalive:true)` — `sendBeacon`
+  `Authorization` başlığı taşıyamaz.
+- Yazma yolu Next route: `POST /api/activity` — tarayıcıdan doğrudan Supabase
+  yazımı **yok** (B-031'in bu yüzeydeki ilk kapanışı).
+- **Saklama 180 gün** (kullanıcı kararı) + pg_cron purge job'u.
+- **Açık rıza gerekli** (meşru menfaat yetmez): `profiles.activity_consent_at`,
+  her an opt-out. Kapalıyken koç "aktivite kaydı kapalı" rozeti görür —
+  **"hiç açmadı" DEĞİL**, açık/kapalı/hiç-karar-verilmedi üç ayrı durum.
+- **Danışan kendi kaydını görür** (kullanıcı kararı) — koç görünümüyle simetrik
+  değil, danışan kendi geçmişine tam erişir.
+- Koç görünümü **gün hassasiyetinde** — saat/dakika damgası koça
+  **gösterilmez**.
+- İki yeni tablo `delete_account()` manifestine eklenecek (**15 → 17**) ve
+  `rls.test.sql` güncellenecek.
+
+### Dilimler
+
+1. Şema + RLS + `delete_account()` genişletmesi + purge (pg_cron).
+2. `POST /api/activity` + istemci heartbeat (`fetch(keepalive:true)`).
+3. Rıza/aydınlatma akışı + iki görünüm (danışan kendi kaydı, koç gün
+   hassasiyetinde özet).
+4. Fırsat: **B-009** (`42501` RLS reddi sunucu tarafına hiç ulaşmıyor) aynı
+   uçla (`POST /api/activity`'nin loglama altyapısı) kapatılabilir mi —
+   değerlendirilecek, garanti değil.
+
+---
+
 ## 8. Faz 5 — Sağlık Verisi Senkronizasyonu
 
 - Mobil: iOS HealthKit + Android Health Connect (uygun Expo modülü/config

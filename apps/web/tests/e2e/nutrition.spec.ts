@@ -26,7 +26,7 @@
 
 import { type Page } from '@playwright/test'
 
-import { TEST_USERS, login } from './fixtures'
+import { TEST_USERS, login, loginAsCoach } from './fixtures'
 import { expect, resource, test } from './resource-lock'
 
 // Testin kendi ürettiği rastgele sayı: tekrarlanan koşularda hedef değeri
@@ -114,7 +114,7 @@ test.describe('Beslenme Akışı (§4.2)', () => {
       const mealKcal = 400
 
       // --- 1) Koç: danışanı seç, Beslenme sekmesinde günlük hedefi gir ve kaydet ---
-      await login(page, TEST_USERS.coach)
+      await loginAsCoach(page)
       await selectClient(page, CLIENT1_FULL_NAME)
       await page.getByRole('tab', { name: /Beslenme/ }).click()
 
@@ -191,7 +191,7 @@ test.describe('Beslenme Akışı (§4.2)', () => {
     // (bkz. src/components/DashboardTabs.tsx `selectedClientIds`) — art arda
     // iki `{isim} seç` tıklaması ikisini de seçili bırakır (arama filtresi
     // yalnızca GÖRÜNÜR listeyi daraltır, seçim durumunu ETKİLEMEZ).
-    await login(page, TEST_USERS.coach)
+    await loginAsCoach(page)
     await selectClient(page, CLIENT1_FULL_NAME)
     await selectClient(page, CLIENT2_FULL_NAME)
 

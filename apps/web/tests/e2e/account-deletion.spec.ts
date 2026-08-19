@@ -31,9 +31,19 @@ import { expect, test } from './resource-lock'
 const BASE_URL = process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:3000'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'http://127.0.0.1:54321'
-const ANON_KEY =
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0'
+// SABİT (hardcoded) BİR ANAHTAR BİLEREK KONMAZ — daha önce burada duran değer yerel
+// Supabase'in HERKESE AÇIK demo anon key'iydi (gerçek bir sır değil), ama gitleaks
+// bunu ayırt edemiyor ve `security` CI job'unu "leaks found" ile kırıyordu. Anahtar
+// artık YALNIZCA ortamdan okunur; yoksa aşağıdaki `test.skip` paketi gerekçesiyle
+// atlar (bkz. `SERVICE_ROLE_KEY` için hemen altındaki AYNI desen).
+const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? null
+
+/** `test.skip` ile korunan test gövdelerinde çağrılır — o noktada anahtarın VAR olduğu
+ *  garantidir; yine de burada bir kez daha (savunma amaçlı) daralt/fırlat. */
+function anonKey(): string {
+  if (!ANON_KEY) throw new Error('NEXT_PUBLIC_SUPABASE_ANON_KEY yok')
+  return ANON_KEY
+}
 
 /**
  * `service_role` anahtarını üç kaynaktan sırayla arar:
@@ -89,7 +99,7 @@ function adminClient(): SupabaseClient {
 async function signInForTokens(email: string): Promise<{ access: string; refresh: string }> {
   const response = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
     method: 'POST',
-    headers: { apikey: ANON_KEY, 'Content-Type': 'application/json' },
+    headers: { apikey: anonKey(), 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password: TEST_PASSWORD }),
   })
   const body = (await response.json()) as { access_token?: string; refresh_token?: string }
@@ -102,7 +112,7 @@ async function signInForTokens(email: string): Promise<{ access: string; refresh
 /** PostgREST'e VERİLEN token ile gider; ham durum kodu + gövdeyi döndürür. */
 async function restGet(token: string, query: string): Promise<{ status: number; body: unknown }> {
   const response = await fetch(`${SUPABASE_URL}/rest/v1/${query}`, {
-    headers: { apikey: ANON_KEY, Authorization: `Bearer ${token}` },
+    headers: { apikey: anonKey(), Authorization: `Bearer ${token}` },
   })
   return { status: response.status, body: await response.json().catch(() => null) }
 }
@@ -166,6 +176,10 @@ test.describe('Hesap silme (KVKK)', () => {
   test.skip(
     !SERVICE_ROLE_KEY,
     'SUPABASE_SERVICE_ROLE_KEY / SERVICE_ROLE_KEY bulunamadı — test süreci hesap silme fikstürünü kuramaz.'
+  )
+  test.skip(
+    !ANON_KEY,
+    'NEXT_PUBLIC_SUPABASE_ANON_KEY bulunamadı — test süreci Supabase REST/Auth uçlarına anon anahtarsız gidemez.'
   )
 
   // ###########################################################################
@@ -337,7 +351,7 @@ test.describe('Hesap silme (KVKK)', () => {
     const writeResponse = await fetch(`${SUPABASE_URL}/rest/v1/progress_entries`, {
       method: 'POST',
       headers: {
-        apikey: ANON_KEY,
+        apikey: anonKey(),
         Authorization: `Bearer ${oldAccessToken}`,
         'Content-Type': 'application/json',
       },
@@ -354,14 +368,14 @@ test.describe('Hesap silme (KVKK)', () => {
 
     // (c) KİMLİK: GoTrue kullanıcıyı tanımıyor.
     const whoAmI = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
-      headers: { apikey: ANON_KEY, Authorization: `Bearer ${oldAccessToken}` },
+      headers: { apikey: anonKey(), Authorization: `Bearer ${oldAccessToken}` },
     })
     expect(whoAmI.ok, 'GoTrue silinen kullanıcıyı hâlâ tanıyor').toBe(false)
 
     // (d) YENİLEME: oturum uzatılamaz — `auth.refresh_tokens` CASCADE ile gitti.
     const refreshResponse = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
       method: 'POST',
-      headers: { apikey: ANON_KEY, 'Content-Type': 'application/json' },
+      headers: { apikey: anonKey(), 'Content-Type': 'application/json' },
       body: JSON.stringify({ refresh_token: oldRefreshToken }),
     })
     expect(refreshResponse.ok, 'silinen hesabın oturumu YENİLENEBİLDİ').toBe(false)
@@ -369,7 +383,7 @@ test.describe('Hesap silme (KVKK)', () => {
     // (e) Şifreyle yeniden giriş de mümkün olmamalı.
     const reLogin = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
       method: 'POST',
-      headers: { apikey: ANON_KEY, 'Content-Type': 'application/json' },
+      headers: { apikey: anonKey(), 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: user.email, password: TEST_PASSWORD }),
     })
     expect(reLogin.ok, 'silinen hesaba yeniden giriş yapılabildi').toBe(false)

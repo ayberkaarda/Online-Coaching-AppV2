@@ -59,6 +59,50 @@ E2E_PASSWORD=BaskaParola123!
 
 Bu testler **canlı bir Supabase örneği** gerektirir. CI ortamında Supabase ayağa kaldırılmadan veya seed verisi yüklenmeden çalıştırılırsa (`supabase db reset` atlanırsa) tüm testler başarısız olur — giriş yapılacak kullanıcılar veritabanında bulunmayacaktır. CI pipeline'ına Supabase servislerini başlatan ve seed uygulayan bir adım eklemeden bu testleri çalıştırmayın.
 
+## Koç oturumu ve zorunlu ikinci faktör (ZORUNLU okuma)
+
+`supabase/migrations/20260819120000_mfa_aal2_gate.sql` (ADR-0026) 14 tabloya RESTRICTIVE bir politika kurdu:
+
+```
+not is_coach() or (select auth.jwt() ->> 'aal') = 'aal2'
+```
+
+Parolayla yapılan **her** giriş `aal1` verir. Yani koç kimliğiyle koşan bir test düz `login(page, TEST_USERS.coach)` kullanırsa **hiçbir danışan verisi göremez** — ve testler patlamak yerine boş ekranlarla "geçiyor" gibi görünebilir. Koç kimliğiyle koşan her test **`loginAsCoach(page)`** kullanmalıdır.
+
+**Danışan tarafına dokunulmadı ve dokunulmamalı.** Politikanın `not is_coach()` dalı danışan için her zaman `true` döner; danışan testleri `aal1`'de kalır. Yeşil kalmaları, kapının danışanı etkilemediğinin kanıtıdır.
+
+### Nasıl çalışıyor
+
+1. **`global-setup.ts` → `ensureCoachTotpFactor()`** — koç hesabında doğrulanmış bir TOTP faktörü yoksa kurar (`enroll` + `challenge` + `verify`, `otplib` ile gerçek RFC 6238 kodu). Secret'ı `apps/web/.e2e-coach-totp.json` dosyasına yazar (`.gitignore`da).
+2. **`global-setup.ts` → `createCoachAal2State()`** — koç için **tek** bir tarayıcı oturumu açar, uygulamanın kendi `/profile#guvenlik` ekranından seviye yükseltir ve `storageState`i `os.tmpdir()/my-coaching-appv2-e2e-locks/coach-aal2-state.json` dosyasına alır.
+3. **`loginAsCoach(page)`** — o cookie'leri test bağlamına kopyalar ve `/`'e gider. Giriş formunu sürmez.
+
+### Neden her testte step-up yapılmıyor (ÖLÇÜLDÜ)
+
+GoTrue, başarılı bir MFA doğrulamasında kullanıcının **diğer tüm oturumlarını iptal ediyor**. Ham `fetch` ile ölçüm (aynı kullanıcı, üç oturum):
+
+```
+before verify   200 200 200      (/user)
+verify          200
+after  verify   403 403 200      (session_not_found)
+```
+
+Her koç testinde step-up yapılan ilk tasarımda tam paket koşusunda 5 test bu yüzden düştü: paralel worker'lar birbirinin oturumunu öldürüyordu (PostgREST sorguları JWT'yi durum tutmadan doğruladığı için bir süre çalışmaya devam eder, ama uygulamanın `/user` çağrısı 403 alır ve arayüz kullanıcıyı `/login`'e atar). Bu yüzden koşu başına **tek** doğrulama yapılır.
+
+### Secret kaybolursa / faktör elle kurulursa
+
+Doğrulanmış bir faktörü silmek `aal2` gerektirir, `aal2` de o faktörün secret'ını — yani test kendini kurtaramaz. `global-setup` bu durumda ne yapılacağını söyleyen bir hata basar. İki çıkış yolu:
+
+```
+# 1) secret elinizdeyse
+E2E_COACH_TOTP_SECRET=<base32-secret> pnpm run test:e2e
+
+# 2) yerelde faktör satırını silin (yalnızca koç hesabının faktörleri)
+docker exec supabase_db_my-coaching-app psql -U postgres -d postgres -c   "delete from auth.mfa_factors where user_id = (select id from auth.users where email = 'coach@example.com');"
+```
+
+**Ön koşul:** yerel GoTrue'da TOTP açık olmalı (`supabase/config.toml` → `[auth.mfa.totp] enroll_enabled/verify_enabled = true`). Env değişkenleri konteyner oluşturulurken sabitlendiği için ayar sonradan eklendiyse yığının `supabase stop && supabase start` ile yeniden kurulması gerekir.
+
 ## İzolasyon: paylaşılan kaynak kilidi (ZORUNLU okuma)
 
 Bu paket **tek bir veritabanına** ve seed'deki **sabit iki danışan hesabına** karşı koşar. Eş zamanlılık iki boyutludur:

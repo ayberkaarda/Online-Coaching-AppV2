@@ -20,7 +20,7 @@
 
 import { type Page } from '@playwright/test'
 
-import { TEST_USERS, login, type TestUser } from './fixtures'
+import { TEST_USERS, login, loginAsCoach, type TestUser } from './fixtures'
 import { expect, resource, test } from './resource-lock'
 
 // Date.now() yerine testin kendi ürettiği rastgele sayı: tekrarlanan/paralel
@@ -115,7 +115,7 @@ test.describe('Plan Akışları (karakterizasyon)', () => {
       const day = 'Pazartesi'
 
       // --- 1) Koç: danışanı seç, Antrenman sekmesinde planı yaz, kaydet ---
-      await login(page, TEST_USERS.coach)
+      await loginAsCoach(page)
       await selectClient(page, CLIENT1_FULL_NAME)
       await page.getByRole('tab', { name: /Antrenman/ }).click()
 
@@ -163,7 +163,7 @@ test.describe('Plan Akışları (karakterizasyon)', () => {
       const day = 'Salı'
 
       // --- 1) Koç: planı "Antrenman" sekmesinden kaydeder ---
-      await login(page, TEST_USERS.coach)
+      await loginAsCoach(page)
       await selectClient(page, CLIENT1_FULL_NAME)
       await page.getByRole('tab', { name: /Antrenman/ }).click()
 
@@ -305,7 +305,7 @@ test.describe('Plan Akışları (karakterizasyon)', () => {
 
       // Koç varsayılan `page` bağlamında, danışan ikinci bir bağlamda çalışır.
       const coachPage = page
-      await login(coachPage, TEST_USERS.coach)
+      await loginAsCoach(coachPage)
       await selectClient(coachPage, CLIENT2_FULL_NAME)
       await coachPage.getByRole('tab', { name: /Antrenman/ }).click()
 

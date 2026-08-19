@@ -3,6 +3,7 @@
 // Giriş sayfası: react-hook-form + zod doğrulaması ile Supabase oturum açma.
 
 import { zodResolver } from '@hookform/resolvers/zod'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import type { JSX } from 'react'
 import { useForm } from 'react-hook-form'
@@ -110,6 +111,12 @@ export default function LoginPage(): JSX.Element {
                 {errors.password.message}
               </p>
             )}
+            <Link
+              href="/forgot-password"
+              className="mt-2 inline-block text-xs font-bold uppercase tracking-wider text-gray-500 hover:text-accent"
+            >
+              Şifremi unuttum
+            </Link>
           </div>
 
           <button

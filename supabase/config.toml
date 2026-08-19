@@ -78,6 +78,29 @@ refresh_token_reuse_interval = 10
 enable_signup = false
 enable_manual_linking = false
 
+# ADR-0026 — TOTP çok faktörlü kimlik doğrulama.
+#
+# BU BLOK OLMADAN İŞ ÇALIŞMAZ VE KOÇ KİLİTLENİR. Yerel GoTrue varsayılanları
+# ÖLÇÜLDÜ ve TOTP KAPALI geliyordu:
+#   GOTRUE_MFA_TOTP_ENROLL_ENABLED=false
+#   GOTRUE_MFA_TOTP_VERIFY_ENABLED=false
+# `20260819120000_mfa_aal2_gate.sql` koçtan `aal2` istiyor; `aal2`ye çıkmanın tek
+# yolu bir TOTP faktörü kaydedip doğrulamaktır. Kayıt kapalıysa koç ne veri
+# görebilir ne de kilidi açabilir.
+#
+# DİKKAT — bu değişiklik ÇALIŞAN yığına kendiliğinden inmez: env değişkenleri
+# konteyner OLUŞTURULURKEN sabitlenir. Uygulanması için `supabase stop` +
+# `supabase start` gerekir. Barındırılan projede aynı ayar Dashboard'dan açılır.
+#
+# SMS/telefon faktörü BİLEREK KAPALI (ADR-0026 §Reddedilen alternatifler D):
+# ücretli sağlayıcı gerektirir ve SIM-swap'a açıktır.
+[auth.mfa]
+max_enrolled_factors = 10
+
+[auth.mfa.totp]
+enroll_enabled = true
+verify_enabled = true
+
 [auth.email]
 # DİKKAT: Supabase CLI'ın [auth.email] şemasında `enabled` diye bir anahtar YOK
 # (CLI kaynağında -- apps/cli/src/legacy/commands/start/services/gotrue.service.ts --

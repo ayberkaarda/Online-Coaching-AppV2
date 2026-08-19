@@ -2,6 +2,8 @@ import { defineConfig, devices } from '@playwright/test'
 import os from 'node:os'
 import path from 'node:path'
 
+import { E2E_BASE_URL, E2E_SUPABASE_ANON_KEY, E2E_SUPABASE_URL } from './tests/e2e/e2e-env'
+
 // ---------------------------------------------------------------------------
 // KATMAN 1 — UZAK (BARINDIRILAN) SUPABASE'E KARŞI E2E KOŞMAYI ENGELLEYEN İDDİA
 //
@@ -17,7 +19,11 @@ import path from 'node:path'
 // start` üzerinden koşar ve `next start` NODE_ENV=production ile çalışır (bkz.
 // aşağıdaki A-12 notu). `NODE_ENV !== 'production'` gibi bir koşul, korumaya
 // çalıştığı senaryonun tam olarak içinde kendini kapatırdı.
-const effectiveSupabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'http://127.0.0.1:54321'
+// TEK KAYNAK: aynı değerler `tests/e2e/coach-mfa.ts` (global-setup'ın Node tarafı
+// Supabase istemcisi) tarafından da kullanılıyor. İki kopya olsaydı, biri
+// değiştirilip diğeri unutulduğunda global-setup A projesine TOTP faktörü kurar,
+// tarayıcı B projesine giderdi ve tüm koç spec'leri anlaşılmaz biçimde düşerdi.
+const effectiveSupabaseUrl = E2E_SUPABASE_URL
 const supabaseHost = (() => {
   try {
     return new URL(effectiveSupabaseUrl).hostname
@@ -144,7 +150,7 @@ export default defineConfig({
   workers: process.env.CI ? 1 : localWorkers,
   reporter: [['html', { open: 'never' }], ['list']],
   use: {
-    baseURL: process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:3000',
+    baseURL: E2E_BASE_URL,
     // `trace: 'on-first-retry'` yerelde zaten MALİYETSİZ: `retries: 0` olduğu için
     // hiçbir yerel test asla "ilk retry"ye ulaşmaz, trace hiç toplanmaz. CI'da
     // (`retries: 2`) tanı amacıyla ilk retry'de devreye girer — DOKUNULMADI.
@@ -179,7 +185,7 @@ export default defineConfig({
     // webServer.timeout'u aşma riski taşır. Yerelde ise `pnpm run test:e2e`
     // tek başına çalışabilsin diye build adımı komuta dahil edilir.
     command: process.env.CI ? 'pnpm run start' : 'pnpm run build && pnpm run start',
-    url: process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:3000',
+    url: E2E_BASE_URL,
     reuseExistingServer: !process.env.CI,
     // ORTAM TUZAĞI KAPATILDI — `NEXT_PUBLIC_*` değişkenleri BUILD ZAMANINDA
     // bundle'a gömülür. `.env.local` eskiden BARINDIRILAN (uzak) Supabase projesini
@@ -191,18 +197,17 @@ export default defineConfig({
     // yedek olarak KASITLI şekilde yerinde bırakıldı — üçü birden kaybolmadıkça
     // koşu yanlış hedefe gidemez.
     //
-    // Aşağıdaki değerler yerel Supabase yığınının SABİT DEMO ANAHTARLARIDIR
-    // (`npx supabase status` her kurulumda aynısını üretir) — gerçek sır DEĞİLDİR,
-    // depoya yazılmalarında sakınca yoktur.
+    // Değerlerin kendisi `tests/e2e/e2e-env.ts` içindedir (TEK KAYNAK — global-setup
+    // da aynı hedefe bağlanmak zorunda). Orada duran şey yerel Supabase yığınının
+    // SABİT DEMO ANAHTARLARIDIR (`npx supabase status` her kurulumda aynısını
+    // üretir) — gerçek sır DEĞİLDİR, depoya yazılmalarında sakınca yoktur.
     //
     // Dışarıdan verilen değer HER ZAMAN önceliklidir: CI kendi ortam
     // değişkenleriyle (.github/workflows/ci.yml) bunları geçersiz kılar,
     // geliştirici de tek seferlik başka bir hedefe yönlendirebilir.
     env: {
-      NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'http://127.0.0.1:54321',
-      NEXT_PUBLIC_SUPABASE_ANON_KEY:
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0',
+      NEXT_PUBLIC_SUPABASE_URL: E2E_SUPABASE_URL,
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: E2E_SUPABASE_ANON_KEY,
       NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000',
       // A-12 (src/env.server.ts) NODE_ENV=production iken AI_BACKEND_API_KEY'i zorunlu kılar
       // (fail-fast, `superRefine`). `next start` NODE_ENV=production ile çalıştığından bu değer

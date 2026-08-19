@@ -130,7 +130,26 @@ export function useSignOut() {
 
   return useMutation({
     mutationFn: async (): Promise<void> => {
-      const { error } = await supabase.auth.signOut()
+      // ######################################################################
+      // # KAPSAM `local` — `global` DEĞİL (varsayılan buydu, DEĞİŞTİRİLDİ)   #
+      // #                                                                    #
+      // # `signOut()` parametresiz çağrıldığında GoTrue varsayılanı          #
+      // # `scope: 'global'`dır: kullanıcının TÜM cihazlarındaki oturumları   #
+      // # iptal eder. Yani telefondan "Çıkış yap" diyen kullanıcı,           #
+      // # masaüstündeki açık oturumundan da DÜŞÜYORDU. Bunu kimse istemedi;  #
+      // # "çıkış", basılan cihazdan çıkmak demektir.                         #
+      // #                                                                    #
+      // # E2E tarafında da yarış üretiyordu: `auth.spec.ts`in logout         #
+      // # senaryosu, paralel koşan başka bir spec'in oturumunu öldürüp o     #
+      // # spec'i rastgele kırıyordu (B-037'nin tarif ettiği imza).           #
+      // #                                                                    #
+      // # "TÜM CİHAZLARDAN ÇIK" HÂLÂ MEŞRU BİR İHTİYAÇTIR — ama AYRI ve     #
+      // # AÇIK bir eylem olmalıdır ("Diğer tüm oturumları kapat" düğmesi,    #
+      // # `scope: 'global'` ile). Sıradan çıkışın yan etkisi olarak          #
+      // # yapılmamalı: kullanıcı ne olduğunu görmeden diğer cihazlarından    #
+      // # atılıyor.                                                          #
+      // ######################################################################
+      const { error } = await supabase.auth.signOut({ scope: 'local' })
       if (error) throw new Error(error.message)
     },
     onSuccess: async () => {
@@ -162,6 +181,96 @@ export function useUpdatePassword() {
     },
     onError: (error: Error) => {
       notify.error(`Şifre güncellenemedi: ${error.message}`)
+    },
+  })
+}
+
+// ---------------------------------------------------------------------------
+// Şifre sıfırlama (Faz 4.7 dilim 3 — B-05x)
+// ---------------------------------------------------------------------------
+
+export interface RequestPasswordResetInput {
+  email: string
+  /**
+   * Sıfırlama bağlantısının kullanıcıyı geri getireceği adres. Supabase panelindeki
+   * "Redirect URLs" allowlist'inde OLMAK ZORUNDADIR (yerelde
+   * `http://localhost:3000/reset-password`); aksi halde GoTrue bağlantıyı reddeder.
+   *
+   * Bu paket web VE mobil arasında paylaşıldığı için `window` üzerinden TÜRETİLMEZ —
+   * çağıran (web sayfası) `clientEnv.NEXT_PUBLIC_APP_URL` gibi platforma özgü bir
+   * kaynaktan AÇIKÇA vermelidir. Verilmez ve tarayıcıdaysak `window.location.origin`
+   * yedeğine düşülür; o da yoksa (SSR/mobil) alan hiç gönderilmez ve Supabase panelde
+   * ayarlı varsayılan Site URL'i kullanır.
+   */
+  redirectTo?: string
+}
+
+/**
+ * Kullanıcının KENDİ tetiklediği şifre sıfırlama e-postası
+ * (`/forgot-password` → `supabase.auth.resetPasswordForEmail`).
+ *
+ * KULLANICI SAYIMI YOK: Supabase bu uç nokta için hesap var/yok bilgisini sızdırmaz —
+ * her iki durumda da AYNI başarı yanıtını döner (`{ data: {}, error: null }`). Bu yüzden
+ * `onError` BİLEREK toast GÖSTERMEZ: çağıran sayfa (`/forgot-password`) network/biçim
+ * hatalarında bile her zaman aynı nötr mesajı göstermelidir — burada bir hata toast'u
+ * "bu e-posta kayıtlı değil" gibi okunabilir ve sayımı geri getirirdi. Hata yine de
+ * `mutation.error` üzerinden erişilebilir kalır (network hatası ayrımı sayfanın kendi
+ * kararıdır), ama VARSAYILAN akış onu göstermez.
+ */
+export function useRequestPasswordReset() {
+  const supabase = useSupabaseClient()
+  return useMutation({
+    mutationFn: async ({ email, redirectTo }: RequestPasswordResetInput): Promise<void> => {
+      const resolvedRedirectTo =
+        redirectTo ??
+        (typeof window !== 'undefined' ? `${window.location.origin}/reset-password` : undefined)
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        ...(resolvedRedirectTo ? { redirectTo: resolvedRedirectTo } : {}),
+      })
+      if (error) throw new Error(error.message)
+    },
+  })
+}
+
+export interface CoachResetClientPasswordInput {
+  /**
+   * Hedef danışanın `profiles.id`'si. E-posta İSTEMCİDEN ALINMAZ ve bu hook'a hiç
+   * VERİLMEZ — sunucu ucu (`/api/coach/reset-client-password`) koçun kimliğini
+   * doğruladıktan sonra danışanın kayıtlı e-postasını KENDİSİ okur. Böylece bir koç,
+   * (form alanı elle değiştirilse bile) rastgele bir e-postaya sıfırlama bağlantısı
+   * tetikleyemez.
+   */
+  clientId: string
+}
+
+interface CoachResetClientPasswordResponse {
+  ok: true
+}
+
+/**
+ * KOÇ TETİKLEMELİ şifre sıfırlama (Faz 4.7 dilim 3).
+ *
+ * Koç bağlantıyı ASLA GÖRMEZ ve danışan adına GİRİŞ YAPILMAZ (impersonation yok): sunucu
+ * ucu Supabase'in `resetPasswordForEmail`'ini KENDİSİ çağırır, e-postayı Supabase kendi
+ * SMTP'siyle danışana gönderir ve bağlantı YANITA HİÇ KONMAZ — bu mutasyonun başarı
+ * yanıtı yalnızca `{ ok: true }`'dur. Her tetikleme sunucu tarafında denetim kaydına
+ * yazılır (bkz. route.ts).
+ */
+export function useCoachResetClientPassword() {
+  const notify = useNotifier()
+  return useMutation({
+    mutationFn: async (
+      input: CoachResetClientPasswordInput
+    ): Promise<CoachResetClientPasswordResponse> =>
+      apiFetch<CoachResetClientPasswordResponse>('/api/coach/reset-client-password', {
+        method: 'POST',
+        json: input,
+      }),
+    onSuccess: () => {
+      notify.success('Danışana şifre sıfırlama bağlantısı gönderildi.')
+    },
+    onError: (error: Error) => {
+      notify.error(`Şifre sıfırlama tetiklenemedi: ${error.message}`)
     },
   })
 }

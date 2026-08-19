@@ -18,6 +18,7 @@ import {
 import { DashboardTabs } from '@/components/DashboardTabs'
 import { NotificationForm } from '@/components/NotificationForm'
 import { ThemeToggle } from '@/components/ThemeToggle'
+import { CoachMfaGate } from '@/components/security/CoachMfaGate'
 
 export default function DashboardPage(): JSX.Element {
   const router = useRouter()
@@ -91,6 +92,11 @@ export default function DashboardPage(): JSX.Element {
 
   return (
     <main id="main-content" className="container relative mx-auto max-w-6xl px-4 py-12 sm:px-6">
+      {/* `/login` başarılı girişte `router.push('/')` yapıyor, yani `/` her oturumun ilk
+          durağıdır; proxy/middleware katmanı rolü BİLEMEZ (rol `profiles` tablosunda ve
+          aal1'de o tablo koça RLS ile kapalı), oradan sormak `service_role` yüzeyini
+          genişletirdi (ADR-0025 §3'ün sınırı). Bu yüzden kapı burada, istemcide. */}
+      <CoachMfaGate />
       <div className="absolute left-4 top-4 z-50 flex items-center gap-2">
         {/* DANIŞAN BİLDİRİM ZİLİ */}
         {role === 'client' && (

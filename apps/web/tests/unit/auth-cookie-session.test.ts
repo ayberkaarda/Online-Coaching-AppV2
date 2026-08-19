@@ -9,6 +9,8 @@
 //      kurulamaz ve TÜM E2E paketi düşerdi. Bu test o regresyonu sabitler.
 //   C) `useSignIn` artık `setSession(tokens)` ÇAĞIRMAZ; sunucunun az önce yazdığı cookie'den
 //      `getSession()` ile hidrat eder.
+//   D) `useSignOut` çıkışı YALNIZCA BU CİHAZDAN yapar (`scope: 'local'`) — kullanıcının
+//      diğer cihazlardaki oturumlarını düşürmez.
 //
 // A ve B için `@supabase/ssr` MOCK'LANMAZ — cookie üretiminin (adlandırma, parçalama,
 // nitelikler) gerçek kütüphane tarafından yapıldığı doğrulanır. Yalnızca ağ katmanı
@@ -54,6 +56,7 @@ vi.mock('sonner', () => ({
 const getSessionMock = vi.fn()
 const setSessionMock = vi.fn()
 const onAuthStateChangeMock = vi.fn()
+const signOutMock = vi.fn()
 const { apiFetchMock } = vi.hoisted(() => ({ apiFetchMock: vi.fn() }))
 
 vi.mock('@repo/api-client/api/client', () => ({
@@ -64,7 +67,7 @@ vi.mock('@repo/api-client/api/client', () => ({
 import { POST } from '@/app/api/auth/sign-in/route'
 import { resetServerEnvCache } from '@/env.server'
 import { SupabaseClientProvider } from '@repo/api-client/context'
-import { useSignIn } from '@repo/api-client/hooks/useSession'
+import { useSignIn, useSignOut } from '@repo/api-client/hooks/useSession'
 import { resetRateLimit } from '@/lib/rate-limit'
 
 import { asSupabaseClient } from './test-utils'
@@ -74,6 +77,7 @@ const supabase = asSupabaseClient({
     getSession: getSessionMock,
     setSession: setSessionMock,
     onAuthStateChange: onAuthStateChangeMock,
+    signOut: signOutMock,
   },
 })
 
@@ -306,5 +310,40 @@ describe('useSignIn — oturum cookie’den hidrat edilir (A-05 / B-006)', () =>
     await expect(
       result.current.mutateAsync({ email: 'ok@example.com', password: PASSWORD })
     ).rejects.toThrow('Oturum başlatılamadı. Lütfen tekrar deneyin.')
+  })
+})
+
+describe('useSignOut — çıkış YALNIZCA bu cihazdan (scope: local)', () => {
+  beforeEach(() => {
+    signOutMock.mockReset()
+    signOutMock.mockResolvedValue({ error: null })
+  })
+
+  // ###########################################################################
+  // # REGRESYON: `signOut()` parametresiz çağrıldığında GoTrue varsayılanı     #
+  // # `scope: 'global'`dır ve kullanıcının TÜM cihazlarındaki oturumu iptal    #
+  // # eder. Telefondan çıkan kullanıcı masaüstünden de düşüyordu. Bu test o    #
+  // # varsayılana geri dönülmesini engeller.                                   #
+  // ###########################################################################
+  it("signOut'u { scope: 'local' } ile çağırır — global çıkış YAPMAZ", async () => {
+    const { result } = renderHook(() => useSignOut(), { wrapper: createWrapper() })
+
+    await result.current.mutateAsync()
+
+    expect(signOutMock).toHaveBeenCalledTimes(1)
+    expect(signOutMock).toHaveBeenCalledWith({ scope: 'local' })
+
+    // Parametresiz çağrı (eski davranış) bir daha oluşmamalı.
+    expect(signOutMock).not.toHaveBeenCalledWith()
+    const [firstArg] = signOutMock.mock.calls[0] as [{ scope?: string } | undefined]
+    expect(firstArg?.scope).not.toBe('global')
+  })
+
+  it('GoTrue hata dönerse Türkçe hata mesajıyla fırlatır', async () => {
+    signOutMock.mockResolvedValue({ error: { message: 'network down' } })
+
+    const { result } = renderHook(() => useSignOut(), { wrapper: createWrapper() })
+
+    await expect(result.current.mutateAsync()).rejects.toThrow('network down')
   })
 })

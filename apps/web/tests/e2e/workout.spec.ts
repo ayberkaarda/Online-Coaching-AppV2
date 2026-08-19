@@ -16,7 +16,7 @@
 
 import { type Page } from '@playwright/test'
 
-import { TEST_USERS, login } from './fixtures'
+import { TEST_USERS, login, loginAsCoach } from './fixtures'
 import { expect, resource, test } from './resource-lock'
 
 // src/lib/utils.ts `getTodayName()` ile AYNI eşleme (0 = Pazar).
@@ -117,7 +117,7 @@ test.describe('Antrenman akışı (AC-2.1 — antrenman yarısı)', () => {
       const coachPage = page
 
       // --- 1) Koç: bekleyen onayları temizle, bugünün planını yayınla ----------
-      await login(coachPage, TEST_USERS.coach)
+      await loginAsCoach(coachPage)
       await selectClient(coachPage, CLIENT1_FULL_NAME)
       await coachPage.getByRole('tab', { name: /Antrenman/ }).click()
       await clearPendingApprovals(coachPage)

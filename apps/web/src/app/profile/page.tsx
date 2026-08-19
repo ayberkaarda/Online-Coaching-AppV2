@@ -3,7 +3,7 @@
 // Profil sayfası: avatar yükleme, şifre değiştirme, beslenme/antrenman programı görüntüleme.
 
 import { zodResolver } from '@hookform/resolvers/zod'
-import { AlertTriangle, Dumbbell, Salad, Trash2, User } from 'lucide-react'
+import { AlertTriangle, Dumbbell, Salad, ShieldAlert, Trash2, User } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import type { ChangeEvent, JSX } from 'react'
 import { useEffect, useState } from 'react'
@@ -21,6 +21,7 @@ import {
   useWorkoutPlan,
 } from '@repo/api-client'
 import { QueryState, SkeletonCard, SkeletonText } from '@/components/ui'
+import { SecuritySection } from '@/components/security/SecuritySection'
 import { ALLOWED_IMAGE_MIME, validateImageFile } from '@repo/api-client/upload-validation'
 import { passwordChangeSchema, type PasswordChangeInput } from '@repo/types/schemas'
 import {
@@ -152,11 +153,11 @@ function DeleteAccountSection(): JSX.Element {
   return (
     <section
       aria-labelledby="delete-account-heading"
-      className="mt-8 rounded-3xl border-2 border-red-200 bg-red-50/60 p-6 dark:border-red-900/60 dark:bg-red-950/20"
+      className="mt-8 rounded-2xl border-2 border-red-200 bg-red-50/60 p-6 dark:border-red-900/60 dark:bg-red-950/20"
     >
       <h2
         id="delete-account-heading"
-        className="mb-3 flex items-center gap-2 text-lg font-black text-red-700 dark:text-red-400"
+        className="mb-3 flex items-center gap-2 text-lg font-bold text-red-700 dark:text-red-400"
       >
         <AlertTriangle aria-hidden="true" className="h-5 w-5 shrink-0" />
         Hesabımı Sil
@@ -248,7 +249,12 @@ export default function ProfilePage(): JSX.Element {
 
   const { data: session, isLoading: isSessionLoading } = useSession()
   const userId = session?.user.id
-  const { data: profile, isLoading: isProfileLoading } = useProfile(userId)
+  const {
+    data: profile,
+    isLoading: isProfileLoading,
+    isError: isProfileError,
+    error: profileError,
+  } = useProfile(userId)
   const workoutPlanQuery = useWorkoutPlan(userId)
   const nutritionPlanQuery = useNutritionPlan(userId)
 
@@ -291,7 +297,10 @@ export default function ProfilePage(): JSX.Element {
     })
   })
 
-  if (isSessionLoading || isProfileLoading || !profile) {
+  // isSessionLoading: oturum sorgusu daha dönmedi.
+  // !session: oturum yok — yukarıdaki useEffect '/login'e yönlendirecek, o tamamlanana
+  // kadar nötr bir iskelet gösterilir (yönlendirme render SONRASI çalışır).
+  if (isSessionLoading || !session) {
     return (
       <div className="container mx-auto max-w-4xl space-y-8 px-4 py-12">
         <SkeletonCard />
@@ -300,6 +309,72 @@ export default function ProfilePage(): JSX.Element {
           <SkeletonText lines={4} />
         </div>
       </div>
+    )
+  }
+
+  if (isProfileLoading) {
+    return (
+      <div className="container mx-auto max-w-4xl space-y-8 px-4 py-12">
+        <SkeletonCard />
+        <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
+          <SkeletonText lines={4} />
+          <SkeletonText lines={4} />
+        </div>
+      </div>
+    )
+  }
+
+  // ###########################################################################
+  // # PROFİL YOK — RLS REDDİ DAHİL: BU DAL KOÇU KİLİTLEMEK İÇİN VAR             #
+  // #                                                                         #
+  // # `mfa_aal2_gate` politikası `profiles` tablosunu DA kapsıyor: aal1'deki  #
+  // # bir koç kendi profil satırını bile OKUYAMAZ, `useProfile()` boş/hatalı  #
+  // # döner. Eski davranış (tek birleşik erken dönüş) koçu SONSUZ İSKELETTE   #
+  // # bırakıyordu — kayıt ekranına hiç ulaşamıyordu. Burada bunun yerine      #
+  // # SecuritySection'ı içeren kilitli bir görünüm gösterilir; avatar/şifre/  #
+  // # plan/hesap-silme blokları RENDER EDİLMEZ (zaten RLS onları da           #
+  // # okutmayacaktır).                                                       #
+  // ###########################################################################
+  if (!profile) {
+    return (
+      <main id="main-content" className="container mx-auto max-w-4xl px-4 py-12">
+        <button
+          onClick={() => router.push('/')}
+          className="mb-6 flex items-center gap-2 font-bold text-accent transition-opacity hover:opacity-80"
+        >
+          ← Ana Sayfaya Dön
+        </button>
+
+        <h1 className="mb-6 text-3xl font-bold text-gray-800 dark:text-zinc-200">Profilim</h1>
+
+        <div
+          role="alert"
+          className="mb-8 flex items-start gap-3 rounded-2xl border-2 border-amber-300 bg-amber-50 p-6 dark:border-amber-800 dark:bg-amber-950/30"
+        >
+          <ShieldAlert
+            aria-hidden="true"
+            className="mt-0.5 h-6 w-6 shrink-0 text-amber-700 dark:text-amber-400"
+          />
+          <div className="space-y-1">
+            <p className="font-bold text-amber-900 dark:text-amber-200">
+              Hesabınız iki adımlı doğrulama tamamlanana kadar kilitli
+            </p>
+            <p className="text-sm font-medium leading-relaxed text-amber-900/90 dark:text-amber-200/90">
+              Koç hesapları için iki adımlı doğrulama zorunludur. Profil bilgilerinize ve danışan
+              verilerinize erişebilmek için önce aşağıdan doğrulamayı tamamlayın.
+            </p>
+            {isProfileError && profileError && (
+              <p className="text-xs font-medium text-amber-800/70 dark:text-amber-300/70">
+                Teknik detay: {profileError.message}
+              </p>
+            )}
+          </div>
+        </div>
+
+        <div id="guvenlik" className="scroll-mt-8">
+          <SecuritySection />
+        </div>
+      </main>
     )
   }
 
@@ -432,6 +507,26 @@ export default function ProfilePage(): JSX.Element {
             <WorkoutPlanView plan={workoutPlanQuery.data ?? EMPTY_WORKOUT_PLAN} />
           </QueryState>
         </div>
+      </div>
+
+      {/* ###################################################################
+          # GÜVENLİK BÖLÜMÜ SAYFANIN KALICI PARÇASIDIR — İKİ DALDA DA VAR    #
+          #                                                                  #
+          # Yukarıdaki "kilitli görünüm" dalı YALNIZCA aal1'deki koçu kayıt  #
+          # olmaya ZORLAMAK içindir. Bölüm SADECE orada render edilseydi:    #
+          #   * DANIŞAN MFA ekranına HİÇ ulaşamazdı — profili okunabildiği   #
+          #     için her zaman bu tam görünüme düşer ve kilitli dala hiç      #
+          #     girmez. ADR-0026 §Karar 2'nin "danışan opt-in" kararı kâğıt  #
+          #     üzerinde kalırdı: opt-in yapılacak arayüz erişilemez olurdu. #
+          #   * aal2'ye ÇIKMIŞ KOÇ da faktörlerini yönetemezdi (listeleme /  #
+          #     kaldırma) — çünkü doğrulandıktan sonra o da tam görünümdedir.#
+          #                                                                  #
+          # `SecuritySection` üç hâli kendi içinde ayırır (faktör yok ->      #
+          # kayıt, faktör var + aal1 -> seviye yükseltme, aal2 -> liste +    #
+          # kaldırma), bu yüzden her iki dalda da doğru davranır.            #
+          ################################################################### */}
+      <div id="guvenlik" className="scroll-mt-8">
+        <SecuritySection />
       </div>
 
       {/* KVKK hesap silme — sayfanın EN ALTINDA ve görsel olarak ayrılmış ("tehlikeli

@@ -8,7 +8,7 @@
 // Bu dosyadaki testler politika tekrar daralırsa (veya chatPartnerId çözümü
 // başka bir şekilde bozulursa) kırmızı vermelidir.
 
-import { TEST_USERS, login } from './fixtures'
+import { TEST_USERS, login, loginAsCoach } from './fixtures'
 import { expect, resource, test } from './resource-lock'
 
 // Date.now() yerine testin kendi ürettiği rastgele sayı: paralel/tekrarlanan
@@ -64,7 +64,7 @@ test.describe('Mesajlaşma Akışı', () => {
       const coachContext = await browser.newContext()
       try {
         const coachPage = await coachContext.newPage()
-        await login(coachPage, TEST_USERS.coach)
+        await loginAsCoach(coachPage)
 
         // supabase/seed.sql: client1@example.com -> "Ahmet Yılmaz". Arama ile
         // filtreleyip seç; ".last()" kullanılır çünkü current_streak === 0 olan
@@ -133,7 +133,7 @@ test.describe('Mesajlaşma Akışı', () => {
   )
 
   test('koç danışan seçmeden sohbet arayüzünü kullanamıyor', async ({ page }) => {
-    await login(page, TEST_USERS.coach)
+    await loginAsCoach(page)
     await page.getByRole('tab', { name: /sohbet/i }).click()
 
     // NOT (kaynağa uydurmak zorunda kalınan beklenti): MessagesTab.tsx kendi

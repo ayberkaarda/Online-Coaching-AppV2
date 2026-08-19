@@ -1,6 +1,6 @@
 // Panel sekmeleri, klavye navigasyonu, tema değiştirme ve rol bazlı erişim testleri.
 
-import { TEST_USERS, login } from './fixtures'
+import { TEST_USERS, login, loginAsCoach } from './fixtures'
 // Bu dosyadaki testler SALT OKUNUR (sekme gezinme, tema, rol bazlı yönlendirme):
 // hiçbir paylaşılan kaynağa yazmadıkları için `resource(...)` ilan ETMEZLER ve
 // kilit fixture'ı onlar için no-op'tur — tam paralel koşmaya devam ederler.
@@ -81,7 +81,7 @@ test.describe('Danışan Paneli', () => {
 
 test.describe('Koç Paneli', () => {
   test.beforeEach(async ({ page }) => {
-    await login(page, TEST_USERS.coach)
+    await loginAsCoach(page)
   })
 
   test('"Koç Paneli" başlığı ve "Kullanıcı Yönetimi" butonu görünür', async ({ page }) => {

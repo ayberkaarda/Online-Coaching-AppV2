@@ -36,6 +36,48 @@ export type Database = {
         }
         Relationships: []
       }
+      coach_actions: {
+        Row: {
+          action: string
+          actor_id: string | null
+          id: string
+          occurred_at: string
+          request_id: string | null
+          target_id: string
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          id?: string
+          occurred_at?: string
+          request_id?: string | null
+          target_id: string
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          id?: string
+          occurred_at?: string
+          request_id?: string | null
+          target_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coach_actions_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coach_actions_target_id_fkey"
+            columns: ["target_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       daily_logs: {
         Row: {
           client_id: string
@@ -871,6 +913,15 @@ export type Database = {
           p_path: string
         }
         Returns: undefined
+      }
+      record_coach_action: {
+        Args: {
+          p_action: string
+          p_actor_id: string
+          p_request_id?: string
+          p_target_id: string
+        }
+        Returns: string
       }
       save_nutrition_plan: {
         Args: { p_client_ids: string[]; p_plan: Json }

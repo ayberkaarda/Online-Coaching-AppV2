@@ -16,7 +16,7 @@
 
 import { type Page } from '@playwright/test'
 
-import { TEST_USERS, login } from './fixtures'
+import { TEST_USERS, login, loginAsCoach } from './fixtures'
 import { expect, resource, test } from './resource-lock'
 
 // supabase/seed.sql: client1 -> "Ahmet Yılmaz".
@@ -101,7 +101,7 @@ test.describe('Form check akışı (AC-2.3 kanıtı curl ile ayrıca doğruland�
       const feedback = `E2E geri bildirim ${randomSuffix()}`
       try {
         const coachPage: Page = await coachContext.newPage()
-        await login(coachPage, TEST_USERS.coach)
+        await loginAsCoach(coachPage)
         await coachPage.goto('/users')
 
         await expect(
