@@ -20,6 +20,10 @@
     "./hooks": "./src/hooks/index.ts",
     "./hooks/*": "./src/hooks/*.ts"
   },
+  "scripts": {
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
+  },
   "dependencies": {
     "@repo/logger": "workspace:*",
     "@repo/types": "workspace:*",
@@ -32,6 +36,7 @@
   },
   "devDependencies": {
     "@repo/config": "workspace:*",
-    "@types/react": "^19.0.7"
+    "@types/react": "^19.0.7",
+    "eslint": "^9"
   }
 }

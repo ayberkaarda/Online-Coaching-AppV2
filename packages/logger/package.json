@@ -6,7 +6,12 @@
   "exports": {
     ".": "./src/index.ts"
   },
+  "scripts": {
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
+  },
   "devDependencies": {
-    "@repo/config": "workspace:*"
+    "@repo/config": "workspace:*",
+    "eslint": "^9"
   }
 }

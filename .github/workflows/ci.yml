@@ -45,7 +45,13 @@ jobs:
       # yolunu `pnpm store path` ile sorgulaması demektir, pnpm o anda PATH'te yoksa adım
       # düşer. `version` BİLEREK verilmiyor — action, package.json'daki `packageManager`
       # alanını okuyup sürümü oradan sabitler (tek doğruluk kaynağı).
-      - uses: pnpm/action-setup@v4
+      #
+      # B-054 / Faz 4.5 commit 7b: v4 → v6 (son sürüm v6.0.10, ölçüldü). Aradaki iki majör
+      # DAVRANIŞ DEĞİŞTİRMİYOR: v5 yalnızca action runtime'ını Node.js 24'e çekti (bu repo
+      # zaten Node 24'te, c7a2), v6 yalnızca pnpm v11 desteği ekledi. `packageManager`
+      # alanıyla action ayarı çeliştiğinde hata fırlatan v4 davranışı korunuyor — biz
+      # `version` vermediğimiz için o yol hiç tetiklenmiyor.
+      - uses: pnpm/action-setup@v6
 
       - uses: actions/setup-node@v7
         with:
@@ -55,6 +61,16 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # Faz 4.5 commit 7b: aşağıdaki kapı komutlarının HİÇBİRİNİN metni değişmedi ama
+      # artık kökte `turbo run <görev> --filter=!mobile` çalıştırıyorlar (bkz. kök
+      # package.json + turbo.json). Bunun iki gözle görülür sonucu var:
+      #   1. `lint` artık `apps/web`'e ek olarak `packages/*`'ı da kapsıyor (B-049) —
+      #      uyarı tabanı bu yüzden 13'ten 17'ye ÇIKTI (13 web + 4 @repo/logger console
+      #      adaptörü). Bu bir GERİLEME DEĞİL, daha önce hiç lint'lenmeyen kod kütlesinin
+      #      kapsama girmesidir.
+      #   2. `apps/mobile` bu job'un kapsamı DIŞINDA (`--filter=!mobile`): mobil kapıları
+      #      aşağıdaki ayrı `mobile` job'unda PARALEL koşuyor, böylece `frontend`ın süresi
+      #      (ve ona `needs:` ile bağlı `e2e`/`docker` kritik yolu) uzamıyor.
       - name: Lint
         run: pnpm run lint
 
@@ -84,7 +100,14 @@ jobs:
         run: pnpm run test:coverage
 
       - name: Upload coverage report
-        uses: actions/upload-artifact@v4
+        # B-054 / Faz 4.5 commit 7b: v4 → v7 (son majör). Kullandığımız üç input
+        # (`name`, `path`, `retention-days`) üç majörde de aynı anlamda: v5/v6 yalnızca
+        # action runtime'ını Node 24'e taşıdı (runner ≥ 2.327.1 gerekir — GitHub-hosted
+        # runner'lar bunu karşılıyor), v7 paketi ESM'e geçirdi ve OPSİYONEL `archive`
+        # input'unu ekledi. `archive: false` verilirse `name` yok sayılıyor — biz o input'u
+        # vermiyoruz, dolayısıyla bu repoda davranış değişikliği YOK. Aynı bump aşağıdaki
+        # iki `upload-artifact` adımı için de geçerli.
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: coverage-report
@@ -94,6 +117,70 @@ jobs:
 
       - name: Build
         run: pnpm run build
+
+  mobile:
+    name: Mobile (type-check / lint / expo-doctor / expo export)
+    runs-on: ubuntu-latest
+    # BİLEREK AYRI VE PARALEL bir job (Faz 4.5 commit 7b): mobil kapıları `frontend`e adım
+    # olarak eklenseydi, `frontend` hem kendi süresine mobil tsc+lint+export'u eklerdi hem de
+    # ona `needs:` ile bağlı `e2e` (timeout 20 dk, gerçek koşum ~10 dk) ve `docker` job'larını
+    # geciktirirdi. Kritik yolu E2E belirlediği için paralel bir mobil job duvar süresini
+    # UZATMAZ. Ayrıca mobil kırılması web kapılarından bağımsız, tek bakışta okunur olur.
+    #
+    # `needs:` YOK — hiçbir şeyi beklemez, checkout'la birlikte başlar.
+    #
+    # timeout: ilk koşumun süresi ölçülmedi (yerelde kurulum hariç `expo export` ~1,5 dk,
+    # `expo-doctor` ~20 sn). CI'da soğuk `pnpm install` + üç platform bundle'ı için makul bir
+    # üst sınır olarak 20 dk verildi; asılı kalan bir Metro koşusu job'u sonsuza kadar
+    # tutmasın diye sınır AÇIKÇA yazılıyor.
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      # pnpm, setup-node'dan ÖNCE (bkz. `frontend` job'undaki ayrıntılı not).
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        # FİLTRESİZ kurulum ZORUNLU: bu job'un ihtiyacı olan React Native/Expo ağacı
+        # `apps/mobile`'da. (Karşılaştırma: `Dockerfile` `--filter web...` ile kurar ve o
+        # ağacı bilerek DIŞARIDA bırakır — bkz. Dockerfile `deps` aşaması.)
+        run: pnpm install --frozen-lockfile
+
+      - name: Type-check (apps/mobile)
+        # = `turbo run type-check --filter=mobile` → apps/mobile'da `tsc --noEmit`.
+        run: pnpm run mobile:type-check
+
+      - name: Lint (apps/mobile)
+        # = `turbo run lint --filter=mobile`. apps/mobile'ın ESLint yapılandırması kendi
+        # TypeScript parser'ını AÇIKÇA kuruyor (Next'e özgü zincir mobilde yok) —
+        # bkz. apps/mobile/eslint.config.mjs.
+        run: pnpm run mobile:lint
+
+      - name: expo-doctor
+        working-directory: apps/mobile
+        # ÖLÇÜLMÜŞ TUZAK: `pnpm --filter mobile exec expo-doctor` ÇALIŞMAZ — `expo-doctor`
+        # workspace'in hiçbir paketinin bağımlılığı değil, dolayısıyla `node_modules/.bin`
+        # altında binary YOK ve komut "command not found" ile düşer. Doğru çağrı, paketi
+        # anlık indirip çalıştıran `npx expo-doctor`'dır (yerelde bu tam komutla 21/21 geçti).
+        #
+        # Bu adım AĞA ÇIKAR: expo-doctor, kurulu paket sürümlerini Expo SDK 57'nin beklenen
+        # sürüm matrisiyle karşılaştırmak için Expo'nun uzak API'sini sorgular. Bu yüzden
+        # `--verbose` ile tam çıktı log'lanıyor: adım kırmızıya dönerse ilk şüphelinin
+        # gerçek bir sürüm uyumsuzluğu mu yoksa ağ/registry erişimi mi olduğu log'dan
+        # DOĞRUDAN okunabilsin, tahmin edilmesin.
+        run: npx expo-doctor --verbose
+
+      - name: expo export (smoke)
+        # Cihazsız en güçlü kanıt: Metro'nun üç platform için de bundle üretebildiğini ve
+        # workspace TS paketlerini (@repo/types, @repo/logger) symlink ardından çözüp
+        # transpile edebildiğini gösterir. AC-4.5.3'ü KAPATMAZ — çalışma zamanı (boot,
+        # çift-React, native modül) hâlâ kullanıcının Expo Go smoke'unu bekliyor.
+        run: pnpm run mobile:export
 
   backend:
     name: Backend (ruff / mypy / pytest)
@@ -105,7 +192,33 @@ jobs:
       - uses: actions/checkout@v7
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
+        # B-054 / Faz 4.5 commit 7b: v5 → **v7**. Bu bir "en son majöre çık" bumpı DEĞİL,
+        # ölçülmüş bir tavan seçimi:
+        #
+        # * En son sürüm bugün **v10.0.1** (2026-08-14). Ama v8.0.0 sürüm notunda action
+        #   MAJÖR/MİNÖR ETİKET YAYINLAMAYI BIRAKTI (tedarik zinciri sertleştirmesi, tj-actions
+        #   olayı gerekçesiyle). ÖLÇÜLDÜ (`git ls-remote --tags`): repoda yalnızca
+        #   v1…v7 kayan majör etiketleri var; `@v8`/`@v9`/`@v10` DİYE BİR ETİKET YOK.
+        #   v8+ kullanmak `@v10.0.1` gibi TAM SÜRÜM veya commit hash'i pinlemeyi gerektirir —
+        #   bu, reponun bugünkü "kayan majöre pinle" sözleşmesini değiştiren ayrı bir karardır
+        #   (dur-ve-sor; kullanıcıya raporlandı, bu commit'te BİLEREK alınmadı).
+        # * v9.0.0 `prune-cache` varsayılanını `false` yapıyor (Actions cache kullanımı artar),
+        #   v10.0.0 `pull_request_target`/`workflow_run`/`release` olaylarında önbelleği
+        #   kapatıyor — bu repo yalnızca push/pull_request/schedule kullandığı için ikincisi
+        #   etkisiz, ama ikisi de davranış değişikliğidir.
+        #
+        # v7'ye kadar olan kırıcı değişikliklerin bu repoya etkisi ÖLÇÜLDÜ:
+        # * v6: `python-version` artık venv'i OTOMATİK ETKİNLEŞTİRMİYOR (yeni
+        #   `activate-environment` input'u, varsayılan false). Bu job'un setup-uv'den SONRAKİ
+        #   tüm adımları `uv sync` / `uv run` — ikisi de projenin kendi ortamını (`.venv`)
+        #   kendisi çözer, ambient bir venv aktivasyonuna İHTİYAÇ DUYMAZ. (`security` job'u
+        #   da yalnızca `uvx` kullanıyor, aynı şekilde bağımsız.) v6 ayrıca `pyproject-file`/
+        #   `uv-file` input'larını kaldırdı — bu repo ikisini de kullanmıyor.
+        # * v6: varsayılan `cache-dependency-glob` genişledi → yalnızca BİR KEZ cache miss.
+        # * v7: action runtime'ı node20 → node24. GitHub-hosted runner'larda sorunsuz
+        #   (bu repo zaten `actions/checkout@v7`/`setup-node@v7` kullanıyor); `server-url`
+        #   input'u kaldırıldı — kullanılmıyor.
+        uses: astral-sh/setup-uv@v7
         with:
           python-version: '3.12'
 
@@ -160,7 +273,7 @@ jobs:
       - uses: actions/checkout@v7
 
       # pnpm, setup-node'dan ÖNCE (bkz. `frontend` job'undaki aynı notu).
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
 
       - uses: actions/setup-node@v7
         with:
@@ -171,7 +284,19 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Install Supabase CLI
-        uses: supabase/setup-cli@v1
+        # B-054 / Faz 4.5 commit 7b: v1 → v3 (son majör; ölçüldü).
+        # ÖLÇÜM (`git ls-remote`): eski `@v1` bir ETİKET DEĞİL, `refs/heads/v1` DALIYDI —
+        # yani bugüne kadar hareketli bir dala pinliydik. `v3` gerçek bir etiket; bu bump
+        # aynı zamanda bir sağlamlaştırma.
+        # DAVRANIŞ DEĞİŞİKLİĞİ (bilinçli, kullanıcıya raporlandı): v3 CLI'yi artık GitHub
+        # release'lerinden değil **npm paketinden** kuruyor ve `github-token` input'unu
+        # kaldırdı (bu repo o input'u hiç kullanmıyordu). Gözlemlenebilir sözleşme aynı:
+        # `version: latest` v3'te de destekleniyor (`latest`/`beta`/sabit npm sürümü).
+        # v2'den beri `version` HİÇ verilmezse CLI sürümü kök kilit dosyasından
+        # (`pnpm-lock.yaml` → kökün `supabase` devDependency'si) türetiliyor; bu, yerel ile
+        # CI'ı tek sürüme kilitlerdi ama BUGÜNKÜ NİYETİ (her zaman en son CLI) değiştirirdi —
+        # o yüzden `latest` BİLEREK korundu.
+        uses: supabase/setup-cli@v3
         with:
           version: latest
 
@@ -213,6 +338,18 @@ jobs:
         run: pnpm run test:rls
 
       - name: DB tipleri drift kontrolü (B-047)
+        # ADR-0023 §3 / AC-4.5.4 (Faz 4.5 commit 7b): `db:types` script'inin GÖVDESİ artık
+        # `packages/types/package.json`'da — üretilen dosyaya sahip olan paketle aynı yerde.
+        # Kökte YALNIZCA bir delegasyon kaldı (`pnpm --filter @repo/types run db:types`), bu
+        # yüzden aşağıdaki komut ve `git diff` yolu DEĞİŞMEDİ; bu adım taşımadan etkilenmez.
+        # (Taşıma bilerek delegasyonla yapıldı: aksi hâlde bu adım aynı commit'te
+        # güncellenmek zorunda kalırdı ve unutulursa drift kontrolü sessizce kırılırdı.)
+        # ÖLÇÜLDÜ: `supabase` CLI kökün devDependency'si olarak KALDI ve taşımadan sonra da
+        # `packages/types` içinden çözülüyor — pnpm, workspace paketlerinin script'lerini
+        # çalıştırırken workspace KÖKÜNÜN `node_modules/.bin` dizinini de PATH'e ekliyor
+        # (`pnpm --filter @repo/types exec supabase --version` → 2.114.0). Yani CLI'yi
+        # pakete taşımak GEREKMEDİ.
+        #
         # `pnpm run db:types` = `supabase gen types typescript --local ...` — YEREL,
         # AYAKTA bir Supabase yığını gerektirir. Bu yığını ayağa kaldıran CI'daki TEK
         # job burasıdır ("Start local Supabase stack" + "Reset database" adımları
@@ -301,7 +438,7 @@ jobs:
         run: pnpm run test:e2e
 
       - name: Upload Playwright report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: playwright-report
@@ -311,7 +448,7 @@ jobs:
           retention-days: 14
 
       - name: Upload test results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: test-results
@@ -361,7 +498,7 @@ jobs:
           fetch-depth: 0
 
       # pnpm, setup-node'dan ÖNCE (bkz. `frontend` job'undaki aynı notu).
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
 
       # NOT: `cache: 'pnpm'` BİLEREK verilmiyor. Bu job hiçbir adımda `pnpm install`
       # koşmuyor (`pnpm audit --prod` yalnızca `pnpm-lock.yaml`'ı okur, kurulum yapmaz);
@@ -385,7 +522,10 @@ jobs:
           package-manager-cache: false
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
+        # v5 → v7 bumpının ölçümü ve v8+'ın neden ALINMADIĞI için bkz. `backend` job'undaki
+        # aynı adımın uzun notu. Bu job setup-uv'den sonra yalnızca `uvx` çağırıyor
+        # (semgrep, pip-audit) — v6'nın kaldırdığı otomatik venv aktivasyonuna bağımlı değil.
+        uses: astral-sh/setup-uv@v7
         with:
           python-version: '3.12'
 
@@ -488,17 +628,21 @@ jobs:
   required-checks:
     name: Required checks
     if: always()
-    needs: [frontend, backend, e2e, docker, security]
+    # `mobile` Faz 4.5 commit 7b'de eklendi — zorunlu kapı listesine de girmek ZORUNDA:
+    # aksi hâlde job kırmızı olur ama `required-checks` yeşil kalır ve kapı sessizce delinir.
+    needs: [frontend, mobile, backend, e2e, docker, security]
     runs-on: ubuntu-latest
     steps:
       - name: Verify all required jobs passed
         run: |
           echo "frontend: ${{ needs.frontend.result }}"
+          echo "mobile: ${{ needs.mobile.result }}"
           echo "backend: ${{ needs.backend.result }}"
           echo "e2e: ${{ needs.e2e.result }}"
           echo "docker: ${{ needs.docker.result }}"
           echo "security: ${{ needs.security.result }}"
           if [[ "${{ needs.frontend.result }}" != "success" ]] || \
+             [[ "${{ needs.mobile.result }}" != "success" ]] || \
              [[ "${{ needs.backend.result }}" != "success" ]] || \
              [[ "${{ needs.docker.result }}" != "success" ]] || \
              [[ "${{ needs.security.result }}" != "success" ]] || \

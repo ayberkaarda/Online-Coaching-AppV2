@@ -2,11 +2,15 @@
   "name": "@repo/config",
   "version": "0.0.0",
   "private": true,
-  "description": "apps/web ve gelecekteki paketler arasında paylaşılan tsconfig/eslint temelleri (ADR-0023 madde 1, Faz 4.5 commit 3). Build adımı yok; ham .json/.mjs dosyaları exports üzerinden dağıtılır.",
+  "description": "apps/web, apps/mobile ve packages/* arasında paylaşılan tsconfig/eslint temelleri (ADR-0023 madde 1, Faz 4.5 commit 3; eslint/package.mjs commit 7b/B-049'da eklendi). Build adımı yok; ham .json/.mjs dosyaları exports üzerinden dağıtılır.",
   "exports": {
     "./tsconfig/base.json": "./tsconfig/base.json",
     "./tsconfig/next.json": "./tsconfig/next.json",
     "./tsconfig/e2e.json": "./tsconfig/e2e.json",
-    "./eslint/base.mjs": "./eslint/base.mjs"
+    "./eslint/base.mjs": "./eslint/base.mjs",
+    "./eslint/package.mjs": "./eslint/package.mjs"
+  },
+  "dependencies": {
+    "@typescript-eslint/parser": "^8.62.1"
   }
 }

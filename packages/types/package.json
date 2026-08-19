@@ -7,10 +7,16 @@
     ".": "./src/index.ts",
     "./schemas": "./src/schemas.ts"
   },
+  "scripts": {
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "db:types": "supabase gen types typescript --local --schema public > src/database.ts"
+  },
   "dependencies": {
     "zod": "^3.24.1"
   },
   "devDependencies": {
-    "@repo/config": "workspace:*"
+    "@repo/config": "workspace:*",
+    "eslint": "^9"
   }
 }

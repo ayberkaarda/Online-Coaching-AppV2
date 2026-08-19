@@ -1,0 +1,117 @@
+{
+  // Turborepo görev grafiği (ADR-0023 madde 1/4, Faz 4.5 commit 7b).
+  //
+  // TURBO KOMUT İCAT ETMEZ: her görev, ilgili workspace paketinin KENDİ `package.json`
+  // script'ini çağırır. Özellikle `apps/web`'in `"build": "next build --webpack"`
+  // pinlemesi (ADR-0006/0012, next-pwa v5 Turbopack ile çakışıyor) buradan görünmez ve
+  // değişmez — turbo yalnızca "web paketinde `build` script'ini koştur" der.
+  //
+  // `Dockerfile` BİLEREK turbo kullanmaz (`pnpm --filter web run build` çağırır): imaj
+  // `--filter web...` ile kurulduğu için kök devDependency olan `turbo` orada YOK ve
+  // olması da gerekmiyor — build tek pakettir, görev grafiğine ihtiyacı yoktur.
+  "$schema": "https://turborepo.com/schema.json",
+
+  // TUI yerine düz akış: CI log'ları ve Windows terminalleri için tek biçimli, ayrıştırılabilir
+  // çıktı verir; "eski yol ↔ turbo yolu aynı sonucu üretti" karşılaştırması ancak böyle
+  // birebir okunabilir.
+  "ui": "stream",
+
+  // `loose` BİLİNÇLİ SEÇİM (turbo 2 varsayılanı `strict`'tir).
+  // `strict` kipinde turbo, göreve YALNIZCA aşağıda `globalEnv`/`env` ile ilan edilen
+  // değişkenleri + kendi sistem beyaz listesini geçirir. Bu repoda iki yerde davranışı
+  // sessizce değiştirirdi:
+  //   1. `apps/web/vitest` testlerinin bir bölümü (`vi.unstubAllEnvs()` çağıran 7 dosya)
+  //      test sonunda CI'ın AMBIENT `process.env`'ine düşer ve `ci.yml`'deki workflow-env
+  //      değerlerini görmeyi VARSAYAR (bkz. docs/PROGRESS.md §4 "CI'ın ambient env'i").
+  //   2. `next build` / `next-pwa` zinciri `NEXT_TELEMETRY_DISABLED` gibi ilan edilmemiş
+  //      değişkenlere dokunur; Windows'ta ayrıca kabuk/araç değişkenleri filtrelenebilir.
+  // `loose` = bugünkü npm/pnpm script davranışının BİREBİR aynısı (her değişken geçer);
+  // önbellek anahtarı yine yalnızca aşağıda ilan edilenlerden türetilir. Böylece geçiş
+  // "eşdeğerlik" iddiasını korur.
+  "envMode": "loose",
+
+  // Önbellek anahtarına giren env değişkenleri. Liste `apps/web/src`, `packages/*/src`,
+  // `next.config.mjs`, `vitest.*` ve `scripts/` üzerinde `process.env.X` taranarak
+  // ÜRETİLDİ — tahmin değil. Biri değişirse ilgili görevin önbelleği geçersiz olur.
+  "globalEnv": [
+    "AI_BACKEND_API_KEY",
+    "AI_BACKEND_URL",
+    "ALLOW_HOSTED_TARGET",
+    "CI",
+    "LOG_LEVEL",
+    "NEXT_PUBLIC_APP_URL",
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+    "NEXT_PUBLIC_SUPABASE_URL",
+    "NEXT_RUNTIME",
+    "NODE_ENV",
+    "RATE_LIMIT_MAX_REQUESTS",
+    "RATE_LIMIT_WINDOW_MS",
+    "SUPABASE_SERVICE_ROLE_KEY",
+    "SUPABASE_URL",
+    "TRUSTED_PROXY_COUNT"
+  ],
+
+  // Kökteki, paket dosyası olmadığı için hiçbir paketin girdi kümesine girmeyen ama
+  // ÇIKTIYI etkileyen dosyalar.
+  "globalDependencies": [".npmrc", "pnpm-workspace.yaml"],
+
+  "tasks": {
+    "build": {
+      // `^build`: bir paketin build'i, bağımlı olduğu workspace paketlerinin build'inden
+      // SONRA koşar. `packages/*` bugün ham TS yayınlıyor (build adımı YOK), dolayısıyla
+      // bu kenar bugün hiçbir görev üretmez; buradaki asıl işlevi, hash'in bağımlı
+      // paketlerin içeriğini de kapsamasını GARANTİ etmektir.
+      "dependsOn": ["^build"],
+      // `.env*` dosyaları .gitignore'da; turbo varsayılan girdi kümesi git-takipli
+      // dosyalardan oluştuğu için AÇIKÇA eklenmezse `.env.local` değişse bile bayat bir
+      // build önbellekten servis edilirdi. Bu repoda o tam olarak "yanlış Supabase
+      // hedefine build" tuzağıdır (bkz. docs/PROGRESS.md §4).
+      "inputs": ["$TURBO_DEFAULT$", ".env", ".env.*"],
+      "outputs": [
+        ".next/**",
+        "!.next/cache/**",
+        // next-pwa çıktısı `.next` DIŞINA yazılır (bkz. .gitignore'daki aynı liste).
+        // Buraya yazılmazsa önbellek isabetinde `.next` geri gelir ama `sw.js`
+        // gelmez/bayat kalır — PWA zinciri sessizce kırılır.
+        "public/sw.js",
+        "public/sw.js.map",
+        "public/workbox-*.js",
+        "public/workbox-*.js.map",
+        "public/fallback-*.js"
+      ]
+    },
+
+    "lint": {
+      "dependsOn": ["^lint"],
+      "outputs": []
+    },
+
+    "lint:fix": {
+      // Dosya yazar; önbelleklenemez.
+      "cache": false,
+      "outputs": []
+    },
+
+    "type-check": {
+      "dependsOn": ["^type-check"],
+      "outputs": []
+    },
+
+    "type-check:e2e": {
+      "dependsOn": ["^type-check"],
+      "outputs": []
+    },
+
+    "test": {
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", ".env", ".env.*"],
+      "outputs": []
+    },
+
+    "test:coverage": {
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", ".env", ".env.*"],
+      "outputs": ["coverage/**"]
+    }
+  }
+}

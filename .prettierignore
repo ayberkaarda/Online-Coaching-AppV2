@@ -19,3 +19,6 @@ pnpm-lock.yaml
 apps/mobile/.expo/
 apps/mobile/dist/
 apps/mobile/expo-env.d.ts
+
+# turbo yerel görev önbelleği ve log dosyaları (Faz 4.5 commit 7b) — kaynak değil.
+.turbo/

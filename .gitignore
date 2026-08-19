@@ -79,3 +79,6 @@ docker-compose.override.yml
 # supabase (local stack scratch files — contains generated secrets)
 supabase/.temp/
 supabase/.branches/
+
+# turbo (Faz 4.5 commit 7b) — yerel görev önbelleği ve daemon log/soket dosyaları
+.turbo/
