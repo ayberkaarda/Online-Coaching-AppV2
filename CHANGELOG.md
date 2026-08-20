@@ -34,12 +34,18 @@ Bu dosya, projedeki önemli değişiklikleri belgeler. Biçim [Keep a Changelog]
 - Cookie tabanlı oturuma geçişten kalan eski `sb-*-auth-token` `localStorage` artıkları mount'ta bir kez temizleniyor.
 - AI antrenman üretimi artık sabit `age: 20, goal: 'bulk', weight: 75` göndermiyor; `NutritionTab` deseniyle form üzerinden alınıyor, kilo son ölçümden ön dolduruluyor.
 - E2E `plans.spec.ts` artık akışın sonunda kendi `pending` onay fikstürünü üretiyor; `seed.sql` demo verisi E2E koşularıyla tükenmiyor.
+- **Hijyen turu:** repo OneDrive ağacından (`...\OneDrive\Masaüstü\coaching\my-coaching-appv2`) yerel diske (`C:\dev\my-coaching-appv2`) taşındı — OneDrive senkronizasyonunun sır/yedek dosyalarını buluta taşıma riski ve Windows `MAX_PATH` uzunluğu sorunları için; yeni konumda tam test paketi (868 test, RLS 144, type-check/lint/format/ratchet/build) temiz doğrulandı.
 
 ### Düzeltildi
 
 - CI `security` job'u: `@typescript-eslint/parser`'ın `packages/config`'te yanlışlıkla `dependencies` altında tutulması, `pnpm audit --prod`'un eslint zafiyetlerini production grafiğinde görmesine neden oluyordu; `devDependencies`'e taşındı.
 - CI `e2e` job'u: Playwright tarayıcı kurulumunun apt aynası yavaşlığı yüzünden zaman aşımına uğraması — tarayıcı önbelleklemesi eklendi, `timeout-minutes` 20 → 30.
 - `docker/setup-buildx-action` v3 → v4 (Node 20 deprecation uyarısı gideriliyor).
+
+### Güvenlik
+
+- **B-033 kapandı:** `apps/web/.env.hosted.local` diskte düz metin `service_role` anahtarı taşıyordu; Supabase'de yeni publishable + secret key çifti oluşturuldu, dosyadaki `SUPABASE_SERVICE_ROLE_KEY` satırı tamamen silindi ve legacy JWT anahtarları panelde devre dışı bırakıldı — OneDrive'a senkronlanmış eski anahtar artık geçersiz. Tam geçmiş sır taraması (`git log --all -S`) gerçek `service_role` JWT'sinin hiçbir commit'te bulunmadığını doğruladı.
+- `docs/security/findings-access-control.md`'deki yerel Supabase demo anon JWT'si (her `supabase start` kurulumunda aynı, herkese açık bir sabit — gerçek sır değil) gitleaks'in tam geçmiş taramasına takılmaması için maskelendi; bulgunun kendisi değişmedi.
 
 ## [1.0.0] - 2026-08-16
 

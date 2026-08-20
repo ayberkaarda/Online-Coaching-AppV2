@@ -330,10 +330,16 @@ anlamsız kılar.
 ```
 1) 'service_role' literal in client chunks:      (0 eslesme)
 3) JWT taramasi (.next/static):
-   eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24i…
+   eyJhbGciOi…<yerel demo anon anahtarı, maskelendi>
    -> payload decode: {"iss":"supabase-demo","role":"anon","exp":1983812996}
 5) server chunks service_role:                   (0 eslesme)
 ```
+
+> Not: Yukarıdaki JWT, her `supabase start` kurulumunda birebir aynı çıkan **yerel demo
+> anon anahtarıdır** — gerçek bir sır değil, herkese açık ve rotasyona tabi olmayan bir
+> sabittir. Bu belge repo portfolyo olarak public yapılabildiği için, tam geçmiş taramasında
+> gitleaks'in buna takılmaması amacıyla değer maskelendi; bulgunun kendisi (istemci paketinde
+> gerçek `service_role` sızıntısı yok) değişmedi.
 
 `service_role` JWT'si veya anahtarı istemci paketinde **yoktur**. Tek bulgu, `src/env.ts` içindeki
 `serverSchema`'nın istemci grafiğine girmesi:
