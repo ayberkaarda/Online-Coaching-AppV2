@@ -154,3 +154,62 @@ export function useUploadAvatar() {
     },
   })
 }
+
+export interface UpdateBodyMetricsInput {
+  /** Güncellenecek profil satırı. Kapı gereği KENDİ kimliğin olmak zorunda. */
+  userId: string
+  /** `YYYY-MM-DD`, ya da alanı temizlemek için `null`. */
+  birth_date: string | null
+  /** Santimetre, ya da alanı temizlemek için `null`. */
+  height_cm: number | null
+}
+
+/**
+ * Künye (doğum tarihi + boy) güncellemesi — `profiles.birth_date` / `height_cm`.
+ *
+ * ###########################################################################
+ * # BU ALANLARI YALNIZCA SATIRIN SAHİBİ YAZABİLİR                           #
+ * ###########################################################################
+ * Kapı arayüzde değil VERİTABANINDA: `profiles_guard_body_metrics`
+ * tetikleyicisi (20260820170000_profile_body_metrics.sql §2) son kullanıcı
+ * yazmalarında `auth.uid() <> <satır id>` ise `42501` fırlatır. Koç, tüm
+ * profillerde UPDATE yetkisi olmasına rağmen (`profiles_update_coach`) bu iki
+ * kolonu BAŞKASI için yazamaz.
+ *
+ * NEDEN: bunlar danışanın KENDİ beyanıdır. Koç doldurabilseydi "danışanın
+ * beyanı" ile "koçun tahmini" veritabanında ayırt edilemez olurdu ve
+ * `profiles` üzerinde denetim izi bulunmadığı için B-010'un sorduğu "bu satırı
+ * kim yazdı?" sorusu yanıtsız kalırdı.
+ *
+ * Bu yüzden `userId` çağıranın KENDİ kimliği olmalıdır; başkasının kimliği
+ * gönderilirse mutasyon sunucudan hata alır (arayüz onu sessizce yutmaz).
+ *
+ * KİLO BURADA YOK: tek kaynak `progress_entries.weight_kg` (B-036 dersi).
+ */
+export function useUpdateBodyMetrics() {
+  const supabase = useSupabaseClient()
+  const notify = useNotifier()
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({
+      userId,
+      birth_date,
+      height_cm,
+    }: UpdateBodyMetricsInput): Promise<void> => {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ birth_date, height_cm })
+        .eq('id', userId)
+      if (error) throw wrapSupabaseError(error, { table: 'profiles', op: 'update' })
+    },
+    onSuccess: (_result, { userId }) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.profile(userId) })
+      void queryClient.invalidateQueries({ queryKey: queryKeyRoots.profiles })
+      notify.success('Künye bilgileriniz kaydedildi.')
+    },
+    onError: (error: Error) => {
+      notify.error(`Künye kaydedilemedi: ${error.message}`)
+    },
+  })
+}

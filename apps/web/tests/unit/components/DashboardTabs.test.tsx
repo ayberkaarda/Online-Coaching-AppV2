@@ -71,6 +71,9 @@ function makeProfile(overrides: Partial<Profile> = {}): Profile {
     activity_consent_granted_at: null,
     activity_consent_revoked_at: null,
     activity_consent_version: null,
+    // Künye dilimi — profiles Row'un parçası (ikisi de nullable).
+    birth_date: null,
+    height_cm: null,
     created_at: '2026-01-01T00:00:00.000Z',
     updated_at: '2026-01-01T00:00:00.000Z',
     ...overrides,

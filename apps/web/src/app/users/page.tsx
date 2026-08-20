@@ -10,6 +10,7 @@ import { useEffect } from 'react'
 import { useProfile, useProfiles, useSession } from '@repo/api-client'
 import { QueryState, SkeletonCard } from '@/components/ui'
 import { CoachUserManagement } from '@/components/CoachUserManagement'
+import { InviteClientForm } from '@/components/InviteClientForm'
 import { ThemeToggle } from '@/components/ThemeToggle'
 
 export default function UsersPage(): JSX.Element {
@@ -74,6 +75,7 @@ export default function UsersPage(): JSX.Element {
           </div>
         }
       >
+        <InviteClientForm />
         <CoachUserManagement clients={clients ?? []} />
       </QueryState>
     </main>

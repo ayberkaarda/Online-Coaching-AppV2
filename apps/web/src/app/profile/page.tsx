@@ -3,7 +3,7 @@
 // Profil sayfası: avatar yükleme, şifre değiştirme, beslenme/antrenman programı görüntüleme.
 
 import { zodResolver } from '@hookform/resolvers/zod'
-import { AlertTriangle, Dumbbell, Salad, ShieldAlert, Trash2, User } from 'lucide-react'
+import { AlertTriangle, Dumbbell, IdCard, Salad, ShieldAlert, Trash2, User } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import type { ChangeEvent, JSX } from 'react'
 import { useEffect, useState } from 'react'
@@ -16,10 +16,19 @@ import {
   useNutritionPlan,
   useProfile,
   useSession,
+  useUpdateBodyMetrics,
   useUpdatePassword,
   useUploadAvatar,
   useWorkoutPlan,
 } from '@repo/api-client'
+import type { ProfileWithAvatar } from '@repo/api-client'
+import {
+  HEIGHT_CM_MAX,
+  HEIGHT_CM_MIN,
+  bodyMetricsSchema,
+  calculateAge,
+  type BodyMetricsInput,
+} from '@/lib/body-metrics'
 import { QueryState, SkeletonCard, SkeletonText } from '@/components/ui'
 import { SecuritySection } from '@/components/security/SecuritySection'
 import { ActivityConsent } from '@/components/activity/ActivityConsent'
@@ -100,6 +109,177 @@ function NutritionPlanView({ plan }: { plan: NutritionPlan }): JSX.Element {
         )
       })}
     </ul>
+  )
+}
+
+/**
+ * KÜNYE — doğum tarihi + boy (`profiles.birth_date` / `profiles.height_cm`).
+ *
+ * ###########################################################################
+ * # BU FORMU HERKES KENDİ PROFİLİNDE GÖRÜR — KOÇ DAHİL                      #
+ * ###########################################################################
+ * Bölüm rol'e göre gizlenmez: koç da kendi verisinin sahibidir ve kendi
+ * künyesini doldurabilir. Ayrım "danışan mı koç mu" değil, "kendi satırın mı"
+ * ayrımıdır ve VERİTABANINDA yaşar: `profiles_guard_body_metrics`
+ * tetikleyicisi son kullanıcı yazmalarında `auth.uid()`i satır kimliğiyle
+ * karşılaştırır. Koç, `profiles_update_coach` ile başkasının satırında UPDATE
+ * yetkisine sahip olmasına RAĞMEN bu iki kolonu BAŞKASI için yazamaz (42501).
+ *
+ * NEDEN "koç dolduramaz": bunlar danışanın KENDİ beyanıdır. Koç doldurursa
+ * "danışanın beyanı" ile "koçun tahmini" veritabanında ayırt edilemez hâle
+ * gelir ve `profiles` üzerinde denetim izi olmadığı için B-010'un sorusu
+ * ("bu satırı kim yazdı?") yanıtsız kalır.
+ *
+ * ###########################################################################
+ * # NEDEN "YAŞ" DEĞİL "DOĞUM TARİHİ" SORULUYOR, VE KİLO NEDEN BURADA YOK    #
+ * ###########################################################################
+ * Yaş her yıl bayatlayan türetilmiş veridir; kaydedilen şey doğum tarihidir ve
+ * yaş yanında ANLIK olarak hesaplanıp gösterilir (`calculateAge`). Kilo ise bu
+ * formda BİLEREK yoktur: tek doğruluk kaynağı `progress_entries` zaman
+ * serisidir (B-036 dersi — iki kilo kaynağı kaçınılmaz olarak ayrışır).
+ *
+ * İki alan da OPSİYONELDİR: boş bırakılabilir ve sonradan temizlenebilir.
+ * Uygulamanın hiçbir akışı doldurulmuş olmalarını şart koşmaz; tek etkileri
+ * otomatik program/beslenme üreticilerinin formunu ÖN DOLDURMAKTIR.
+ */
+function BodyMetricsSection({ profile }: { profile: ProfileWithAvatar }): JSX.Element {
+  const updateBodyMetrics = useUpdateBodyMetrics()
+
+  // `defaultValues` HTML alanlarının konuştuğu dili kullanır (boş alan = `''`),
+  // zod ÇIKTISI ise `null`'dur — dönüşümü `bodyMetricsSchema` içindeki
+  // `emptyToNull` ön-işlemcisi yapar. Tip iddiası bu KASITLI giriş/çıkış
+  // uyuşmazlığını tek satırda işaretler (RHF form değerleri = şema çıktısı).
+  const defaultValues = {
+    birth_date: profile.birth_date ?? '',
+    height_cm: profile.height_cm ?? '',
+  } as unknown as BodyMetricsInput
+
+  const {
+    register: registerMetric,
+    handleSubmit: handleSubmitMetrics,
+    reset: resetMetrics,
+    formState: { errors: metricErrors },
+  } = useForm<BodyMetricsInput>({
+    resolver: zodResolver(bodyMetricsSchema),
+    defaultValues,
+  })
+
+  const age = calculateAge(profile.birth_date)
+
+  const onSubmit = handleSubmitMetrics((values) => {
+    updateBodyMetrics.mutate(
+      {
+        userId: profile.id,
+        birth_date: values.birth_date,
+        height_cm: values.height_cm,
+      },
+      {
+        // Kaydedilen değerler yeni "temiz" hâl olur; aksi hâlde form kirli
+        // kalır ve kullanıcı kaydettiğinden emin olamaz.
+        onSuccess: () => resetMetrics(values),
+      }
+    )
+  })
+
+  return (
+    <section
+      aria-labelledby="body-metrics-heading"
+      className="mt-8 rounded-panel border border-border bg-surface-raised p-6"
+    >
+      <h2
+        id="body-metrics-heading"
+        className="mb-2 flex items-center gap-2 text-lg font-bold text-fg"
+      >
+        <IdCard aria-hidden="true" className="h-5 w-5 shrink-0" />
+        Künye
+      </h2>
+
+      <p className="mb-5 text-sm font-medium leading-relaxed text-fg-muted">
+        Doğum tarihiniz ve boyunuz, otomatik antrenman ve beslenme programı üreticilerinin girdisi
+        olarak kullanılır (kalori ihtiyacı hesabı boy ve yaşa dayanır). İkisi de zorunlu değildir;
+        boş bırakabilir veya sonradan temizleyebilirsiniz. Bu alanları yalnızca siz
+        doldurabilirsiniz — koçunuz sizin adınıza dolduramaz. Kilonuz burada tutulmaz, ilerleme
+        kayıtlarınızdan okunur.
+      </p>
+
+      <form onSubmit={onSubmit} noValidate className="space-y-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label htmlFor="birth-date" className="mb-1 block text-sm font-bold text-fg">
+              Doğum tarihi
+            </label>
+            <input
+              id="birth-date"
+              type="date"
+              autoComplete="bday"
+              aria-invalid={metricErrors.birth_date ? 'true' : 'false'}
+              aria-describedby={
+                metricErrors.birth_date
+                  ? 'birth-date-error'
+                  : age !== null
+                    ? 'birth-date-age'
+                    : undefined
+              }
+              className="w-full rounded-control border border-border bg-canvas p-3 text-sm font-medium text-fg outline-none focus:border-accent"
+              {...registerMetric('birth_date')}
+            />
+            {metricErrors.birth_date ? (
+              <p id="birth-date-error" role="alert" className="mt-1 text-xs font-bold text-danger">
+                {metricErrors.birth_date.message}
+              </p>
+            ) : age !== null ? (
+              // Yaş SAKLANMAZ, gösterilir: kaydedilmiş doğum tarihinden anlık
+              // hesaplanır, dolayısıyla hiçbir zaman bayatlamaz.
+              <p id="birth-date-age" className="mt-1 text-xs font-medium text-fg-muted">
+                Kayıtlı doğum tarihinize göre yaşınız: {age}
+              </p>
+            ) : null}
+          </div>
+
+          <div>
+            <label htmlFor="height-cm" className="mb-1 block text-sm font-bold text-fg">
+              Boy (cm)
+            </label>
+            <input
+              id="height-cm"
+              type="number"
+              inputMode="decimal"
+              step="0.1"
+              min={HEIGHT_CM_MIN}
+              max={HEIGHT_CM_MAX}
+              placeholder="Örn. 178.5"
+              autoComplete="off"
+              aria-invalid={metricErrors.height_cm ? 'true' : 'false'}
+              aria-describedby={metricErrors.height_cm ? 'height-cm-error' : undefined}
+              className="w-full rounded-control border border-border bg-canvas p-3 text-sm font-medium text-fg outline-none focus:border-accent"
+              {...registerMetric('height_cm')}
+            />
+            {metricErrors.height_cm ? (
+              <p id="height-cm-error" role="alert" className="mt-1 text-xs font-bold text-danger">
+                {metricErrors.height_cm.message}
+              </p>
+            ) : null}
+          </div>
+        </div>
+
+        {/* Sunucu hatası TOAST'a ek olarak SAYFADA da gösterilir: toast kaybolur,
+            kullanıcı formu terk etmeden neyin yanlış gittiğini görebilmelidir. */}
+        {updateBodyMetrics.isError && updateBodyMetrics.error ? (
+          <p role="alert" className="text-xs font-bold text-danger">
+            Künye kaydedilemedi: {updateBodyMetrics.error.message}
+          </p>
+        ) : null}
+
+        <button
+          type="submit"
+          disabled={updateBodyMetrics.isPending}
+          aria-busy={updateBodyMetrics.isPending}
+          className="rounded-control bg-accent px-6 py-3 text-sm font-bold text-accent-fg transition-opacity hover:opacity-90 disabled:opacity-50"
+        >
+          {updateBodyMetrics.isPending ? 'Kaydediliyor...' : 'Künyeyi Kaydet'}
+        </button>
+      </form>
+    </section>
   )
 }
 
@@ -508,6 +688,13 @@ export default function ProfilePage(): JSX.Element {
             <WorkoutPlanView plan={workoutPlanQuery.data ?? EMPTY_WORKOUT_PLAN} />
           </QueryState>
         </div>
+      </div>
+
+      {/* Künye — Güvenlik'ten ÖNCE: "hesabımla ilgili ne oluyor" kontrollerinden
+          (Güvenlik / Aktivite rızası / Hesap silme) farklı olarak bu bölüm PROFİL
+          VERİSİDİR ve sayfanın üst yarısındaki profil kartının doğal devamıdır. */}
+      <div id="kunye" className="scroll-mt-8">
+        <BodyMetricsSection profile={profile} />
       </div>
 
       {/* ###################################################################

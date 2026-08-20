@@ -48,6 +48,7 @@ import {
   useExercises,
   useGenerateWorkout,
   usePendingApprovals,
+  useProfile,
   useProgressEntries,
   useSaveWorkoutPlan,
   useSubmitProgramForApproval,
@@ -62,6 +63,7 @@ import {
   type SessionExercise,
 } from '@repo/api-client/hooks/useWorkoutSession'
 import { recordActivityEvent } from '@/lib/activity/emit'
+import { calculateAge } from '@/lib/body-metrics'
 import { DAYS, getTodayName } from '@/lib/utils'
 import { aiWorkoutSchema, type AiWorkoutInput } from '@repo/types/schemas'
 import {
@@ -198,9 +200,24 @@ export default function WorkoutTab({
   // --- Otomatik program üretici (kural tabanlı backend) ------------------------
   // B-056: yaş/hedef/kilo ARTIK SABİT DEĞİL — beslenme sekmesindeki
   // (`NutritionTab.tsx` "AI diyetisyen" bölümü) `useForm` + `zodResolver` +
-  // `@repo/types/schemas` deseni birebir kopyalanır. `profiles` tablosunda
-  // yaş/hedef sütunu OLMADIĞI için (bkz. görev notu) bu alanlar her üretimde
-  // formdan istenir; şema zaten `@repo/types/schemas` içinde vardı (`aiWorkoutSchema`).
+  // `@repo/types/schemas` deseni birebir kopyalanır.
+  //
+  // #########################################################################
+  // # HANGİ ALAN ÖN DOLDURULUR, HANGİSİ HER SEFERİNDE SORULUR                #
+  // #########################################################################
+  // Künye dilimi (`profiles.birth_date`) ve ilerleme kayıtları (`progress_
+  // entries.weight_kg`) artık gerçek veri taşıyor, dolayısıyla:
+  //   * `age`    -> `birth_date`ten HESAPLANIR ve ön doldurulur
+  //   * `weight` -> EN SON `progress_entries` kaydından ön doldurulur
+  // İkisi de yalnızca VARSAYILANDIR: kullanıcı alanı serbestçe değiştirebilir
+  // (ör. "6 hafta sonra 80 kg olacağım" senaryosu) ve veri yoksa alan BOŞ
+  // kalır — sahte bir varsayılan (20 yaş / 75 kg) KONMAZ, form eskisi gibi
+  // çalışır.
+  //
+  // `goal` (bulk/cut/maintain) BİLEREK ön doldurulmaz ve profile de YAZILMAZ:
+  // o bir PLAN-ANLIK tercihtir, kimlik verisi değil. Aynı danışan aynı hafta
+  // içinde farklı hedeflerle iki program üretebilir; profile yazılsaydı
+  // "danışanın hedefi" diye kalıcılaşır ve bayatlardı.
   const {
     register,
     handleSubmit,
@@ -231,6 +248,23 @@ export default function WorkoutTab({
   if (weightDefaultKey !== loadedWeightDefaultKey) {
     setLoadedWeightDefaultKey(weightDefaultKey)
     if (latestWeightKg !== null) setValue('weight', latestWeightKg)
+  }
+
+  // Yaş alanı için varsayılan: künyedeki doğum tarihinden HESAPLANIR. Yaş
+  // hiçbir yerde SAKLANMAZ (bkz. `@/lib/body-metrics` başlık yorumu) — burada
+  // da anlık türetilir, dolayısıyla asla bayatlamaz. Künye boşsa alan BOŞ
+  // kalır ve kullanıcı eskisi gibi kendisi yazar.
+  const profileQuery = useProfile(targetId)
+  const prefilledAge = useMemo(
+    () => calculateAge(profileQuery.data?.birth_date),
+    [profileQuery.data?.birth_date]
+  )
+
+  const ageDefaultKey = targetId ? `${targetId}:${profileQuery.isFetched ? '1' : '0'}` : 'none'
+  const [loadedAgeDefaultKey, setLoadedAgeDefaultKey] = useState(ageDefaultKey)
+  if (ageDefaultKey !== loadedAgeDefaultKey) {
+    setLoadedAgeDefaultKey(ageDefaultKey)
+    if (prefilledAge !== null) setValue('age', prefilledAge)
   }
 
   const onGenerateSmartWorkout = handleSubmit(async (values) => {

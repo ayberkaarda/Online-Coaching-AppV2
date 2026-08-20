@@ -791,7 +791,7 @@ yatırmayacağını (Apple Developer hesabı dahil) belirtti; sıralama buna gö
    yazıyor ama `form-checks-media` bucket'ına o adlarla nesne koymuyor; o güne kadar
    demo görselleri girmişse `--only=form-check-compare` ile tek komutta üretilir.
 
-   **Mobil viewport kareleri eklenecek.** Gerekçe (ölçüldü, bu turda): proje **responsive**
+   **(a) Web'in mobil viewport kareleri.** Gerekçe (ölçüldü, bu turda): proje **responsive**
    ve bunun sağlam bir kanıtı var — E2E paketi `Desktop Chrome` **ve `Mobile Chrome`
    (Pixel 5)** olmak üzere iki viewport'ta birden koşuyor, yani 54 testin tamamı mobil
    ekran boyutunda da geçiyor. Ayrıca 71 responsive yardımcı sınıf (`sm:` 16, `md:` 49,
@@ -803,13 +803,37 @@ yatırmayacağını (Apple Developer hesabı dahil) belirtti; sıralama buna gö
    Yapılacak: `scripts/capture-screenshots.mjs`'e mobil viewport seçeneği ekleyip
    **bir-iki mobil kare** üretmek ve README'de masaüstü karşılığının yanına koymak
    ("aynı ekran, iki boyut" karşılaştırması). Script zaten viewport parametresi alacak
-   şekilde yazılmış, sıfırdan iş değil.
+   şekilde yazılmış, sıfırdan iş değil. Bu kareler yalnızca web'in mobil ekran
+   genişliğindeki render'ı — Expo mobil uygulamasının kendi ekranları DEĞİL, bkz. (b).
 
-   **Bilinen sınır, dürüstçe yazılsın:** kırılma noktaları `md:`te yoğunlaşmış, `lg:` 6
-   ve `xl:` 0 — geniş ekranlarda düzen özel bir yerleşim almıyor, yalnızca esniyor. Bu
-   bilinçli bir sınır olarak kayda geçsin (portfolyo bağlamında kabul edilebilir),
-   kapanış turunda ADR-0028'in "bilinçli takaslar" listesine girecek maddelerden biri
-   olarak işaretlensin.
+   **(b) YENİ — Expo mobil uygulamasının (`apps/mobile`) kendi ekran görüntüleri.**
+   Bunlar (a)'dan ayrı bir şey: web'in mobil viewport'ta render'ı değil, gerçek Expo Go
+   uygulamasının kendi ekranları. **B-052'den SONRA** çekilecek — bugün `apps/mobile`
+   iskelet hâlde (beş placeholder sekme, gerçek auth yok, veri katmanı yok), şimdi
+   alınacak bir kare bitmemiş bir uygulamayı gösterir. Araç sıfırdan yazılmayacak: Faz
+   4.5'in mobil smoke turunda zaten denendi ve kanıtlandı — Android emülatöründe
+   (Pixel 8 AVD) `pnpm --filter mobile exec expo start --android` ile Expo Go (SDK
+   57.0.0) açılıp `adb exec-out screencap -p` ile kare alınabiliyor; tam yordam
+   [`archive/progress-faz-4.5-monorepo-mobil-temel.md`](archive/progress-faz-4.5-monorepo-mobil-temel.md)'in
+   "Mobil smoke sonucu (2026-08-19)" bölümünde yazılı, oradan devralınacak.
+
+   Çekilecek kareler B-052 kapandığında netleşir (üç dilim: auth temeli, `index`/`plan`
+   salt-okunur ekranlar, progress yazma yolu) — **en az üç kare, gerçek veriyle**: gerçek
+   girişle açılmış panel ekranı, antrenman planı ekranı, ilerleme/kilo girişi ekranı.
+   Kaç kare ve hangi ek ekranlar (ör. sekme ikonları artık yer tutucu değilse) B-052
+   bitince kesinleşir.
+
+   **Bilinen sınırlar, dürüstçe yazılsın (ikisi de kapanış turunda ADR-0028'in "bilinçli
+   takaslar" listesine girecek maddelerden):**
+
+   - (a) için: kırılma noktaları `md:`te yoğunlaşmış, `lg:` 6 ve `xl:` 0 — geniş
+     ekranlarda düzen özel bir yerleşim almıyor, yalnızca esniyor. Bu bilinçli bir sınır
+     olarak kayda geçsin (portfolyo bağlamında kabul edilebilir).
+   - (b) için: **iOS karesi OLMAYACAK.** Expo Go App Store'da SDK 54'te takılı kaldı
+     (Apple onay gecikmesi — Faz 4.5 mobil smoke turunun da iOS'u Android'e kaydırma
+     nedeniydi) ve iOS build'i Windows'ta üretilemez; EAS ile cihaza kurmak ücretli
+     Apple Developer hesabı gerektirir, ki bu portfolyo kararının tam almadığı maliyet
+     (bkz. §5 girişi, "para yatırmayacak"). Yalnızca Android emülatöründen kare alınacak.
 
 8. **Kapanış turu** — **ADR-0028** kapsam dondurma (0027 davet ADR'sine gitti);
    "yapılmayanlar" (telefon, blok periyodizasyon, auth ban, Faz 5-9) bilinçli takas

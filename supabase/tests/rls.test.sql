@@ -9752,8 +9752,334 @@ rollback;
 
 
 -- =============================================================================
+-- KUNYE — 146) POZITIF + NEGATIF: DANISAN KENDI KUNYESINI YAZAR, BASKASININKINI
+-- YAZAMAZ (20260820170000_profile_body_metrics.sql, profiles_guard_body_metrics)
+--   (a) POZITIF: Danisan A kendi satirinin birth_date/height_cm alanlarini
+--       gunceller -> 1 satir etkilenir VE deger GERCEKTEN DB den geri okunur
+--       (yazdigini geri okumadan test tautoloji olurdu).
+--   (b) NEGATIF: AYNI danisan A, danisan B nin birth_date/height_cm alanlarini
+--       guncellemeye calisir. Bu satir zaten profiles_select/profiles_update_self
+--       tarafindan GORUNMEZ/GUNCELLENMEZ kilinir (RLS satir seviyesinde USING
+--       auth.uid()=id ile satiri tarama asamasinda eler, kolon kapisi tetikleyicisi
+--       o zaman hic devreye girmez) -- yani sonuc "0 satir etkilendi" VEYA
+--       "42501" olabilir; HANGISI oldugu raise notice ile kayda gecer. Ardindan
+--       danisan B nin satirinin GERCEKTEN degismedigi (birth_date is null) ayrica
+--       dogrulanir.
+-- =============================================================================
+begin;
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+do $$
+declare
+  v_rows   int;
+  v_bd     date;
+  v_h      numeric;
+  v_caught boolean := false;
+  v_state  text;
+begin
+  -- (a) POZITIF
+  update public.profiles
+     set birth_date = date '1988-04-12', height_cm = 165.5
+   where id = '22222222-2222-2222-2222-222222222222';
+  get diagnostics v_rows = row_count;
+  if v_rows <> 1 then
+    raise exception 'BASARISIZ [146a satir sayisi]: beklenen 1, gelen %', v_rows;
+  end if;
+
+  select birth_date, height_cm into v_bd, v_h
+    from public.profiles where id = '22222222-2222-2222-2222-222222222222';
+  if v_bd is distinct from date '1988-04-12' or v_h is distinct from 165.5 then
+    raise exception 'BASARISIZ [146a geri okuma]: yazilan deger DB den FARKLI donuyor -> %, %', v_bd, v_h;
+  end if;
+  raise notice 'GECTI [146a Danisan A kendi kunyesini yazdi ve GERCEKTEN geri okundu (1 satir)]';
+
+  -- (b) NEGATIF: baskasinin (B) kunyesi
+  begin
+    update public.profiles
+       set birth_date = date '2000-01-01', height_cm = 190
+     where id = '33333333-3333-3333-3333-333333333333';
+    get diagnostics v_rows = row_count;
+  exception when insufficient_privilege then
+    v_caught := true;
+    get stacked diagnostics v_state = returned_sqlstate;
+  end;
+
+  if v_caught then
+    if v_state is distinct from '42501' then
+      raise exception 'BASARISIZ [146b hata kodu]: beklenen 42501, gelen %', v_state;
+    end if;
+    raise notice 'GECTI [146b Danisan A baskasinin (B) kunyesini yazamadi -- sonuc: 42501 (kolon kapisi tetiklendi)]';
+  else
+    if v_rows <> 0 then
+      raise exception 'BASARISIZ [146b]: Danisan A baskasinin (B) kunyesini YAZABILDI -- % satir etkilendi', v_rows;
+    end if;
+    raise notice 'GECTI [146b Danisan A baskasinin (B) kunyesini yazamadi -- sonuc: 0 satir etkilendi (RLS satiri taramada eledi)]';
+  end if;
+
+  select birth_date into v_bd from public.profiles
+   where id = '33333333-3333-3333-3333-333333333333';
+  if v_bd is not null then
+    raise exception 'BASARISIZ [146b dogrulama]: danisan B nin birth_date i DEGISMIS -> %', v_bd;
+  end if;
+  raise notice 'GECTI [146b dogrulama Danisan B nin kunyesi GERCEKTEN degismedi (birth_date is null)]';
+end $$;
+
+rollback;
+
+
+-- =============================================================================
+-- KUNYE — 147) KOC KUNYE YAZAMAZ (BU PAKETIN EN ONEMLI SENARYOSU)
+-- (20260820170000_profile_body_metrics.sql, profiles_guard_body_metrics)
+--
+-- Migration'in kendi ONCUL OLCUMU (dosyanin SS2 basligindaki "KARAR: POLITIKA
+-- YETMEZ" notu) canli DB de koc'un `profiles_update_coach` politikasi
+-- araciligiyla BASKASININ profilini (o an full_name uzerinden) yazabildigini
+-- gostermisti. Bu senaryo, kolon kapisinin GERCEKTEN kapandigini VE kapinin
+-- GEREGINDEN GENIS OLMADIGINI (full_name hala yazilabiliyor, koc kendi
+-- kunyesini yazabiliyor) birlikte olcer.
+--   (a) Koc, danisan A nin height_cm ini yazmaya calisir -> 42501
+--   (b) Koc, danisan A nin birth_date ini yazmaya calisir -> 42501
+--   (c) POZITIF KONTROL: ayni aal2 koc, danisan A nin full_name ini HALA
+--       guncelleyebilir (1 satir) -- kapi profiles UPDATE ini TUMDEN
+--       KAPATMADI, yalnizca iki kolonu sabitledi.
+--   (d) POZITIF KONTROL: aal2 koc KENDI satirinin (11111111-...) birth_date/
+--       height_cm ini gunceller -> basarili, deger geri okunur. Kural
+--       "DANISAN doldurur" degil "SAHIBI doldurur"dur -- koc da kendi
+--       verisinin sahibidir.
+--   (e) Kurulumdaki kunyenin (height_cm=180) DEGISMEDIGI dogrulanir.
+--
+-- aal2 SART: aal claim'i olmadan/aal1 ile mfa_aal2_gate zaten koca profiles
+-- uzerinde hicbir yazma/okuma vermez -- bu durumda senaryo YANLIS NEDENLE
+-- geçerdi (kolon kapisi degil, aal2 kapisi kapatmis olurdu).
+-- =============================================================================
+begin;
+
+-- KURULUM (postgres, rol taklidinden ONCE): danisan A nin satirina bilinen
+-- bir kunye yaz. Kurulum ile iddia bilincli olarak AYRIDIR.
+update public.profiles
+   set birth_date = date '1992-06-15', height_cm = 180
+ where id = '22222222-2222-2222-2222-222222222222';
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","aal":"aal2"}';
+do $$
+declare
+  v_caught boolean;
+  v_state  text;
+  v_rows   int;
+  v_bd     date;
+  v_h      numeric;
+begin
+  -- (a)
+  v_caught := false;
+  begin
+    update public.profiles set height_cm = 999
+     where id = '22222222-2222-2222-2222-222222222222';
+  exception when insufficient_privilege then
+    v_caught := true;
+    get stacked diagnostics v_state = returned_sqlstate;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [147a]: KOC danisan A nin height_cm ini YAZABILDI -- kolon kapisi calismiyor';
+  end if;
+  if v_state is distinct from '42501' then
+    raise exception 'BASARISIZ [147a hata kodu]: beklenen 42501, gelen %', v_state;
+  end if;
+  raise notice 'GECTI [147a Koc danisan A nin height_cm ini YAZAMADI (42501)]';
+
+  -- (b)
+  v_caught := false;
+  begin
+    update public.profiles set birth_date = date '2020-01-01'
+     where id = '22222222-2222-2222-2222-222222222222';
+  exception when insufficient_privilege then
+    v_caught := true;
+    get stacked diagnostics v_state = returned_sqlstate;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [147b]: KOC danisan A nin birth_date ini YAZABILDI -- kolon kapisi calismiyor';
+  end if;
+  if v_state is distinct from '42501' then
+    raise exception 'BASARISIZ [147b hata kodu]: beklenen 42501, gelen %', v_state;
+  end if;
+  raise notice 'GECTI [147b Koc danisan A nin birth_date ini YAZAMADI (42501)]';
+
+  -- (c) POZITIF KONTROL: kapi geregeinden genis degil
+  update public.profiles set full_name = 'Ahmet Yilmaz (koc yazdi)'
+   where id = '22222222-2222-2222-2222-222222222222';
+  get diagnostics v_rows = row_count;
+  if v_rows <> 1 then
+    raise exception 'BASARISIZ [147c]: Koc danisan A nin full_name ini GUNCELLEYEMEDI -- kapi geregeinden genis, profiles UPDATE ini tumden kapatmis';
+  end if;
+  raise notice 'GECTI [147c POZITIF Koc danisan A nin full_name ini HALA guncelleyebiliyor (1 satir) -- kapi yalnizca iki kolonu sabitliyor]';
+
+  -- (d) POZITIF KONTROL: koc kendi kunyesini yazabilir
+  update public.profiles
+     set birth_date = date '1985-11-20', height_cm = 177.0
+   where id = '11111111-1111-1111-1111-111111111111';
+  get diagnostics v_rows = row_count;
+  if v_rows <> 1 then
+    raise exception 'BASARISIZ [147d]: Koc KENDI kunyesini yazamadi -- % satir', v_rows;
+  end if;
+
+  select birth_date, height_cm into v_bd, v_h
+    from public.profiles where id = '11111111-1111-1111-1111-111111111111';
+  if v_bd is distinct from date '1985-11-20' or v_h is distinct from 177.0 then
+    raise exception 'BASARISIZ [147d geri okuma]: koc kendi kunyesini yazdi ama DB den FARKLI donuyor -> %, %', v_bd, v_h;
+  end if;
+  raise notice 'GECTI [147d POZITIF Koc KENDI kunyesini yazabiliyor ve geri okunuyor -- kural SAHIBI doldurur, DANISAN doldurur degil]';
+
+  -- (e) kurulumdaki kunye DEGISMEDI (coach hala okuyabiliyor: aal2 + profiles_select)
+  select height_cm into v_h from public.profiles
+   where id = '22222222-2222-2222-2222-222222222222';
+  if v_h is distinct from 180 then
+    raise exception 'BASARISIZ [147e]: danisan A nin kurulumdaki height_cm degeri DEGISMIS -> % (beklenen 180)', v_h;
+  end if;
+  raise notice 'GECTI [147e Danisan A nin kurulum kunyesi (height_cm=180) DEGISMEDI]';
+end $$;
+
+rollback;
+
+
+-- =============================================================================
+-- KUNYE — 148) CHECK KISITLARI GERCEKTEN REDDEDIYOR (profiles_birth_date_chk /
+-- profiles_height_cm_chk, 20260820170000_profile_body_metrics.sql)
+-- Danisan A kimligiyle (kolon kapisi zaten acik, cunku A KENDI satirini
+-- yaziyor -- burada sinanan CHECK kisitidir, kolon kapisi degil), KENDI
+-- satirinda:
+--   (a) gelecek tarihli dogum tarihi (current_date + 1)          -> 23514
+--   (b) 1900 oncesi dogum tarihi (1899-12-31)                    -> 23514
+--   (c) birim hatasi boy 1.75 (metre girilmis)                   -> 23514
+--   (d) absurt boy 1750 (mm girilmis)                             -> 23514
+--   (e) iki ondalikli boy 175.25                                  -> 23514
+--   (f) POZITIF KONTROL: makul degerler (1995-03-14, 178.5) GECER ve geri
+--       okunur -- bu dal olmadan kisit "her seyi reddet" sabiti olabilirdi.
+--   (g) NULL POZITIF KONTROL: ikisi de null yazilabilir -- kunye ZORUNLU
+--       DEGIL.
+-- =============================================================================
+begin;
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+do $$
+declare
+  v_caught boolean;
+  v_state  text;
+  v_bd     date;
+  v_h      numeric;
+begin
+  -- (a) gelecek tarih
+  v_caught := false;
+  begin
+    update public.profiles set birth_date = current_date + 1
+     where id = '22222222-2222-2222-2222-222222222222';
+  exception when check_violation then
+    v_caught := true;
+    get stacked diagnostics v_state = returned_sqlstate;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [148a]: GELECEK tarihli dogum tarihi KABUL EDILDI';
+  end if;
+  if v_state is distinct from '23514' then
+    raise exception 'BASARISIZ [148a kod]: beklenen 23514, gelen %', v_state;
+  end if;
+
+  -- (b) 1900 oncesi
+  v_caught := false;
+  begin
+    update public.profiles set birth_date = date '1899-12-31'
+     where id = '22222222-2222-2222-2222-222222222222';
+  exception when check_violation then
+    v_caught := true;
+    get stacked diagnostics v_state = returned_sqlstate;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [148b]: 1900 ONCESI dogum tarihi KABUL EDILDI';
+  end if;
+  if v_state is distinct from '23514' then
+    raise exception 'BASARISIZ [148b kod]: beklenen 23514, gelen %', v_state;
+  end if;
+
+  -- (c) birim hatasi: metre
+  v_caught := false;
+  begin
+    update public.profiles set height_cm = 1.75
+     where id = '22222222-2222-2222-2222-222222222222';
+  exception when check_violation then
+    v_caught := true;
+    get stacked diagnostics v_state = returned_sqlstate;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [148c]: BIRIM HATASI (1.75 m) KABUL EDILDI -- Mifflin-St Jeor sacmalardi';
+  end if;
+  if v_state is distinct from '23514' then
+    raise exception 'BASARISIZ [148c kod]: beklenen 23514, gelen %', v_state;
+  end if;
+
+  -- (d) absurt: milimetre
+  v_caught := false;
+  begin
+    update public.profiles set height_cm = 1750
+     where id = '22222222-2222-2222-2222-222222222222';
+  exception when check_violation then
+    v_caught := true;
+    get stacked diagnostics v_state = returned_sqlstate;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [148d]: ABSURT boy (1750 mm) KABUL EDILDI';
+  end if;
+  if v_state is distinct from '23514' then
+    raise exception 'BASARISIZ [148d kod]: beklenen 23514, gelen %', v_state;
+  end if;
+
+  -- (e) iki ondalik
+  v_caught := false;
+  begin
+    update public.profiles set height_cm = 175.25
+     where id = '22222222-2222-2222-2222-222222222222';
+  exception when check_violation then
+    v_caught := true;
+    get stacked diagnostics v_state = returned_sqlstate;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [148e]: IKI ONDALIKLI boy (175.25) KABUL EDILDI';
+  end if;
+  if v_state is distinct from '23514' then
+    raise exception 'BASARISIZ [148e kod]: beklenen 23514, gelen %', v_state;
+  end if;
+
+  raise notice 'GECTI [148a-e CHECK kisitlari gelecek/1900-oncesi/birim-hatasi(m)/absurt(mm)/iki-ondalikli boyu REDDETTI (23514)]';
+
+  -- (f) POZITIF KONTROL: makul degerler gecer
+  update public.profiles
+     set birth_date = date '1995-03-14', height_cm = 178.5
+   where id = '22222222-2222-2222-2222-222222222222';
+  select birth_date, height_cm into v_bd, v_h
+    from public.profiles where id = '22222222-2222-2222-2222-222222222222';
+  if v_bd is distinct from date '1995-03-14' or v_h is distinct from 178.5 then
+    raise exception 'BASARISIZ [148f POZITIF]: makul kunye yazilamadi -> %, %', v_bd, v_h;
+  end if;
+  raise notice 'GECTI [148f POZITIF makul degerler (1995-03-14, 178.5) GECTI ve geri okundu -- kisit "her seyi reddet" sabiti degil]';
+
+  -- (g) NULL POZITIF KONTROL
+  update public.profiles
+     set birth_date = null, height_cm = null
+   where id = '22222222-2222-2222-2222-222222222222';
+  select birth_date, height_cm into v_bd, v_h
+    from public.profiles where id = '22222222-2222-2222-2222-222222222222';
+  if v_bd is not null or v_h is not null then
+    raise exception 'BASARISIZ [148g NULL POZITIF]: null yazilamadi -> %, %', v_bd, v_h;
+  end if;
+  raise notice 'GECTI [148g NULL POZITIF kunye ZORUNLU DEGIL -- ikisi de null yazilabiliyor]';
+end $$;
+
+rollback;
+
+
+-- =============================================================================
 -- TOPLAM ÖZET
--- Bu noktaya yalnızca YUKARIDAKİ 144 senaryonun HEPSİ GECTI verdiyse ulaşılır --
+-- Bu noktaya yalnızca YUKARIDAKİ 148 senaryonun HEPSİ GECTI verdiyse ulaşılır --
 -- herhangi biri BASARISIZ olsaydı raise exception + ON_ERROR_STOP psql'i
 -- daha önce sıfırdan farklı çıkış koduyla durdururdu.
 --   * 1–19  : Faz 1a ve öncesi (profiles, notifications, form_checks, daily_logs,
@@ -9968,6 +10294,28 @@ rollback;
 --             modelinin (ADR-0007) REGRESYON KAPISI, davet ucu eklendiği
 --             için ARTIK gerekli (B-058: koç-danışan atama tablosu yok)
 --             (145d)
+--   * 146–148: Faz 4.9 dilim 2 — PROFİL KÜNYESİ (doğum tarihi + boy)
+--             (20260820170000_profile_body_metrics.sql): danışan A KENDİ
+--             `birth_date`/`height_cm` alanlarını yazar ve DB'den GERÇEKTEN
+--             geri okunur; aynı danışan A başkasının (B) künyesini
+--             YAZAMAZ — sonuç "0 satır etkilendi" (RLS satırı taramada eler)
+--             ile "42501" (kolon kapısı) arasında hangisi çıkarsa raise
+--             notice ile kayda geçer, B'nin satırı GERÇEKTEN değişmez (146);
+--             *** BU PAKETİN EN ÖNEMLİ SENARYOSU *** — aal2 KOÇ danışan A'nın
+--             `height_cm`/`birth_date` alanlarını YAZAMAZ (42501,
+--             `profiles_guard_body_metrics` tetikleyicisi), *** POZİTİF
+--             KONTROL *** aynı koç danışan A'nın `full_name`'ini HÂLÂ
+--             güncelleyebilir — kapı `profiles` UPDATE'ini TÜMDEN kapatmadı,
+--             yalnızca iki kolonu sabitledi — ve koç KENDİ satırının
+--             künyesini yazabilir (kural "danışan doldurur" değil "SAHİBİ
+--             doldurur"dur); kurulumdaki künye (`height_cm=180`) değişmeden
+--             kalır (147); CHECK kısıtları (`profiles_birth_date_chk`,
+--             `profiles_height_cm_chk`) gelecek tarih, 1900 öncesi, birim
+--             hatası (1.75 m), absürt değer (1750 mm) ve iki ondalık basamağı
+--             (175.25) 23514 ile REDDEDER; *** POZİTİF KONTROL *** makul
+--             değerler (1995-03-14, 178.5) GEÇER ve geri okunur, *** NULL
+--             POZİTİF KONTROL *** künye ZORUNLU DEĞİL — ikisi de null
+--             yazılabilir (148)
 --
 -- NOT: `nutrition_logs`, `progress_entries` ve `progress_photos` ayrıca senaryo
 -- 73 (yetki) ve 74 (RLS+FORCE) tarafından DİNAMİK olarak kapsanır — o iki
@@ -9975,5 +10323,5 @@ rollback;
 -- =============================================================================
 do $$
 begin
-  raise notice 'TUM RLS TESTLERI GECTI (145 senaryo)';
+  raise notice 'TUM RLS TESTLERI GECTI (148 senaryo)';
 end $$;

@@ -556,10 +556,12 @@ export type Database = {
           activity_consent_revoked_at: string | null
           activity_consent_version: number | null
           avatar_path: string | null
+          birth_date: string | null
           created_at: string
           current_streak: number
           email: string | null
           full_name: string
+          height_cm: number | null
           id: string
           last_checkin_at: string | null
           nutrition_plan: string | null
@@ -572,10 +574,12 @@ export type Database = {
           activity_consent_revoked_at?: string | null
           activity_consent_version?: number | null
           avatar_path?: string | null
+          birth_date?: string | null
           created_at?: string
           current_streak?: number
           email?: string | null
           full_name?: string
+          height_cm?: number | null
           id: string
           last_checkin_at?: string | null
           nutrition_plan?: string | null
@@ -588,10 +592,12 @@ export type Database = {
           activity_consent_revoked_at?: string | null
           activity_consent_version?: number | null
           avatar_path?: string | null
+          birth_date?: string | null
           created_at?: string
           current_streak?: number
           email?: string | null
           full_name?: string
+          height_cm?: number | null
           id?: string
           last_checkin_at?: string | null
           nutrition_plan?: string | null

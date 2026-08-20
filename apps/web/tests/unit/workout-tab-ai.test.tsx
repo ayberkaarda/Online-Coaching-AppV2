@@ -15,6 +15,9 @@
 //      değerlerle (sayıya çevrilmiş) çağrılır — sabit 20/bulk/75 ARTIK GİTMİYOR.
 //   3) Danışanın son `progress_entries` kaydı varsa kilo alanı ONUNLA
 //      doldurulur (sahte varsayılan değil, gerçek veri).
+//   4) KÜNYE DİLİMİ: danışanın `profiles.birth_date` alanı doluysa yaş alanı
+//      ONDAN HESAPLANIP ön doldurulur; künye boşsa alan BOŞ kalır (fallback).
+//      `goal` ön doldurulmaz — plan-anlık tercihtir, profil verisi değildir.
 
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -33,6 +36,7 @@ vi.mock('@repo/api-client', async (importOriginal) => {
     useExercises: vi.fn(),
     useGenerateWorkout: vi.fn(),
     usePendingApprovals: vi.fn(),
+    useProfile: vi.fn(),
     useProgressEntries: vi.fn(),
     useSaveWorkoutPlan: vi.fn(),
     useSubmitProgramForApproval: vi.fn(),
@@ -56,6 +60,7 @@ import {
   useExercises,
   useGenerateWorkout,
   usePendingApprovals,
+  useProfile,
   useProgressEntries,
   useSaveWorkoutPlan,
   useSubmitProgramForApproval,
@@ -96,6 +101,7 @@ function mockWorkoutHooks(
     approvals?: Record<string, unknown>
     logs?: Record<string, unknown>
     exercises?: Record<string, unknown>
+    profile?: Record<string, unknown>
     progressEntries?: Record<string, unknown>
     generateWorkout?: Record<string, unknown>
   } = {}
@@ -120,6 +126,9 @@ function mockWorkoutHooks(
   )
   vi.mocked(useExercises).mockReturnValue(
     mockQuery({ data: [], ...overrides.exercises }) as unknown as ReturnType<typeof useExercises>
+  )
+  vi.mocked(useProfile).mockReturnValue(
+    mockQuery({ data: undefined, ...overrides.profile }) as unknown as ReturnType<typeof useProfile>
   )
   vi.mocked(useProgressEntries).mockReturnValue(
     mockQuery({ data: [], ...overrides.progressEntries }) as unknown as ReturnType<
@@ -244,5 +253,92 @@ describe('WorkoutTab — Akıllı Antrenör (AI) gönderim', () => {
     rerender(tabElement())
 
     expect(await screen.findByLabelText('Kilo (kg)')).toHaveValue(77.5)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// KÜNYE ÖN DOLDURMA — sahte zamansız, yine de deterministik
+//
+// Yaş her yıl artar; sabit bir doğum tarihi + sabit beklenen yaş yazan bir test
+// yılbaşında KENDİLİĞİNDEN kırılırdı (yaşın neden SAKLANMADIĞININ testteki
+// yansıması). `vi.setSystemTime` ise sahte zamanlayıcı gerektirir ve
+// `userEvent` ile birlikte kırılgandır. Bunun yerine doğum tarihi ÇALIŞMA
+// ANINDA "tam 30 yıl önce, 1 Ocak" olarak kurulur: 1 Ocak her zaman geçmiş
+// (veya bugün) olduğu için beklenen yaş HER GÜN tam olarak 30'dur.
+// ---------------------------------------------------------------------------
+const EXPECTED_AGE = 30
+const BIRTH_DATE = `${new Date().getFullYear() - EXPECTED_AGE}-01-01`
+
+describe('WorkoutTab — Akıllı Antrenör (AI) künye ön doldurma', () => {
+  it('künyedeki doğum tarihinden HESAPLANAN yaş alana doldurulur', async () => {
+    // Kilo prefill testiyle AYNI gerekçe: sorgu GERÇEK kullanımda önce
+    // `isFetched: false` ile başlar, veri gelince `true`'ya döner. Statik bir
+    // `isFetched: true` mock'u render-sırası senkronunu hiç TETİKLEMEZ.
+    mockWorkoutHooks({ profile: { isFetched: false, data: undefined } })
+
+    const { rerender } = renderTab()
+    expect(screen.getByLabelText('Yaş')).toHaveValue(null)
+
+    vi.mocked(useProfile).mockReturnValue(
+      mockQuery({
+        isFetched: true,
+        data: { id: CLIENT_ID, birth_date: BIRTH_DATE, height_cm: 178.5 },
+      }) as unknown as ReturnType<typeof useProfile>
+    )
+    rerender(tabElement())
+
+    expect(await screen.findByLabelText('Yaş')).toHaveValue(EXPECTED_AGE)
+  })
+
+  it('künye BOŞSA yaş alanı boş kalır — form eskisi gibi çalışır (fallback)', async () => {
+    mockWorkoutHooks({ profile: { isFetched: false, data: undefined } })
+
+    const { rerender } = renderTab()
+
+    vi.mocked(useProfile).mockReturnValue(
+      mockQuery({
+        isFetched: true,
+        data: { id: CLIENT_ID, birth_date: null, height_cm: null },
+      }) as unknown as ReturnType<typeof useProfile>
+    )
+    rerender(tabElement())
+
+    expect(await screen.findByLabelText('Yaş')).toHaveValue(null)
+  })
+
+  it('ön doldurulan yaş EZİLMEZ — kullanıcı değiştirebilir ve gönderilen değer onunkidir', async () => {
+    const { generateWorkout } = mockWorkoutHooks({
+      profile: { isFetched: false, data: undefined },
+    })
+    const user = userEvent.setup()
+
+    const { rerender } = renderTab()
+
+    vi.mocked(useProfile).mockReturnValue(
+      mockQuery({
+        isFetched: true,
+        data: { id: CLIENT_ID, birth_date: BIRTH_DATE, height_cm: 178.5 },
+      }) as unknown as ReturnType<typeof useProfile>
+    )
+    rerender(tabElement())
+
+    const ageField = await screen.findByLabelText('Yaş')
+    expect(ageField).toHaveValue(EXPECTED_AGE)
+
+    await user.clear(ageField)
+    await user.type(ageField, '40')
+
+    await user.selectOptions(screen.getByLabelText('Antrenman şablonu'), 'ppl')
+    await user.type(screen.getByLabelText('Kilo (kg)'), '82')
+    await user.selectOptions(screen.getByLabelText('Hedef'), 'cut')
+    await user.click(screen.getByRole('button', { name: 'Oluştur' }))
+
+    expect(generateWorkout.mutateAsync).toHaveBeenCalledWith({
+      split_type: 'ppl',
+      user_prompt: '',
+      age: 40,
+      goal: 'cut',
+      weight: 82,
+    })
   })
 })

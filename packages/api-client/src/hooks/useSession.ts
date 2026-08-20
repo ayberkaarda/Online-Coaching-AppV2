@@ -7,7 +7,7 @@ import type { Session } from '@supabase/supabase-js'
 import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query'
 import { useEffect } from 'react'
 
-import { apiFetch } from '../api/client'
+import { ApiError, apiFetch } from '../api/client'
 import { logger } from '@repo/logger'
 import { queryKeyRoots, queryKeys } from '../query/keys'
 import { useSupabaseClient } from '../context'
@@ -271,6 +271,67 @@ export function useCoachResetClientPassword() {
     },
     onError: (error: Error) => {
       notify.error(`Şifre sıfırlama tetiklenemedi: ${error.message}`)
+    },
+  })
+}
+
+// ---------------------------------------------------------------------------
+// Danışan daveti (Faz 4.9 dilim 2 — arayüz)
+// ---------------------------------------------------------------------------
+
+export interface InviteClientInput {
+  email: string
+  /** Boş/undefined gönderilebilir — sunucu şeması opsiyonel kabul eder. */
+  full_name?: string
+}
+
+interface InviteClientResponse {
+  ok: true
+}
+
+/**
+ * KOÇ TETİKLEMELİ danışan daveti (`/api/coach/invite-client`, ADR-0027).
+ *
+ * Sunucu ucu `supabase.auth.admin.inviteUserByEmail`'i KENDİSİ çağırır; davet
+ * bağlantısı/token'ı YANITA HİÇ KONMAZ — başarı yanıtı `useCoachResetClientPassword`
+ * ile AYNI şekilde yalnızca `{ ok: true }`'dur.
+ *
+ * ######################################################################
+ * # `Authorization: Bearer` AÇIKÇA EKLENİR — cookie'den OKUNMAZ         #
+ * # Route (`route.ts` §1) kimliği YALNIZCA `Authorization` başlığından  #
+ * # okur (CSRF yüzeyi açmamak için, `account/delete` ile aynı gerekçe). #
+ * # Bu yüzden `useDeleteAccount` deseni izlenir: token `supabase.auth.  #
+ * # getSession()`ten okunup başlığa ELLE konur.                        #
+ * ######################################################################
+ *
+ * BAŞARI/HATA METNİ BURADA GÖSTERİLMEZ (jenerik bir toast YOKTUR): 409
+ * (`EMAIL_ALREADY_REGISTERED`), 403 (`MFA_REQUIRED` — ayrıca Güvenlik bölümüne
+ * bağlantı gerektirir), 429 ve 503 durumları form seviyesinde AYIRT EDİLEREK
+ * gösterilir (bkz. `InviteClientForm`); tek bir jenerik toast bu ayrımı
+ * kaybederdi. `mutation.error` (bir `ApiError`) ve `mutation.isSuccess` çağıran
+ * tarafından okunur.
+ */
+export function useInviteClient() {
+  const supabase = useSupabaseClient()
+  return useMutation({
+    mutationFn: async (input: InviteClientInput): Promise<InviteClientResponse> => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+
+      if (!session?.access_token) {
+        throw new ApiError(
+          401,
+          'NOT_AUTHENTICATED',
+          'Oturumunuz sona ermiş. Lütfen tekrar giriş yapın.'
+        )
+      }
+
+      return apiFetch<InviteClientResponse>('/api/coach/invite-client', {
+        method: 'POST',
+        json: input,
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
     },
   })
 }
