@@ -2,29 +2,86 @@
 
 Koçların danışanlarını antrenman, beslenme ve ilerleme verisi üzerinden uçtan uca yönettiği; yapay zeka destekli plan önerilerinin daima bir koç onayından geçtiği ("closed-loop") online fitness koçluğu platformu.
 
-![CI](https://github.com/<KULLANICI_ADI>/<REPO_ADI>/actions/workflows/ci.yml/badge.svg)
-![Node](https://img.shields.io/badge/node-%E2%89%A520.11-339933?logo=node.js&logoColor=white)
-![Python](https://img.shields.io/badge/python-%E2%89%A53.12-3776AB?logo=python&logoColor=white)
-![Next.js](https://img.shields.io/badge/next.js-16.2-000000?logo=nextdotjs&logoColor=white)
-![TypeScript](https://img.shields.io/badge/typescript-strict-3178C6?logo=typescript&logoColor=white)
+[![CI](https://github.com/ayberkaarda/Online-Coaching-AppV2/actions/workflows/ci.yml/badge.svg)](https://github.com/ayberkaarda/Online-Coaching-AppV2/actions/workflows/ci.yml)
+![Node](https://img.shields.io/badge/node-24%20LTS-339933?logo=node.js&logoColor=white)
+![TypeScript](https://img.shields.io/badge/typescript-6.0%20strict-3178C6?logo=typescript&logoColor=white)
+![Next.js](https://img.shields.io/badge/next.js-16.3-000000?logo=nextdotjs&logoColor=white)
+![Expo](https://img.shields.io/badge/expo-SDK%2057-000020?logo=expo&logoColor=white)
+![Python](https://img.shields.io/badge/python-3.14-3776AB?logo=python&logoColor=white)
+![License](https://img.shields.io/badge/license-MIT-blue)
 
-> `<KULLANICI_ADI>/<REPO_ADI>` yer tutucusunu bu deponun gerçek GitHub sahibi/adıyla değiştirin (rozetin çalışması için gereklidir).
+---
+
+## In brief (English)
+
+**Closed-Loop Coaching Hub** is a coaching platform where a coach manages clients' training, nutrition and progress data, and where every AI-generated plan must pass through explicit coach approval before it becomes a client's active program — the "closed loop" in the name. It is a pnpm + Turborepo monorepo: two apps (`apps/web` on Next.js 16 / React 19, `apps/mobile` on Expo SDK 57) and four shared packages (`config`, `types`, `api-client`, `logger`), backed by Supabase (Postgres 17, Auth, Storage, Realtime) and a separate FastAPI service on Python 3.14 that the browser can never reach directly.
+
+Three engineering choices are worth a reviewer's attention. **First, authorization lives entirely in the database:** the browser talks to Supabase directly, so a route-level check would be bypassable — mandatory coach MFA is therefore enforced as a `RESTRICTIVE` RLS policy on 16 tables that fails closed when the `aal` claim cannot be read ([ADR-0026](docs/adr/0026-totp-mfa-ve-aal2-kapisi.md)). **Second, destructive and privacy-critical operations are fail-closed by construction:** `delete_account()` refuses to delete anything at all if a single storage object survives the pre-pass, so a half-deleted account is impossible at the schema level ([ADR-0025](docs/adr/0025-hesap-silme-ve-service-role-sunucu-yolu.md)), and the activity-log consent gate sits _inside_ the only write function rather than in front of it. **Third, the boundaries are tested, not asserted:** 868 Vitest unit/component tests, 144 SQL scenarios that exercise RLS from a real authenticated session, and 54 Playwright end-to-end tests, all gated by a six-job GitHub Actions pipeline.
+
+This is a **portfolio project**. It is not deployed publicly, has no users, and is not maintained as a commercial product; the code, the 26 ADRs and the documentation exist to show how the decisions were made. Most of the documentation below is in Turkish — that is where the depth is, and it is deliberate rather than an oversight.
+
+---
 
 ## İçindekiler
 
-1. [Özellikler](#özellikler)
-2. [Mimari](#mimari)
-3. [Teknoloji Yığını](#teknoloji-yığını)
-4. [Hızlı Başlangıç](#hızlı-başlangıç)
-5. [Ortam Değişkenleri](#ortam-değişkenleri)
-6. [Geliştirme Komutları](#geliştirme-komutları)
-7. [Test](#test)
-8. [Veritabanı ve RLS](#veritabanı-ve-rls)
-9. [Docker ile Çalıştırma](#docker-ile-çalıştırma)
-10. [Dağıtım](#dağıtım)
-11. [Güvenlik](#güvenlik)
-12. [Proje Yapısı](#proje-yapısı)
-13. [Katkı ve Lisans](#katkı-ve-lisans)
+1. [Öne çıkan mühendislik kararları](#öne-çıkan-mühendislik-kararları)
+2. [Özellikler](#özellikler)
+3. [Mimari](#mimari)
+4. [Teknoloji Yığını](#teknoloji-yığını)
+5. [Hızlı Başlangıç](#hızlı-başlangıç)
+6. [Ortam Değişkenleri](#ortam-değişkenleri)
+7. [Geliştirme Komutları](#geliştirme-komutları)
+8. [Test](#test)
+9. [Veritabanı ve RLS](#veritabanı-ve-rls)
+10. [Docker ile Çalıştırma](#docker-ile-çalıştırma)
+11. [Dağıtım](#dağıtım)
+12. [Güvenlik](#güvenlik)
+13. [Proje Yapısı](#proje-yapısı)
+14. [Katkı ve Lisans](#katkı-ve-lisans)
+
+> **Bu bir portfolyo projesidir.** Yayında değildir, gerçek kullanıcısı yoktur ve ticari bir ürün olarak sürdürülmemektedir. Depoda ilginç olan şey özellik listesi değil, kararların nasıl alındığıdır: 26 ADR, 34 migration ve her sınırın arkasındaki test paketi. Aşağıdaki ilk bölüm tam da bunun için var.
+
+---
+
+## Öne çıkan mühendislik kararları
+
+26 ADR'nin tamamını okumaya gerek yok; incelemeye değer altı karar aşağıda. Her biri gerçek bir kısıttan doğdu ve hepsinin kaynağı depoda.
+
+### 1. MFA kapısı route'ta değil, RLS'te
+
+**[ADR-0026](docs/adr/0026-totp-mfa-ve-aal2-kapisi.md) · [`supabase/migrations/20260819120000_mfa_aal2_gate.sql`](supabase/migrations/20260819120000_mfa_aal2_gate.sql)**
+
+Tek koçlu modelde koç hesabı **her danışanın** ölçümlerini, fotoğraflarını ve yazışmalarını açan tek anahtardır, ve o kapıyı bugüne dek yalnızca bir parola tutuyordu. Kapıyı bir Next.js route'una koymak işe yaramazdı: tarayıcı Supabase'e `supabase.from(...)` ile **doğrudan** gidiyor, arada BFF yok — route kontrolü basit bir `fetch` ile atlanır. Bu yüzden zorunlu TOTP, danışan verisi taşıyan 16 tabloya kurulmuş tek kalıplı bir **RESTRICTIVE** RLS politikasıdır: koçun JWT'sinde `aal2` yoksa sorgu boş küme döner. `aal` claim'i hiç okunamıyorsa da boş küme döner — **fail-closed**; danışan tarafı ise hiç etkilenmez (opt-in).
+
+### 2. Yarım silinmiş hesap şema seviyesinde imkânsız
+
+**[ADR-0025](docs/adr/0025-hesap-silme-ve-service-role-sunucu-yolu.md) · [`supabase/migrations/20260819100000_account_deletion.sql`](supabase/migrations/20260819100000_account_deletion.sql)**
+
+Supabase, `storage.objects`'ten SQL ile satır silmeyi platform trigger'ıyla **yasaklıyor** (`storage.protect_delete()`), yani fiziksel dosya silme tek başına veritabanı transaksiyonunun dışında kalmak zorunda. Bu, "auth kullanıcısı gitti ama vücut fotoğrafı S3'te duruyor" senaryosunu doğal bir olasılık hâline getirir. Çözüm sırayı sözleşmeye bırakmak yerine **dayatmak** oldu: `delete_account()` çağrıldığında geriye tek bir storage nesnesi kalmışsa `raise` eder ve **hiçbir şey silinmez**. Denetim kaydı (`account_deletions`) kasıtlı olarak uid, e-posta, ad ve IP taşımaz — silinen kişiyi işaret eden bir silme kaydı unutulma hakkını yerine getirmiş sayılmazdı.
+
+### 3. Rıza kapısı, yazma fonksiyonunun içinde
+
+**Faz 4.8 · [`supabase/migrations/20260820090000_activity_log.sql`](supabase/migrations/20260820090000_activity_log.sql) · [`20260820140000_coach_activity_summary.sql`](supabase/migrations/20260820140000_coach_activity_summary.sql)**
+
+Koçun danışan aktivitesini görebilmesi (sekme görüntüleme, giriş/çıkış, günlük giriş) KVKK anlamında açık rıza gerektirir. Rıza kontrolü çağıranın önüne değil, tek yazma yolu olan `record_activity()`'nin **içine** kondu: rıza yoksa fonksiyon istisna fırlatır, hiçbir satır yazılmaz. Rıza geri çekildiğinde kullanıcının tüm `activity_*` satırları **aynı anda** silinir (kapat = durdur **ve** sil). Mahremiyet sınırı da arayüzde değil veri katmanındadır: koç ham tabloya hiç gitmez, `coach_activity_summary()` RPC'sini çağırır ve o fonksiyon `returns table(day date, ...)` imzasıyla gün hassasiyetinden daha incesini **döndüremez** — geliştirici konsolunu açan bir koç bile danışanın saatini göremez. Fonksiyon bilerek `SECURITY INVOKER`'dır, böylece `aal2` kapısı burada da geçerli kalır.
+
+### 4. Üç katmanlı, fail-closed hosted hedef guard'ı
+
+**[`apps/web/src/env.server.ts`](apps/web/src/env.server.ts) · [ADR-0020](docs/adr/0020-hosted-senkronizasyon-stratejisi.md)**
+
+Bu kod tabanındaki en pahalı kaza, "yerelde çalıştığını sanan" bir `pnpm run build && pnpm run start`'ın `service_role` ile barındırılan projeye yazmasıdır — RLS baypas edildiği için hiçbir politika onu durduramaz. Guard üç katmanda kuruldu: Katman 0 `.env.local`'ın yerel yığını göstermesi, Katman 1 `playwright.config.ts`'in hedef iddiası, Katman 2 sunucu tarafında `*.supabase.co|com` hedefini görüp `ALLOW_HOSTED_TARGET=1` yoksa **fırlatan** bir kontrol. Kritik ayrıntı: guard bilinçli olarak `NODE_ENV`'e koşullanmadı — tehlikeli yol tam da `next start` (yani `NODE_ENV=production`) üzerinden geçtiği için, `NODE_ENV !== 'production'` koşullu bir guard korumaya çalıştığı senaryoda kendini kapatırdı. Bunun bir regresyon testi var.
+
+### 5. Supabase istemcisi enjekte edilir, import edilmez
+
+**[ADR-0024](docs/adr/0024-api-client-supabase-enjeksiyonu.md) · [`packages/api-client/src/context.tsx`](packages/api-client/src/context.tsx)**
+
+`@repo/api-client` paketi 18 TanStack Query hook'u taşıyor ve bunları hem web hem mobil tüketecek. Paket Supabase istemcisini **modül seviyesinde import etmez**; `SupabaseClientProvider` ile dışarıdan alır. Sebep somut: web'in oturum deposu cookie tabanlıdır (`@supabase/ssr`), mobilin `SecureStore` olacaktır — modül seviyesinde bir singleton, web'in cookie deposunu Metro grafiğine sızdırırdı. Aynı disiplin bildirim katmanına da uygulandı: paket `sonner` gibi DOM'a bağlı bir toast kütüphanesi import etmez, `NotifierProvider` portunun arkasından çağırır. `pino` de aynı sebeple `@repo/logger` yerine `apps/web`'de bırakıldı.
+
+### 6. Eski tasarım dili tek yönlü mandalla kilitli
+
+**[ADR-0018](docs/adr/0018-kimlik-gecisi-iki-katman-ve-ci-ratchet.md) · [`scripts/identity-ratchet.mjs`](scripts/identity-ratchet.mjs)**
+
+Görsel kimlik geçişini tek bir dev "restyle PR"ında yapmak diff'i incelenemez hâle getirirdi; "zamanla düzelir" demek ise iki dilin kalıcı olarak yan yana yaşaması demekti. Üçüncü yol: eski dilin izlerini (`font-black`, `bg-gradient-to-*`, `rounded-3xl`, ham marka moru, JSX emoji) sayan bir grep script'i CI'da koşuyor ve **tavanın üstüne çıkan her PR kırmızı oluyor**. Tavan asla otomatik yükselmez; bir PR sayacı düşürdüğünde yeni değer baseline olur. Bugünkü durum: `font-black` 49 → 25, gradyan 14 → 12, `rounded-3xl` 17 → 15, ham `#8b5cf6` ve emoji **0'da kilitli**. Ham rengin ondalık RGB yazımı (`139, 92, 246`) için ayrı bir sayaç var — hex sayacı onu yakalamıyordu.
 
 ---
 
@@ -32,60 +89,81 @@ Koçların danışanlarını antrenman, beslenme ve ilerleme verisi üzerinden u
 
 ### Koç (`coach`) perspektifinden
 
-- Tüm danışanların profilini, ilerleme geçmişini ve form-check fotoğraflarını tek panelden görme.
-- Danışanların önerdiği AI antrenman/beslenme planlarını **onaylama veya reddetme** (`program_approvals`) — hiçbir plan koç onayı olmadan danışanın aktif programına yazılmaz.
-- Duyuru ve bireysel bildirim gönderme.
-- Danışanlarla gerçek zamanlı, çevrimiçi durumu görünen birebir sohbet.
-- ~~Danışan hesabı oluşturma/yönetme (rol ataması dahil)~~ — bu akış için yazılmış `service_role` tabanlı server action'lar hiçbir yerden çağrılmadığı tespit edildiği için kaldırıldı (bkz. `docs/DISCOVERY.md` §2.5, §15.2 #3); uygulamada şu an danışan hesabı oluşturmanın bir yolu **yok**. Faz 2'de koç-danışan akışıyla birlikte yeniden kurulacak.
+- Tüm danışanların profilini, ilerleme geçmişini ve form-check fotoğraflarını tek panelden görme; kilo/ölçü trendini 7/30/90 günlük pencerelerde izleme.
+- Danışanların ürettiği AI antrenman/beslenme planlarını **onaylama veya reddetme** (`program_approvals`) — hiçbir plan koç onayı olmadan danışanın aktif programına yazılmaz.
+- Duyuru ve bireysel bildirim gönderme; danışanlarla gerçek zamanlı, ek dosya destekli birebir sohbet.
+- **Zorunlu TOTP çok faktörlü kimlik doğrulama** — koç hesabı `aal2` olmadan hiçbir danışan verisi göremez (bkz. [karar #1](#1-mfa-kapısı-routeta-değil-rlste)).
+- Danışan için **şifre sıfırlama tetikleme**: koç danışan adına oturum açamaz (impersonation yok); sıfırlama bağlantısı danışanın kendi e-postasına gider ve işlem `coach_actions` denetim tablosuna yazılır — denetim yazımı başarısız olursa sıfırlama fail-closed iptal edilir.
+- Rıza vermiş danışanlar için **gün hassasiyetinde etkinlik özeti** (bkz. [karar #3](#3-rıza-kapısı-yazma-fonksiyonunun-içinde)).
+- **Yok:** danışan hesabı oluşturma akışı. Bu iş için yazılmış `service_role` tabanlı server action'lar hiçbir yerden çağrılmadığı için kaldırılmıştı (`docs/DISCOVERY.md` §2.5) ve yerine bir arayüz gelmedi; hesaplar bugün Supabase tarafında elle açılıyor. Çok-koçlu izolasyon (koç-danışan atama tablosu) da yok — borç kütüğünde **B-058** olarak izleniyor.
 
 ### Danışan (`client`) perspektifinden
 
-- **Form check**: haftalık kilo girişi + önden/arkadan poz fotoğrafı; geçmiş kayıtlarla **before/after** kıyaslama. Fotoğraflar private bir Supabase Storage bucket'ında (`form-checks-media`) tutulur ve yalnızca **imzalı (signed) adres** ile, TTL 1 saat sonra geçersiz olacak şekilde sunulur — bkz. [Güvenlik](#güvenlik).
-- Kilo ve makro (protein/karbonhidrat/yağ) trendlerini grafiklerle (Recharts/Chart.js) izleme.
-- **Canlı gym modu**: antrenman sırasında set bazlı ağırlık/tekrar/RPE girişi (`workout_logs`).
-- Hedef, split tipi ve seviyeye göre **AI antrenman planı** ve antropometrik verilere göre **AI beslenme planı (BMR/TDEE + makro dağılımı)** üretimi.
-- Üretilen programı koç onayına gönderme; onaylanınca profile yazılır ve bildirim düşer.
-- Günlük su/sodyum/makro girişi (günde tek kayıt, `daily_logs`).
-- Ardışık form-check günlerine dayalı **streak (seri) takibi**.
-- Koçla gerçek zamanlı sohbet ve okunmamış bildirim rozeti.
+- **Form check**: haftalık kilo girişi + önden/arkadan poz fotoğrafı; geçmiş kayıtlarla **before/after** karşılaştırma (sürgülü kıyas bileşeni). Fotoğraflar private bir Supabase Storage bucket'ında (`form-checks-media`) tutulur ve yalnızca **imzalı (signed) adres** ile, 1 saatlik TTL ile sunulur.
+- Kilo, ölçü ve makro (protein/karbonhidrat/yağ) trendlerini Recharts grafikleriyle izleme; ayrı bir ilerleme fotoğrafı arşivi (`progress_photos`).
+- **Canlı gym modu**: antrenman sırasında set bazlı ağırlık/tekrar/RPE girişi (`workout_logs`), sürümlenmiş plan yapısı üzerinden.
+- Hedef, split tipi ve seviyeye göre **AI antrenman planı**, antropometrik verilere göre **AI beslenme planı (BMR/TDEE + makro dağılımı)** üretimi; üretilen program koç onayına gider, onaylanınca profile yazılır ve bildirim düşer.
+- Günlük su/sodyum/makro girişi (günde tek kayıt, `daily_logs`) ve ardışık form-check günlerine dayalı **streak takibi**.
+- Koçla gerçek zamanlı sohbet, okunma durumu ve okunmamış bildirim rozeti; sunucu tarafında magic-byte doğrulamasından geçmiş ek dosyalar.
+- **Kendi verisi üzerinde kontrol**: opt-in TOTP MFA, `/verilerim` altında etkinlik kaydının tam ayrıntılı görünümü, rızayı tek tıkla geri çekme ve **hesabı + tüm verisini kalıcı silme** (bkz. [karar #2](#2-yarım-silinmiş-hesap-şema-seviyesinde-imkânsız)).
 - **PWA**: ana ekrana eklenebilir, `workout_logs`/`profiles` verisi için çevrimdışı önbellek (`next-pwa`, `NetworkFirst`); form-check fotoğrafları cihazda tutulmaz (`NetworkOnly`).
 - Koyu tema (`next-themes`, sistem tercihiyle uyumlu + manuel toggle).
+
+### Mobil (`apps/mobile`)
+
+Expo SDK 57 / React Native 0.86 üzerinde **iskelet**: `expo-router` ile 5 sekme + oturum açma ekranı, paylaşılan `@repo/types` ve `@repo/logger` bağlı. Veri katmanı **bilerek** henüz bağlanmadı (bkz. [ADR-0023](docs/adr/0023-monorepo-kesim-plani.md)); CI'da tip kontrolü, lint, `expo-doctor` ve `expo export` ile ayrı bir job olarak koşuyor. Android emülatöründe gerçek smoke koşusu yapıldı.
 
 ---
 
 ## Mimari
 
-Next.js sunucu tarafı; Supabase'e (Postgres/Auth/Storage/Realtime) doğrudan, Python AI servisine ise **yalnızca kendi API route'ları üzerinden proxy** ile bağlanır. Tarayıcı FastAPI'yi hiçbir zaman doğrudan görmez.
+pnpm + Turborepo monorepo. Next.js sunucu tarafı; Supabase'e (Postgres/Auth/Storage/Realtime) doğrudan, Python AI servisine ise **yalnızca kendi API route'ları üzerinden proxy** ile bağlanır. Tarayıcı FastAPI'yi hiçbir zaman doğrudan görmez.
 
 ```mermaid
 graph TD
   Browser["Tarayıcı (React 19 UI)"]
+  Mobile["apps/mobile — Expo SDK 57 (iskelet)"]
 
-  subgraph NextJS["Next.js 16 — App Router"]
+  subgraph Packages["packages/* — paylaşılan kaynak (build adımı yok)"]
+    Types["@repo/types<br/>DB tipleri + zod şemaları"]
+    ApiClient["@repo/api-client<br/>TanStack Query hook'ları<br/>Supabase Context ile enjekte"]
+    Logger["@repo/logger<br/>platformdan bağımsız çekirdek"]
+    Config["@repo/config<br/>tsconfig + eslint temelleri"]
+  end
+
+  subgraph NextJS["apps/web — Next.js 16 App Router"]
     Pages["Sayfalar / Server Components"]
     APIRoutes["API Routes (/api/*)"]
+    Proxy["proxy.ts — rate limit + nonce'lu CSP"]
   end
 
   subgraph SupabaseBox["Supabase"]
-    PG[("Postgres + RLS")]
-    Auth["Auth (GoTrue)"]
-    Storage["Storage"]
+    PG[("Postgres 17 + RLS")]
+    Auth["Auth (GoTrue + TOTP)"]
+    Storage["Storage (private bucket'lar)"]
     Realtime["Realtime"]
   end
 
-  subgraph FastAPIBox["FastAPI — Python 3.12"]
+  subgraph FastAPIBox["ai_backend — FastAPI, Python 3.14"]
     Routers["routers/"]
     Services["services/"]
   end
 
-  Browser -->|HTTPS| Pages
-  Browser -->|"fetch /api/*"| APIRoutes
-  Pages -->|"supabase-js, anon key + oturum JWT"| PG
+  Browser -->|HTTPS| Proxy
+  Proxy --> Pages
+  Proxy --> APIRoutes
+  Browser -->|"supabase-js, anon key + oturum JWT"| PG
   Browser -->|"supabase-js, anon key + JWT"| Realtime
-  Pages -->|"public read / imzalı URL"| Storage
+  Browser -->|"imzalı URL (TTL 1 sa)"| Storage
+  APIRoutes -->|"service_role — yalnızca 5 uçta"| PG
   APIRoutes -->|"server-side fetch, X-API-Key + X-Request-ID"| Routers
   Routers --> Services
-  PG -.->|"RLS politikaları auth.uid() okur"| Auth
+
+  NextJS --> ApiClient
+  Mobile -.->|"veri katmanı henüz bağlı değil"| ApiClient
+  ApiClient --> Types
+  ApiClient --> Logger
+  PG -.->|"RLS politikaları auth.uid() ve aal claim'ini okur"| Auth
 ```
 
 **Danışan AI antrenman planı ister → koç onaylar** akışı:
@@ -96,56 +174,61 @@ sequenceDiagram
   participant N as Next.js /api/ai/workout
   participant F as FastAPI /analyze/workout
   participant P as Postgres (program_approvals)
-  participant K as Koç
+  participant K as Koç (aal2)
   participant Not as notifications
 
   D->>N: POST /api/ai/workout (hedef, split, seviye)
-  N->>N: zod ile gövde doğrulama
+  N->>N: zod ile gövde doğrulama + günlük AI kotası
   N->>F: POST /analyze/workout (X-Request-ID, X-API-Key)
   F-->>N: 200 OK — haftalık antrenman planı (JSON)
   N-->>D: plan + X-Request-ID header
-  D->>P: insert program_approvals (workout_data, status=pending)
+  D->>P: submit_program_for_approval() (workout_data, status=pending)
   K->>P: program_approvals SELECT (status=pending)
-  K->>P: UPDATE status=approved, reviewed_by, reviewed_at
+  K->>P: approve_program() — atomik: status + plan yazımı tek transaksiyon
   P-->>D: Realtime bildirim (program_approvals değişti)
-  D->>D: onaylanan plan profiles.workout_plan alanına yazılır
   K->>Not: insert notifications (client_id, mesaj)
   Not-->>D: bildirim listesine düşer
 ```
 
-Derinlemesine mimari kararlar, veri modeli ve ADR'ler için bkz. [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+Derinlemesine mimari kararlar, veri modeli ve ADR indeksi için bkz. [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) ve [`docs/adr/`](docs/adr/).
 
 ---
 
 ## Teknoloji Yığını
 
-| Katman                    | Teknoloji                            | Sürüm             | Amaç                                         |
-| ------------------------- | ------------------------------------ | ----------------- | -------------------------------------------- |
-| Frontend framework        | Next.js (App Router)                 | 16.2.10           | SSR/RSC, routing, server actions, API routes |
-| UI kütüphanesi            | React                                | 19.2.4            | Bileşen modeli                               |
-| Dil                       | TypeScript (strict)                  | ^5.7.2            | Tip güvenliği                                |
-| Stil                      | Tailwind CSS                         | ^3.4.19           | Utility-first CSS                            |
-| Veri çekme/önbellek       | TanStack Query                       | ^5.62.11          | Sunucu state yönetimi, cache invalidation    |
-| Form + doğrulama          | React Hook Form + Zod                | ^7.54.2 / ^3.24.1 | Form state ve şema doğrulama                 |
-| Bildirim (toast)          | Sonner                               | ^1.7.2            | Kullanıcıya geri bildirim                    |
-| Grafikler                 | Recharts, Chart.js + react-chartjs-2 | ^3.9.1 / ^4.5.1   | Kilo/makro trend grafikleri                  |
-| Tema                      | next-themes                          | ^0.4.6            | Koyu/açık tema                               |
-| PWA                       | next-pwa                             | ^5.6.0            | Service worker, çevrimdışı önbellek          |
-| Loglama (frontend)        | pino                                 | ^9.6.0            | Yapılandırılmış JSON log                     |
-| Backend veritabanı        | Supabase (Postgres)                  | 15.8.x            | Veri, Auth, Storage, Realtime                |
-| İstemci SDK               | @supabase/supabase-js                | ^2.110.0          | Supabase erişimi                             |
-| AI servisi                | FastAPI                              | ≥0.115            | Antrenman/beslenme/öneri motoru              |
-| AI servis dili            | Python                               | ≥3.12             | —                                            |
-| AI servis doğrulama       | Pydantic + pydantic-settings         | ≥2.9 / ≥2.6       | Şema ve ayar doğrulama                       |
-| AI servis loglama         | structlog                            | ≥24.4             | Yapılandırılmış JSON log                     |
-| AI servis rate limit      | slowapi                              | ≥0.1.9            | İstek sınırlama                              |
-| Paket yöneticisi (JS)     | pnpm                                 | 10.34.5           | `package.json#packageManager` ile sabitli    |
-| Paket yöneticisi (Python) | uv                                   | —                 | Bağımlılık/venv yönetimi                     |
-| Birim/bileşen test        | Vitest + Testing Library             | ^2.1.8            | Frontend testleri                            |
-| Backend test              | pytest + pytest-cov                  | ≥8.3              | FastAPI testleri                             |
-| E2E test                  | Playwright                           | ^1.49.1           | Uçtan uca senaryolar                         |
-| CI                        | GitHub Actions                       | —                 | Lint/type-check/test/build/docker            |
-| Konteynerleştirme         | Docker + docker compose              | —                 | Yerel/prod paketleme                         |
+| Katman                    | Teknoloji                    | Sürüm              | Amaç                                                   |
+| ------------------------- | ---------------------------- | ------------------ | ------------------------------------------------------ |
+| Monorepo görev koşucusu   | Turborepo                    | 2.10.11            | Görev grafiği, önbellek (2 app + 4 paket)              |
+| Paket yöneticisi (JS)     | pnpm                         | 10.34.5            | `package.json#packageManager` ile sabitli              |
+| Çalışma zamanı            | Node.js                      | 24 LTS             | `engines.node: >=24.19.0`                              |
+| Frontend framework        | Next.js (App Router)         | 16.3.1             | SSR/RSC, routing, API routes — **webpack'e pinli**     |
+| UI kütüphanesi            | React                        | 19.2.4             | Bileşen modeli                                         |
+| Dil                       | TypeScript (strict)          | 6.0.3              | Tüm workspace'lerde tek majör (B-051)                  |
+| Stil                      | Tailwind CSS                 | ^3.4.19            | Utility-first CSS + `src/design/tokens.ts`             |
+| Veri çekme/önbellek       | TanStack Query               | ^5.62.11           | Sunucu state yönetimi, cache invalidation              |
+| Form + doğrulama          | React Hook Form + Zod        | ^7.54.2 / ^3.24.1  | Form state ve şema doğrulama                           |
+| Grafikler                 | Recharts                     | ^3.9.1             | Kilo/ölçü/makro trend grafikleri (Chart.js kaldırıldı) |
+| İkonlar                   | lucide-react                 | ^1.31.0            | Emoji yerine ikon seti (ADR-0016)                      |
+| Bildirim (toast)          | Sonner                       | ^1.7.2             | Yalnızca `apps/web`; pakete port arkasından verilir    |
+| Tema                      | next-themes                  | ^0.4.6             | Koyu/açık tema, nonce zinciriyle uyumlu                |
+| PWA                       | next-pwa                     | ^5.6.0             | Service worker, çevrimdışı önbellek                    |
+| Loglama (frontend)        | pino                         | ^9.6.0             | Yapılandırılmış JSON log + `REDACT_PATHS`              |
+| Mobil                     | Expo SDK / React Native      | 57 / 0.86.2        | `expo-router` ile iskelet istemci                      |
+| Veritabanı                | Supabase (Postgres)          | 17.6.x             | Veri, Auth, Storage, Realtime — 21 tablo, 34 migration |
+| İstemci SDK               | @supabase/supabase-js + ssr  | ^2.110.0 / ^0.12.4 | Supabase erişimi, cookie tabanlı oturum (ADR-0022)     |
+| AI servisi                | FastAPI                      | ≥0.115             | Antrenman/beslenme/öneri motoru                        |
+| AI servis dili            | Python                       | 3.14               | `pyproject` tabanı ≥3.12; CI/mypy/ruff 3.14'e pinli    |
+| AI servis doğrulama       | Pydantic + pydantic-settings | ≥2.9 / ≥2.6        | Şema ve ayar doğrulama                                 |
+| AI servis loglama         | structlog                    | ≥24.4              | Yapılandırılmış JSON log                               |
+| AI servis rate limit      | slowapi                      | ≥0.1.9             | İstek sınırlama                                        |
+| Paket yöneticisi (Python) | uv                           | —                  | Bağımlılık/venv yönetimi                               |
+| Birim/bileşen test        | Vitest + Testing Library     | ^2.1.8             | 868 test / 68 dosya                                    |
+| Backend test              | pytest + pytest-cov          | ≥8.3               | FastAPI testleri (`--cov-fail-under=70`)               |
+| E2E test                  | Playwright                   | ^1.49.1            | 10 spec dosyası, chromium + Mobile Chrome              |
+| CI                        | GitHub Actions               | —                  | 6 job + `required-checks` kapısı                       |
+| Konteynerleştirme         | Docker + docker compose      | —                  | Çok aşamalı build, `output: 'standalone'`              |
+
+> **Next.js neden webpack'e pinli:** `next-pwa` v5 Turbopack ile çalışmıyor ve PWA çevrimdışı önbelleği projenin kabul kriterlerinden biri. Karar ve alternatifleri: [ADR-0006](docs/adr/0006-next-pwa-korunmasi.md), [ADR-0012](docs/adr/0012-pwa-webpack-build.md).
 
 ---
 
@@ -153,12 +236,13 @@ Derinlemesine mimari kararlar, veri modeli ve ADR'ler için bkz. [`docs/ARCHITEC
 
 ### Önkoşullar
 
-- **Node.js ≥ 20.11** (bkz. `package.json#engines`)
-- **pnpm ≥ 10** — JS paket yöneticisi. Kesin sürüm `package.json#packageManager` alanında (`pnpm@10.34.5`) sabitlidir; pnpm 10 bu alanı okuyup kendini o sürüme ayarlar. Kurulum: `npm i -g pnpm@10.34.5` (corepack Node 25 ile dağıtımdan çıkarıldığı için kullanılmıyor).
-- **Python ≥ 3.12**
-- **[uv](https://docs.astral.sh/uv/)** — Python paket/venv yöneticisi
-- **[Supabase CLI](https://supabase.com/docs/guides/cli)** — yerel Postgres/Auth/Storage/Studio için
-- Docker (opsiyonel — bkz. [Docker ile Çalıştırma](#docker-ile-çalıştırma))
+- **Node.js 24 LTS** (`package.json#engines` → `>=24.19.0`)
+- **pnpm ≥ 10** — kesin sürüm `package.json#packageManager` alanında (`pnpm@10.34.5`) sabitlidir; pnpm 10 bu alanı okuyup kendini o sürüme ayarlar. Kurulum: `npm i -g pnpm@10.34.5` (corepack Node 25 ile dağıtımdan çıkarıldığı için kullanılmıyor).
+- **Python 3.14** ve **[uv](https://docs.astral.sh/uv/)**
+- **[Supabase CLI](https://supabase.com/docs/guides/cli)** — yerel Postgres/Auth/Storage/Studio için (Docker gerektirir)
+- Docker (yerel Supabase yığını için zaten gerekli; uygulama konteynerleri opsiyonel)
+
+> **pnpm tuzağı:** bu depoda script'lere bayrak geçirirken `--` ayırıcısı **kullanılmaz**. Doğru kullanım `pnpm run test:e2e --ui`, `pnpm run test --reporter=verbose` biçimindedir.
 
 ### Adımlar (macOS/Linux — bash)
 
@@ -167,28 +251,29 @@ Derinlemesine mimari kararlar, veri modeli ve ADR'ler için bkz. [`docs/ARCHITEC
 git clone <repo-url>
 cd my-coaching-appv2
 
-# 2) Frontend bağımlılıklarını yükleyin
+# 2) Tüm workspace bağımlılıklarını yükleyin (kökten, tek komut)
 pnpm install --frozen-lockfile
 
 # 3) Ortam değişkenlerini kopyalayıp doldurun
-cp .env.example .env.local
-# .env.local dosyasını açıp Supabase proje bilgilerinizi girin
+cp apps/web/.env.example apps/web/.env.local
+# .env.local'ı açıp Supabase proje bilgilerinizi girin.
+# Yerel geliştirmede NEXT_PUBLIC_SUPABASE_URL yerel yığını göstermeli
+# (http://127.0.0.1:54321) — hosted bir adres girerseniz sunucu guard'ı
+# ALLOW_HOSTED_TARGET=1 olmadan ilk istekte bilinçli olarak düşer.
 
 # 4) Yerel Supabase yığınını başlatın (Postgres + Auth + Storage + Studio)
 npx supabase start
 
-# 5) Migration'ları uygulayın (+ yerel seed verisi)
+# 5) Migration'ları uygulayın
 pnpm run db:migrate
-# not: db:migrate `supabase db push` çalıştırır; TAMAMEN sıfırdan + seed için
-# `supabase db reset` kullanın (bkz. supabase/README.md — bu komut veriyi SİLER)
+# not: db:migrate `supabase db push` çalıştırır. TAMAMEN sıfırdan + seed için
+# `supabase db reset` gerekir — bu komut yereldeki TÜM VERİYİ SİLER.
 
-# 6) TypeScript tiplerini üretin
+# 6) TypeScript tiplerini üretin (packages/types/src/database.ts)
 pnpm run db:types
 
 # 7) AI backend bağımlılıklarını kurun
-cd ai_backend
-uv sync
-cd ..
+cd ai_backend && uv sync && cd ..
 ```
 
 İki ayrı terminalde geliştirme sunucularını başlatın:
@@ -210,7 +295,7 @@ Set-Location my-coaching-appv2
 
 pnpm install --frozen-lockfile
 
-Copy-Item .env.example .env.local
+Copy-Item apps/web/.env.example apps/web/.env.local
 # .env.local dosyasını açıp Supabase proje bilgilerinizi girin
 
 npx supabase start
@@ -235,26 +320,53 @@ uv run uvicorn app.main:app --reload
 
 Uygulama `http://localhost:3000`, AI servisi `http://localhost:8000` (Swagger: `/docs`) adresinde çalışır.
 
+> **Koç hesabıyla giriş yapacaksanız:** `aal2` kapısı yüzünden TOTP kaydı zorunludur ve yerel GoTrue'da TOTP varsayılan olarak **kapalı** gelir. `supabase/config.toml` içinde MFA/TOTP açılıp yığın yeniden başlatılmadan koç akışı çalışmaz (ayrıntı: [ADR-0026](docs/adr/0026-totp-mfa-ve-aal2-kapisi.md) "Kalan risk").
+
+### Mobil (opsiyonel)
+
+```bash
+pnpm --filter mobile run start   # Expo geliştirme sunucusu
+pnpm run mobile:type-check
+pnpm run mobile:lint
+```
+
 ---
 
 ## Ortam Değişkenleri
 
-### Next.js (`.env.local`, kaynak: `.env.example`, doğrulama: `src/env.ts` ile zod)
+### Next.js (`apps/web/.env.local`, kaynak: `apps/web/.env.example`)
 
-| Değişken                        | Zorunlu mu                                  | Varsayılan              | Kullanıldığı yer           | Açıklama                                                                                                                                                                                                                         |
-| ------------------------------- | ------------------------------------------- | ----------------------- | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `NEXT_PUBLIC_SUPABASE_URL`      | Evet                                        | —                       | İstemci + sunucu           | Supabase proje URL'i. Build-time'da tarayıcı paketine gömülür.                                                                                                                                                                   |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Evet                                        | —                       | İstemci + sunucu           | Supabase anon/public anahtarı. RLS ile korunur, istemciye açık olması güvenlidir.                                                                                                                                                |
-| `SUPABASE_SERVICE_ROLE_KEY`     | Hayır — şu an kod tabanında kullanılmıyor   | —                       | **Yalnızca sunucu**        | RLS'yi bypass eden servis rolü anahtarı. Onu tüketen `src/lib/supabase/admin.ts` ve çağrılmayan server action'lar (`src/app/actions.ts`) ölü kod oldukları için kaldırıldı; Faz 2'de koç-danışan akışıyla birlikte geri gelecek. |
-| `AI_BACKEND_URL`                | Hayır                                       | `http://localhost:8000` | Sunucu (`/api/ai/*` proxy) | FastAPI servisinin adresi.                                                                                                                                                                                                       |
-| `AI_BACKEND_API_KEY`            | Hayır (FastAPI `API_KEY` ayarlıysa gerekli) | —                       | Sunucu                     | FastAPI'ye `X-API-Key` header'ı olarak iletilir.                                                                                                                                                                                 |
-| `NEXT_PUBLIC_APP_URL`           | Hayır                                       | `http://localhost:3000` | İstemci + sunucu           | Mutlak URL üretimi (ör. e-posta linkleri).                                                                                                                                                                                       |
-| `NODE_ENV`                      | Hayır                                       | `development`           | Sunucu                     | `development` \| `test` \| `production`.                                                                                                                                                                                         |
-| `LOG_LEVEL`                     | Hayır                                       | `info`                  | Sunucu                     | pino log seviyesi.                                                                                                                                                                                                               |
-| `RATE_LIMIT_WINDOW_MS`          | Hayır                                       | `60000`                 | Sunucu (`proxy.ts`)        | Genel `/api/*` rate limit penceresi (ms).                                                                                                                                                                                        |
-| `RATE_LIMIT_MAX_REQUESTS`       | Hayır                                       | `60`                    | Sunucu (`proxy.ts`)        | Pencere başına genel istek sınırı. AI uçları (`/api/ai/*`) bundan bağımsız, sabit **20 istek/dakika** ile sınırlıdır.                                                                                                            |
+Doğrulama iki dosyaya bölünmüştür: istemciye de gömülen değerler [`apps/web/src/env.shared.ts`](apps/web/src/env.shared.ts), yalnızca sunucuda yaşayanlar [`apps/web/src/env.server.ts`](apps/web/src/env.server.ts) (`import 'server-only'` taşır). İkisi de zod ile fail-fast doğrular.
 
-> **UYARI: `SUPABASE_SERVICE_ROLE_KEY` ASLA `NEXT_PUBLIC_` öneki ALMAMALI ve istemci koduna (bileşen, hook, `'use client'` dosyası) ASLA import EDİLMEMELİDİR.** Bu anahtar RLS'yi tamamen atlar; sızması tüm veritabanının ele geçirilmesi anlamına gelir. Kod tabanında şu an bu anahtarı kullanan hiçbir kod yok (eski `src/lib/supabase/admin.ts` istemcisi, onu tüketen tek yer olan ölü server action'larla birlikte kaldırıldı); yeniden eklenirse `server-only` paketiyle korunmalıdır.
+| Değişken                        | Zorunlu mu                         | Varsayılan              | Kullanıldığı yer           | Açıklama                                                                                                                                             |
+| ------------------------------- | ---------------------------------- | ----------------------- | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `NEXT_PUBLIC_SUPABASE_URL`      | Evet                               | —                       | İstemci + sunucu           | Supabase proje URL'i. Build-time'da tarayıcı paketine gömülür.                                                                                       |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Evet                               | —                       | İstemci + sunucu           | Supabase anon/publishable anahtarı. RLS ile korunur, istemciye açık olması güvenlidir.                                                               |
+| `SUPABASE_SERVICE_ROLE_KEY`     | **Evet, beş sunucu ucu için**      | —                       | **Yalnızca sunucu**        | RLS'yi baypas eden servis rolü anahtarı — aşağıdaki uyarıya bakın. Ayarlı değilse ilgili uçlar `503` döner.                                          |
+| `ALLOW_HOSTED_TARGET`           | Hosted/production hedefte **evet** | _(boş)_                 | Sunucu                     | `1` değilse `*.supabase.co\|com` hedefli her sunucu isteği fail-closed reddedilir (bkz. [karar #4](#4-üç-katmanlı-fail-closed-hosted-hedef-guardı)). |
+| `AI_BACKEND_URL`                | Hayır                              | `http://localhost:8000` | Sunucu (`/api/ai/*` proxy) | FastAPI servisinin adresi.                                                                                                                           |
+| `AI_BACKEND_API_KEY`            | Production'da **evet**             | —                       | Sunucu                     | FastAPI'ye `X-API-Key` olarak iletilir. `NODE_ENV=production` iken yoksa uygulama fail-fast eder.                                                    |
+| `NEXT_PUBLIC_APP_URL`           | Hayır                              | `http://localhost:3000` | İstemci + sunucu           | Mutlak URL üretimi (ör. e-posta linkleri).                                                                                                           |
+| `NODE_ENV`                      | Hayır                              | `development`           | Sunucu                     | `development` \| `test` \| `production`.                                                                                                             |
+| `LOG_LEVEL`                     | Hayır                              | `info`                  | Sunucu                     | pino log seviyesi.                                                                                                                                   |
+| `RATE_LIMIT_WINDOW_MS`          | Hayır                              | `60000`                 | Sunucu (`proxy.ts`)        | Genel `/api/*` rate limit penceresi (ms).                                                                                                            |
+| `RATE_LIMIT_MAX_REQUESTS`       | Hayır                              | `60`                    | Sunucu (`proxy.ts`)        | Pencere başına genel istek sınırı. `/api/ai/*` bundan bağımsız, sabit **20 istek/dakika**.                                                           |
+| `TRUSTED_PROXY_COUNT`           | Hayır                              | `0`                     | Sunucu                     | `X-Forwarded-For` zincirinde kaç hop'a güvenileceği. **Varsayılan 0 = hiçbir başlığa güvenilmez.**                                                   |
+| `AI_QUOTA_DAILY_LIMIT`          | Hayır                              | `20`                    | Sunucu                     | Kullanıcı başına günlük AI proxy isteği (üç uç tek paylaşılan kova).                                                                                 |
+
+> **UYARI — `SUPABASE_SERVICE_ROLE_KEY`.** Bu anahtar RLS'yi **tamamen** baypas eder; sızması tüm veritabanının ele geçirilmesi demektir. ASLA `NEXT_PUBLIC_` öneki almamalı ve istemci koduna (bileşen, hook, `'use client'` dosyası) import edilmemelidir.
+>
+> [ADR-0025](docs/adr/0025-hesap-silme-ve-service-role-sunucu-yolu.md)'ten bu yana anahtar **çalışma zamanında kullanılıyor** — beş sunucu ucunda ve her birinde dar bir iş için:
+>
+> | Uç                                      | Neden `service_role` gerekiyor                                               |
+> | --------------------------------------- | ---------------------------------------------------------------------------- |
+> | `POST /api/account/delete`              | Storage API ile fiziksel dosya silme + `delete_account()` çağrısı            |
+> | `POST /api/attachments/verify`          | Magic-byte doğrulama damgasını yazma (istemci kendi kendini doğrulayamamalı) |
+> | `POST /api/activity`                    | `record_activity()` — EXECUTE yalnızca `service_role`'de                     |
+> | `PUT/DELETE /api/activity/consent`      | `grant_activity_consent()` / `revoke_activity_consent()`                     |
+> | `POST /api/coach/reset-client-password` | `auth.admin.generateLink()` ile kurtarma bağlantısı üretme                   |
+>
+> Disiplin: anahtarı okuyan tek dosya `env.server.ts`'tir ve `import 'server-only'` taşır (yanlışlıkla istemciden import edilirse **build-time** hatası verir); `service_role`'ün EXECUTE hakkı sayılı fonksiyonla sınırlıdır ve denetim tablolarında doğrudan tablo yetkisi bile yoktur; anahtar yapılandırılmamışsa uçlar `503` döner — **sessizce "yaptım" demezler**; hiçbir log satırı anahtarı, token'ı veya hata gövdesini taşımaz.
 
 ### FastAPI (`ai_backend/.env`, kaynak: `ai_backend/app/core/config.py`)
 
@@ -269,33 +381,37 @@ Uygulama `http://localhost:3000`, AI servisi `http://localhost:8000` (Swagger: `
 | `LOG_LEVEL`    | `INFO`                  | structlog log seviyesi.                                                                                       |
 | `DATA_DIR`     | `ai_backend/data`       | CSV veri dosyalarının okunacağı dizin.                                                                        |
 
-(`LOG_JSON` ve `is_production` gibi ek dahili ayarlar için `ai_backend/app/core/config.py` dosyasına bakın.)
-
 ---
 
 ## Geliştirme Komutları
 
-### Next.js (`package.json`)
+### Kök (`package.json`) — Turborepo üzerinden
 
-| Komut                    | Ne yapar                                                                          |
-| ------------------------ | --------------------------------------------------------------------------------- |
-| `pnpm run dev`           | Geliştirme sunucusu (`next dev --webpack`).                                       |
-| `pnpm run build`         | Production build (`output: 'standalone'`).                                        |
-| `pnpm run start`         | Production build'i çalıştırır.                                                    |
-| `pnpm run lint`          | ESLint flat config (`eslint.config.mjs`) ile lint çalıştırır.                     |
-| `pnpm run lint:fix`      | ESLint, otomatik düzeltmeyle.                                                     |
-| `pnpm run type-check`    | `tsc --noEmit` — derleme yapmadan tip kontrolü.                                   |
-| `pnpm run test`          | Vitest, tek seferlik çalıştırma.                                                  |
-| `pnpm run test:watch`    | Vitest, izleme modu.                                                              |
-| `pnpm run test:coverage` | Vitest, kapsam raporuyla.                                                         |
-| `pnpm run test:e2e`      | Playwright E2E testleri.                                                          |
-| `pnpm run test:e2e:ui`   | Playwright, arayüzlü mod.                                                         |
-| `pnpm run format`        | Prettier ile tüm dosyaları biçimlendirir.                                         |
-| `pnpm run format:check`  | Prettier biçim kontrolü (yazmadan).                                               |
-| `pnpm run db:types`      | Yerel Supabase şemasından `src/types/database.ts` üretir.                         |
-| `pnpm run db:migrate`    | `supabase db push` — bekleyen migration'ları uygular.                             |
-| `pnpm run clean:foods`   | `data/daily_food_nutrition_dataset.csv` → `data/clean_foods.csv` dönüşümü.        |
-| `pnpm run ci`            | `lint && type-check && test && build` — CI'nin frontend job'unun yerel karşılığı. |
+Aşağıdaki komutlar `--filter=!mobile` ile web + paketleri kapsar; mobil ayrı `mobile:*` script'leriyle koşar.
+
+| Komut                                                          | Ne yapar                                                                      |
+| -------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `pnpm run dev`                                                 | `apps/web` geliştirme sunucusu (`next dev --webpack`).                        |
+| `pnpm run build`                                               | Tüm workspace'lerde `build` (`output: 'standalone'`).                         |
+| `pnpm run start`                                               | Production build'i çalıştırır.                                                |
+| `pnpm run lint`                                                | ESLint flat config; `apps/web` + `packages/*`.                                |
+| `pnpm run type-check`                                          | `tsc --noEmit` — derleme yapmadan tip kontrolü.                               |
+| `pnpm run type-check:e2e`                                      | E2E dosyaları için ayrı tsconfig ile tip kontrolü.                            |
+| `pnpm run test`                                                | Vitest, tek seferlik çalıştırma.                                              |
+| `pnpm run test:coverage`                                       | Vitest, kapsam raporuyla (`coverage/index.html`).                             |
+| `pnpm run test:e2e`                                            | Playwright E2E testleri (`pnpm run test:e2e --ui` ile arayüzlü).              |
+| `pnpm run test:rls`                                            | 144 RLS senaryosunu yerel Postgres konteynerinde psql ile koşar.              |
+| `pnpm run test:transform`                                      | Veri dönüşümü SQL testleri.                                                   |
+| `pnpm run ratchet`                                             | Kimlik ratchet'i — eski tasarım dili sayaçlarını doğrular (ADR-0018).         |
+| `pnpm run format`                                              | Prettier ile tüm dosyaları biçimlendirir.                                     |
+| `pnpm run format:check`                                        | Prettier biçim kontrolü (yazmadan).                                           |
+| `pnpm run db:migrate`                                          | `supabase db push` — bekleyen migration'ları uygular.                         |
+| `pnpm run db:types`                                            | Yerel şemadan `packages/types/src/database.ts` üretir.                        |
+| `pnpm run db:backup-hosted`                                    | Barındırılan projenin şema + veri + rol yedeğini alır.                        |
+| `pnpm run clean:foods`                                         | `data/daily_food_nutrition_dataset.csv` → `data/clean_foods.csv` dönüşümü.    |
+| `pnpm run db:import-catalog`                                   | `exercises` / `food_database` referans kataloglarını yükler.                  |
+| `pnpm run mobile:type-check` / `mobile:lint` / `mobile:export` | `apps/mobile` kapıları.                                                       |
+| `pnpm run ci`                                                  | `lint && type-check && test && build` — CI frontend job'unun yerel karşılığı. |
 
 ### AI Backend (`ai_backend/`)
 
@@ -312,35 +428,41 @@ Uygulama `http://localhost:3000`, AI servisi `http://localhost:8000` (Swagger: `
 
 ## Test
 
-Test piramidi üç katmandan oluşur:
+Test piramidi dört katmandan oluşur; sayılar en son tam koşumdan alınmıştır.
 
-1. **Vitest (birim/bileşen)** — `vitest.config.ts`. Ortam: jsdom. Kapsam eşikleri (`v8` provider): `lines 60`, `functions 60`, `branches 55`, `statements 60`. Çalıştırma: `pnpm run test:coverage`; HTML rapor `coverage/index.html`, terminalde `text` özeti. Güncel durum: **203/203 test, 18 dosya** (`src/lib/storage.ts` testleri dahil).
-2. **pytest (backend)** — `ai_backend/pyproject.toml` → `--cov=app --cov-report=term-missing --cov-fail-under=70`. Çalıştırma: `cd ai_backend && uv run pytest`. Güncel durum: **63 test, kapsam %92**.
-3. **Playwright (E2E)** — `playwright.config.ts`, senaryolar `tests/e2e/` altında (chromium + Mobile Chrome projeleri). Örnek akış: **giriş yap → günlük veri girişi (`daily_logs`) → dashboard'da güncellenmiş veriyi doğrula**. Çalıştırma: `pnpm run test:e2e`; rapor `playwright-report/index.html`. `webServer` ayarı testten önce otomatik `pnpm run build && pnpm run start` çalıştırır. Güncel durum: **16 senaryo × 2 profil (chromium + Mobile Chrome) = 16×2 koşum**, hepsi geçiyor.
-4. **RLS (SQL)** — `supabase/tests/rls.test.sql`, `pnpm run test:rls`. Güncel durum: **19/19 senaryo** geçiyor (bkz. [Veritabanı ve RLS](#veritabanı-ve-rls)).
+| Katman                     | Kapsam                                                 | Komut                    | Durum                                 |
+| -------------------------- | ------------------------------------------------------ | ------------------------ | ------------------------------------- |
+| **Vitest** (birim/bileşen) | jsdom, `apps/web` + `packages/*`                       | `pnpm run test:coverage` | **868 test / 68 dosya**, satır %67.17 |
+| **RLS** (SQL)              | `supabase/tests/rls.test.sql`, gerçek oturum JWT'siyle | `pnpm run test:rls`      | **144 senaryo**                       |
+| **pytest** (backend)       | `ai_backend/tests`                                     | `uv run pytest`          | eşik `--cov-fail-under=70`            |
+| **Playwright** (E2E)       | 10 spec, chromium + Mobile Chrome                      | `pnpm run test:e2e`      | **54 geçen**, 4 atlanan               |
 
-CI, her PR'da bu katmanları çalıştırır (bkz. `.github/workflows/ci.yml`); `test:e2e` yalnızca `pull_request` event'inde tetiklenir.
+Birkaç ayrıntı:
+
+- **Kapsam eşikleri tek yönlü mandaldır** (`vitest.config.ts`): `lines 60`, `functions 60`, `branches 55`, `statements 60`. Ölçülen değer (%67.17) eşiğin üstünde; eşik düşürülmez.
+- **RLS testleri iddia değil ölçümdür.** Senaryolar gerçek bir `authenticated` JWT'si üstlenip (`set local request.jwt.claims`) sorguları koşturur; "koç `aal1`'de kaç satır görüyor" sorusunun cevabı bir yorum satırı değil, test çıktısındaki sayıdır.
+- **E2E gerçek yığına karşı koşar.** `webServer` testten önce `pnpm run build && pnpm run start` çalıştırır; CI'da ayrıca `supabase start` + `supabase db reset` ile temiz bir veritabanı kurulur. Koç spec'leri `aal2` fixture'ı üzerinden TOTP kodu üretir (`otplib`).
+- **`e2e` job'u yalnızca `pull_request` event'inde tetiklenir** — push'ta kritik yol uzamasın diye.
 
 ---
 
 ## Veritabanı ve RLS
 
-**Tablolar:** `profiles`, `notifications`, `form_checks`, `daily_logs`, `workout_logs`, `program_approvals`, `messages`, `exercises`, `food_database`.
+**21 public tablo, 34 migration.** Danışan verisi taşıyan 16 tablo `aal2` kapısının kapsamındadır; kalan beşi katalog (`exercises`, `food_database`) ve denetim/damga tablolarıdır (`account_deletions`, `coach_actions`, `message_attachment_verifications` — hepsi RLS + FORCE ve **sıfır politika** ile herkese kapalı, tek yazarları `SECURITY DEFINER` fonksiyonlar).
 
-**Rol modeli:** Veritabanı enum'u `user_role` artık doğrudan **`coach`** (koç) ve **`client`** (danışan) değerlerini alır (bkz. `supabase/migrations/20260817090000_rename_roles.sql` — önceki `admin`/`student` etiketlerinden yeniden adlandırıldı; ilgili tablolardaki `student_id` kolonları da `client_id` oldu). Kullanıcıya görünen Türkçe arayüz metinleri ("Öğrenci Paneli" gibi) bu fazın kapsamı dışında bırakıldı ve henüz güncellenmedi; ürün dili düzenlemesi Faz 2'de yapılacak.
+**Rol modeli:** `user_role` enum'u `coach` ve `client` değerlerini alır ([ADR-0013](docs/adr/0013-rollerin-coach-client-olarak-yeniden-adlandirilmasi.md)). Bilinçli istisna: AI backend tel protokolündeki `student_id` alanı değişmedi, çünkü `ai_backend/app/schemas/recommendations.py` bu adı bekliyor.
 
-> **Bilinçli istisna:** AI backend tel protokolündeki `student_id` alanı (`src/lib/api/types.ts` → `RecommendationInput.student_id`, `src/lib/validation/schemas.ts` → `recommendationSchema.student_id`) DEĞİŞMEDİ, çünkü `ai_backend/app/schemas/recommendations.py` bu adı bekliyor ve backend bu fazın kapsamı dışında.
+**Yetkilendirmenin tek kaynağı Row Level Security'dir.** Uygulama kodu hiçbir yerde rol kontrolünü kendi başına yapıp veriye erişim kararı vermez — tüm SELECT/INSERT/UPDATE/DELETE Postgres'teki politikalardan süzülür. `anon` rolünden `public` şemadaki tüm tablo/fonksiyon yetkileri REVOKE edilmiştir; tüm tablolarda RLS hem `enabled` hem `forced`'tır (tablo sahibi de baypas edemez).
 
-**Yetkilendirmenin tek kaynağı Row Level Security'dir.** Uygulama kodu (server action, API route, client component) hiçbir yerde rol kontrolünü kendi başına yapıp veriye erişim kararı vermez — tüm SELECT/INSERT/UPDATE/DELETE, Postgres'teki RLS politikaları tarafından süzülür. `anon` (oturumsuz) rolünden `public` şemadaki tüm tablo/fonksiyon yetkileri REVOKE edilmiştir.
-
-Migration ve tip üretimi:
+**Salt-eklemeli migration kuralı:** var olan bir migration düzenlenmez, yenisi yazılır. Her migration dosyası neden var olduğunu, hangi ölçüme dayandığını ve nasıl geri alınacağını (`-- DOWN` bloğu) kendi içinde taşır.
 
 ```bash
-pnpm run db:migrate   # bekleyen migration'ları uzak/yerel projeye uygular
-pnpm run db:types     # src/types/database.ts dosyasını yeniden üretir
+pnpm run db:migrate   # bekleyen migration'ları uygular
+pnpm run db:types     # packages/types/src/database.ts dosyasını yeniden üretir
+pnpm run test:rls     # 144 senaryo
 ```
 
-CSV import (referans katalogları `exercises`/`food_database` için) dahil tüm detaylar, RLS tablosu, storage bucket politikaları ve bilinen uyumsuzluklar için bkz. [`supabase/README.md`](supabase/README.md).
+CSV import, RLS politika tablosu, storage bucket politikaları ve bilinen uyumsuzluklar için bkz. [`supabase/README.md`](supabase/README.md).
 
 ---
 
@@ -352,68 +474,89 @@ docker compose up --build
 
 | Servis                    | Port    | Not                                                                                                                                                                     |
 | ------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `web` (Next.js)           | `3000`  | `ai-backend` servisi `healthy` olana kadar başlamaz.                                                                                                                    |
+| `web` (Next.js)           | `3000`  | `ai-backend` servisi `healthy` olana kadar başlamaz. `apps/web/.env.local` dosyasını `env_file` olarak okur.                                                            |
 | `ai-backend` (FastAPI)    | `8000`  | `/health` üzerinden healthcheck.                                                                                                                                        |
 | `supabase-db` (opsiyonel) | `54322` | Yalnızca izole/CI smoke test için minimal Postgres — **gerçek yerel geliştirme için bunun yerine `npx supabase start` kullanın** (Auth/Storage/Studio dahil tam yığın). |
 
-`web` servisi `.env.local` dosyasını `env_file` olarak okur; `AI_BACKEND_URL` compose içinde `http://ai-backend:8000` olarak override edilir (konteynerler arası servis adı çözümlemesi). `NEXT_PUBLIC_*` değişkenleri **build-time**'da gömüldüğü için `docker build --build-arg NEXT_PUBLIC_SUPABASE_URL=...` gibi build-arg olarak geçirilmelidir (bkz. `Dockerfile`).
+`Dockerfile` çok aşamalıdır (`node:24-alpine`) ve monorepo'dan yalnızca web dilimini kurar (`pnpm install --frozen-lockfile --filter web...`). `AI_BACKEND_API_KEY` her iki serviste de zorunludur; tanımlı değilse compose açık bir hatayla durur (sessizce anahtarsız ayağa kalkmaz). `NEXT_PUBLIC_*` değişkenleri **build-time**'da gömüldüğü için `docker build --build-arg NEXT_PUBLIC_SUPABASE_URL=...` biçiminde geçirilmelidir.
 
 ---
 
 ## Dağıtım
 
-Frontend Vercel'e, AI backend Railway veya Fly.io'ya, veritabanı Supabase'e dağıtılır. Adım adım kılavuz, ortam değişkeni matrisi ve dağıtım sonrası kontrol listesi için bkz. [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
+Proje **yayında değildir**; aşağıdaki kılavuz hazırlanmış ama uygulanmamış bir dağıtım yoludur. Hedef topoloji: frontend Vercel, AI backend Railway veya Fly.io, veritabanı Supabase. Adım adım kılavuz, ortam değişkeni matrisi ve dağıtım sonrası kontrol listesi için bkz. [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
+
+**Deploy sözleşmesi:** gerçek bir hosted hedefe çıkarken `ALLOW_HOSTED_TARGET=1` ayarlanmak **zorundadır**; aksi halde uygulama ilk istekte bilinçli olarak düşer (bkz. [karar #4](#4-üç-katmanlı-fail-closed-hosted-hedef-guardı)).
 
 ---
 
 ## Güvenlik
 
-- **HTTP güvenlik başlıkları** (`next.config.mjs`): CSP, HSTS (`max-age=63072000; includeSubDomains; preload`), `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy`, `Permissions-Policy`.
-- **Rate limiting**: Next.js `proxy.ts` tüm `/api/*` yollarına IP+yol bazlı bellek-içi limit uygular (`/api/health` muaf, `/api/ai/*` dakikada 20 istekle daha sıkı sınırlıdır); FastAPI tarafında aynı prensip `slowapi` ile (`RATE_LIMIT`, `/analyze/*` ve `/recommendations` için ayrıca 20/dakika).
-- **Girdi doğrulama**: tüm API route ve server action girdileri zod şemalarıyla (`src/lib/validation/schemas.ts`) doğrulanır; FastAPI tarafında Pydantic modelleri aynı rolü üstlenir.
-- **Service-role anahtarı kod tabanında yok**: onu kullanan tek yer olan `src/lib/supabase/admin.ts` ve çağrılmayan server action'lar (`src/app/actions.ts`) ölü kod oldukları için kaldırıldı; geri eklenirse `server-only` paketiyle işaretlenip istemci bundle'ına sızması build hatasıyla engellenmelidir.
-- **Hata mesajlarında stack trace sızdırılmaz**: AI proxy (`src/lib/api/proxy.ts`) upstream hata detaylarını yalnızca sunucu loguna yazar, istemciye genel bir mesaj + `request_id` döner; FastAPI production modunda da generic hata mesajına düşer (`ENVIRONMENT=production`).
-- **RLS**: satır düzeyi izolasyonun tek kaynağı; bkz. [Veritabanı ve RLS](#veritabanı-ve-rls).
-- **Storage mahremiyeti**: `avatars` ve `form-checks-media` bucket'ları **private**'tır (`public = false`, bkz. `supabase/migrations/20260817100000_private_storage.sql`). Kolonlar (`profiles.avatar_path`, `form_checks.front_pose_path`/`back_pose_path`) tam URL değil bucket içi yol saklar; okuma yalnızca `src/lib/storage.ts` ile üretilen **imzalı adres** (TTL 3600 sn, sahibi veya koç için) üzerinden yapılır. `anon` rolü hiçbir storage nesnesini okuyamaz.
+- **RLS**, yetkilendirmenin tek kaynağıdır; koç için `aal2` (MFA) zorunluluğu da bir RLS politikasıdır, route kontrolü değil. Bkz. [Veritabanı ve RLS](#veritabanı-ve-rls).
+- **HTTP güvenlik başlıkları**: HSTS (`max-age=63072000; includeSubDomains; preload`), `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy`, `Permissions-Policy`, `X-DNS-Prefetch-Control` statik olarak `next.config.mjs`'te; **nonce tabanlı CSP** ise her istek için `proxy.ts`'te üretilir (ADR-0022).
+- **Oturum deposu cookie**, `localStorage` değil (`@supabase/ssr`) — XSS ile token okunmasına karşı yüzey daralması (ADR-0022).
+- **Rate limiting üç katmanlı**: `/api/*` için IP+yol bazlı bellek-içi limit (`/api/health` muaf), `/api/ai/*` için dakikada 20, ve kullanıcı başına **günlük AI kotası**. Giriş ucunda ayrıca normalize edilmiş e-posta başına 10 başarısız deneme / 15 dakika — anahtarın IP değil e-posta olması bilinçli: `TRUSTED_PROXY_COUNT=0` iken IP tabanlı kilit tüm kullanıcıları kilitleyen bir DoS koluna dönüşürdü.
+- **`X-Forwarded-For`'a varsayılan olarak güvenilmez** (`TRUSTED_PROXY_COUNT=0`); istemci bu başlığı serbestçe ayarlayabildiği için güvenilir hop sayısı açıkça verilmeden hiçbir IP çözümlemesi yapılmaz.
+- **Girdi doğrulama**: tüm API route girdileri zod şemalarıyla (`@repo/types/schemas`), FastAPI tarafında Pydantic modelleriyle doğrulanır.
+- **Dosya yükleme**: yüklenen ekler sunucu tarafında **magic-byte** ile doğrulanır (uzantıya/`Content-Type`'a güvenilmez) ve doğrulama damgası TOCTOU'ya kapalı bir eTag ile bağlanır; indirme `Content-Disposition: attachment` ile yapılır.
+- **Storage mahremiyeti**: `avatars`, `form-checks-media`, `progress-photos` ve `message-attachments` bucket'ları **private**'tır. Kolonlar tam URL değil bucket içi yol saklar; okuma yalnızca **imzalı adres** (TTL 3600 sn) üzerinden yapılır ve `anon` rolü hiçbir storage nesnesini okuyamaz.
+- **Hata mesajlarında stack trace sızdırılmaz**: AI proxy upstream hata detaylarını yalnızca sunucu loguna yazar, istemciye genel bir mesaj + `request_id` döner.
+- **Log maskeleme**: `@repo/logger` içindeki `REDACT_PATHS` listesi token/anahtar/e-posta alanlarını maskeler; `service_role` yolları buna **güvenmez**, hassas alanı loga hiç koymaz.
 - **Uçtan uca izlenebilirlik**: her AI proxy isteği bir `X-Request-ID` üretir, hem Next.js hem FastAPI loglarında bu kimlikle görünür.
+- **CI güvenlik kapısı**: semgrep, gitleaks (haftalık tam geçmiş taraması dahil), `pnpm audit --prod --audit-level=high` ve `pip-audit`.
 
-### Zafiyet Bildirimi
-
-Bir güvenlik açığı bulduysanız lütfen **genel bir GitHub issue AÇMAYIN**. Bunun yerine depo sahibiyle özel olarak iletişime geçin (bkz. GitHub profili) ve mümkünse yeniden üretim adımlarını, etkilenen dosya/satırı ve önerilen düzeltmeyi paylaşın.
+Güvenlik açığı bildirimi için bkz. [`SECURITY.md`](SECURITY.md) — lütfen **genel bir GitHub issue açmayın**.
 
 ---
 
 ## Proje Yapısı
 
 ```
-src/
-  app/                 App Router: layout, page (dashboard), login, profile, users,
-                       error/global-error/not-found/loading
-  app/api/health       sağlık kontrolü (Docker HEALTHCHECK)
-  app/api/ai/{workout,nutrition,recommendations}   FastAPI'ye sunucu tarafı proxy
-  components/          DashboardTabs, CoachUserManagement, NotificationForm, ThemeToggle
-  components/tabs/     Announcements, Stats, FormCheck, DailyLog, Nutrition, Workout, Messages
-  components/ui/       Skeleton, ErrorBoundary, QueryState, EmptyState
-  hooks/               TanStack Query hook'ları (useSession, useProfile, usePlans, useAi, ...)
-  lib/supabase/        client.ts (tarayıcı), server.ts
-  lib/api/             merkezi fetch client + ApiError + AI sözleşme tipleri + proxy yardımcısı
-  lib/query/           QueryClient yapılandırması ve queryKeys
-  lib/validation/      zod şemaları
-  lib/storage.ts       private bucket'lar için imzalı (signed) adres üretimi (TTL 1 saat)
-  lib/                 logger.ts (pino), rate-limit.ts, utils.ts
-  types/               database.ts (Supabase üretimi), domain.ts, index.ts
-  env.ts               zod ile runtime env doğrulaması
-  proxy.ts             /api/* için rate limiting
-ai_backend/app/        main.py (factory), core/, routers/, services/, schemas/, data/
-supabase/migrations/   şema, fonksiyon/trigger, RLS politikaları, storage
-data/                  CSV kaynak dosyaları (exercises, foods)
-tests/e2e/             Playwright senaryoları
+apps/
+  web/                        Next.js 16 App Router uygulaması
+    src/app/                  layout, page (dashboard), login, profile, users,
+                              verilerim, forgot-password, reset-password
+    src/app/api/              health · ai/{workout,nutrition,recommendations} ·
+                              account/delete · activity{,/consent} ·
+                              attachments/verify · auth/sign-in ·
+                              coach/reset-client-password
+    src/components/           DashboardTabs, CoachUserManagement, NotificationForm
+    src/components/tabs/      Announcements, Stats, FormCheck, DailyLog, Nutrition,
+                              Workout, Messages
+    src/components/security/  CoachMfaGate, SecuritySection (TOTP kaydı)
+    src/components/activity/  ActivityConsent, ClientActivityLog, CoachActivitySummary
+    src/components/progress/  ProgressPhotos, BeforeAfterSlider
+    src/components/workout/   GymMode
+    src/design/tokens.ts      light/dark tasarım token'ları (ADR-0015)
+    src/lib/                  supabase/, api/ (proxy, rate limit, kota), security/,
+                              logger.ts (pino dallanması), notifier.ts
+    src/env.{shared,server}.ts  zod ile env doğrulaması + hosted hedef guard'ı
+    src/proxy.ts              /api/* rate limiting + nonce'lu CSP
+    tests/unit/               Vitest (68 dosya)
+    tests/e2e/                Playwright (10 spec)
+  mobile/                     Expo SDK 57 iskeleti (expo-router, 5 sekme)
+packages/
+  config/                     paylaşılan tsconfig + eslint temelleri
+  types/                      database.ts (Supabase üretimi) + zod şemaları
+  api-client/                 TanStack Query hook'ları, Supabase Context enjeksiyonu,
+                              storage/upload yardımcıları, query key fabrikaları
+  logger/                     platformdan bağımsız logger çekirdeği + REDACT_PATHS
+ai_backend/app/               main.py (factory), core/, routers/, services/, schemas/
+supabase/
+  migrations/                 34 migration — şema, fonksiyon/trigger, RLS, storage
+  tests/rls.test.sql          144 RLS senaryosu
+docs/
+  adr/                        26 mimari karar kaydı
+  archive/                    17 faz anlatısı (kapanan fazlar buraya taşınır)
+  ARCHITECTURE.md, DEPLOYMENT.md, DISCOVERY.md, PROGRESS.md, ops/, security/
+scripts/                      identity-ratchet, katalog import, hosted yedek, E2E temizlik
+data/                         CSV kaynak dosyaları (exercises, foods)
 ```
 
 ---
 
 ## Katkı ve Lisans
 
-Katkı süreci, dal adlandırma, commit kuralları ve PR beklentileri için bkz. [`CONTRIBUTING.md`](CONTRIBUTING.md).
+Süreç, dal adlandırma, commit kuralları ve PR beklentileri: [`CONTRIBUTING.md`](CONTRIBUTING.md). Sürüm geçmişi: [`CHANGELOG.md`](CHANGELOG.md). Güvenlik politikası: [`SECURITY.md`](SECURITY.md).
 
-**Lisans:** Bu proje MIT Lisansı ile lisanslanmıştır. Tam metin ve telif bildirimi için bkz. [`LICENSE.txt`](LICENSE.txt).
+**Lisans:** MIT — tam metin ve telif bildirimi için bkz. [`LICENSE.txt`](LICENSE.txt).

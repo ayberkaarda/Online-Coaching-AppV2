@@ -292,3 +292,80 @@ Ayrı bir borç olarak açılması önerilir.
   kalıyor.
 - Access token'ın `exp`ine kadar biçimsel geçerliliği kabul edilen bir artık risktir
   (bkz. "Kalan risk").
+
+---
+
+## Uygulama sonrası ek (2026-08-20) — yüzey denetimi
+
+Bu ADR §5/§Bedeller kararı şuydu: `service_role` yüzeyi **iki fonksiyon + Storage API** ile
+sınırlı kalır ve _"bu yüzeye yeni bir uç eklenmesi bu ADR'nin güncellenmesini gerektirir."_
+Sonraki üç fazda (4.6, 4.7, 4.8) üç uç daha eklendi — her biri kendi turunda tek başına
+gerekçeliydi, ama **hiçbiri bu ADR'ye karşı denetlenmedi ve ADR hiç güncellenmedi.** Bu bölüm
+o denetimi şimdi, geriye dönük olarak yapar. Karar (§Karar, §5.3/§4) **değiştirilmiyor** —
+aşağıdaki yalnızca bir ölçüm ve bir değerlendirmedir.
+
+### Beş uç — tam liste
+
+`grep -rl SUPABASE_SERVICE_ROLE_KEY apps/web/src` bugün tam olarak beş dosyada eşleşiyor
+(artı okuma tanımının kendisi, `apps/web/src/env.server.ts`):
+
+| #   | Dosya                                                                                | Faz / borç                          | `service_role` ile çağrılan RPC(ler)                                      | Gerekçe (kaynaktan)                                                                                                                                                                                                                  |
+| --- | ------------------------------------------------------------------------------------ | ----------------------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1   | `apps/web/src/app/api/account/delete/route.ts`                                       | Bu ADR'nin kendisi (Faz 4.6, B-042) | `account_deletion_manifest`, `delete_account` + Storage API (dosya silme) | `auth.users` satırını `authenticated` silemez; koçun danışan konuşmasına yüklediği ekleri danışanın kendi yetkisi silemez (ölçüm 4)                                                                                                  |
+| 2   | `apps/web/src/app/api/attachments/verify/route.ts`                                   | Faz 4.6, B-028 (AC-4.6.4)           | `record_attachment_verification`                                          | Doğrulama damgasını yazan RPC'nin EXECUTE'u yalnızca `service_role`'de olmalı — aksi hâlde tarayıcıdaki kod kendi kendini "doğrulanmış" ilan edebilirdi (dosya başı yorum, §"NEDEN service_role")                                    |
+| 3   | `apps/web/src/app/api/activity/route.ts` + `apps/web/src/app/api/activity/shared.ts` | Faz 4.8 dilim 2 (§7c)               | `record_activity`                                                         | §7c'nin "tarayıcıdan doğrudan Supabase yazımı yok" kararının şema seviyesindeki karşılığı; `activity_sessions`/`activity_events`'e ve rıza damgalarına yazan TEK yol bu route'lardır (`shared.ts` dosya başı yorumu)                 |
+| 4   | `apps/web/src/app/api/activity/consent/route.ts`                                     | Faz 4.8 dilim 2                     | `grant_activity_consent`, `revoke_activity_consent`                       | Aynı gerekçe (3) ile aynı `shared.ts` çekirdeğini paylaşır; `revoke` ayrıca kullanıcının tüm `activity_*` satırlarını aynı transaksiyonda siler (KVKK m.7)                                                                           |
+| 5   | `apps/web/src/app/api/coach/reset-client-password/route.ts`                          | Faz 4.7 dilim 3                     | `record_coach_action`                                                     | `coach_actions` sıfır politikalı (grant var, politika yok); denetim satırı yazılamazsa müdahale (şifre sıfırlama e-postası) **hiç tetiklenmez** — iz bırakmadan yapılan müdahale, hiç yapılamayan müdahaleden daha kötü kabul edildi |
+
+Beşinci satırda dikkat: `resetPasswordForEmail` çağrısının kendisi **anon key** ile,
+kimliksiz bir istemciyle yapılır (dosya başı yorum, "KARAR" bloğu) — `service_role` bu route'ta
+yalnızca denetim satırını yazmak için kullanılır, e-posta tetikleme adımına hiç girmez. Aynı
+şekilde uç #2'de baytları okuma ve uyumsuz nesneyi silme adımları da kullanıcının **kendi**
+token'ıyla (RLS altında) yapılır; `service_role` yalnızca son damga yazımı için devreye girer.
+
+### Disiplin denetimi (ölçüldü, varsayılmadı)
+
+| Kontrol                                                                                                                                                                                                  |                             #1 delete                              |           #2 attachments/verify            |                 #3 activity                  |                  #4 activity/consent                  |           #5 coach/reset-client-password           |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :----------------------------------------------------------------: | :----------------------------------------: | :------------------------------------------: | :---------------------------------------------------: | :------------------------------------------------: |
+| `import 'server-only'` dosya başında                                                                                                                                                                     |                            ✓ (satır 1)                             |                ✓ (satır 1)                 |    ✓ (satır 1, `route.ts` + `shared.ts`)     |                      ✓ (satır 1)                      |                    ✓ (satır 1)                     |
+| Anahtar `getServerEnv()` üzerinden okunuyor (doğrudan `process.env` değil)                                                                                                                               |                                 ✓                                  |                     ✓                      |          ✓ (`shared.ts` üzerinden)           |               ✓ (`shared.ts` üzerinden)               |                         ✓                          |
+| Anahtar yoksa fail-closed 503 (sessiz "başarılı" yok)                                                                                                                                                    |                  ✓ `ACCOUNT_DELETION_UNAVAILABLE`                  |  ✓ `ATTACHMENT_VERIFICATION_UNAVAILABLE`   |           ✓ `ACTIVITY_UNAVAILABLE`           |               ✓ `ACTIVITY_UNAVAILABLE`                |         ✓ `COACH_ACTION_AUDIT_UNAVAILABLE`         |
+| EXECUTE yalnızca `service_role` (migration: `revoke all ... from public/anon/authenticated` + `grant execute ... to service_role`, ve migration içinde `has_function_privilege` ile runtime doğrulaması) | ✓ (20260819100000 / 20260820090000 §6, satır 1036-1039, 1133-1136) | ✓ (20260819110000, satır 238-241, 418-422) | ✓ (20260820090000, satır 795-798, 1244-1267) | ✓ (aynı migration, satır 280-283, 346-349, 1244-1267) |     ✓ (20260819130000, satır 193-196, 430-436)     |
+| `SECURITY DEFINER` + pinli `search_path = public, pg_temp`                                                                                                                                               |                                 ✓                                  |                     ✓                      |                      ✓                       |                           ✓                           |                         ✓                          |
+| Anahtar/token log satırına, hata gövdesine veya yanıt başlığına yazılmıyor                                                                                                                               |           ✓ (uid de yazılmaz, yalnızca sayı/`requestId`)           |                     ✓                      |                      ✓                       |                           ✓                           | ✓ (e-posta yalnızca `maskEmailForLog` ile maskeli) |
+
+Yedi ölçüm de **yeşil**. Ek bulgu (gri alan — ne ihlal ne göz ardı edilecek): `service_role`'e
+EXECUTE verilmiş **sekizinci** bir fonksiyon daha var — `purge_expired_activity` (aynı
+migration, satır 857-860). Bu, yukarıdaki beş uçtan hiçbirinin `admin.rpc(...)` ile
+**çağırmadığı** bir fonksiyondur; yalnızca `pg_cron` (birincil) ve `record_activity()`'nin
+içinden fırsatçı çağrıyla (ikincil, satır ~780) tetiklenir — yani HTTP isteği yoluyla asla
+`service_role` istemcisinden geçmez. Uygulama süreci onu hiç çağırmadığı için "beş uç" sayımını
+değiştirmez, ama veritabanı düzeyinde `service_role` anahtarının **çalıştırabileceği** fonksiyon
+kümesi (yani sızmış bir anahtarla yapılabilecekler) beş değil **sekiz**'dir. Bu, "iki fonksiyon"
+diyen orijinal ADR metninin bugün için eksik olduğu tek nokta — güvenlik açığı değil, sayım
+farkı.
+
+### Değerlendirme
+
+**Yüzey büyüdü, disiplin gevşemedi.** Beş ucun da yedi kontrolü de geçmesi — hepsi
+`server-only`, hepsi fail-closed, hepsi migration-seviyesinde `has_function_privilege` ile
+kendi kendini doğrulayan dar bir EXECUTE grant'i, hepsi anahtarı/uid'yi/e-postayı asla açık
+loglamıyor — tesadüf değil: her yeni uç, önceki ucun (çoğunlukla bu ADR'nin ya da
+`account/delete/route.ts`'nin) dosya başı yorumunda **açıkça "AYNI gerekçe" diyerek** deseni
+kopyaladı (`attachments/verify`: "Anahtar disiplini ADR-0025 ile aynıdır"; `activity/shared.ts`:
+"ANAHTAR DİSİPLİNİ ... birebir aynı"; `coach/reset-client-password`: "AYNI gerekçe:
+`account/delete/route.ts`"). Yani **kod disiplini** organik olarak korundu — geliştirici(ler)
+her seferinde bu ADR'yi örnek aldı, sadece belgeyi güncellemedi.
+
+Gevşeyen tek şey **süreç** disiplinidir: ADR'nin kendi yazdığı "yeni uç eklenirse bu ADR
+güncellenir" kuralı üç kez arka arkaya çiğnendi (Faz 4.6, 4.7, 4.8 — hiçbiri bu dosyaya
+dokunmadı). Bu ek, o borcu şimdi kapatıyor; ileride tekrarlanmaması için aşağıdaki kural
+yazılı hâle getiriliyor.
+
+### İleriye dönük kural
+
+`SUPABASE_SERVICE_ROLE_KEY` çalışma zamanında (yeni bir Next.js route/dosyada) okunan her yeni
+uç eklendiğinde, **aynı commit'te** yukarıdaki iki tabloya bir satır eklenir (dosya, faz/borç,
+çağrılan RPC, gerekçe, yedi kontrolün sonucu). Satır eklenmeden yeni bir `service_role` ucu
+"tamamlandı" sayılmaz — tıpkı `account_deletions`/`coach_actions` gibi denetim tablolarının
+"iz bırakmadan yapılan müdahale, hiç yapılamayandan kötüdür" ilkesinin belge karşılığı.

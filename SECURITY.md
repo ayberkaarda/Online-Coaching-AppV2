@@ -2,8 +2,11 @@
 
 Bu belge, "Closed-Loop Coaching Hub" projesinde bir güvenlik açığı bulan araştırmacılar için
 sorumlu açıklama (responsible disclosure) sürecini tanımlar. Proje bu belgenin yazıldığı tarihte
-tek bir bağımsız koçun kendi pratiği için işlettiği, üretimde çalışan ama halka açık bir bug
-bounty programı olmayan küçük ölçekli bir uygulamadır — buna göre gerçekçi bir süreç izliyoruz.
+**yayında değildir** ve gerçek danışan verisi barındırmaz — tek bir bağımsız koçun kendi
+pratiği için tasarlanmış, portfolyo amaçlı geliştirilen küçük ölçekli bir uygulamadır; halka
+açık bir bug bounty programı da yoktur. Buna rağmen güvenlik açığı bildirim süreci gerçek bir
+uygulamadaymış gibi işletilir: kod tabanı ileride canlıya alınabilir ve bu disiplinin kendisi
+de değerlendirmenin bir parçasıdır.
 
 ## Desteklenen sürüm
 

@@ -119,45 +119,123 @@ yorum, `DUMP_TARGETS`):
 
 ## d) Geri yükleme (restore) yordamı — yedeğin işe yaradığını kanıtlama
 
-Yedeğin gerçekten geri yüklenebilir olduğu **yerel bir Postgres'e** geri
-yükleyerek kanıtlanır — hosted'a asla geri yazılmaz (bu script SALT OKUNUR,
-restore de bilerek ayrı ve yerel bir hedefe yapılır).
+Yedeğin gerçekten geri yüklenebilir olduğu **GoTrue migration'ları uygulanmış bir
+hedefe** geri yükleyerek kanıtlanır — hosted'a asla geri yazılmaz (bu script SALT
+OKUNUR, restore de bilerek ayrı ve yerel bir hedefe yapılır).
+
+> **HEDEF ŞARTI (2026-08-20 provasında ölçüldü, bkz. altta "Prova kaydı").**
+> Restore hedefi **GoTrue migration'ları uygulanmış** olmalıdır: gerçek bir
+> Supabase projesi (tek kullanımlık/ayrı bir proje) ya da `supabase start` /
+> `supabase db reset` ile ayağa kalkmış yerel yığın (`supabase_db_<proje>`
+> konteyneri — CLI, migration'ları otomatik uygular). **Çıplak
+> `postgres`/`supabase/postgres` Docker imajı (CLI'sız, elle `docker run`)
+> YETMEZ** — böyle bir imaj eski/kısmi bir `auth` şeması taşır: `identities`,
+> `sessions`, `mfa_amr_claims` tabloları hiç yoktur, `users` tablosunda modern
+> kolonlar eksiktir. Bu şartı karşılamayan bir hedefte `data.sql`'in
+> `auth.users` INSERT'leri ya açıkça hata verir ya da (aşağıdaki tuzağa bkz.)
+> **sessizce hiç uygulanmaz**.
 
 ```powershell
-# 0) Taze bir yerel Supabase yığını (mevcut yerel projeyi bozmamak için ayrı
-#    bir Postgres konteyneri önerilir; en basit yol supabase'i sıfırlamak):
-npx supabase db reset   # yereldeki mevcut migration+seed tabanını sıfırlar
+# 0) Hedef seçimi — GEÇERLİ İKİ YOL:
+#    a) Mevcut yerel projeyi bozmamak isteniyorsa ayrı bir proje dizininde
+#       `supabase start` ile TEK KULLANIMLIK yeni bir yığın başlat (GoTrue
+#       migration'ları CLI tarafından otomatik uygulanır).
+#    b) Mevcut yerel yığını kullan (migration+seed tabanını sıfırlar):
+npx supabase db reset
 
-# 1) Şema önce (foreign key/tetikleyici bağımlılıkları için)
-docker exec -i supabase_db_my-coaching-app psql -U postgres -d postgres `
+# 1) Roller ÖNCE (schema.sql'deki GRANT deyimleri var olmayan bir role
+#    başvurmasın diye; script `--no-role-passwords` kullanır — şifresiz
+#    roller oluşur, test hedefi için sorun değildir)
+docker exec -i <hedef-konteyner> psql -U postgres -d postgres `
+  -v ON_ERROR_STOP=1 -f - < backups/hosted/<damga>/roles.sql
+# BEKLENEN HATA: `supabase_admin` için "reserved role"/"already exists" —
+# hedefte bu rol CLI tarafından zaten oluşturulmuştur, ZARARSIZDIR ve
+# restore'u durdurmaz; aşağıdaki "ON_ERROR_STOP=1 ZORUNLU" bunun dışındaki
+# GERÇEK hataları yakalamak içindir.
+
+# 2) Şema (foreign key/tetikleyici bağımlılıkları için rollerden sonra, veriden önce)
+docker exec -i <hedef-konteyner> psql -U postgres -d postgres `
   -v ON_ERROR_STOP=1 -f - < backups/hosted/<damga>/schema.sql
 
-# 2) Roller (yalnızca CREATE ROLE/GRANT deyimleri; script `--no-role-passwords`
-#    kullanır — şifresiz roller oluşur, yerel test için sorun değildir)
-docker exec -i supabase_db_my-coaching-app psql -U postgres -d postgres `
-  -v ON_ERROR_STOP=1 -f - < backups/hosted/<damga>/roles.sql
-
 # 3) Veri (auth.users DAHİL — foreign key'ler yüzünden roller+şemadan SONRA)
-docker exec -i supabase_db_my-coaching-app psql -U postgres -d postgres `
+docker exec -i <hedef-konteyner> psql -U postgres -d postgres `
   -v ON_ERROR_STOP=1 -f - < backups/hosted/<damga>/data.sql
 ```
 
-**Doğrulama (yedek "işe yaradı" sayılmadan önce hepsi geçmeli):**
+**`-v ON_ERROR_STOP=1` ZORUNLU — asla bayraksız çalıştırma.** 2026-08-20
+provasında ölçüldü: bayraksız `psql`, `data.sql` içindeki `auth.users`
+INSERT'leri hedef şemayla uyuşmadığında (ör. eksik `email_confirmed_at`
+kolonu) hatayı **sessizce atlayıp devam ediyor**. Sonuç: `public` şemasındaki
+uygulama verisi (egzersiz, besin, profil...) tam gelir, restore çıktısında
+**hiçbir hata görünmez**, ama `auth.users` **0 satır** kalır — yani hiçbir
+kullanıcı giriş yapamaz. Bu, gerçek bir felaket anında ilk giriş denemesine
+kadar fark edilmeyecek, "başarılı görünen ama kırık" bir restore üretir.
+`ON_ERROR_STOP=1` ile koşulduğunda gerçek hata görünür hâle gelir:
+`ERROR: column "email_confirmed_at" of relation "users" does not exist` —
+restore o noktada durur ve sorun hemen görülür.
 
-1. `docker exec -i supabase_db_my-coaching-app psql -U postgres -d postgres -c "select count(*) from auth.users;"`
-   — hosted'daki gerçek kullanıcı sayısıyla eşleşmeli.
-2. `docker exec -i supabase_db_my-coaching-app psql -U postgres -d postgres -c "select count(*) from public.profiles;"`
-   — `auth.users` ile aynı sayıda olmalı (backfill kuralı, bkz. ADR-0020).
-3. `npm run test:rls` benzeri bir RLS smoke — geri yüklenen şemanın
-   politikalarının hâlâ geçerli olduğunu gösterir (tam RLS test paketi seed'e
-   bağlı olduğundan burada yalnızca "sorgu hata vermiyor" seviyesinde bir
-   kontrol yeterlidir, tam paket için yerel `db reset` + seed kullanılmalı).
-4. `data.sql` içinde `INSERT INTO "auth"."users"` ve `INSERT INTO
+**Doğrulama (yedek "işe yaradı" sayılmadan önce hepsi geçmeli — restore
+sonrası mutlaka `auth.users` dahil satır sayımı yapılmalı):**
+
+```sql
+select
+  (select count(*) from auth.users)          as auth_users,
+  (select count(*) from public.profiles)     as profiles,
+  (select count(*) from public.exercises)    as exercises,
+  (select count(*) from public.food_database) as food_database,
+  (select count(*) from pg_policies
+     where schemaname in ('public', 'storage')) as rls_policies,
+  (select count(*) from information_schema.routines
+     where routine_schema = 'public')        as functions;
+```
+
+1. `auth.users` **> 0** ve hosted'daki gerçek kullanıcı sayısıyla eşleşmeli —
+   bu satır dosyanın en kritik doğrulamasıdır (bkz. yukarıdaki tuzak); 0
+   çıkması "restore başarısız" demektir, "başarılı ama az veri" değil.
+2. `public.profiles` == `auth.users` (backfill kuralı, bkz. ADR-0020).
+3. `public.exercises` / `public.food_database` hosted'daki değerlerle
+   eşleşmeli (bu turda: 1318 / 581 — bkz. "Prova kaydı").
+4. RLS politika sayısı (57) ve fonksiyon sayısı (31) şema dökümüyle eşleşmeli.
+5. `data.sql` içinde `INSERT INTO "auth"."users"` ve `INSERT INTO
 "public"."profiles"` satırlarının GERÇEKTEN var olduğunu `grep`/arama ile
    doğrulayın (boş bir dump'ı "başarılı" saymayın).
 
 Restore denemesi sonrası **kullanılan yerel Postgres/Docker verisini silin**
 (bu geri yükleme gerçek kişisel veri içerir, bkz. §f).
+
+### Prova kaydı (2026-08-20)
+
+İlk gerçek hosted yedeği (`C:\Users\Ayber\backups\hosted\2026-08-20T13-52-00Z\`
+— `schema.sql` 122.502 bayt, `data.sql` 204.004 bayt, `roles.sql` 358 bayt) tek
+kullanımlık bir `public.ecr.aws/supabase/postgres:17.6.1.158` Docker
+konteynerine geri yüklendi — canlı yerel yığına
+(`supabase_db_my-coaching-app`) **dokunulmadı**, prova sonunda konteyner
+tamamen silindi.
+
+- **`schema.sql` hatasız uygulandı.** `public` şemasının verisi tam geldi: 14
+  tablo, **57 RLS politikası**, 31 fonksiyon; 1318 egzersiz, 581 besin, 2
+  profil, 1 bildirim.
+- **`auth.users` = 0.** Sebep: seçilen çıplak Postgres imajı GoTrue
+  tarafından yönetilen bir `auth` şeması taşımıyordu — `identities`,
+  `sessions`, `mfa_amr_claims` tabloları hiç yoktu, `users` tablosunda modern
+  kolonlar eksikti. `ON_ERROR_STOP=1` ile koşulduğunda gerçek hata görüldü:
+  `ERROR: column "email_confirmed_at" of relation "users" does not exist`.
+- **Asıl tuzak:** aynı `data.sql`, `ON_ERROR_STOP=1` **olmadan** koşulduğunda
+  bu hataları sessizce atlayıp "başarılı" görünüyordu — `auth.users` yine 0
+  kalıyor ama restore çıktısında hiçbir hata satırı görünmüyordu.
+- **Sonuç: yedek eksiksiz, kusur hedefteydi.** `data.sql` gerçekten
+  `auth.users` (2 satır) + `auth.identities` + `auth.sessions` +
+  `auth.mfa_amr_claims` + `auth.refresh_tokens` satırlarını taşıyor (10
+  INSERT bloğu toplamda) — bu turda restore hedefi seçimi hatalıydı,
+  script/yedek değil. Bu bölümün başındaki "Hedef şartı" karşılanan bir
+  hedefte (`supabase start`/`db reset` ile ayağa kalkmış bir yığın veya
+  gerçek bir Supabase projesi) aynı `data.sql` `auth.users`'ı da doğru
+  şekilde geri yükler.
+
+Bu prova, restore yordamının önceki hâlinde eksik olan iki şeyi ortaya
+çıkardı ve bu turda düzeltildi: (1) hedef şartının açıkça yazılmamış olması,
+(2) `ON_ERROR_STOP=1`'in "neden zorunlu" gerekçesinin ölçümle
+belgelenmemiş olması.
 
 ## e) Saklama politikası (öneri — bu turda uygulanmadı, yalnızca öneri)
 

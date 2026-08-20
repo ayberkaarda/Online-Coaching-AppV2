@@ -16,6 +16,7 @@ Bu dosya, projedeki önemli değişiklikleri belgeler. Biçim [Keep a Changelog]
 - `apps/mobile`: Expo SDK 57 (React Native 0.86.2, React 19.2.4) iskeleti — `expo-router` ile 5 sekmeli tab navigasyonu (Panel · Antrenman · Beslenme · İlerleme · Sohbet) ve placeholder auth ekranı.
 - Ayrı, paralel `mobile` CI job'u (`tsc`, lint, `expo-doctor`, `expo export` smoke).
 - `scripts/backup-hosted.mjs` + `docs/ops/hosted-backup.md`: hosted Supabase yedekleme script'i (varsayılan dry-run) ve yordamı (restore dahil).
+- **B-030 kapandı:** ilk gerçek hosted yedeği alındı (`schema.sql`/`data.sql`/`roles.sql` — 14 tablo, 31 fonksiyon, 57 RLS politikası, `auth.users` dahil 10 INSERT bloğu) ve tek kullanımlık bir konteynerde restore provası yapıldı (canlı yerel yığına dokunulmadı). Prova bir tuzak ortaya çıkardı: çıplak `supabase/postgres` imajı GoTrue migration'larını taşımadığı için restore `auth.users`'ı 0 satırla bıraktı ve `-v ON_ERROR_STOP=1` olmadan bu hata sessizce yutuluyordu — yedeğin kendisi eksiksizdi, kusur restore hedefindeydi. `docs/ops/hosted-backup.md` bu bulgularla düzeltildi: restore hedefinin GoTrue migration'ları uygulanmış olması zorunluluğu, `ON_ERROR_STOP=1` gerekçesi, restore sonrası doğrulama sorgusu (`auth.users` dahil) ve prova kaydı eklendi.
 - `packages/api-client`'a `Notifier`/`NotifierProvider`/`useNotifier()` bildirim soyutlaması.
 
 ### Değiştirildi
