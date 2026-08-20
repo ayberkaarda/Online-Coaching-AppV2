@@ -119,7 +119,7 @@ def test_meals_do_not_repeat_the_same_carb_all_day() -> None:
 
 
 def test_single_protein_request_still_repeats_one_source() -> None:
-    """"Tek çeşit protein" açık bir kullanıcı isteğidir; tekrar sınırı onu ezmez."""
+    """ "Tek çeşit protein" açık bir kullanıcı isteğidir; tekrar sınırı onu ezmez."""
     meals = _day(random.Random(5), split_proteins=False)
     proteins = [name for _, items in meals for name, _ in items if name in FOOD_DB["proteins"]]
 
