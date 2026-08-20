@@ -197,10 +197,15 @@ export default defineConfig({
     // yedek olarak KASITLI şekilde yerinde bırakıldı — üçü birden kaybolmadıkça
     // koşu yanlış hedefe gidemez.
     //
-    // Değerlerin kendisi `tests/e2e/e2e-env.ts` içindedir (TEK KAYNAK — global-setup
-    // da aynı hedefe bağlanmak zorunda). Orada duran şey yerel Supabase yığınının
-    // SABİT DEMO ANAHTARLARIDIR (`npx supabase status` her kurulumda aynısını
-    // üretir) — gerçek sır DEĞİLDİR, depoya yazılmalarında sakınca yoktur.
+    // Değerlerin ÇÖZÜMÜ `tests/e2e/e2e-env.ts` içindedir (TEK KAYNAK — global-setup'ın
+    // Node tarafı Supabase istemcisi de aynı hedefe bağlanmak zorunda).
+    //
+    // ORADA DA SABİT ANAHTAR YOKTUR: anon anahtarı ortam değişkeninden
+    // (`NEXT_PUBLIC_SUPABASE_ANON_KEY` / `ANON_KEY`) ya da `apps/web/.env.local`dan
+    // okunur, bulunamazsa açık bir hatayla düşülür. Yerel yığının demo anahtarı
+    // gerçek bir sır olmasa da depoya YAZILMAZ: gitleaks onu JWT olarak görüp
+    // `security` job'unu kırar (bu bir kez yaşandı) ve sabit bir varsayılan, CI'ın
+    // verdiği anahtarla yerelin sessizce ayrışmasına yol açar.
     //
     // Dışarıdan verilen değer HER ZAMAN önceliklidir: CI kendi ortam
     // değişkenleriyle (.github/workflows/ci.yml) bunları geçersiz kılar,

@@ -2,6 +2,9 @@
 
 Bu klasördeki testler gerçek bir Supabase örneğine ve seed verisine ihtiyaç duyar; birim testlerinin aksine mock kullanmazlar.
 
+> **Kural:** E2E kaynak dosyalarına anahtar/secret sabit yazılmaz — hepsi `process.env`'den
+> (gerekirse `apps/web/.env.local`'dan) okunur; aksi hâlde CI'ın gitleaks adımı push'u kırar.
+
 ## Önkoşullar
 
 1. Yerel Supabase yığınını başlatın:
