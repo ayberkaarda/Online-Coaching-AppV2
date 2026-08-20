@@ -151,6 +151,19 @@ jobs:
         # ağacı bilerek DIŞARIDA bırakır — bkz. Dockerfile `deps` aşaması.)
         run: pnpm install --frozen-lockfile
 
+      - name: tsconfig guard (B-057)
+        # `expo start`/`expo export` `apps/mobile/tsconfig.json`'u SESSİZCE yeniden yazar
+        # (yorumları siler, `include`'dan `.expo/types` + `expo-env.d.ts` girdilerini çıkarır,
+        # Prettier'ın reddettiği biçime sokar) — bu tur İKİ KEZ CI'ı kırdı (bkz. docs/PROGRESS.md
+        # §4). Bu adım o sapmayı yakalar. BİLEREK expo adımlarından (`expo-doctor`/`expo export`,
+        # aşağıda) ÖNCE koşuyor: böylece COMMIT'LENMİŞ (checkout) dosyayı doğrular, CI içinde
+        # expo'nun ürettiği geçici rewrite'ı değil. İki bağımsız kanıt: (1) Prettier biçimi,
+        # (2) yapısal değişmezler (yorum korunumu + include girdileri). git-hook YERİNE CI:
+        # git-hook yerelde `--no-verify` ile atlanabilir, bu kapı atlanamaz.
+        run: |
+          pnpm exec prettier --check apps/mobile/tsconfig.json
+          node scripts/check-mobile-tsconfig.mjs
+
       - name: Type-check (apps/mobile)
         # = `turbo run type-check --filter=mobile` → apps/mobile'da `tsc --noEmit`.
         run: pnpm run mobile:type-check

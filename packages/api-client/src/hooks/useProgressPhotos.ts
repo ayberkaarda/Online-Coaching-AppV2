@@ -143,7 +143,16 @@ export function useUploadProgressPhoto() {
         })
         .select()
         .single()
-      if (error) throw wrapSupabaseError(error, { table: 'progress_photos', op: 'insert' })
+      if (error) {
+        // B-005 (B-038 buraya birleşti): storage.upload BAŞARILI oldu ama tablo INSERT'i
+        // hata verdi — yüklenen nesne artık HİÇBİR satır tarafından işaret edilmiyor, YETİM.
+        // Silme yolundaki (`useDeleteProgressPhoto`) telafinin AYNISIYLA temizlenir.
+        // SIRA/GÖLGELEME: `removeStoredObject` ASLA fırlatmaz, yalnız loglar (bkz. storage.ts
+        // dosya başı) — bu yüzden telafiyi ÖNCE bekleyip SONRA orijinal insert hatasını
+        // fırlatmak güvenlidir; telafi silme kullanıcıya dönen asıl hatayı GÖLGELEMEZ.
+        await removeStoredObject(supabase, PROGRESS_PHOTOS_BUCKET, path)
+        throw wrapSupabaseError(error, { table: 'progress_photos', op: 'insert' })
+      }
 
       return data
     },

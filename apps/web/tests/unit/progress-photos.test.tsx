@@ -210,6 +210,42 @@ describe('useUploadProgressPhoto — yol sözleşmesi', () => {
   })
 })
 
+// ---------------------------------------------------------------------------
+// B-005 (B-038): upload BAŞARILI + insert BAŞARISIZ → yüklenen nesne YETİM kalmasın
+// ---------------------------------------------------------------------------
+describe('useUploadProgressPhoto — insert hatasında yetim nesne telafisi (B-005)', () => {
+  it('storage.upload başarılı ama insert hata verirse yüklenen nesne removeStoredObject ile silinir VE orijinal insert hatası yüzeye çıkar', async () => {
+    uploadMock.mockResolvedValue({ error: null })
+    // insert zinciri: .insert(...).select().single() → hata döndürür.
+    const singleMock = vi.fn(() =>
+      Promise.resolve({ data: null, error: { message: 'insert reddedildi', code: '23514' } })
+    )
+    const selectMock = vi.fn(() => ({ single: singleMock }))
+    const insertMock = vi.fn(() => ({ select: selectMock }))
+    fromMock.mockImplementation((table: string) => {
+      if (table === 'progress_photos') return { insert: insertMock }
+      throw new Error(`beklenmeyen tablo: ${table}`)
+    })
+
+    const { result } = renderHook(() => useUploadProgressPhoto(), { wrapper: createWrapper() })
+    const file = makeFile(PNG_BYTES, 'photo.png', 'image/png')
+
+    result.current.mutate({ clientId: CLIENT_ID, angle: 'front', file, takenOn: '2026-08-17' })
+
+    await waitFor(() => expect(result.current.isError).toBe(true))
+
+    // Yüklenmiş nesne TAM OLARAK yüklenen yolla, silme yolundaki telafinin aynısıyla
+    // (`removeStoredObject(supabase, bucket, path)`) temizlenmeli — aksi hâlde yetim kalır.
+    const uploadedPath = uploadMock.mock.calls[0]?.[0] as string
+    expect(removeStoredObjectMock).toHaveBeenCalledWith(supabase, 'progress-photos', uploadedPath)
+
+    // Telafi silme, kullanıcıya dönen ASIL insert hatasını GÖLGELEMEZ: yüzeye çıkan hata
+    // hâlâ insert hatasıdır (wrapSupabaseError ile sarılmış), removeStoredObject'in
+    // dönüşü değil.
+    expect(result.current.error?.message).toContain('insert reddedildi')
+  })
+})
+
 describe('useDeleteProgressPhoto — satır + best-effort dosya temizliği', () => {
   it('önce tablo satırını siler, ardından bucket nesnesini best-effort temizler', async () => {
     const eqMock = vi.fn().mockResolvedValue({ error: null })

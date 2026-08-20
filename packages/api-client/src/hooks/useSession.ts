@@ -257,15 +257,43 @@ interface CoachResetClientPasswordResponse {
  * yazılır (bkz. route.ts).
  */
 export function useCoachResetClientPassword() {
+  const supabase = useSupabaseClient()
   const notify = useNotifier()
   return useMutation({
+    // ######################################################################
+    // # `Authorization: Bearer` AÇIKÇA EKLENİR — cookie'den OKUNMAZ         #
+    // # Route (`reset-client-password/route.ts` §1) kimliği YALNIZCA        #
+    // # `Authorization` başlığından okur (cookie kabul etmez; CSRF yüzeyi   #
+    // # açmamak için `account/delete` ile aynı gerekçe). Bu yüzden          #
+    // # `useInviteClient` deseni izlenir: token `supabase.auth.getSession()`#
+    // # ten okunup başlığa ELLE konur.                                     #
+    // #                                                                    #
+    // # NEDEN UYKUDA KALDI: bu hook henüz HİÇBİR arayüzden çağrılmıyor      #
+    // # (koç arayüzüne bağlanmamış). Başlıksız çağrı yalnızca UI'a          #
+    // # bağlandığında 401 üretirdi; o güne kadar sessizce kırık kalırdı —   #
+    // # bu düzeltme, bağlanmadan ÖNCE deseni doğrusuyla hizalar.            #
+    // ######################################################################
     mutationFn: async (
       input: CoachResetClientPasswordInput
-    ): Promise<CoachResetClientPasswordResponse> =>
-      apiFetch<CoachResetClientPasswordResponse>('/api/coach/reset-client-password', {
+    ): Promise<CoachResetClientPasswordResponse> => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+
+      if (!session?.access_token) {
+        throw new ApiError(
+          401,
+          'NOT_AUTHENTICATED',
+          'Oturumunuz sona ermiş. Lütfen tekrar giriş yapın.'
+        )
+      }
+
+      return apiFetch<CoachResetClientPasswordResponse>('/api/coach/reset-client-password', {
         method: 'POST',
         json: input,
-      }),
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
+    },
     onSuccess: () => {
       notify.success('Danışana şifre sıfırlama bağlantısı gönderildi.')
     },
