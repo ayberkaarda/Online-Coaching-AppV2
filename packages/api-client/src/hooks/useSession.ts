@@ -363,3 +363,69 @@ export function useInviteClient() {
     },
   })
 }
+
+// ---------------------------------------------------------------------------
+// Hesap aktif/pasif durumu (Faz 4.10) — koç danışanı pasifleştirir/aktifleştirir
+// ---------------------------------------------------------------------------
+
+export interface SetClientActiveStateInput {
+  /** Hedef danışanın `profiles.id`'si. */
+  client_id: string
+  /** `true` = yeniden aktifleştir, `false` = pasifleştir. */
+  active: boolean
+}
+
+interface SetClientActiveStateResponse {
+  ok: true
+}
+
+/**
+ * KOÇ TETİKLEMELİ danışan aktif/pasif durumu değişimi
+ * (`/api/coach/set-client-active`, Faz 4.10).
+ *
+ * Sunucu ucu `set_client_active_state` RPC'sini KENDİSİ çağırır; RPC fail-closed
+ * olarak ÖNCE denetim satırını (`client_deactivated`/`client_reactivated`) yazar,
+ * SONRA `profiles.is_active`i günceller.
+ *
+ * ######################################################################
+ * # `Authorization: Bearer` AÇIKÇA EKLENİR — cookie'den OKUNMAZ         #
+ * # Route (§1) kimliği YALNIZCA `Authorization` başlığından okur (CSRF   #
+ * # yüzeyi açmamak için, `useInviteClient` ile aynı gerekçe).           #
+ * ######################################################################
+ *
+ * BAŞARI/HATA METNİ BURADA GÖSTERİLMEZ (jenerik toast YOKTUR): 403
+ * (`MFA_REQUIRED` — ayrıca Güvenlik bölümüne bağlantı gerektirir), 404, 429
+ * ve 503 durumları çağıran tarafından (bkz. `CoachUserManagement`) AYIRT
+ * EDİLEREK gösterilir. Başarıda `profiles` önbelleği geçersiz kılınır ki koç
+ * arayüzü yeni `is_active` değerini görsün.
+ */
+export function useSetClientActiveState() {
+  const supabase = useSupabaseClient()
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: SetClientActiveStateInput): Promise<SetClientActiveStateResponse> => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+
+      if (!session?.access_token) {
+        throw new ApiError(
+          401,
+          'NOT_AUTHENTICATED',
+          'Oturumunuz sona ermiş. Lütfen tekrar giriş yapın.'
+        )
+      }
+
+      return apiFetch<SetClientActiveStateResponse>('/api/coach/set-client-active', {
+        method: 'POST',
+        json: input,
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
+    },
+    onSuccess: () => {
+      // Koç portföyü `is_active`i yeniden okusun (buton "Pasifleştir" <->
+      // "Yeniden aktifleştir" arası değişsin).
+      void queryClient.invalidateQueries({ queryKey: queryKeyRoots.profiles })
+    },
+  })
+}

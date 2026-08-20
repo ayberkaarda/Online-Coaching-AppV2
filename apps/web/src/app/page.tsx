@@ -17,6 +17,7 @@ import {
 } from '@repo/api-client'
 import { DashboardTabs } from '@/components/DashboardTabs'
 import { NotificationForm } from '@/components/NotificationForm'
+import { PassiveClientScreen } from '@/components/PassiveClientScreen'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { CoachMfaGate } from '@/components/security/CoachMfaGate'
 
@@ -88,6 +89,16 @@ export default function DashboardPage(): JSX.Element {
         </div>
       </div>
     )
+  }
+
+  // PASİF DANIŞAN KAPISI (Faz 4.10): koçluk hizmeti sona ermiş danışan, dashboard
+  // yerine yalnızca "hesabı sil / çıkış" ekranını görür. Gerçek engel veritabanı
+  // RLS'indedir (account_active_gate); bu yalnızca doğru ekranı çizer. `is_active`
+  // pasif danışanın KENDİ profiles satırından okunabilir (RLS istisnası), yani bu
+  // kontrol pasif danışanda da güvenilir çalışır. Profil henüz yüklenmediyse
+  // (is_active bilinmiyor) kapı tetiklenmez; role='coach' asla pasifleşemez.
+  if (profile && profile.role === 'client' && profile.is_active === false) {
+    return <PassiveClientScreen />
   }
 
   return (

@@ -694,6 +694,12 @@ connection()`, bedeli öngörülenden geniş — beş sayfa değil tüm rota ağ
   seviyesindeki korumayla çakışıp çakışmadığı (çift kilitlenme, gereksiz karmaşıklık) gözden
   geçirilmeli. Bu madde kapanana kadar `[auth.rate_limit]`'in var olması "korunuyoruz" anlamına
   **gelmez** — bkz. §4b.
+- **2026-08-20 sızma testi (pentest) turu — bkz. `docs/security/pentest-2026-08-20.md`.** Dört
+  cepheli (RLS/yetki, sunucu uçları/auth, enjeksiyon/AI backend, sırlar/başlıklar/istemci) canlı
+  saldırı turu; manşet saldırıların hepsi tuttu. **Yeni açık 1:** P-01 (sign-in zamanlama
+  oracle'ı, Düşük/Orta, donduruldu — GoTrue'nun kendi `/token` ucu aynı oracle'ı zaten açık
+  bıraktığı için uygulama katmanı düzeltmesi güvenlik tiyatrosu olurdu). **B-058 (çapraz-koç
+  IDOR) yeniden onaylandı** — zaten kayıtlı, ADR-0007'nin bilinçli sonucu, donduruldu.
 
 ---
 

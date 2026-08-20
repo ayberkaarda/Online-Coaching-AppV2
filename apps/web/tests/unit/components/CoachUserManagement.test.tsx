@@ -73,6 +73,7 @@ vi.mock('@repo/api-client', async (importOriginal) => {
     useReviewFormCheck: vi.fn(),
     useSendNotification: vi.fn(),
     useSession: vi.fn(),
+    useSetClientActiveState: vi.fn(),
   }
 })
 
@@ -86,6 +87,7 @@ import {
   useReviewFormCheck,
   useSendNotification,
   useSession,
+  useSetClientActiveState,
 } from '@repo/api-client'
 import {
   buildTrendSeries,
@@ -196,6 +198,11 @@ beforeEach(() => {
   vi.mocked(useSession).mockReturnValue({
     data: { user: { id: 'coach-1' } },
   } as unknown as ReturnType<typeof useSession>)
+  vi.mocked(useSetClientActiveState).mockReturnValue({
+    mutate: vi.fn(),
+    isPending: false,
+    error: null,
+  } as unknown as ReturnType<typeof useSetClientActiveState>)
 
   mockTrend(buildTrendSeries([], { rangeDays: 30, today: TODAY }))
 })

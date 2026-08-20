@@ -35,7 +35,8 @@
 // # değildir (migration KARAR 4).                                             #
 // ###########################################################################
 
-import { Activity, Bell, Clock, ImageOff } from 'lucide-react'
+import { Activity, Bell, Clock, ImageOff, UserCheck, UserX } from 'lucide-react'
+import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { JSX } from 'react'
 import {
@@ -67,8 +68,10 @@ import {
   useReviewFormCheck,
   useSendNotification,
   useSession,
+  useSetClientActiveState,
   type TrendRangeDays,
 } from '@repo/api-client'
+import { ApiError } from '@repo/api-client/api/client'
 import type { ProfileWithAvatar } from '@repo/api-client/hooks/useProfile'
 import { daysSince, formatDateTR, formatDateTimeTR } from '@/lib/utils'
 
@@ -87,12 +90,20 @@ export function CoachUserManagement({ clients }: CoachUserManagementProps): JSX.
   // "Şimdi" render sırasında değil, lazy initializer + event handler'larda hesaplanır (saflık kuralı).
   const [nowMs, setNowMs] = useState<number>(() => Date.now())
 
+  // Aktif/pasif durum değişimi (Faz 4.10). Tek onay adımı yeterli: işlem geri
+  // alınabilir (koç istediğinde tersine çevirir).
+  const setClientActive = useSetClientActiveState()
+  // `null` = onay istenmedi; aksi halde bekleyen eylem.
+  const [activeConfirm, setActiveConfirm] = useState<'deactivate' | 'reactivate' | null>(null)
+
   // Prop değişince state'i ayarlamanın resmî React kalıbı: effect yerine render sırasında senkronlama.
   const [prevClientId, setPrevClientId] = useState<string | null>(selectedClient?.id ?? null)
   if ((selectedClient?.id ?? null) !== prevClientId) {
     setPrevClientId(selectedClient?.id ?? null)
     setBeforePoseOverride(null)
     setAfterPoseOverride(null)
+    // Danışan değişince bekleyen onay adımı düşer (yanlış danışana uygulanmasın).
+    setActiveConfirm(null)
   }
 
   const closeButtonRef = useRef<HTMLButtonElement | null>(null)
@@ -248,6 +259,35 @@ export function CoachUserManagement({ clients }: CoachUserManagementProps): JSX.
   const afterPose = poses.find((p) => p.id === afterPoseId)
   const clientCards = clients.filter((c) => c.role !== 'coach')
   const isLoading = formChecksQuery.isLoading || dailyLogsQuery.isLoading || trendQuery.isLoading
+
+  // `is_active` güncel değeri `clients` prop'undan okunur (selectedClient bir
+  // ANLIK KOPYADIR ve mutasyon sonrası bayatlar); mutasyon `profiles` önbelleğini
+  // geçersiz kılınca prop tazelenir ve buton kendiliğinden döner.
+  const selectedClientLive = clients.find((c) => c.id === selectedClient?.id) ?? selectedClient
+  const isClientActive = selectedClientLive?.is_active ?? true
+
+  const setActiveError = setClientActive.error
+  const isSetActiveApiError = ApiError.isApiError(setActiveError)
+  // MFA_REQUIRED'da mesaj yeterli değil: koç NEREYE gideceğini bilmeli (davet
+  // formuyla aynı kalıp).
+  const isSetActiveMfaRequired =
+    isSetActiveApiError && (setActiveError as ApiError).code === 'MFA_REQUIRED'
+
+  const handleToggleActive = (): void => {
+    if (!selectedClient) return
+    const nextActive = !isClientActive
+    setClientActive.mutate(
+      { client_id: selectedClient.id, active: nextActive },
+      {
+        onSuccess: () => {
+          setActiveConfirm(null)
+          toast.success(
+            nextActive ? 'Danışan yeniden aktifleştirildi.' : 'Danışan pasifleştirildi.'
+          )
+        },
+      }
+    )
+  }
 
   return (
     <div>
@@ -467,6 +507,102 @@ export function CoachUserManagement({ clients }: CoachUserManagementProps): JSX.
                   <span aria-hidden="true">✕</span>
                 </button>
               </div>
+
+              {/* --- HESAP DURUMU (aktif/pasif) — Faz 4.10 ---
+                  Konum kararı: yükleme iskeletinin DIŞINDA (header'ın hemen
+                  altında) çünkü bu eylem danışanın analitik verisine (trend/makro)
+                  bağlı DEĞİLDİR; koç, veriler yüklenmeden de danışanı
+                  pasifleştirebilmeli. Pasif danışanın kendisi bu ekranı GÖRMEZ —
+                  o kendi cihazında `PassiveClientScreen`'i görür. */}
+              <section
+                aria-labelledby="account-state-heading"
+                className="rounded-panel border border-border bg-surface p-4"
+              >
+                <h3
+                  id="account-state-heading"
+                  className="mb-1 text-sm font-bold uppercase tracking-wider text-fg-muted"
+                >
+                  Hesap Durumu
+                </h3>
+                <p className="mb-3 text-sm text-fg-muted">
+                  {isClientActive
+                    ? 'Bu danışanın hesabı aktif. Koçluk hizmeti sona erdiyse hesabı pasifleştirebilirsiniz: pasif danışan sisteme girer ama verilerini göremez, yalnızca hesabını silebilir veya çıkış yapabilir.'
+                    : 'Bu danışanın hesabı PASİF. Verilerine erişimi kapalı. Yeniden aktifleştirdiğinizde tüm verisine yeniden erişir.'}
+                </p>
+
+                {setActiveError && (
+                  <div
+                    role="alert"
+                    className="mb-3 space-y-2 rounded-control border border-red-500/30 bg-red-500/10 p-3 text-sm font-bold text-red-600 dark:text-red-400"
+                  >
+                    <p>
+                      {isSetActiveApiError
+                        ? (setActiveError as ApiError).message
+                        : 'İşlem gerçekleştirilemedi. Lütfen tekrar deneyin.'}
+                    </p>
+                    {isSetActiveMfaRequired && (
+                      <Link href="/profile#guvenlik" className="inline-block underline">
+                        Güvenlik bölümüne git
+                      </Link>
+                    )}
+                  </div>
+                )}
+
+                {activeConfirm === null ? (
+                  <button
+                    type="button"
+                    onClick={() => setActiveConfirm(isClientActive ? 'deactivate' : 'reactivate')}
+                    disabled={setClientActive.isPending}
+                    className={
+                      isClientActive
+                        ? 'inline-flex items-center gap-2 rounded-control bg-red-500 px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-red-600 disabled:opacity-50'
+                        : 'inline-flex items-center gap-2 rounded-control bg-accent px-4 py-2 text-sm font-bold text-accent-fg transition-opacity hover:opacity-90 disabled:opacity-50'
+                    }
+                  >
+                    {isClientActive ? (
+                      <UserX aria-hidden="true" className="h-4 w-4 shrink-0" />
+                    ) : (
+                      <UserCheck aria-hidden="true" className="h-4 w-4 shrink-0" />
+                    )}
+                    {isClientActive ? 'Pasifleştir' : 'Yeniden aktifleştir'}
+                  </button>
+                ) : (
+                  <div className="space-y-3">
+                    <p className="text-sm font-bold text-fg">
+                      {activeConfirm === 'deactivate'
+                        ? `${selectedClient.full_name} pasifleştirilsin mi? Danışan artık verilerini göremeyecek.`
+                        : `${selectedClient.full_name} yeniden aktifleştirilsin mi? Danışan tüm verisine yeniden erişecek.`}
+                    </p>
+                    <div className="flex flex-wrap gap-3">
+                      <button
+                        type="button"
+                        onClick={handleToggleActive}
+                        disabled={setClientActive.isPending}
+                        aria-busy={setClientActive.isPending}
+                        className={
+                          activeConfirm === 'deactivate'
+                            ? 'inline-flex items-center gap-2 rounded-control bg-red-600 px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-red-700 disabled:opacity-50'
+                            : 'inline-flex items-center gap-2 rounded-control bg-accent px-4 py-2 text-sm font-bold text-accent-fg transition-opacity hover:opacity-90 disabled:opacity-50'
+                        }
+                      >
+                        {setClientActive.isPending
+                          ? 'İşleniyor...'
+                          : activeConfirm === 'deactivate'
+                            ? 'Evet, pasifleştir'
+                            : 'Evet, aktifleştir'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setActiveConfirm(null)}
+                        disabled={setClientActive.isPending}
+                        className="rounded-control border border-border px-4 py-2 text-sm font-bold text-fg transition-colors hover:bg-canvas disabled:opacity-50"
+                      >
+                        Vazgeç
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </section>
 
               {isLoading ? (
                 <div className="flex flex-col gap-6">

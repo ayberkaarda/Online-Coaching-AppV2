@@ -563,6 +563,7 @@ export type Database = {
           full_name: string
           height_cm: number | null
           id: string
+          is_active: boolean
           last_checkin_at: string | null
           nutrition_plan: string | null
           role: Database["public"]["Enums"]["user_role"]
@@ -581,6 +582,7 @@ export type Database = {
           full_name?: string
           height_cm?: number | null
           id: string
+          is_active?: boolean
           last_checkin_at?: string | null
           nutrition_plan?: string | null
           role?: Database["public"]["Enums"]["user_role"]
@@ -599,6 +601,7 @@ export type Database = {
           full_name?: string
           height_cm?: number | null
           id?: string
+          is_active?: boolean
           last_checkin_at?: string | null
           nutrition_plan?: string | null
           role?: Database["public"]["Enums"]["user_role"]
@@ -962,6 +965,7 @@ export type Database = {
         Returns: Json
       }
       increment_streak: { Args: { user_id: string }; Returns: number }
+      is_active_user: { Args: { uid?: string }; Returns: boolean }
       is_coach: { Args: { uid?: string }; Returns: boolean }
       is_coach_profile: { Args: { target: string }; Returns: boolean }
       is_end_user_write: { Args: never; Returns: boolean }
@@ -1056,6 +1060,10 @@ export type Database = {
       save_workout_plan: {
         Args: { p_client_ids: string[]; p_plan: Json }
         Returns: number
+      }
+      set_client_active_state: {
+        Args: { p_active: boolean; p_client_id: string; p_request_id?: string }
+        Returns: undefined
       }
       submit_program_for_approval: {
         Args: { p_client_id: string; p_workout_data: Json }

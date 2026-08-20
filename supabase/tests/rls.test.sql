@@ -10078,8 +10078,380 @@ rollback;
 
 
 -- =============================================================================
+-- HESAP AKTIF/PASIF — 149) PASIF DANISAN 15 TABLOYU OKUYAMAZ, YALNIZCA KENDI
+-- profiles SATIRINI OKUR (20260820180000_account_active_state.sql,
+-- account_active_gate + is_active_user + KRITIK profiles istisnasi)
+--   (a) KURULUM/BOS-GECME KONTROLU: AKTIF danisan A kendi + kocu gorur (>=2
+--       profil) ve daily_logs'ta verisi var (>0) -- pasif olcumu anlamli olsun.
+--   (b) A pasiflestirilir (postgres, RLS bypass).
+--   (c) PASIF A: account_active_gate ile 15 tablonun HICBIRINI goremez (0), ama
+--       KENDI profiles satirini (id=auth.uid()) HALA okur -- pasif ekran icin
+--       KRITIK istisna. profiles=1 (yalnizca kendi satiri; kocu ARTIK gormez).
+-- =============================================================================
+begin;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated","aal":"aal1"}';
+do $$
+declare v_prof int; v_daily int;
+begin
+  select count(*) into v_prof  from public.profiles;
+  select count(*) into v_daily from public.daily_logs;
+  if v_prof < 2 then
+    raise exception 'BASARISIZ [149 kurulum]: AKTIF A profiles=% (>=2 bekleniyor) -- pasif olcumu anlamsiz olurdu', v_prof;
+  end if;
+  if v_daily = 0 then
+    raise exception 'BASARISIZ [149 kurulum]: AKTIF A daily_logs=0 -- BOS GECME, pasif olcumu anlamsiz';
+  end if;
+  raise notice 'GECTI [149 kurulum AKTIF A profiles=% daily_logs=% -- olcum anlamli]', v_prof, v_daily;
+end $$;
+reset role;
+
+-- A yi pasiflestir (postgres RLS bypass; ROLLBACK ile geri alinacak).
+update public.profiles set is_active = false where id = '22222222-2222-2222-2222-222222222222';
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated","aal":"aal1"}';
+do $$
+declare
+  -- 16 kapili tablonun profiles DISINDAKI 15'i.
+  v_tables text[] := array[
+    'notifications', 'messages', 'form_checks', 'daily_logs', 'workout_logs',
+    'nutrition_logs', 'program_approvals', 'workout_plans', 'workout_plan_exercises',
+    'nutrition_plans', 'nutrition_plan_meals', 'progress_entries', 'progress_photos',
+    'activity_sessions', 'activity_events'
+  ];
+  v_table text;
+  v_n     bigint;
+  v_seen  int := 0;
+  v_prof  int;
+begin
+  foreach v_table in array v_tables loop
+    execute format('select count(*) from public.%I', v_table) into v_n;
+    if v_n <> 0 then
+      raise exception 'BASARISIZ [149]: PASIF A public.% tablosunda % satir GORDU -- account_active_gate bu tabloda YOK/PERMISSIVE', v_table, v_n;
+    end if;
+    v_seen := v_seen + 1;
+  end loop;
+  if v_seen <> 15 then
+    raise exception 'BASARISIZ [149]: 15 tablo beklenirken % olculdu.', v_seen;
+  end if;
+
+  -- KRITIK ISTISNA: kendi profiles satirini OKUYABILMELI (pasif ekran).
+  select count(*) into v_prof from public.profiles;
+  if v_prof <> 1 then
+    raise exception 'BASARISIZ [149]: PASIF A profiles=% (1 -- yalnizca KENDI satiri -- bekleniyor). 0 ise pasif ekran cizilemez; >1 ise istisna cok genis.', v_prof;
+  end if;
+  perform 1 from public.profiles where id = '22222222-2222-2222-2222-222222222222';
+  if not found then
+    raise exception 'BASARISIZ [149]: PASIF A KENDI profil satirini OKUYAMADI -- pasif ekran (is_active/full_name) cizilemez';
+  end if;
+
+  raise notice 'GECTI [149 PASIF A 15 tablonun HICBIRINI goremez; yalnizca KENDI profiles satirini okur (istisna dogru)]';
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- HESAP AKTIF/PASIF — 150) PASIF DANISAN HICBIR TABLOYA YAZAMAZ + KENDI
+-- is_active'ini TRUE'YA CEKEMEZ (guard)
+--   (a) PASIF A daily_logs / progress_entries'e INSERT edemez (42501,
+--       account_active_gate with_check false).
+--   (b) *** KRITIK *** PASIF A kendi is_active'ini true YAPAMAZ: kendini yeniden
+--       aktiflestiremez -- profiles_guard_server_columns is_active kapisi (42501).
+--       Boylece pasiflik yalnizca kocun set_client_active_state RPC'siyle
+--       kaldirilabilir.
+-- =============================================================================
+begin;
+update public.profiles set is_active = false where id = '22222222-2222-2222-2222-222222222222';
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated","aal":"aal1"}';
+do $$
+declare v_caught boolean; v_state text;
+begin
+  -- (a) daily_logs INSERT reddedilmeli
+  v_caught := false;
+  begin
+    insert into public.daily_logs (client_id, log_date, water_lt)
+    values ('22222222-2222-2222-2222-222222222222', current_date - 600, 2.5);
+  exception when insufficient_privilege then v_caught := true;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [150a daily_logs]: PASIF A daily_logs a YAZABILDI';
+  end if;
+
+  -- progress_entries INSERT reddedilmeli
+  v_caught := false;
+  begin
+    insert into public.progress_entries (client_id, entry_date, weight_kg)
+    values ('22222222-2222-2222-2222-222222222222', current_date - 600, 80);
+  exception when insufficient_privilege then v_caught := true;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [150a progress_entries]: PASIF A progress_entries e YAZABILDI';
+  end if;
+  raise notice 'GECTI [150a PASIF A hicbir tabloya yazamaz (42501)]';
+
+  -- (b) KENDI is_active'ini true CEKEMEZ (guard)
+  v_caught := false;
+  begin
+    update public.profiles set is_active = true
+     where id = '22222222-2222-2222-2222-222222222222';
+  exception when insufficient_privilege then
+    v_caught := true; get stacked diagnostics v_state = returned_sqlstate;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [150b]: PASIF A kendi is_active ini TRUE cekebildi -- kendini yeniden aktiflestirdi (guard YOK)';
+  end if;
+  if v_state is distinct from '42501' then
+    raise exception 'BASARISIZ [150b hata kodu]: beklenen 42501, gelen %', v_state;
+  end if;
+  raise notice 'GECTI [150b PASIF A kendi is_active ini TRUE cekemez (42501, guard) -- yalnizca koc RPC si aktiflestirir]';
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- HESAP AKTIF/PASIF — 151) REGRESYON: KOC AKTIF DANISANI ETKILEMEZ, KOC
+-- ETKILENMEZ + role='coach' SAYISI = 1
+--   (a) AKTIF danisan A (is_active default true) bugunku gibi calisir: profiles
+--       >=2, en az 5 tabloda veri goruyor (bos-gecme korumasi).
+--   (b) KOC (aal2, her zaman aktif) etkilenmez: profiles>=3, daily_logs>0.
+--   (c) role='coach' satir sayisi = 1 -- tek-kocluk (ADR-0007): koc ASLA
+--       pasiflesemez (RPC yalnizca role=client hedef alir) invaryantinin
+--       dayanagi.
+-- =============================================================================
+begin;
+-- (a) AKTIF danisan A
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated","aal":"aal1"}';
+do $$
+declare
+  v_tables text[] := array[
+    'profiles', 'notifications', 'messages', 'form_checks', 'daily_logs',
+    'workout_logs', 'nutrition_logs', 'program_approvals', 'workout_plans',
+    'workout_plan_exercises', 'nutrition_plans', 'nutrition_plan_meals',
+    'progress_entries', 'progress_photos', 'activity_sessions', 'activity_events'
+  ];
+  v_table text; v_n bigint; v_prof int; v_nonzero int := 0;
+begin
+  select count(*) into v_prof from public.profiles;
+  if v_prof < 2 then
+    raise exception 'BASARISIZ [151a]: AKTIF A profiles=% (>=2 bekleniyor) -- account_active_gate aktif danisani ETKILIYOR', v_prof;
+  end if;
+  foreach v_table in array v_tables loop
+    execute format('select count(*) from public.%I', v_table) into v_n;
+    if v_n > 0 then v_nonzero := v_nonzero + 1; end if;
+  end loop;
+  if v_nonzero < 5 then
+    raise exception 'BASARISIZ [151a bos gecme]: AKTIF A yalnizca % tabloda veri gordu -- gate aktif danisani da kilitlemis olabilir', v_nonzero;
+  end if;
+  raise notice 'GECTI [151a AKTIF danisan A etkilenmiyor: profiles=%, % tabloda veri]', v_prof, v_nonzero;
+end $$;
+reset role;
+
+-- (b) KOC (aal2)
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","aal":"aal2"}';
+do $$
+declare v_prof int; v_daily int;
+begin
+  select count(*) into v_prof  from public.profiles;
+  select count(*) into v_daily from public.daily_logs;
+  if v_prof < 3 then
+    raise exception 'BASARISIZ [151b]: KOC profiles=% (>=3 bekleniyor) -- account_active_gate kocu ETKILIYOR', v_prof;
+  end if;
+  if v_daily = 0 then
+    raise exception 'BASARISIZ [151b]: KOC daily_logs goremiyor -- gate kocu ETKILIYOR';
+  end if;
+  raise notice 'GECTI [151b KOC (aal2, aktif) etkilenmiyor: profiles=%, daily_logs=%]', v_prof, v_daily;
+end $$;
+reset role;
+
+-- (c) role='coach' sayisi = 1
+do $$
+declare v_coach_count bigint;
+begin
+  select count(*) into v_coach_count from public.profiles where role = 'coach'::public.user_role;
+  if v_coach_count <> 1 then
+    raise exception 'BASARISIZ [151c]: role=coach satir sayisi % (1 bekleniyordu) -- koc pasiflesemez invaryanti (RPC role=client hedef alir) ve tek-kocluk (ADR-0007) KIRILMIS', v_coach_count;
+  end if;
+  raise notice 'GECTI [151c role=coach satir sayisi = 1 -- tek-kocluk REGRESYON KAPISI ayakta]';
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- HESAP AKTIF/PASIF — 152) RPC YETKISI + coach_actions KAPALI LISTESI +
+-- POLITIKA SURUKLENMESI
+--   (a) set_client_active_state YALNIZCA service_role'de: authenticated (koc
+--       aal2 dahil) CAGIRAMAZ; service_role CALISIR ve is_active i gercekten
+--       degistirir (pozitif); koc/var-olmayan hedef reddedilir (42501).
+--   (b) coach_actions kapali listesi client_deactivated/client_reactivated i
+--       KABUL eder (record_coach_action ile, service_role); tanimsiz action
+--       23514 ile reddedilir (liste hala KAPALI).
+--   (c) 16/16 account_active_gate RESTRICTIVE/ALL/authenticated; profiles
+--       ISTISNASI dogru (using auth.uid() TASIR, with_check TASIMAZ); sema
+--       surukleme yok; is_active_user SECURITY DEFINER.
+-- =============================================================================
+begin;
+-- (a) authenticated (koc aal2) RPC yi CAGIRAMAZ
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","aal":"aal2"}';
+do $$
+declare v_caught boolean := false;
+begin
+  begin
+    perform public.set_client_active_state('22222222-2222-2222-2222-222222222222', false, null);
+  exception when insufficient_privilege then v_caught := true;
+           when others then v_caught := true;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [152a]: authenticated (koc) set_client_active_state i CAGIRABILDI -- EXECUTE service_role ile sinirli DEGIL';
+  end if;
+  raise notice 'GECTI [152a authenticated (koc aal2) set_client_active_state i cagiramaz]';
+end $$;
+reset role;
+
+-- service_role CALISIR ve is_active i degistirir (pozitif)
+set local role service_role;
+select public.set_client_active_state('22222222-2222-2222-2222-222222222222', false, '00000000-0000-4000-8000-000000000152');
+reset role;
+do $$
+declare v_active boolean; v_n int;
+begin
+  select is_active into v_active from public.profiles where id = '22222222-2222-2222-2222-222222222222';
+  if v_active is distinct from false then
+    raise exception 'BASARISIZ [152a pozitif]: service_role RPC si is_active i false YAPMADI -> %', v_active;
+  end if;
+  select count(*) into v_n from public.coach_actions
+   where action = 'client_deactivated' and target_id = '22222222-2222-2222-2222-222222222222';
+  if v_n < 1 then
+    raise exception 'BASARISIZ [152a denetim]: client_deactivated denetim satiri yazilmadi (%)', v_n;
+  end if;
+  raise notice 'GECTI [152a service_role RPC si is_active i degistirir ve client_deactivated denetimi yazar (denetim ONCE)]';
+end $$;
+
+-- koc/var-olmayan hedef reddedilir (42501)
+set local role service_role;
+do $$
+declare v_caught boolean := false; v_state text;
+begin
+  begin
+    perform public.set_client_active_state('11111111-1111-1111-1111-111111111111', false, null);
+  exception when others then v_caught := true; get stacked diagnostics v_state = returned_sqlstate;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [152a koc hedef]: KOC hedefli set_client_active_state KABUL EDILDI -- koc pasiflestirilebilir';
+  end if;
+  if v_state is distinct from '42501' then
+    raise exception 'BASARISIZ [152a koc hedef kod]: beklenen 42501, gelen %', v_state;
+  end if;
+  raise notice 'GECTI [152a KOC hedefli RPC reddedilir (42501) -- yalnizca role=client]';
+end $$;
+reset role;
+
+-- (b) coach_actions kapali listesi yeni iki degeri KABUL, tanimsizi RED
+set local role service_role;
+do $$
+declare v_id uuid; v_caught boolean; v_state text;
+begin
+  v_id := public.record_coach_action('client_deactivated'::text,
+    '11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222');
+  if v_id is null then
+    raise exception 'BASARISIZ [152b]: client_deactivated KABUL EDILMEDI -- kapali liste genislemedi';
+  end if;
+  v_id := public.record_coach_action('client_reactivated'::text,
+    '11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222');
+  if v_id is null then
+    raise exception 'BASARISIZ [152b]: client_reactivated KABUL EDILMEDI';
+  end if;
+
+  v_caught := false;
+  begin
+    perform public.record_coach_action('bogus_action'::text,
+      '11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222');
+  exception when check_violation then v_caught := true; get stacked diagnostics v_state = returned_sqlstate;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [152b]: tanimsiz action KABUL EDILDI -- kapali liste SERBEST METNE donusmus';
+  end if;
+  if v_state is distinct from '23514' then
+    raise exception 'BASARISIZ [152b kod]: beklenen 23514, gelen %', v_state;
+  end if;
+  raise notice 'GECTI [152b coach_actions client_deactivated/client_reactivated KABUL, tanimsiz 23514]';
+end $$;
+reset role;
+
+-- (c) POLITIKA SURUKLENME + profiles ISTISNASI + is_active_user DEFINER
+do $$
+declare
+  v_expected text[] := array[
+    'profiles', 'notifications', 'messages', 'form_checks', 'daily_logs',
+    'workout_logs', 'nutrition_logs', 'program_approvals', 'workout_plans',
+    'workout_plan_exercises', 'nutrition_plans', 'nutrition_plan_meals',
+    'progress_entries', 'progress_photos', 'activity_sessions', 'activity_events'
+  ];
+  v_ok int; v_total int; v_extra text; v_prof_using text; v_prof_check text;
+begin
+  -- 16 tablonun HEPSI dogru kurulmus mu?
+  select count(*) into v_ok
+    from pg_policies p
+   where p.schemaname='public' and p.policyname='account_active_gate'
+     and p.tablename = any (v_expected)
+     and p.permissive='RESTRICTIVE' and p.cmd='ALL'
+     and p.roles='{authenticated}'::name[]
+     and p.qual like '%is_active_user%' and p.with_check like '%is_active_user%';
+  if v_ok <> 16 then
+    raise exception 'BASARISIZ [152c]: 16 beklenirken % dogru account_active_gate politikasi', v_ok;
+  end if;
+
+  -- Baska tabloya sizmis mi? (tam 16)
+  select count(*) into v_total
+    from pg_policies where schemaname='public' and policyname='account_active_gate';
+  if v_total <> 16 then
+    raise exception 'BASARISIZ [152c]: account_active_gate politika sayisi % (16 bekleniyordu)', v_total;
+  end if;
+
+  -- profiles ISTISNASI: using auth.uid() TASIR, with_check TASIMAZ.
+  select qual, with_check into v_prof_using, v_prof_check
+    from pg_policies where schemaname='public' and tablename='profiles' and policyname='account_active_gate';
+  if v_prof_using not like '%uid%' then
+    raise exception 'BASARISIZ [152c]: profiles account_active_gate using dali auth.uid() istisnasini TASIMIYOR -- pasif ekran cizilemez';
+  end if;
+  if v_prof_check like '%uid%' then
+    raise exception 'BASARISIZ [152c]: profiles account_active_gate with_check dali auth.uid() TASIYOR -- pasif danisan kendi profilini YAZABILIR';
+  end if;
+
+  -- Sema surukleme: kapili 16 + bilinen muafiyetler disinda tablo?
+  select string_agg(t.tablename, ', ' order by t.tablename) into v_extra
+    from pg_tables t
+   where t.schemaname='public'
+     and t.tablename <> all (v_expected)
+     and t.tablename <> all (array[
+       'exercises','food_database','account_deletions',
+       'message_attachment_verifications','coach_actions'
+     ]);
+  if v_extra is not null then
+    raise exception 'BASARISIZ [152c]: account_active_gate ve muafiyet DISINDA public tablo(lar) var -> %', v_extra;
+  end if;
+
+  -- is_active_user SECURITY DEFINER (INVOKER a cevrilirse profiles politikasi
+  -- kendi kendini tetikler).
+  if not exists (
+    select 1 from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+     where n.nspname='public' and p.proname='is_active_user' and p.prosecdef
+  ) then
+    raise exception 'BASARISIZ [152c]: public.is_active_user() SECURITY DEFINER degil';
+  end if;
+
+  raise notice 'GECTI [152c 16/16 account_active_gate RESTRICTIVE+ALL+authenticated, profiles istisnasi dogru, surukleme yok, is_active_user DEFINER]';
+end $$;
+rollback;
+
+
+-- =============================================================================
 -- TOPLAM ÖZET
--- Bu noktaya yalnızca YUKARIDAKİ 148 senaryonun HEPSİ GECTI verdiyse ulaşılır --
+-- Bu noktaya yalnızca YUKARIDAKİ 152 senaryonun HEPSİ GECTI verdiyse ulaşılır --
 -- herhangi biri BASARISIZ olsaydı raise exception + ON_ERROR_STOP psql'i
 -- daha önce sıfırdan farklı çıkış koduyla durdururdu.
 --   * 1–19  : Faz 1a ve öncesi (profiles, notifications, form_checks, daily_logs,
@@ -10316,6 +10688,26 @@ rollback;
 --             değerler (1995-03-14, 178.5) GEÇER ve geri okunur, *** NULL
 --             POZİTİF KONTROL *** künye ZORUNLU DEĞİL — ikisi de null
 --             yazılabilir (148)
+--   * 149–152: Faz 4.10 — HESAP AKTİF/PASİF DURUMU
+--             (20260820180000_account_active_state.sql, account_active_gate):
+--             PASİF danışan (is_active=false) 16 kapılı tablonun profiles
+--             DIŞINDAKİ 15'ini GÖREMEZ ama KENDİ profiles satırını (id=
+--             auth.uid()) HÂLÂ okur — pasif ekran için KRİTİK istisna, profiles
+--             using dalı taşır (149); PASİF danışan hiçbir tabloya YAZAMAZ
+--             (42501) ve *** KRİTİK *** kendi `is_active`'ini TRUE çekemez
+--             (42501, guard) — kendini yeniden aktifleştiremez, yalnızca koç
+--             RPC'si kaldırır (150); REGRESYON — AKTİF danışan (>=5 tabloda
+--             veri) ve KOÇ (aal2, her zaman aktif) ETKİLENMEZ, role='coach'
+--             sayısı = 1 (koç ASLA pasifleşemez, RPC yalnızca role=client hedef
+--             alır) (151); `set_client_active_state` YALNIZCA service_role'de
+--             (authenticated/koç çağıramaz), service_role çağrısı `is_active`'i
+--             değiştirir VE `client_deactivated` denetimini ÖNCE yazar
+--             (fail-closed), koç/var-olmayan hedef 42501, coach_actions kapalı
+--             listesi `client_deactivated`/`client_reactivated`'i KABUL ama
+--             tanımsız action'ı 23514 ile RED, 16/16 account_active_gate
+--             RESTRICTIVE+ALL+authenticated (profiles with_check auth.uid()
+--             İSTİSNASINI TAŞIMAZ), şema sürükleme yok, is_active_user DEFINER
+--             (152)
 --
 -- NOT: `nutrition_logs`, `progress_entries` ve `progress_photos` ayrıca senaryo
 -- 73 (yetki) ve 74 (RLS+FORCE) tarafından DİNAMİK olarak kapsanır — o iki
@@ -10323,5 +10715,5 @@ rollback;
 -- =============================================================================
 do $$
 begin
-  raise notice 'TUM RLS TESTLERI GECTI (148 senaryo)';
+  raise notice 'TUM RLS TESTLERI GECTI (152 senaryo)';
 end $$;

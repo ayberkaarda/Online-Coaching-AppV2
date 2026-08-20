@@ -27,6 +27,7 @@ function makeProfile(overrides: Partial<Profile> = {}): Profile {
     nutrition_plan: null,
     workout_plan: null,
     current_streak: 0,
+    is_active: true,
     last_checkin_at: null,
     // Faz 4.8 (§7c) etkinlik kaydı rıza kolonları — profiles Row'un parçası.
     activity_consent_granted_at: null,
