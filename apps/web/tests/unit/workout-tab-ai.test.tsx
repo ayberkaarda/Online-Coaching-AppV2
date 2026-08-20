@@ -205,7 +205,7 @@ describe('WorkoutTab — Akıllı Antrenör (AI) gönderim', () => {
     await user.type(screen.getByLabelText('Kilo (kg)'), '82')
     await user.selectOptions(screen.getByLabelText('Hedef'), 'cut')
     await user.type(
-      screen.getByLabelText("AI'A TALİMAT VER (PROMPT)"),
+      screen.getByLabelText('ÜRETİCİYE TALİMAT VER (PROMPT)'),
       'Sadece dumbell kullanacağım'
     )
 

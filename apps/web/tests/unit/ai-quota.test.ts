@@ -229,7 +229,7 @@ describe('aiQuotaExceededResponse', () => {
     expect(body.error.code).toBe('AI_QUOTA_EXCEEDED')
     expect(body.error.request_id).toBe('req-123')
     expect(body.error.message).toMatch(/kota/i)
-    expect(body.error.message).toContain('yapay zeka')
+    expect(body.error.message).toContain('plan üretim')
     expect(body.error.message).toContain('5 istek')
   })
 

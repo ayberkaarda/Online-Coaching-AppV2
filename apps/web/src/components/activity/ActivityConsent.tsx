@@ -81,7 +81,7 @@ function ConsentNotice(): JSX.Element {
         <p>
           Hangi sekmeyi görüntülediğiniz ve orada ne kadar kaldığınız; oturum açma ve kapama
           zamanlarınız; ve şu eylemleri yaptığınız anlar: günlük veri girişi, form check (ilerleme
-          fotoğrafı) yükleme, mesaj gönderme, yapay zekâ ile program üretme.
+          fotoğrafı) yükleme, mesaj gönderme, otomatik program üretme.
         </p>
       </div>
       <div>

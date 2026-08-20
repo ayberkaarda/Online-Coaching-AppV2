@@ -1,6 +1,6 @@
 # Güvenlik Politikası
 
-Bu belge, "Closed-Loop Coaching Hub" projesinde bir güvenlik açığı bulan araştırmacılar için
+Bu belge, "Sarmal" projesinde bir güvenlik açığı bulan araştırmacılar için
 sorumlu açıklama (responsible disclosure) sürecini tanımlar. Proje bu belgenin yazıldığı tarihte
 **yayında değildir** ve gerçek danışan verisi barındırmaz — tek bir bağımsız koçun kendi
 pratiği için tasarlanmış, portfolyo amaçlı geliştirilen küçük ölçekli bir uygulamadır; halka

@@ -46,11 +46,11 @@ const ibmPlexMono = IBM_Plex_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: 'Closed-Loop Coaching Hub',
-    template: '%s | Coaching Hub',
+    default: 'Sarmal',
+    template: '%s | Sarmal',
   },
   description: 'Premium Birebir Koçluk ve Gelişim Paneli',
-  applicationName: 'Coaching Hub',
+  applicationName: 'Sarmal',
   // manifest: '/manifest.json', // next-pwa tarafından üretilir
 }
 

@@ -49,8 +49,19 @@ export const mfaQueryKeys = {
   isCoach: () => ['mfa', 'is-coach'] as const,
 } as const
 
-/** Kayıt ekranında kimlik doğrulayıcı uygulamada görünecek hesap etiketi. */
-export const MFA_TOTP_ISSUER = 'Coaching Hub'
+/**
+ * Kayıt ekranında kimlik doğrulayıcı uygulamada görünecek hesap etiketi.
+ *
+ * BİLİNÇLİ GERİYE DÖNÜK OLMAYAN DEĞİŞİKLİK: bu etiket yalnızca `otpauth://` URI'sine
+ * gömülen bir isimdir, secret'ın bir parçası değildir — değişmesi mevcut doğrulamayı
+ * ETKİLEMEZ. Ürün "Coaching Hub"tan "Sarmal"a yeniden adlandırılırken önceden kayıt
+ * olmuş koçların authenticator uygulamasındaki mevcut TOTP faktörleri eski etiketi
+ * ("Coaching Hub") TAŞIMAYA DEVAM EDER — GoTrue kayıtlı faktörün issuer'ını geriye
+ * dönük güncellemez. Yalnızca BUNDAN SONRAKİ yeni kayıtlar "Sarmal" etiketini görür.
+ * Bu tutarsızlık bilinçli kabul edilmiştir; düzeltmek mevcut faktörleri sökme/yeniden
+ * kayıt gerektirir ve bunu zorlayan bir kullanıcı hareketi yok.
+ */
+export const MFA_TOTP_ISSUER = 'Sarmal'
 
 /** Kimlik doğrulayıcı uygulamaların ürettiği kodun uzunluğu (RFC 6238 varsayılanı). */
 export const MFA_TOTP_CODE_LENGTH = 6

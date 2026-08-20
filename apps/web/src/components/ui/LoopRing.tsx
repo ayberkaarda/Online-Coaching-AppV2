@@ -4,8 +4,15 @@
 //
 // TEK ANLAM KURALI: Halka YALNIZCA döngü/çevrim durumu kodlar. Dekorasyon olarak
 // asla kullanılmaz — avatar çerçevesi, buton süsü, arka plan deseni YASAKTIR. Bu
-// kural bir stil tercihi değil, ürünün ("Closed-Loop Coaching Hub") adıyla
-// arayüzünün aynı kavramı göstermesi kararıdır.
+// kural bir stil tercihi değil, ürünün ("Sarmal") adıyla arayüzünün aynı kavramı
+// göstermesi kararıdır: kapalı döngü aynı yere dönseydi bu bir çember olurdu; halka
+// aslında SARMALIN BİR TURUDUR — başladığı yere değil bir üst seviyeye döner, tıpkı
+// antrenman ilerlemesinin kendisi gibi. Ayrıntı ve tam gerekçe için `docs/adr/
+// 0017-imza-oge-halka.md` dosyasının sonundaki "Ek — İsim değişikliği (2026-08-20)"
+// bölümüne bakın. Tek anlam kuralı ve aşağıdaki üç-konum sınırı bu isim
+// değişikliğinden ETKİLENMEDİ; `LoopRing` bileşeni de o ekin gerekçesiyle
+// YENİDEN ADLANDIRILMADI — bu ad sahnedeki nesneyi (bir tur = bir halka) tarif
+// ediyor, ürünü değil.
 //
 // Halkanın ÜÇ görünme yeri vardır, fazlası yok — `LOOP_RING_PURPOSES` bu üçlüyü
 // tipte VE çalışma zamanında kilitler; dördüncü bir yer eklemek ADR-0017'yi

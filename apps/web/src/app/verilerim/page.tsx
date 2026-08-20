@@ -52,7 +52,7 @@ export default function VerilerimPage(): JSX.Element {
         <h1 className="text-3xl font-bold tracking-tight text-fg md:text-4xl">Verilerim</h1>
         <p className="mt-2 max-w-2xl text-sm font-medium text-fg-muted">
           Uygulamadaki etkinliğinizin (oturum açma/kapama, sekme görüntüleme, günlük giriş, form
-          check yükleme, mesaj ve AI kullanımı) kaydıdır. Bu, kendi verinize erişim hakkınızdır
+          check yükleme, mesaj ve program üretimi) kaydıdır. Bu, kendi verinize erişim hakkınızdır
           (KVKK m.11) — koçunuz aynı bilgiyi yalnızca GÜN hassasiyetinde, saat/dakika olmadan görür.
         </p>
       </header>

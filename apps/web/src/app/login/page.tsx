@@ -40,7 +40,7 @@ export default function LoginPage(): JSX.Element {
       <div className="w-full max-w-md rounded-3xl border border-gray-100 bg-white p-8 shadow-2xl dark:border-zinc-800 dark:bg-[#16161d]">
         <div className="mb-8 text-center">
           <h1 className="mb-2 bg-gradient-to-r from-accent to-purple-500 bg-clip-text text-3xl font-black text-transparent">
-            Coaching Hub
+            Sarmal
           </h1>
           <p className="text-sm font-medium uppercase tracking-widest text-gray-500">
             Sisteme Giriş Yapın

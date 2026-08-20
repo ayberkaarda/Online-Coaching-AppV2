@@ -3,6 +3,8 @@
 - **Durum:** Kabul edildi (uygulama Faz 2'de, `LoopRing` bileşeniyle)
 - **Tarih:** 2026-08-17
 - **Karar verenler:** Proje sahibi
+- **Güncelleme:** 2026-08-20 — ürün adı **Sarmal** oldu; karar geçerli, gerekçe genişledi
+  (bkz. sondaki [Ek](#ek--i̇sim-değişikliği-2026-08-20-halkanın-sarmalla-ilişkisi)).
 
 ## Bağlam
 
@@ -99,3 +101,44 @@ o işin kabul kriteridir (`active_planprogram.md` AC-1.6.7 üzerinden Faz 2'ye b
 - `src/components/tabs/NutritionTab.tsx` (halka değil, yatay bar)
 - `src/app/globals.css` (mevcut `prefers-reduced-motion` kuralı — değişmez, kısıtın kaynağı)
 - `active_planprogram.md` §4.2 (halka grafik ifadesi bu ADR ile düzeltildi), §3b
+
+---
+
+## Ek — İsim değişikliği (2026-08-20): halkanın sarmalla ilişkisi
+
+Ürünün adı "Closed-Loop Coaching Hub"tan **Sarmal**'a değişti. Bu ADR'nin bağlam bölümü
+kararı doğrudan eski isme bağladığı için ("Ürünün adı ... ve çekirdek vaadi kapalı
+döngüdür"), gerekçenin güncellenmesi gerekiyor. **Karar iptal edilmiyor.**
+
+**Değişmeyenler:**
+
+- Ürünün imza öğesi **halkadır**.
+- **Tek anlam kuralı** aynen yürürlüktedir: halka yalnızca döngü/çevrim durumu kodlar;
+  dekoratif kullanım (avatar çerçevesi, buton süsü, arka plan deseni) yasaktır.
+- Halkanın **üç** görünme yeri vardır; dördüncüsü bu ADR'yi güncellemeyi gerektirir.
+- `LoopRing` bileşeni **yeniden adlandırılmaz.** Bileşen adı sahnedeki nesneyi tarif eder
+  (bir tur = bir halka), ürün adını değil; yeniden adlandırma testleri ve üç çağrı yerini
+  bedelsiz olmayan bir diff'e sokar, karşılığında hiçbir anlam kazandırmaz.
+- Hareket azaltma kısıtı (`stroke-dashoffset` state'ten gelir, animasyondan değil) bir
+  **doğruluk** meselesidir ve isimden bağımsızdır.
+
+**Değişen — gerekçe:** eski isim halkayı bire bir karşılıyordu ("closed loop" = kapalı halka).
+Yeni isim metaforu daraltmıyor, **bir boyut ekliyor**: **halka, sarmalın bir turudur.**
+Kapalı döngü aynı yere dönmez; her tur — plan atandı → uygulandı → rapor geldi → geri bildirim
+verildi — bir sonrakini bir üst seviyeden başlatır. Antrenman ilerlemesinin kendisi budur:
+tekrar eden bir çevrim, ama üst üste binen değil, yükselen bir çevrim.
+
+Bu, arayüzde şu şekilde okunur ve **yeni bir görsel öğe getirmez**:
+
+- Haftalık döngü halkası bir turdur; ardışık haftalar sarmalın ardışık turlarıdır.
+- Koç triyaj kartının 4 yayı bir turun dört evresidir; kapanınca tur biter, sıradaki başlar.
+- Gym modu dinlenme sayacı tek bir turun en küçük ölçeğidir.
+
+Sarmalı **çizmeye kalkışmıyoruz.** Sarmal ismin taşıdığı kavramdır; ekranda görünen şey her
+zaman tek bir turdur — yani halka. Bir "sarmal grafiği" eklemek tek anlam kuralını bozar
+(halka artık iki şeyi birden söylemeye başlar) ve bu ADR'nin "Olumsuz" bölümündeki dördüncü-yer
+yasağının aynısına takılır. Böyle bir öğe istenirse bu ADR güncellenir.
+
+**Sonuç:** ADR-0017'nin "Olumlu" maddesindeki "ürünün adı ile arayüzün gösterdiği şey aynı
+kavramı işaret eder" ifadesi geçerliliğini korur — sadece kavram artık "kapalı döngü" değil,
+"bir üst seviyeye taşıyan döngü"dür ve halka bunun tek turudur.

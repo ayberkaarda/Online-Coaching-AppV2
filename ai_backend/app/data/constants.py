@@ -52,3 +52,66 @@ HIGH_VOLUME_CARB_GRAM_CAP: int = 80
 #: Kuruyemiş bazlı yağ kaynakları için tek öğün üst sınırı.
 NUT_FAT_SOURCES: tuple[str, ...] = ("Çiğ Badem", "Ceviz", "Fıstık Ezmesi")
 NUT_FAT_GRAM_CAP: int = 30
+
+# ---------------------------------------------------------------------------
+# Antrenman: 4 haftalık progresif aşırı yükleme dalgası
+# ---------------------------------------------------------------------------
+#: Mezosiklus uzunluğu (hafta). Blok periyodizasyon veya otomatik deload YOKTUR;
+#: tek bir doğrusal dalga uygulanır.
+MESOCYCLE_WEEKS: int = 4
+
+#: Hafta (1..4) -> (temel set sayısına eklenen set, o haftanın RIR etiketi).
+#: Hafta 1-2 hacim sabit, yük RIR düşürülerek artar; hafta 3-4'te set sayısı +1.
+#: RIR etiketlerinde tire (-) KULLANILMAZ: plan metnindeki ilerleme satırı web
+#: tarafındaki yedek ayrıştırıcıya (parseDayPlan) egzersiz gibi görünmemelidir.
+#: Kaynak mantık: Schoenfeld ve ark. (2017) hacim-yanıt ilişkisi + RIR bazlı
+#: otoregülasyon (Helms ve ark., 2016).
+WEEKLY_PROGRESSION: tuple[tuple[int, str], ...] = (
+    (0, "3"),
+    (0, "2"),
+    (1, "1"),
+    (1, "0/1"),
+)
+
+# ---------------------------------------------------------------------------
+# Beslenme: öğün yapısı
+# ---------------------------------------------------------------------------
+#: Günün adlandırılmış öğünleri. Protein ve karbonhidrat seçimleri sırayla bu
+#: öğünlere bağlanır (i'inci seçim -> i'inci öğün).
+MEALS: tuple[str, ...] = ("Kahvaltı", "Öğle", "Ara Öğün", "Akşam")
+
+#: Yağ kaynaklarının dağıtıldığı öğünlerin ``MEALS`` içindeki indeksleri
+#: (Öğle ve Akşam). Kahvaltı/ara öğün yağını besinlerin kendi yağı karşılar.
+FAT_MEAL_INDEXES: tuple[int, ...] = (1, 3)
+
+#: Kahvaltıda kullanılabilecek protein kaynakları. Kahvaltı öğününde tavuk
+#: göğsü / dana eti gibi kaynakların çıkmaması için bilinçli bir alt kümedir.
+BREAKFAST_PROTEINS: tuple[str, ...] = ("Yumurta", "Lor Peyniri", "Whey Protein")
+
+#: Öğün başına alt gramaj sınırları (porsiyonun anlamsız küçüklükte olmaması için).
+MIN_PROTEIN_PORTION_G: int = 50
+MIN_CARB_PORTION_G: int = 40
+MIN_FAT_PORTION_G: int = 10
+
+#: Besin bazlı alt sınır istisnaları. Whey için 50g (~1.7 ölçek) gereksiz yüksek
+#: bir taban; tek ölçek (~30g) gerçekçi porsiyondur ve kalan proteini gerçek
+#: yiyeceklere bırakır.
+PORTION_MIN_OVERRIDES: dict[str, int] = {"Whey Protein": 30}
+
+#: Alt gramaj sınırlarının tam olarak uygulandığı referans kalori. Hedef bunun
+#: altındaysa sınırlar orantılı küçülür — aksi halde çok düşük kalorili
+#: hedeflerde (ör. hafif kilolu bir danışanın agresif cut'ı) yalnızca taban
+#: porsiyonlar bile hedefi aşar ve plan hedefe yakınsayamaz.
+MIN_PORTION_REFERENCE_KCAL: int = 1800
+
+#: Günlük yağ hedefinin, protein kaynaklarının kendi yağına ayrılan payı.
+#: Kalan pay karbonhidrat kaynaklarının yağına ve eklenen yağ kaynaklarına
+#: bırakılır. Protein seçimi bu bütçeye göre yapılır: bütçe darsa (agresif
+#: cut) yağlı kaynaklar (dana eti, somon, yumurta) elenir — diyetisyen
+#: refleksinin kural tabanlı karşılığı.
+PROTEIN_FAT_BUDGET_SHARE: float = 0.6
+
+#: Makro yakınsaması için sabit nokta iterasyon sayısı. Protein kaynakları yağ,
+#: karbonhidrat kaynakları protein taşır; gramajlar birkaç geçişte karşılıklı
+#: katkılar düşülerek yeniden hesaplanır. Optimizasyon çözücü DEĞİLDİR.
+MACRO_CONVERGENCE_PASSES: int = 4

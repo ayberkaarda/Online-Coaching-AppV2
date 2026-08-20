@@ -1,6 +1,7 @@
 'use client'
 
-// Yapay zeka üretimleri. İstekler kendi /api/ai/* proxy route'larımıza gider.
+// Otomatik plan üretimleri (kural tabanlı backend — ADR-0021, LLM yoktur).
+// İstekler kendi /api/ai/* proxy route'larımıza gider.
 
 import { useMutation } from '@tanstack/react-query'
 
@@ -30,7 +31,7 @@ export function useGenerateWorkout() {
   return useMutation<WorkoutGenerateResult, Error, WorkoutGenerateInput>({
     mutationFn: (input) => generateWorkoutPlan(supabase, input),
     onSuccess: () => {
-      notify.success('Yapay zeka antrenman programını oluşturdu.')
+      notify.success('Antrenman programı oluşturuldu.')
     },
     onError: (error) => {
       notify.error(`Program oluşturulamadı: ${toUserMessage(error)}`)
@@ -45,7 +46,7 @@ export function useGenerateDiet() {
   return useMutation<DietGenerateResult, Error, DietGenerateInput>({
     mutationFn: (input) => generateDietPlan(supabase, input),
     onSuccess: () => {
-      notify.success('Yapay zeka beslenme programını oluşturdu.')
+      notify.success('Beslenme programı oluşturuldu.')
     },
     onError: (error) => {
       notify.error(`Beslenme programı oluşturulamadı: ${toUserMessage(error)}`)

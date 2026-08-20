@@ -35,19 +35,107 @@ def test_default_rest_days_per_split_type() -> None:
 
 
 def test_determine_base_sets_bulk_young() -> None:
-    assert determine_base_sets("bulk", 25) == "4x8-12 (RIR 0-1)"
+    assert determine_base_sets("bulk", 25, "compound") == "4x5-8 (RIR 3)"
+    assert determine_base_sets("bulk", 25, "isolation") == "3x10-15 (RIR 3)"
 
 
-def test_determine_base_sets_bulk_older_falls_back_to_default() -> None:
-    assert determine_base_sets("bulk", 35) == "3x10-12"
+def test_determine_base_sets_bulk_older_uses_lower_volume() -> None:
+    assert determine_base_sets("bulk", 35, "compound") == "4x6-8 (RIR 3)"
+    assert determine_base_sets("bulk", 35, "isolation") == "3x10-12 (RIR 3)"
 
 
-def test_determine_base_sets_cut() -> None:
-    assert determine_base_sets("cut", 40) == "3x8-10 (RIR 1-2 / Kas Koruma)"
+def test_determine_base_sets_cut_marks_muscle_retention() -> None:
+    assert determine_base_sets("cut", 40, "compound") == "3x6-8 (RIR 3 / Kas Koruma)"
+    assert determine_base_sets("cut", 40, "isolation") == "3x12-15 (RIR 3 / Kas Koruma)"
 
 
 def test_determine_base_sets_maintain() -> None:
-    assert determine_base_sets("maintain", 40) == "3x10-12"
+    assert determine_base_sets("maintain", 40, "compound") == "3x6-8 (RIR 3)"
+    assert determine_base_sets("maintain", 40, "isolation") == "3x10-12 (RIR 3)"
+
+
+def test_determine_base_sets_defaults_to_compound_week_one() -> None:
+    assert determine_base_sets("maintain", 40) == determine_base_sets("maintain", 40, "compound", week=1)
+
+
+def test_determine_base_sets_compound_and_isolation_differ() -> None:
+    """Aynı seansta bileşik ve izolasyon hareketleri AYNI şemayı almaz."""
+    for goal in ("bulk", "cut", "maintain"):
+        compound = determine_base_sets(goal, 25, "compound")  # type: ignore[arg-type]
+        isolation = determine_base_sets(goal, 25, "isolation")  # type: ignore[arg-type]
+        assert compound != isolation
+
+
+def test_determine_base_sets_progresses_over_four_weeks() -> None:
+    """4 haftalık dalga: RIR düşer, son iki haftada set sayısı artar."""
+    weekly = [determine_base_sets("bulk", 25, "compound", week=w) for w in range(1, 5)]
+
+    assert weekly == [
+        "4x5-8 (RIR 3)",
+        "4x5-8 (RIR 2)",
+        "5x5-8 (RIR 1)",
+        "5x5-8 (RIR 0/1)",
+    ]
+
+
+def test_determine_base_sets_clamps_week_out_of_range() -> None:
+    assert determine_base_sets("bulk", 25, "compound", week=0) == determine_base_sets("bulk", 25, "compound", week=1)
+    assert determine_base_sets("bulk", 25, "compound", week=99) == determine_base_sets("bulk", 25, "compound", week=4)
+
+
+def test_generate_workout_uses_different_schemes_within_a_session() -> None:
+    """Squat ile yan kaldırış aynı set/tekrarı almaz (slot etiketi farklılaştırır)."""
+    req = WorkoutAnalyzeRequest(split_type="ppl", user_prompt="", age=25, goal="bulk", weight=80)
+
+    plan = generate_workout(req, rng=random.Random(42)).workout_plan["Pazartesi"]
+    exercise_lines = [line for line in plan.splitlines() if line and line[0].isdigit()]
+
+    assert any("4x5-8 (RIR 3)" in line for line in exercise_lines)
+    assert any("3x10-15 (RIR 3)" in line for line in exercise_lines)
+
+
+def test_generate_workout_includes_weekly_progression_line() -> None:
+    req = WorkoutAnalyzeRequest(split_type="ppl", user_prompt="", age=25, goal="bulk", weight=80)
+
+    plan = generate_workout(req, rng=random.Random(42)).workout_plan["Pazartesi"]
+
+    assert "4 haftalık ilerleme" in plan
+    assert "RIR 3→2→1→0/1" in plan
+
+
+def test_progression_line_has_no_hyphen() -> None:
+    """İlerleme satırı web tarafındaki yedek ayrıştırıcıya egzersiz gibi görünmemeli.
+
+    ``parseDayPlan`` tire içeren satırları egzersiz sanar; ilerleme satırında
+    tire olmaması bilinçli bir kısıttır.
+    """
+    req = WorkoutAnalyzeRequest(split_type="ppl", user_prompt="", age=25, goal="bulk", weight=80)
+
+    plan = generate_workout(req, rng=random.Random(3)).workout_plan["Pazartesi"]
+    progression = [line for line in plan.splitlines() if "haftalık ilerleme" in line]
+
+    assert len(progression) == 1
+    assert "-" not in progression[0]
+
+
+def test_generate_workout_message_is_honest_about_being_rule_based() -> None:
+    """Motor kural tabanlıdır; çıktı kendini yapay zeka olarak TANITMAZ (ADR-0021)."""
+    req = WorkoutAnalyzeRequest(split_type="ppl", user_prompt="", age=25, goal="bulk", weight=80)
+
+    result = generate_workout(req, rng=random.Random(1))
+    haystack = " ".join([result.message, result.ai_analysis, *result.workout_plan.values()]).lower()
+
+    assert "yapay zeka" not in haystack
+    assert "kural tabanlı" in result.message.lower()
+
+
+def test_generate_workout_analysis_contains_single_rationale_line() -> None:
+    req = WorkoutAnalyzeRequest(split_type="ppl", user_prompt="", age=25, goal="bulk", weight=80)
+
+    analysis = generate_workout(req, rng=random.Random(1)).ai_analysis
+
+    assert analysis.count("Gerekçe:") == 1
+    assert "progresif aşırı yükleme" in analysis
 
 
 def test_generate_workout_is_deterministic_with_seeded_rng() -> None:

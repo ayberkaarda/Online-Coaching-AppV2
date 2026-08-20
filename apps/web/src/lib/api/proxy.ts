@@ -223,7 +223,7 @@ export async function handleAiProxy<TOut>(
     return errorResponse(
       503,
       'AI_BACKEND_UNAVAILABLE',
-      'Yapay zeka servisine şu anda ulaşılamıyor. Lütfen daha sonra tekrar deneyin.',
+      'Plan üretim servisine şu anda ulaşılamıyor. Lütfen daha sonra tekrar deneyin.',
       requestId
     )
   } finally {
@@ -240,7 +240,7 @@ export async function handleAiProxy<TOut>(
     return errorResponse(
       502,
       'AI_BACKEND_ERROR',
-      'Yapay zeka servisi şu anda yanıt vermiyor.',
+      'Plan üretim servisi şu anda yanıt vermiyor.',
       requestId
     )
   }
@@ -254,7 +254,7 @@ export async function handleAiProxy<TOut>(
     return errorResponse(
       502,
       'AI_BACKEND_ERROR',
-      'Yapay zeka servisi şu anda yanıt vermiyor.',
+      'Plan üretim servisi şu anda yanıt vermiyor.',
       requestId
     )
   }

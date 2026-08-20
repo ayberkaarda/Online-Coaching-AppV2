@@ -304,18 +304,22 @@ gerekçeliydi, ama **hiçbiri bu ADR'ye karşı denetlenmedi ve ADR hiç güncel
 o denetimi şimdi, geriye dönük olarak yapar. Karar (§Karar, §5.3/§4) **değiştirilmiyor** —
 aşağıdaki yalnızca bir ölçüm ve bir değerlendirmedir.
 
-### Beş uç — tam liste
+### Altı uç — tam liste
 
-`grep -rl SUPABASE_SERVICE_ROLE_KEY apps/web/src` bugün tam olarak beş dosyada eşleşiyor
-(artı okuma tanımının kendisi, `apps/web/src/env.server.ts`):
+`grep -rl SUPABASE_SERVICE_ROLE_KEY apps/web/src` bugün tam olarak yedi dosyada eşleşiyor —
+altı uca karşılık gelir (`apps/web/src/app/api/activity/route.ts` ve
+`apps/web/src/app/api/activity/shared.ts` aynı ucun, #3'ün, iki parçasıdır) — artı okuma
+tanımının kendisi, `apps/web/src/env.server.ts` (toplam sekiz dosya). Faz 4.9 dilim 1
+(danışan daveti) altıncı ucu ekledi; bu ek o satırı **aynı turda** kayda geçiriyor.
 
-| #   | Dosya                                                                                | Faz / borç                          | `service_role` ile çağrılan RPC(ler)                                      | Gerekçe (kaynaktan)                                                                                                                                                                                                                  |
-| --- | ------------------------------------------------------------------------------------ | ----------------------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 1   | `apps/web/src/app/api/account/delete/route.ts`                                       | Bu ADR'nin kendisi (Faz 4.6, B-042) | `account_deletion_manifest`, `delete_account` + Storage API (dosya silme) | `auth.users` satırını `authenticated` silemez; koçun danışan konuşmasına yüklediği ekleri danışanın kendi yetkisi silemez (ölçüm 4)                                                                                                  |
-| 2   | `apps/web/src/app/api/attachments/verify/route.ts`                                   | Faz 4.6, B-028 (AC-4.6.4)           | `record_attachment_verification`                                          | Doğrulama damgasını yazan RPC'nin EXECUTE'u yalnızca `service_role`'de olmalı — aksi hâlde tarayıcıdaki kod kendi kendini "doğrulanmış" ilan edebilirdi (dosya başı yorum, §"NEDEN service_role")                                    |
-| 3   | `apps/web/src/app/api/activity/route.ts` + `apps/web/src/app/api/activity/shared.ts` | Faz 4.8 dilim 2 (§7c)               | `record_activity`                                                         | §7c'nin "tarayıcıdan doğrudan Supabase yazımı yok" kararının şema seviyesindeki karşılığı; `activity_sessions`/`activity_events`'e ve rıza damgalarına yazan TEK yol bu route'lardır (`shared.ts` dosya başı yorumu)                 |
-| 4   | `apps/web/src/app/api/activity/consent/route.ts`                                     | Faz 4.8 dilim 2                     | `grant_activity_consent`, `revoke_activity_consent`                       | Aynı gerekçe (3) ile aynı `shared.ts` çekirdeğini paylaşır; `revoke` ayrıca kullanıcının tüm `activity_*` satırlarını aynı transaksiyonda siler (KVKK m.7)                                                                           |
-| 5   | `apps/web/src/app/api/coach/reset-client-password/route.ts`                          | Faz 4.7 dilim 3                     | `record_coach_action`                                                     | `coach_actions` sıfır politikalı (grant var, politika yok); denetim satırı yazılamazsa müdahale (şifre sıfırlama e-postası) **hiç tetiklenmez** — iz bırakmadan yapılan müdahale, hiç yapılamayan müdahaleden daha kötü kabul edildi |
+| #   | Dosya                                                                                | Faz / borç                          | `service_role` ile çağrılan RPC(ler)                                                             | Gerekçe (kaynaktan)                                                                                                                                                                                                                                                                                                     |
+| --- | ------------------------------------------------------------------------------------ | ----------------------------------- | ------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | `apps/web/src/app/api/account/delete/route.ts`                                       | Bu ADR'nin kendisi (Faz 4.6, B-042) | `account_deletion_manifest`, `delete_account` + Storage API (dosya silme)                        | `auth.users` satırını `authenticated` silemez; koçun danışan konuşmasına yüklediği ekleri danışanın kendi yetkisi silemez (ölçüm 4)                                                                                                                                                                                     |
+| 2   | `apps/web/src/app/api/attachments/verify/route.ts`                                   | Faz 4.6, B-028 (AC-4.6.4)           | `record_attachment_verification`                                                                 | Doğrulama damgasını yazan RPC'nin EXECUTE'u yalnızca `service_role`'de olmalı — aksi hâlde tarayıcıdaki kod kendi kendini "doğrulanmış" ilan edebilirdi (dosya başı yorum, §"NEDEN service_role")                                                                                                                       |
+| 3   | `apps/web/src/app/api/activity/route.ts` + `apps/web/src/app/api/activity/shared.ts` | Faz 4.8 dilim 2 (§7c)               | `record_activity`                                                                                | §7c'nin "tarayıcıdan doğrudan Supabase yazımı yok" kararının şema seviyesindeki karşılığı; `activity_sessions`/`activity_events`'e ve rıza damgalarına yazan TEK yol bu route'lardır (`shared.ts` dosya başı yorumu)                                                                                                    |
+| 4   | `apps/web/src/app/api/activity/consent/route.ts`                                     | Faz 4.8 dilim 2                     | `grant_activity_consent`, `revoke_activity_consent`                                              | Aynı gerekçe (3) ile aynı `shared.ts` çekirdeğini paylaşır; `revoke` ayrıca kullanıcının tüm `activity_*` satırlarını aynı transaksiyonda siler (KVKK m.7)                                                                                                                                                              |
+| 5   | `apps/web/src/app/api/coach/reset-client-password/route.ts`                          | Faz 4.7 dilim 3                     | `record_coach_action`                                                                            | `coach_actions` sıfır politikalı (grant var, politika yok); denetim satırı yazılamazsa müdahale (şifre sıfırlama e-postası) **hiç tetiklenmez** — iz bırakmadan yapılan müdahale, hiç yapılamayan müdahaleden daha kötü kabul edildi                                                                                    |
+| 6   | `apps/web/src/app/api/coach/invite-client/route.ts`                                  | Faz 4.9 dilim 1                     | `record_coach_action`, `link_coach_action_target` + `admin.inviteUserByEmail` (GoTrue Admin API) | Davet edilen kullanıcı HENÜZ YOKTUR — `authenticated` hiçbir bağlamda `auth.users`'a satır ekleyemez; `coach_actions` sıfır politikalıdır; ayrıca hedef profil hiç okunmadığı için `mfa_aal2_gate`'in TESADÜFİ koruması (bkz. uç #5'in altındaki not) bu uçta YOKTUR — `aal2` route içinde AÇIKÇA doğrulanır (ADR-0027) |
 
 Beşinci satırda dikkat: `resetPasswordForEmail` çağrısının kendisi **anon key** ile,
 kimliksiz bir istemciyle yapılır (dosya başı yorum, "KARAR" bloğu) — `service_role` bu route'ta
@@ -323,44 +327,71 @@ yalnızca denetim satırını yazmak için kullanılır, e-posta tetikleme adım
 şekilde uç #2'de baytları okuma ve uyumsuz nesneyi silme adımları da kullanıcının **kendi**
 token'ıyla (RLS altında) yapılır; `service_role` yalnızca son damga yazımı için devreye girer.
 
+Altıncı satırda dikkat — ve bu, beşinci uçtan **açıkça farklıdır, gizlenmez**: uç #6'da
+`service_role` yalnızca denetim satırları için değil, **davetin/kullanıcı oluşturmanın kendisi
+için de** kullanılır — `admin.inviteUserByEmail` çağrısının kendisi `service_role` ile kurulan
+`admin` istemcisiyle yapılır (`route.ts` satır 415). Uç #5'te e-posta tetikleme adımı **anon
+key** ile kimliksiz bir istemciden yapılıyordu (yukarıdaki paragraf); burada öyle değildir —
+GoTrue'nun kullanıcı davet/oluşturma uç noktası zaten yalnızca `service_role` ile çağrılabilir,
+anon key ile çağrılabilecek bir eşdeğeri yoktur. Sonuç: uç #6, bu ADR'nin listelediği altı ucun
+içinde `service_role`'ü hem denetim izi hem de asıl iş (kullanıcı yaratma) için kullanan **tek**
+uçtur.
+
 ### Disiplin denetimi (ölçüldü, varsayılmadı)
 
-| Kontrol                                                                                                                                                                                                  |                             #1 delete                              |           #2 attachments/verify            |                 #3 activity                  |                  #4 activity/consent                  |           #5 coach/reset-client-password           |
-| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :----------------------------------------------------------------: | :----------------------------------------: | :------------------------------------------: | :---------------------------------------------------: | :------------------------------------------------: |
-| `import 'server-only'` dosya başında                                                                                                                                                                     |                            ✓ (satır 1)                             |                ✓ (satır 1)                 |    ✓ (satır 1, `route.ts` + `shared.ts`)     |                      ✓ (satır 1)                      |                    ✓ (satır 1)                     |
-| Anahtar `getServerEnv()` üzerinden okunuyor (doğrudan `process.env` değil)                                                                                                                               |                                 ✓                                  |                     ✓                      |          ✓ (`shared.ts` üzerinden)           |               ✓ (`shared.ts` üzerinden)               |                         ✓                          |
-| Anahtar yoksa fail-closed 503 (sessiz "başarılı" yok)                                                                                                                                                    |                  ✓ `ACCOUNT_DELETION_UNAVAILABLE`                  |  ✓ `ATTACHMENT_VERIFICATION_UNAVAILABLE`   |           ✓ `ACTIVITY_UNAVAILABLE`           |               ✓ `ACTIVITY_UNAVAILABLE`                |         ✓ `COACH_ACTION_AUDIT_UNAVAILABLE`         |
-| EXECUTE yalnızca `service_role` (migration: `revoke all ... from public/anon/authenticated` + `grant execute ... to service_role`, ve migration içinde `has_function_privilege` ile runtime doğrulaması) | ✓ (20260819100000 / 20260820090000 §6, satır 1036-1039, 1133-1136) | ✓ (20260819110000, satır 238-241, 418-422) | ✓ (20260820090000, satır 795-798, 1244-1267) | ✓ (aynı migration, satır 280-283, 346-349, 1244-1267) |     ✓ (20260819130000, satır 193-196, 430-436)     |
-| `SECURITY DEFINER` + pinli `search_path = public, pg_temp`                                                                                                                                               |                                 ✓                                  |                     ✓                      |                      ✓                       |                           ✓                           |                         ✓                          |
-| Anahtar/token log satırına, hata gövdesine veya yanıt başlığına yazılmıyor                                                                                                                               |           ✓ (uid de yazılmaz, yalnızca sayı/`requestId`)           |                     ✓                      |                      ✓                       |                           ✓                           | ✓ (e-posta yalnızca `maskEmailForLog` ile maskeli) |
+| Kontrol                                                                                                                                                                                                  |                             #1 delete                              |           #2 attachments/verify            |                 #3 activity                  |                  #4 activity/consent                  |           #5 coach/reset-client-password           |                                                                                #6 coach/invite-client                                                                                 |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :----------------------------------------------------------------: | :----------------------------------------: | :------------------------------------------: | :---------------------------------------------------: | :------------------------------------------------: | :-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------: |
+| `import 'server-only'` dosya başında                                                                                                                                                                     |                            ✓ (satır 1)                             |                ✓ (satır 1)                 |    ✓ (satır 1, `route.ts` + `shared.ts`)     |                      ✓ (satır 1)                      |                    ✓ (satır 1)                     |                                                                                      ✓ (satır 1)                                                                                      |
+| Anahtar `getServerEnv()` üzerinden okunuyor (doğrudan `process.env` değil)                                                                                                                               |                                 ✓                                  |                     ✓                      |          ✓ (`shared.ts` üzerinden)           |               ✓ (`shared.ts` üzerinden)               |                         ✓                          |                                                                                     ✓ (satır 357)                                                                                     |
+| Anahtar yoksa fail-closed 503 (sessiz "başarılı" yok)                                                                                                                                                    |                  ✓ `ACCOUNT_DELETION_UNAVAILABLE`                  |  ✓ `ATTACHMENT_VERIFICATION_UNAVAILABLE`   |           ✓ `ACTIVITY_UNAVAILABLE`           |               ✓ `ACTIVITY_UNAVAILABLE`                |         ✓ `COACH_ACTION_AUDIT_UNAVAILABLE`         |                                                       ✓ `COACH_ACTION_AUDIT_UNAVAILABLE` (satır 356-369, aynı sabit uç #5 ile)                                                        |
+| EXECUTE yalnızca `service_role` (migration: `revoke all ... from public/anon/authenticated` + `grant execute ... to service_role`, ve migration içinde `has_function_privilege` ile runtime doğrulaması) | ✓ (20260819100000 / 20260820090000 §6, satır 1036-1039, 1133-1136) | ✓ (20260819110000, satır 238-241, 418-422) | ✓ (20260820090000, satır 795-798, 1244-1267) | ✓ (aynı migration, satır 280-283, 346-349, 1244-1267) |     ✓ (20260819130000, satır 193-196, 430-436)     | ✓ `record_coach_action` yeniden bildirimi (20260820160000, satır 267-270) + YENİ `link_coach_action_target` (aynı migration, satır 331-334) + runtime doğrulama §5(e) (satır 469-476) |
+| `SECURITY DEFINER` + pinli `search_path = public, pg_temp`                                                                                                                                               |                                 ✓                                  |                     ✓                      |                      ✓                       |                           ✓                           |                         ✓                          |                                                 ✓ `record_coach_action` (satır 238-240) + `link_coach_action_target` (satır 303-305)                                                  |
+| Anahtar/token log satırına, hata gövdesine veya yanıt başlığına yazılmıyor                                                                                                                               |           ✓ (uid de yazılmaz, yalnızca sayı/`requestId`)           |                     ✓                      |                      ✓                       |                           ✓                           | ✓ (e-posta yalnızca `maskEmailForLog` ile maskeli) |                               ✓ (e-posta yalnızca `maskEmailForLog` ile maskeli, satır 350/425/471; davet bağlantısı `UserResponse` tipinde zaten yok)                                |
 
-Yedi ölçüm de **yeşil**. Ek bulgu (gri alan — ne ihlal ne göz ardı edilecek): `service_role`'e
-EXECUTE verilmiş **sekizinci** bir fonksiyon daha var — `purge_expired_activity` (aynı
-migration, satır 857-860). Bu, yukarıdaki beş uçtan hiçbirinin `admin.rpc(...)` ile
-**çağırmadığı** bir fonksiyondur; yalnızca `pg_cron` (birincil) ve `record_activity()`'nin
-içinden fırsatçı çağrıyla (ikincil, satır ~780) tetiklenir — yani HTTP isteği yoluyla asla
-`service_role` istemcisinden geçmez. Uygulama süreci onu hiç çağırmadığı için "beş uç" sayımını
-değiştirmez, ama veritabanı düzeyinde `service_role` anahtarının **çalıştırabileceği** fonksiyon
-kümesi (yani sızmış bir anahtarla yapılabilecekler) beş değil **sekiz**'dir. Bu, "iki fonksiyon"
-diyen orijinal ADR metninin bugün için eksik olduğu tek nokta — güvenlik açığı değil, sayım
-farkı.
+Yedi ölçüm de **yeşil** (altı ucun her birinde — bkz. yukarıdaki tablonun #6 sütunu). Tabloda
+altı satır var ama "yedi" doğrudur: dördüncü satır (`EXECUTE yalnızca service_role`) tek hücrede
+İKİ ayrı ölçümü bir arada taşır — migration'ın **bildirimsel** `revoke`/`grant` çiftini VE ayrıca
+migration'ın kendi doğrulama bloğundaki **runtime** `has_function_privilege` kontrolünü. #6
+sütunu bu ikiliği aynen korur: `record_coach_action`in yeniden bildirimi (satır 267-270) ve
+`link_coach_action_target`in bildirimi (satır 331-334) bildirimsel yarıyı, migration §5(e)'deki
+`has_function_privilege` çağrıları (satır 469-476) runtime yarıyı karşılar — yani 6 satır ×
+(diğer beşi 1'er + bu satır 2) = 7 ölçüm. Ek bulgu (gri alan — ne ihlal ne göz ardı edilecek):
+`service_role`'e EXECUTE verilmiş **dokuzuncu** bir fonksiyon daha var — `purge_expired_activity`
+(aynı migration, satır 857-860; bu satırın kendisi değişmedi, yalnızca sıradaki yeri kaydı). Bu,
+yukarıdaki altı uçtan hiçbirinin `admin.rpc(...)` ile **çağırmadığı** tek fonksiyondur; yalnızca
+`pg_cron` (birincil) ve `record_activity()`'nin içinden fırsatçı çağrıyla (ikincil, satır ~780)
+tetiklenir — yani HTTP isteği yoluyla asla `service_role` istemcisinden geçmez. Buna karşılık
+Faz 4.9 dilim 1'in eklediği `link_coach_action_target`
+(`20260820160000_coach_invite_action.sql` satır 298-326) **çağrılan** bir fonksiyondur: uç #6
+adım 10'da `admin.rpc('link_coach_action_target', ...)` ile onu doğrudan tetikler (`route.ts`
+satır 448). Uygulama süreci `purge_expired_activity`'yi hiç
+çağırmadığı için "altı uç" sayımını değiştirmez, ama veritabanı düzeyinde `service_role`
+anahtarının **çalıştırabileceği** fonksiyon kümesi (yani sızmış bir anahtarla yapılabilecekler)
+sekiz değil **dokuz**'dur (`account_deletion_manifest`, `delete_account`,
+`record_attachment_verification`, `record_activity`, `grant_activity_consent`,
+`revoke_activity_consent`, `purge_expired_activity`, `record_coach_action`,
+`link_coach_action_target`). Bu, "iki fonksiyon" diyen orijinal ADR metninin bugün için eksik
+olduğu tek nokta — güvenlik açığı değil, sayım farkı.
 
 ### Değerlendirme
 
-**Yüzey büyüdü, disiplin gevşemedi.** Beş ucun da yedi kontrolü de geçmesi — hepsi
+**Yüzey büyüdü, disiplin gevşemedi.** Altı ucun da yedi kontrolü de geçmesi — hepsi
 `server-only`, hepsi fail-closed, hepsi migration-seviyesinde `has_function_privilege` ile
 kendi kendini doğrulayan dar bir EXECUTE grant'i, hepsi anahtarı/uid'yi/e-postayı asla açık
 loglamıyor — tesadüf değil: her yeni uç, önceki ucun (çoğunlukla bu ADR'nin ya da
 `account/delete/route.ts`'nin) dosya başı yorumunda **açıkça "AYNI gerekçe" diyerek** deseni
 kopyaladı (`attachments/verify`: "Anahtar disiplini ADR-0025 ile aynıdır"; `activity/shared.ts`:
 "ANAHTAR DİSİPLİNİ ... birebir aynı"; `coach/reset-client-password`: "AYNI gerekçe:
-`account/delete/route.ts`"). Yani **kod disiplini** organik olarak korundu — geliştirici(ler)
-her seferinde bu ADR'yi örnek aldı, sadece belgeyi güncellemedi.
+`account/delete/route.ts`"; `coach/invite-client`: "`account/delete/route.ts` ve
+`reset-client-password` ile AYNI gerekçe"). Yani **kod disiplini** organik olarak korundu —
+geliştirici(ler) her seferinde bu ADR'yi örnek aldı.
 
-Gevşeyen tek şey **süreç** disiplinidir: ADR'nin kendi yazdığı "yeni uç eklenirse bu ADR
-güncellenir" kuralı üç kez arka arkaya çiğnendi (Faz 4.6, 4.7, 4.8 — hiçbiri bu dosyaya
-dokunmadı). Bu ek, o borcu şimdi kapatıyor; ileride tekrarlanmaması için aşağıdaki kural
-yazılı hâle getiriliyor.
+Gevşeyen şey daha önce **süreç** disipliniydi: ADR'nin kendi yazdığı "yeni uç eklenirse bu ADR
+güncellenir" kuralı üç kez arka arkaya çiğnenmişti (Faz 4.6, 4.7, 4.8 — hiçbiri bu dosyaya
+dokunmamıştı). Bu ek o borcu geriye dönük olarak kapattı. **Faz 4.9 dilim 1 ise bu kuralın ilk
+kez zamanında uygulandığı turdur:** altıncı uç (`coach/invite-client`) kendi migration'ı ve
+route'uyla **aynı commit'te** bu ADR'ye bir satır olarak eklendi — üç kez çiğnenen kural burada
+ilk kez tam olarak işledi, geriye dönük bir düzeltme gerekmedi.
 
 ### İleriye dönük kural
 

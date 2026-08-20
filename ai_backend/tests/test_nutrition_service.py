@@ -8,7 +8,6 @@ import pytest
 
 from app.schemas.nutrition import NutritionAnalyzeRequest
 from app.services.diet_generator import (
-    _format_daily_foods,
     apply_food_preferences,
     generate_diet_plan,
 )
@@ -161,7 +160,5 @@ def test_generate_diet_plan_single_protein_message() -> None:
     assert "'Tek çeşit protein' isteği uygulandı." in analysis
 
 
-def test_format_daily_foods_egg_shows_adet_count() -> None:
-    formatted = _format_daily_foods({"Yumurta": 150, "Tavuk Göğsü": 200})
-
-    assert formatted == "Yumurta:150 (3 Adet), Tavuk Göğsü:200"
+# Öğün biçimlendirme, öğün yapısı ve makro yakınsaması testleri
+# tests/test_nutrition_meals.py dosyasındadır.

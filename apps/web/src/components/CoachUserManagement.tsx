@@ -797,7 +797,7 @@ export function CoachUserManagement({ clients }: CoachUserManagementProps): JSX.
                       </h4>
                       <p className="text-sm font-medium leading-relaxed text-gray-600 dark:text-gray-400">
                         Antrenman programı buradan düzenlenmez. Gün bazlı editör, hareket
-                        kütüphanesi ve AI desteği için üstteki{' '}
+                        kütüphanesi ve otomatik program üretici için üstteki{' '}
                         <span className="font-bold text-emerald-500">Antrenman</span> sekmesini
                         kullanın.
                       </p>

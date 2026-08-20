@@ -324,7 +324,7 @@ export async function ensureCoachTotpFactor(): Promise<void> {
 
       const { data: enrolled, error: enrollError } = await supabase.auth.mfa.enroll({
         factorType: 'totp',
-        issuer: 'Coaching Hub',
+        issuer: 'Sarmal',
         friendlyName: `E2E ${new Date().toISOString().slice(0, 19).replace('T', ' ')}`,
       })
       if (enrollError || !enrolled) {

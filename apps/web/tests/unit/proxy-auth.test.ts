@@ -302,7 +302,7 @@ describe('handleAiProxy — oturum doğrulama', () => {
 
       expect(response.status).toBe(502)
       expect(body.error.code).toBe('AI_BACKEND_ERROR')
-      expect(body.error.message).toBe('Yapay zeka servisi şu anda yanıt vermiyor.')
+      expect(body.error.message).toBe('Plan üretim servisi şu anda yanıt vermiyor.')
       expect(rawText).not.toContain(leakedSecret)
       expect(rawText).not.toContain('gizli-detay')
     })
@@ -328,7 +328,7 @@ describe('handleAiProxy — oturum doğrulama', () => {
       // sunucusuna ulaşılamadı..." iç mimariyi (upstream'in Python/FastAPI olduğunu) ifşa
       // ediyordu. Yeni mesaj jenerik olmalı — hiçbir teknoloji/dil/framework adı geçmemeli.
       expect(body.error.message).toBe(
-        'Yapay zeka servisine şu anda ulaşılamıyor. Lütfen daha sonra tekrar deneyin.'
+        'Plan üretim servisine şu anda ulaşılamıyor. Lütfen daha sonra tekrar deneyin.'
       )
       expect(body.error.message).not.toContain('Python')
       expect(body.error.message.toLowerCase()).not.toContain('fastapi')

@@ -120,7 +120,7 @@ export type Database = {
           id: string
           occurred_at: string
           request_id: string | null
-          target_id: string
+          target_id: string | null
         }
         Insert: {
           action: string
@@ -128,7 +128,7 @@ export type Database = {
           id?: string
           occurred_at?: string
           request_id?: string | null
-          target_id: string
+          target_id?: string | null
         }
         Update: {
           action?: string
@@ -136,7 +136,7 @@ export type Database = {
           id?: string
           occurred_at?: string
           request_id?: string | null
-          target_id?: string
+          target_id?: string | null
         }
         Relationships: [
           {
@@ -959,6 +959,10 @@ export type Database = {
       is_coach: { Args: { uid?: string }; Returns: boolean }
       is_coach_profile: { Args: { target: string }; Returns: boolean }
       is_end_user_write: { Args: never; Returns: boolean }
+      link_coach_action_target: {
+        Args: { p_action_id: string; p_target_id: string }
+        Returns: boolean
+      }
       message_attachment_conversation: {
         Args: { p_name: string }
         Returns: string
@@ -1034,7 +1038,7 @@ export type Database = {
           p_action: string
           p_actor_id: string
           p_request_id?: string
-          p_target_id: string
+          p_target_id?: string
         }
         Returns: string
       }

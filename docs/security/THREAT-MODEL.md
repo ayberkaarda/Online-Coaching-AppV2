@@ -1,7 +1,7 @@
 # Tehdit Modeli (STRIDE)
 
 **Faz:** 1.5 — Güvenlik Denetimi ve Sertleştirme, Grup 6 (Dokümantasyon)
-**Kapsam:** "Closed-Loop Coaching Hub" — Next.js 16 uygulaması, FastAPI `ai_backend` servisi,
+**Kapsam:** "Sarmal" — Next.js 16 uygulaması, FastAPI `ai_backend` servisi,
 Supabase (Postgres + RLS, Auth, Storage), CI (GitHub Actions).
 **Tarih:** 2026-08-17
 **Yöntem:** STRIDE kategorileri, her biri bu projenin gerçek güven sınırlarına ve

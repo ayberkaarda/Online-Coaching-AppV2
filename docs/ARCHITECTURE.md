@@ -1,6 +1,6 @@
 # Mimari
 
-Bu doküman "Closed-Loop Coaching Hub" platformunun sistem bağlamını, veri modelini, kimlik doğrulama/yetkilendirme akışını, istemci veri katmanını, AI proxy tasarımını ve önemli mimari kararları (ADR-lite) belgeler. Genel bakış ve hızlı başlangıç için [`../README.md`](../README.md) dosyasına bakın.
+Bu doküman "Sarmal" platformunun sistem bağlamını, veri modelini, kimlik doğrulama/yetkilendirme akışını, istemci veri katmanını, AI proxy tasarımını ve önemli mimari kararları (ADR-lite) belgeler. Genel bakış ve hızlı başlangıç için [`../README.md`](../README.md) dosyasına bakın.
 
 ## İçindekiler
 
@@ -22,7 +22,7 @@ graph TD
   Coach["Koç (admin)"]
   Student["Danışan (student)"]
 
-  subgraph System["Closed-Loop Coaching Hub"]
+  subgraph System["Sarmal"]
     Web["Next.js 16 Uygulaması\n(App Router, Server Actions, API Routes)"]
     AI["FastAPI AI Servisi\n(antrenman/beslenme/öneri motoru)"]
   end

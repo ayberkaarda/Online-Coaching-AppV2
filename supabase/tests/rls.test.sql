@@ -8798,7 +8798,23 @@ rollback;
 -- menfaati bilerek reddetti). Dayanak düşünce SAKLAMA dayanağı da düşer
 -- (KVKK m.7) — veri 180 günlük pencerede "erimeye" BIRAKILMAZ, ANINDA silinir.
 -- Ayrıca silmenin BAŞKA kullanıcıya dokunmadığı ölçülür (filtresiz delete YOK).
--- =============================================================================
+--
+-- ### CANLI VERİ KIRILGANLIĞI DÜZELTMESİ (2026-08-20) ########################
+--   (c) İZOLASYON iddiası eskiden danışan B için MUTLAK sayım kullanıyordu
+--   (`count(*) ... <> 1`). Bu, dosya başındaki "KENDİ KURULUMUNU YAPMA
+--   KURALI"nı ihlal ediyordu: B'nin DIŞARIDAKİ (gerçek/manuel kullanım kaynaklı)
+--   `activity_events`/`activity_sessions` satırı OLMADIĞINI varsayıyordu.
+--   Yerel yığında B için GERÇEKTEN canlı veri varsa (ölçüldü: bu düzeltme
+--   sırasında 54 olay / 36 oturum) mutlak sayım `<> 1` her zaman patlar ve
+--   yanıltıcı bir "FILTRESIZ DELETE!" mesajı verir — oysa HİÇBİR ŞEY
+--   silinmemiştir. Düzeltme: mutlak sayım yerine, senaryonun KENDİ ürettiği
+--   sabit-id'li satırın (session `d0000000-...-000000000241` ve ona bağlı
+--   `login` olayı) varlığı doğrudan ID ile sorgulanır. Bu, dışarıdaki satır
+--   sayısından TAMAMEN bağımsızdır ve ölçülen güvenlik garantisini
+--   DEĞİŞTİRMEZ: `revoke_activity_consent(A)` B'nin KENDİ ürettiğimiz satırına
+--   dokunmamalıdır; dokunursa (filtresiz DELETE ya da yanlış WHERE) o satır
+--   ID'siyle birlikte GİDER ve iddia GERÇEKTEN yakalar.
+-- ###############################################################################
 begin;
 
 update public.profiles
@@ -8838,16 +8854,32 @@ begin
       public.activity_consent_state('22222222-2222-2222-2222-222222222222');
   end if;
 
-  -- (b) SİL: kullanıcının HİÇBİR satırı kalmamalı.
+  -- (b) SİL: kullanıcının HİÇBİR satırı kalmamalı. (A'nın DIŞARIDAN canlı
+  -- satırı olmadığı ölçüldü -- 0/0 -- yoksa bu iddia da (c) gibi ID bazlı
+  -- yazılmalıydı.)
   if (select count(*) from public.activity_events   where user_id = '22222222-2222-2222-2222-222222222222') <> 0
      or (select count(*) from public.activity_sessions where user_id = '22222222-2222-2222-2222-222222222222') <> 0 then
     raise exception 'BASARISIZ [141 SIL]: geri cekmeden sonra satirlar KALDI -- 180 gun "erimeye" birakilmis, KVKK m.7 ihlali';
   end if;
 
-  -- (c) İZOLASYON: danışan B'nin kaydı ETKİLENMEMELİ (filtresiz delete YOK).
-  if (select count(*) from public.activity_events   where user_id = '33333333-3333-3333-3333-333333333333') <> 1
-     or (select count(*) from public.activity_sessions where user_id = '33333333-3333-3333-3333-333333333333') <> 1 then
-    raise exception 'BASARISIZ [141 IZOLASYON]: BASKA kullanicinin kaydi silindi -- FILTRESIZ DELETE!';
+  -- (c) İZOLASYON: danışan B'nin KENDİ ÜRETTİĞİMİZ sabit-id'li satırı
+  -- ETKİLENMEMELİ (filtresiz delete YOK). Mutlak sayım KULLANILMAZ -- B için
+  -- dışarıda (gerçek/manuel kullanım) satır bulunabilir; bkz. dosya başındaki
+  -- "CANLI VERİ KIRILGANLIĞI DÜZELTMESİ" notu.
+  if not exists (
+    select 1 from public.activity_sessions
+     where id = 'd0000000-0000-0000-0000-000000000241'
+       and user_id = '33333333-3333-3333-3333-333333333333'
+  ) then
+    raise exception 'BASARISIZ [141 IZOLASYON]: BASKA kullanicinin (B) KENDI URETTIGIMIZ oturumu KAYIP -- FILTRESIZ DELETE!';
+  end if;
+  if not exists (
+    select 1 from public.activity_events
+     where session_id = 'd0000000-0000-0000-0000-000000000241'
+       and user_id     = '33333333-3333-3333-3333-333333333333'
+       and event        = 'login'
+  ) then
+    raise exception 'BASARISIZ [141 IZOLASYON]: BASKA kullanicinin (B) KENDI URETTIGIMIZ olayi KAYIP -- FILTRESIZ DELETE!';
   end if;
   if public.activity_consent_state('33333333-3333-3333-3333-333333333333') is distinct from 'granted' then
     raise exception 'BASARISIZ [141 IZOLASYON]: BASKA kullanicinin rizasi geri cekildi';
@@ -9083,6 +9115,32 @@ rollback;
 -- =============================================================================
 begin;
 
+-- ### CANLI VERİ KIRILGANLIĞI DÜZELTMESİ (2026-08-20) ########################
+--   (c) danışan B'nin KENDİ özetini POZİTİF olarak ölçerken eskiden BUGÜN için
+--   mutlak `1200` bekliyordu. Bu, B'nin DIŞARIDAKİ (gerçek/manuel kullanım
+--   kaynaklı) `activity_sessions` satırı OLMADIĞINI varsayıyordu — senaryo
+--   141'deki AYNI hata (bkz. o senaryonun başındaki not). Yerel yığında B için
+--   BUGÜNE ait canlı süre varsa (ölçüldü: bu düzeltme sırasında +14 sn) mutlak
+--   `1200` iddiası patlar. Düzeltme: fonksiyonun AYNI toplama mantığıyla
+--   (session süresi, `start_day` kovası) B'nin bu senaryonun kendi INSERT'ini
+--   yapmadan ÖNCEKİ "bugün" toplamı `postgres` bağlamıyla ölçülüp
+--   `set_config`e taşınır; (c)'deki iddia sabit `1200` yerine
+--   `baseline + 1200` ile karşılaştırır. Ölçülen garanti DEĞİŞMEZ (RPC'nin
+--   döndürdüğü toplam, ham tablodaki GERÇEK toplamla eşleşmeli); yalnızca
+--   dışarıdaki satır sayısından bağımsız hale getirilir.
+do $$
+declare
+  v_baseline integer;
+begin
+  select coalesce(sum(greatest(0, round(extract(epoch from (s.last_seen_at - s.started_at))))), 0)::integer
+    into v_baseline
+    from public.activity_sessions s
+   where s.user_id = '33333333-3333-3333-3333-333333333333'::uuid
+     and (s.started_at at time zone 'Europe/Istanbul')::date = (now() at time zone 'Europe/Istanbul')::date;
+  perform set_config('zz.s144_b_baseline_secs', v_baseline::text, true);
+end $$;
+-- ###############################################################################
+
 -- Kurulum: danışan A'nın rızası VAR.
 set local role service_role;
 do $$
@@ -9292,13 +9350,18 @@ set local role authenticated;
 set local request.jwt.claims = '{"sub":"33333333-3333-3333-3333-333333333333","role":"authenticated"}';
 do $$
 declare
-  v_secs integer;
+  v_secs     integer;
+  v_baseline integer := current_setting('zz.s144_b_baseline_secs')::integer;
+  v_expected integer := v_baseline + 1200;
 begin
   select c.total_seconds into v_secs
     from public.coach_activity_summary('33333333-3333-3333-3333-333333333333'::uuid) c
    where c.day = (now() at time zone 'Europe/Istanbul')::date;
-  if v_secs is distinct from 1200 then
-    raise exception 'BASARISIZ [144c POZITIF]: danisan KENDI ozetini alamadi (total_seconds=%, 1200 bekleniyordu)', v_secs;
+  -- Mutlak `1200` DEĞİL, baseline + 1200 (bkz. senaryo basindaki "CANLI VERI
+  -- KIRILGANLIGI DUZELTMESI" notu -- B'nin bu senaryo DISINDA da bugune ait
+  -- canli suresi olabilir).
+  if v_secs is distinct from v_expected then
+    raise exception 'BASARISIZ [144c POZITIF]: danisan KENDI ozetini alamadi (total_seconds=%, % bekleniyordu = baseline % + 1200)', v_secs, v_expected, v_baseline;
   end if;
   raise notice 'GECTI [144c danisan baskasinin ozetini ALAMAZ, kendi ozetini ALIR]';
 end $$;
@@ -9341,6 +9404,350 @@ begin
   raise notice 'GECTI [144d riza kapaliyken satirlar DURSA BILE kume BOS ve HATA YOK]';
 end $$;
 reset role;
+rollback;
+
+
+-- =============================================================================
+-- KOÇ EYLEM DENETİMİ + DAVET (Faz 4.9 dilim 1) — 145) DANIŞAN DAVETİ
+-- (20260820160000_coach_invite_action.sql, ADR-0027)
+--
+--   (a) YENİ `client_invited` NULL hedefle KABUL edilir (pozitif kontrol),
+--       ESKİ `password_reset_requested` invaryantı AYNEN korunur (22023),
+--       kapalı liste hâlâ KAPALIDIR (23514); `link_coach_action_target()`
+--       DOLU bir hedefi ASLA yeniden yönlendirmez -- geçmiş tahrif edilemez.
+--   (b) `authenticated` (koç dahil) ne `record_coach_action()`u ne de YENİ
+--       `link_coach_action_target()`u çağırabilir; ikincisi ayrıca YAPISAL
+--       olarak da (SECURITY DEFINER + pinli search_path + EXECUTE yalnız
+--       service_role) doğrulanır -- senaryo 132'nin deseni.
+--   (c) *** BU PAKETİN EN ÖNEMLİ SENARYOSU *** -- tetikleyiciyi DOĞRUDAN
+--       sınar (HTTP/GoTrue'ya HİÇ gitmez; yerel GoTrue'nun 2/saat
+--       `email_sent` global sınırı davetleri de sayar, gerçek davet
+--       gönderilemez): `auth.users`a ELLE, saldırganın/kazanın deneyeceği TAM
+--       girdiyle (`raw_user_meta_data.role = "coach"`) satır eklenir; davetle
+--       doğan kullanıcı HER ZAMAN `client` olmalı (AC-02), `full_name` ise
+--       metadata'dan OKUNMALI. Ardından o kullanıcı iki fazlı akışın DB
+--       tarafıyla denetim satırına bağlanır.
+--   (d) `role = 'coach'` satır sayısı HER ZAMAN 1 -- tek-koçluk modelinin
+--       (ADR-0007) REGRESYON KAPISI; davet ucu eklendiği için ARTIK gerekli
+--       (yeni kullanıcı üretmenin ilk otomatik yolu).
+-- =============================================================================
+begin;
+
+-- --- (a) YENİ action DEĞERİ KABUL EDİLİYOR, ESKİ İNVARYANT KORUNUYOR --------
+set local role service_role;
+do $$
+declare
+  v_id     uuid;
+  v_caught boolean;
+  v_state  text;
+begin
+  -- (a1) POZİTİF KONTROL: client_invited NULL hedefle KABUL edilir.
+  v_id := public.record_coach_action(
+    'client_invited'::text,
+    '11111111-1111-1111-1111-111111111111'::uuid,
+    null::uuid,
+    'a0000000-0000-0000-0000-000000000145'::uuid
+  );
+  if v_id is null then
+    raise exception 'BASARISIZ [145a1]: client_invited NULL hedefle yazilamadi -- genisletilen kapali liste calismiyor';
+  end if;
+  -- id'yi `postgres`e tasi (service_role'un coach_actions'ta dogrudan SELECT
+  -- yetkisi YOK -- senaryo 134a'daki AYNI desen).
+  perform set_config('zz.coach_action_145_id', v_id::text, true);
+
+  -- (a2) ESKİ İNVARYANT KORUNUYOR: password_reset_requested + NULL hedef -> 22023.
+  v_caught := false;
+  begin
+    perform public.record_coach_action(
+      'password_reset_requested'::text,
+      '11111111-1111-1111-1111-111111111111'::uuid,
+      null::uuid
+    );
+  exception when invalid_parameter_value then
+    v_caught := true;
+    get stacked diagnostics v_state = returned_sqlstate;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [145a2]: password_reset_requested NULL hedefle KABUL EDILDI -- genisleme ESKI invaryanti gevsetmis';
+  end if;
+  if v_state is distinct from '22023' then
+    raise exception 'BASARISIZ [145a2 hata kodu]: beklenen 22023, gelen %', v_state;
+  end if;
+
+  -- (a3) KAPALI LİSTE HÂLÂ KAPALI: tanimsiz action -> 23514 (SERBEST METNE donusmedi).
+  v_caught := false;
+  begin
+    perform public.record_coach_action(
+      'not_a_real_action'::text,
+      '11111111-1111-1111-1111-111111111111'::uuid,
+      '22222222-2222-2222-2222-222222222222'::uuid
+    );
+  exception when check_violation then
+    v_caught := true;
+    get stacked diagnostics v_state = returned_sqlstate;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [145a3]: tanimsiz action degeri KABUL EDILDI -- kapali liste SERBEST METNE donusmus';
+  end if;
+  if v_state is distinct from '23514' then
+    raise exception 'BASARISIZ [145a3 hata kodu]: beklenen 23514, gelen %', v_state;
+  end if;
+end $$;
+reset role;
+
+-- (a4) `postgres` bağlamıyla doğrula: yazılan satır client_invited VE hedefsiz.
+do $$
+declare
+  v_id     uuid := current_setting('zz.coach_action_145_id')::uuid;
+  v_action text;
+  v_target uuid;
+begin
+  select action, target_id into v_action, v_target
+    from public.coach_actions where id = v_id;
+
+  if v_action is distinct from 'client_invited' then
+    raise exception 'BASARISIZ [145a4]: yazilan satirin action i client_invited degil -> %', v_action;
+  end if;
+  if v_target is not null then
+    raise exception 'BASARISIZ [145a4]: yazilan satirin target_id si NULL degil -> %', v_target;
+  end if;
+end $$;
+
+-- (a5) link_coach_action_target: DOLU hedef ASLA yeniden yönlendirilemez.
+set local role service_role;
+do $$
+declare
+  v_id      uuid := current_setting('zz.coach_action_145_id')::uuid;
+  v_linked1 boolean;
+  v_linked2 boolean;
+begin
+  v_linked1 := public.link_coach_action_target(v_id, '22222222-2222-2222-2222-222222222222'::uuid);
+  if v_linked1 is distinct from true then
+    raise exception 'BASARISIZ [145a5]: hedefsiz client_invited satiri BAGLANAMADI -- beklenen true, gelen %', v_linked1;
+  end if;
+
+  v_linked2 := public.link_coach_action_target(v_id, '33333333-3333-3333-3333-333333333333'::uuid);
+  if v_linked2 is distinct from false then
+    raise exception 'BASARISIZ [145a5 yeniden yonlendirme]: DOLU hedef ikinci cagriyla DEGISTIRILEBILDI -- gecmis tahrif edilebilir, beklenen false, gelen %', v_linked2;
+  end if;
+end $$;
+reset role;
+
+-- (a5 doğrulama) `postgres` bağlamıyla satırı oku: target_id danışan A'da KALDI.
+do $$
+declare
+  v_id     uuid := current_setting('zz.coach_action_145_id')::uuid;
+  v_target uuid;
+begin
+  select target_id into v_target from public.coach_actions where id = v_id;
+  if v_target is distinct from '22222222-2222-2222-2222-222222222222'::uuid then
+    raise exception 'BASARISIZ [145a5 dogrulama]: target_id beklenen danisan A degil, gelen % -- gecmis tahrif edilmis', v_target;
+  end if;
+  raise notice 'GECTI [145a client_invited NULL hedefle KABUL edilir; eski invaryant (22023) VE kapali liste (23514) KORUNUYOR; link_coach_action_target DOLU hedefi yeniden yonlendiremiyor]';
+end $$;
+
+
+-- --- (b) `authenticated` YENİ FONKSİYONU DA ÇAĞIRAMAZ -----------------------
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","aal":"aal2"}';
+do $$
+declare
+  v_caught boolean;
+begin
+  -- (b1) record_coach_action: client_invited de dahil, hala CAGRILAMAZ --
+  -- genisletilen kapali liste yeni bir cagri yolu ACMADI.
+  v_caught := false;
+  begin
+    perform public.record_coach_action(
+      'client_invited'::text,
+      '11111111-1111-1111-1111-111111111111'::uuid,
+      null::uuid
+    );
+  exception when insufficient_privilege then
+    v_caught := true;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [145b1]: aal2 koc client_invited ile record_coach_action i CAGIRABILDI -- genisletilen kapali liste yeni bir cagri yolu ACTI';
+  end if;
+
+  -- (b2) link_coach_action_target: koç kendi izini baska birine YONLENDIREMEZ.
+  v_caught := false;
+  begin
+    perform public.link_coach_action_target(
+      'a0000000-0000-0000-0000-000000000145'::uuid,
+      '22222222-2222-2222-2222-222222222222'::uuid
+    );
+  exception when insufficient_privilege then
+    v_caught := true;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [145b2]: aal2 koc link_coach_action_target i CAGIRABILDI -- kendi izini baska birine yonlendirebilirdi';
+  end if;
+
+  raise notice 'GECTI [145b authenticated (koc dahil) ne record_coach_action(client_invited) ne de link_coach_action_target i cagirabiliyor]';
+end $$;
+reset role;
+
+-- (b devam) YAPISAL SÜRÜKLENME TESTİ — link_coach_action_target (senaryo 132 deseni).
+do $$
+declare
+  v_secdef boolean;
+  v_config text[];
+  v_sig    constant text := 'public.link_coach_action_target(uuid, uuid)';
+begin
+  select p.prosecdef, p.proconfig into v_secdef, v_config
+    from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public' and p.proname = 'link_coach_action_target';
+
+  if v_secdef is null then
+    raise exception 'BASARISIZ [145b YAPI]: public.link_coach_action_target YOK -- davet ucu PGRST202 alir';
+  end if;
+  if not v_secdef then
+    raise exception 'BASARISIZ [145b YAPI SECURITY]: SECURITY INVOKER olmus -- coach_actions sifir-politikali, guncelleme OLMEZ';
+  end if;
+  if v_config is null or not (v_config @> array['search_path=public, pg_temp']) then
+    raise exception 'BASARISIZ [145b YAPI search_path]: arama yolu pinlenmemis (%)', v_config;
+  end if;
+
+  if has_function_privilege('authenticated', v_sig, 'EXECUTE') then
+    raise exception 'BASARISIZ [145b YAPI grant]: AUTHENTICATED rolune ACIK -- koc kendi izini yeniden yonlendirebilir';
+  end if;
+  if has_function_privilege('anon', v_sig, 'EXECUTE') then
+    raise exception 'BASARISIZ [145b YAPI grant]: ANON rolune ACIK';
+  end if;
+  if not has_function_privilege('service_role', v_sig, 'EXECUTE') then
+    raise exception 'BASARISIZ [145b YAPI grant]: service_role CALISTIRAMIYOR -- davet ucunun 2. fazi kirilir';
+  end if;
+  if exists (
+    select 1
+      from pg_proc p
+      join pg_namespace n on n.oid = p.pronamespace,
+           lateral aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a
+     where n.nspname = 'public' and p.proname = 'link_coach_action_target'
+       and a.grantee = 0 and a.privilege_type = 'EXECUTE'
+  ) then
+    raise exception 'BASARISIZ [145b YAPI grant]: link_coach_action_target PUBLIC a ACIK';
+  end if;
+
+  raise notice 'GECTI [145b YAPI link_coach_action_target SECURITY DEFINER + pinli search_path + EXECUTE yalnizca service_role]';
+end $$;
+
+
+-- --- (c) DAVETLE DOĞAN KULLANICININ ROLÜ HER ZAMAN client (AC-02) -----------
+--     *** BU PAKETİN EN ÖNEMLİ SENARYOSU ***
+--
+-- `admin.inviteUserByEmail` GoTrue'ya gerçekten gitmez -- yerel GoTrue nun
+-- `email_sent = 2/saat` GLOBAL siniri davetleri de saydigi icin gercek bir
+-- davet burada gonderilemez (ADR-0027 §Bedeller). Bu yuzden tetikleyici
+-- (`on_auth_user_created` -> `handle_new_user()`) DOGRUDAN sinanir: `postgres`
+-- kimligiyle `auth.users`a ELLE, saldirganin/kazanin deneyecegi TAM girdiyle
+-- -- `raw_user_meta_data` icinde BILEREK `{"full_name":"Davet Edilen",
+-- "role":"coach"}` -- bir satir eklenir. Kolon kumesi senaryo 70/143 ile
+-- AYNIDIR (bu dosyada zaten OLCULMUS desen; ayrica `information_schema.
+-- columns` sorgusuyla dogrulandi: auth.users da varsayilansiz NOT NULL tek
+-- kolon `id`dir, ancak GoTrue'nun gercekte doldurdugu kolon kumesini
+-- yansitmak icin seed.sql / senaryo 70 ile AYNI 15 kolon kullanilir).
+--
+-- Blok en sonda ROLLBACK ile bitecek -- bu auth.users satiri KALICI OLMAYACAK.
+insert into auth.users (
+  instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
+  raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
+  confirmation_token, email_change, email_change_token_new, recovery_token
+)
+values (
+  '00000000-0000-0000-0000-000000000000',
+  'd0000000-0000-0000-0000-000000000145',
+  'authenticated',
+  'authenticated',
+  'davet-145@example.test',
+  'x',
+  now(),
+  '{"provider":"email","providers":["email"]}'::jsonb,
+  '{"full_name":"Davet Edilen","role":"coach"}'::jsonb,
+  now(), now(), '', '', '', ''
+);
+
+do $$
+declare
+  v_role public.user_role;
+  v_name text;
+begin
+  select role, full_name into v_role, v_name
+    from public.profiles where id = 'd0000000-0000-0000-0000-000000000145';
+
+  if v_role is null then
+    raise exception 'BASARISIZ [145c kurulum]: handle_new_user profil olusturmadi (tetikleyici bagli mi?)';
+  end if;
+  if v_role is distinct from 'client'::public.user_role then
+    raise exception 'BASARISIZ [145c AC-02 yetki yukseltme]: metadata role=coach YAZMASINA RAGMEN profil % oldu -- davet ucu yetki yukseltme yoluna donusmus', v_role;
+  end if;
+  if v_name is distinct from 'Davet Edilen' then
+    raise exception 'BASARISIZ [145c full_name]: metadata nin SADECE bu alani okunmali, gelen %', v_name;
+  end if;
+  raise notice 'GECTI [145c davetle dogan kullanici role=coach metadata sine RAGMEN HER ZAMAN client (AC-02); full_name metadata dan okunuyor]';
+end $$;
+
+-- Uçtan uca: davetle doğan kullanıcıyı iki fazlı akışın DB tarafıyla denetim
+-- satırına bağla (adım 8 + adım 10, invite-client/route.ts).
+set local role service_role;
+do $$
+declare
+  v_audit_id uuid;
+  v_linked   boolean;
+begin
+  v_audit_id := public.record_coach_action(
+    'client_invited'::text,
+    '11111111-1111-1111-1111-111111111111'::uuid,
+    null::uuid,
+    'a1000000-0000-0000-0000-000000000145'::uuid
+  );
+  if v_audit_id is null then
+    raise exception 'BASARISIZ [145c ucdan uca]: client_invited denetim satiri yazilamadi';
+  end if;
+
+  v_linked := public.link_coach_action_target(v_audit_id, 'd0000000-0000-0000-0000-000000000145'::uuid);
+  if v_linked is distinct from true then
+    raise exception 'BASARISIZ [145c ucdan uca]: davetle dogan kullanici denetim satirina BAGLANAMADI -- beklenen true, gelen %', v_linked;
+  end if;
+
+  raise notice 'GECTI [145c ucdan uca iki fazli davet akisinin DB tarafi calisiyor: kayit (adim 8) + baglama (adim 10)]';
+end $$;
+reset role;
+
+
+-- --- (d) role='coach' SATIR SAYISI = 1 -- REGRESYON KAPISI ------------------
+--
+-- PROGRESS'te kayitli oneri, B-058'in tetigini otomatik yakalar. Bu senaryo,
+-- yukaridaki (c)'nin DOGRUDAN devamidir: (c) davetle dogan kullanicinin ASLA
+-- coach OLMADIGINI kanitlar, (d) ise DAHA GENIS bir invaryanti -- sistemde HER
+-- ZAMAN TEK bir koc oldugunu -- olcer. Davet ucu eklenmeden ONCE bu satir
+-- sayisi degismiyordu (yeni kullanici uretmenin hicbir OTOMATIK yolu yoktu);
+-- artik `invite-client` route'u SERVICE_ROLE ile calisan bir kullanici
+-- fabrikasi oldugu icin bu kapı ARTIK GEREKLIDIR.
+--
+-- Bu sayi 1 den FARKLILASIRSA (ister bu migration'in bir hatasindan, ister
+-- ELLE `profiles.role` guncellemesinden, ister ileride "ikinci koc" ozelligi
+-- eklenip bu testin GUNCELLENMEDEN birakilmasindan kaynaklansin):
+--   * `is_coach()` SECURITY DEFINER'dir ve TUM RLS politikalarinin (14+
+--     tablo, `mfa_aal2_gate` dahil) "coach mu" sorusunu YANITLAR -- ikinci bir
+--     koc, o politikalarin TUMUNDE ayni yetkiyi ELE GECIRIR.
+--   * B-058 kayitlidir: koc-danisan ATAMA tablosu YOKTUR. Yani ikinci bir koc,
+--     `invite-client` ucundaki `profiles_select` politikasi altinda ZATEN TUM
+--     danisan tabanini gorur ve TUMUNU davet/yonetim yetkisine sahip olur --
+--     tek-kocluk modeli (ADR-0007) varsayimi sessizce KIRILMIS olur.
+do $$
+declare
+  v_coach_count bigint;
+begin
+  select count(*) into v_coach_count
+    from public.profiles where role = 'coach'::public.user_role;
+
+  if v_coach_count <> 1 then
+    raise exception 'BASARISIZ [145d REGRESYON]: role=coach satir sayisi % (1 bekleniyordu) -- tek-kocluk model (ADR-0007) varsayimi KIRILMIS; is_coach() tabanli TUM RLS politikalari ve mfa_aal2_gate ikinci bir koc icin de acilir, ayrica invite-client ucu B-058 (koc-danisan atama tablosu yok) nedeniyle o koca da TUM danisan tabanini gorme/davet etme yetkisi verir', v_coach_count;
+  end if;
+  raise notice 'GECTI [145d role=coach satir sayisi = 1 -- tek-kocluk model (ADR-0007) REGRESYON KAPISI ayakta]';
+end $$;
+
 rollback;
 
 
@@ -9538,6 +9945,29 @@ rollback;
 --             bir arıza değildir; koç durumu zaten rıza rozetinden görür) —
 --             kurulum satırların gerçekten durduğunu doğrular, yani test
 --             tautoloji değildir (144d)
+--   * 145    : Faz 4.9 dilim 1 — DANIŞAN DAVETİ
+--             (20260820160000_coach_invite_action.sql, ADR-0027): YENİ
+--             `client_invited` eylem türü NULL hedefle KABUL edilir (pozitif
+--             kontrol), ESKİ `password_reset_requested` invaryantı AYNEN
+--             korunur (22023) ve kapalı liste hâlâ KAPALIDIR (23514) —
+--             genişletme onu serbest metne çevirmedi; YENİ
+--             `link_coach_action_target()` DOLU bir hedefi ASLA yeniden
+--             yönlendirmez, geçmiş tahrif edilemez (145a); `authenticated`
+--             (koç dahil) ne `record_coach_action()`u ne de YENİ
+--             `link_coach_action_target()`u çağırabilir — genişletilen kapalı
+--             liste yeni bir çağrı yolu AÇMADI — ve ikinci fonksiyonun
+--             SECURITY DEFINER + pinli `search_path` + EXECUTE yalnızca
+--             `service_role` sürüklenme testi de burada koşar (145b); ***
+--             BU PAKETİN EN ÖNEMLİ SENARYOSU *** — davetle doğan kullanıcı,
+--             `raw_user_meta_data` içinde BİLEREK `role:"coach"` YAZSA BİLE,
+--             tetikleyici (`handle_new_user`) ile HER ZAMAN `client` olur
+--             (AC-02, tetikleyici doğrudan sınanır — HTTP/GoTrue'ya hiç
+--             gidilmez), `full_name` metadata'dan OKUNUR ve uçtan uca iki
+--             fazlı davet akışının DB tarafı (kayıt + bağlama) çalışır
+--             (145c); `role='coach'` satır sayısı HER ZAMAN 1 — tek-koçluk
+--             modelinin (ADR-0007) REGRESYON KAPISI, davet ucu eklendiği
+--             için ARTIK gerekli (B-058: koç-danışan atama tablosu yok)
+--             (145d)
 --
 -- NOT: `nutrition_logs`, `progress_entries` ve `progress_photos` ayrıca senaryo
 -- 73 (yetki) ve 74 (RLS+FORCE) tarafından DİNAMİK olarak kapsanır — o iki
@@ -9545,5 +9975,5 @@ rollback;
 -- =============================================================================
 do $$
 begin
-  raise notice 'TUM RLS TESTLERI GECTI (144 senaryo)';
+  raise notice 'TUM RLS TESTLERI GECTI (145 senaryo)';
 end $$;

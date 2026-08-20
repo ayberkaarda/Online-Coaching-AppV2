@@ -712,14 +712,26 @@ export default function NutritionTab({
     return Math.round((food.calories_per_100g * grams) / 100)
   }
 
-  /** "Yulaf:80, Tavuk:200" biçimindeki listenin toplam kalorisini hesaplar. */
+  /**
+   * Bir günün toplam kalorisini hesaplar. İKİ lehçe de desteklenir:
+   *
+   *   1. Tek satır, virgülle ayrılmış:  `"Yulaf:80, Tavuk Göğsü:200"`
+   *   2. Öğün etiketli, çok satırlı (kural tabanlı üreticinin çıktısı):
+   *      `"Kahvaltı: Yumurta:150 (3 Adet), Yulaf:80"`
+   *
+   * Jeton hâlâ `besin:gram` biçimindedir; öğün etiketi yalnızca başına
+   * eklenir. Bu yüzden jetondaki SON iki iki-nokta parçası okunur. Üreticinin
+   * eklediği "Toplam: ..." özet satırı bilerek atlanır.
+   */
   const sumCalories = (itemsString: string): number => {
     let total = 0
-    for (const item of itemsString.split(',')) {
+    for (const item of itemsString.split(/[,\n]/)) {
+      if (item.trimStart().startsWith('Toplam:')) continue
+
       const parts = item.split(':')
-      if (parts.length !== 2) continue
-      const name = parts[0]
-      const grams = parts[1]
+      if (parts.length < 2) continue
+      const name = parts[parts.length - 2]
+      const grams = parts[parts.length - 1]
       if (name === undefined || grams === undefined) continue
       total += calculateCalories(name, Number.parseInt(grams, 10) || 0)
     }
@@ -767,7 +779,10 @@ export default function NutritionTab({
 
     const newEntry = `${selectedFood.name}:${grams}`
     const current = nutritionData[quickAddDay]
-    const newItemsString = current.items ? `${current.items}, ${newEntry}` : newEntry
+    // Gün çok satırlı (öğün etiketli) lehçedeyse yeni besin kendi satırına
+    // eklenir; tek satırlık lehçede eski davranış (virgül) korunur.
+    const separator = current.items.includes('\n') ? '\n' : ', '
+    const newItemsString = current.items ? `${current.items}${separator}${newEntry}` : newEntry
 
     setNutritionData((prev) =>
       withDay(prev, quickAddDay, newItemsString, sumCalories(newItemsString))
@@ -782,7 +797,7 @@ export default function NutritionTab({
     setNutritionData((prev) => withDay(prev, day, value, sumCalories(value)))
   }
 
-  // --- AI diyetisyen ----------------------------------------------------------
+  // --- Otomatik diyet üretici (kural tabanlı backend) --------------------------
   const {
     register,
     handleSubmit,
@@ -905,14 +920,14 @@ export default function NutritionTab({
         </p>
       ) : null}
 
-      {/* AKILLI DİYETİSYEN PANELİ */}
+      {/* OTOMATİK DİYET PANELİ (kural tabanlı hesaplayıcı) */}
       <form
         onSubmit={onGenerate}
         noValidate
         className="mb-6 rounded-panel border border-accent/20 bg-surface p-5 shadow-inner"
       >
         <h4 className="mb-4 flex items-center gap-2 text-sm font-bold text-accent">
-          <Brain aria-hidden="true" className="h-4 w-4 shrink-0" /> AI DİYETİSYEN &amp; KALORİ
+          <Brain aria-hidden="true" className="h-4 w-4 shrink-0" /> OTOMATİK DİYET &amp; KALORİ
           HESAPLAYICI
         </h4>
         <div className="flex flex-col gap-6 md:flex-row">
@@ -1018,7 +1033,7 @@ export default function NutritionTab({
 
           <div className="flex flex-1 flex-col gap-3">
             <label htmlFor="ai-diet-prompt" className="sr-only">
-              Yapay zekâya talimat
+              Plan üreticisine talimat
             </label>
             <textarea
               id="ai-diet-prompt"

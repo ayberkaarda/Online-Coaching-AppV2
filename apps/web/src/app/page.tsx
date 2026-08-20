@@ -194,7 +194,7 @@ export default function DashboardPage(): JSX.Element {
 
       <header className="mb-12 mt-12 space-y-2 text-center md:mt-0">
         <h1 className="bg-gradient-to-r from-accent to-purple-400 bg-clip-text text-3xl font-black tracking-tight text-transparent md:text-5xl">
-          Closed-Loop Coaching Hub
+          Sarmal
         </h1>
         <p className="text-sm font-medium uppercase tracking-widest text-gray-500 dark:text-gray-400 md:text-base">
           {role === 'coach' ? 'Koç Paneli' : 'Danışan Paneli'}

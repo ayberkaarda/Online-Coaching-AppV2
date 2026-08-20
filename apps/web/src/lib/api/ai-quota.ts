@@ -167,7 +167,7 @@ export function aiQuotaExceededResponse(quota: AiQuotaCheck, requestId: string):
   return errorResponse(
     429,
     'AI_QUOTA_EXCEEDED',
-    `Günlük yapay zeka kullanım kotanızı doldurdunuz (günde en fazla ${quota.limit} istek). ` +
+    `Günlük plan üretim kotanızı doldurdunuz (günde en fazla ${quota.limit} istek). ` +
       `Kotanız yaklaşık ${hours} saat sonra yenilenecek.`,
     requestId,
     undefined,

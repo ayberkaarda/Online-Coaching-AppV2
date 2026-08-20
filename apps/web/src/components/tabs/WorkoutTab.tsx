@@ -195,7 +195,7 @@ export default function WorkoutTab({
   // Set kayıtları oturumlara gruplanır (`completed_at` denormalize damgası).
   const sessions = useMemo(() => groupLogsIntoSessions(logsQuery.data), [logsQuery.data])
 
-  // --- AI antrenör ------------------------------------------------------------
+  // --- Otomatik program üretici (kural tabanlı backend) ------------------------
   // B-056: yaş/hedef/kilo ARTIK SABİT DEĞİL — beslenme sekmesindeki
   // (`NutritionTab.tsx` "AI diyetisyen" bölümü) `useForm` + `zodResolver` +
   // `@repo/types/schemas` deseni birebir kopyalanır. `profiles` tablosunda
@@ -498,7 +498,7 @@ export default function WorkoutTab({
             VAR
           </h4>
           <p className="mb-4 text-sm text-fg-muted">
-            Danışan yapay zeka ile tasarladığı bu programı onayına sundu. İncele ve onayla.
+            Danışan otomatik üreticiyle hazırladığı bu programı onayına sundu. İncele ve onayla.
           </p>
           <div className="flex gap-3">
             <button
@@ -554,7 +554,7 @@ export default function WorkoutTab({
           <Bot aria-hidden="true" className="mt-2 h-10 w-10 shrink-0 text-accent" />
           <div className="w-full flex-1 space-y-3">
             <p className="mb-1 block text-xs font-bold uppercase tracking-wide text-accent">
-              AKILLI ANTRENÖR (AI)
+              OTOMATİK PROGRAM ÜRETİCİ
             </p>
             <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
               <div>
@@ -643,7 +643,7 @@ export default function WorkoutTab({
                 htmlFor="ai-workout-prompt"
                 className="mb-1 block text-xs font-semibold text-fg-muted"
               >
-                AI&apos;A TALİMAT VER (PROMPT)
+                ÜRETİCİYE TALİMAT VER (PROMPT)
               </label>
               <textarea
                 id="ai-workout-prompt"

@@ -1,100 +1,36 @@
 version: 2
 
-updates:
-  # Faz 4.5'te pnpm workspace monorepo'ya geçildi (apps/web, apps/mobile,
-  # packages/{config,types,api-client,logger}); npm ekosistemi artık tek bir
-  # kök package.json değil, bu dört ağaçta bağımlılık taşıyor (B-055).
-  #
-  # DÜZELTME (B-055, 2026-08-20 triyaj — bkz. docs/discovery/dependabot-triyaji-2026-08-19.md):
-  # `directories: ['/', '/apps/web', '/apps/mobile', '/packages/*']` (çoğul, çoklu yol)
-  # denendi ama bu, dependabot-core'un bilinen bir pnpm-workspace kusurunu tetikledi
-  # (dependabot-core#10758 — "pnpm workspace'lerinde ağaç taraması yok"; kısmi düzeltme
-  # PR #10806 2024-12-03'te merge edildi ama YETERSİZ). Sonuç ölçüldü: 10/10 PR
-  # `pnpm install --frozen-lockfile` adımında ERR_PNPM_OUTDATED_LOCKFILE ile düştü —
-  # dependabot manifest dosyasını güncelliyor ama kökteki PAYLAŞILAN pnpm-lock.yaml'ı
-  # workspace bütünüyle tutarlı yeniden çözemiyor. Topluluk tarafından doğrulanmış
-  # çözüm TEK KÖK `directory: '/'`'e dönmek (alveusgg PR #868, "Dependabot only needs
-  # to run against root for pnpm workspaces" — kendi ölçümümüzle birebir eşleşti).
-  # YANLIŞ İZLENİM VERMESİN: monorepo'yu görmesi için glob GEREKMİYOR — pnpm workspace
-  # kökten çözüldüğü için dependabot tek `directory: '/'` ile apps/*, packages/*
-  # dahil TÜM ağacı zaten görür; glob burada FAZLA ve ZARARLIYDI (kilit dosyasını
-  # bozan taraf oydu), gerekli değildi.
-  - package-ecosystem: npm
-    directory: '/'
-    schedule:
-      interval: weekly
-    # 5 -> 10: eskiden 4 ayrı dizin girdisi vardı, her biri kendi 5-PR bütçesine
-    # sahipti (teorik tavan ~20 npm PR'ı). Tek kök girdisine düşünce tüm workspace
-    # npm güncellemeleri AYNI bütçeyi paylaşıyor; mevcut 10 açık PR göz önüne
-    # alındığında 5 darboğaz yaratır (kesin değil, izlenmeli).
-    open-pull-requests-limit: 10
-    commit-message:
-      prefix: 'chore(deps)'
-    groups:
-      next:
-        patterns:
-          - 'next'
-          - 'next-*'
-          - 'eslint-config-next'
-      react:
-        patterns:
-          - 'react'
-          - 'react-dom'
-          - 'react-*'
-          - '@types/react'
-          - '@types/react-dom'
-      dev-dependencies:
-        dependency-type: development
-        update-types:
-          - minor
-          - patch
-    ignore:
-      # apps/mobile: Expo SDK 57'ye kilitli (ADR-0023 madde 10, Faz 4.5 commit 6).
-      # expo/react-native paketlerinin major/minor bump'ı SADECE `expo install`
-      # ile elle yapılır — dependabot'un bağımsız önerdiği sürümler SDK uyumunu
-      # bozabilir. Patch güncellemeleri serbest.
-      - dependency-name: 'expo'
-        update-types:
-          - 'version-update:semver-major'
-          - 'version-update:semver-minor'
-      - dependency-name: 'expo-*'
-        update-types:
-          - 'version-update:semver-major'
-          - 'version-update:semver-minor'
-      - dependency-name: 'react-native'
-        update-types:
-          - 'version-update:semver-major'
-          - 'version-update:semver-minor'
-      - dependency-name: 'react-native-*'
-        update-types:
-          - 'version-update:semver-major'
-          - 'version-update:semver-minor'
-      # Tek React kuralı: react/react-dom tüm workspace'te (web, mobile,
-      # @repo/api-client peerDependency) 19.2.4'e pinli; major/minor bump'lar
-      # elle ve tüm ağaçlarda birlikte yapılır.
-      - dependency-name: 'react'
-        update-types:
-          - 'version-update:semver-major'
-          - 'version-update:semver-minor'
-      - dependency-name: 'react-dom'
-        update-types:
-          - 'version-update:semver-major'
-          - 'version-update:semver-minor'
-      # B-051: TypeScript 6.0.3'e bilinçli pin (Faz 4.5 c7a1 — web + mobil aynı fiziksel
-      # .pnpm örneğine symlink'li, tek örnek). TS 7.0 kararlı derleyici API'siz çıktı
-      # (typescript-eslint tip-farkında kurallar buna bağımlı) ve strict/module
-      # varsayılanlarını değiştiriyor; B-051 elle yeniden değerlendirilene kadar bastır
-      # (bkz. docs/discovery/dependabot-triyaji-2026-08-19.md §4.1, eski PR #16/#19).
-      - dependency-name: 'typescript'
-        update-types:
-          - 'version-update:semver-major'
-      # tailwindcss 3.x→4.x gerçek bir CSS migration'ı (PostCSS mimarisi, globals.css,
-      # sınıf dili); görsel kimlik katmanı Faz 2 Katman B'ye kasıtlı bağlı, ratchet
-      # sayaçları buna bağlı. O faz başlayana kadar bastır (bkz. triyaj §4.3, eski PR #17).
-      - dependency-name: 'tailwindcss'
-        update-types:
-          - 'version-update:semver-major'
+# KAPSAM DONDURMA KARARI (2026-08-20, Fable danışmasıyla — bkz.
+# docs/discovery/dependabot-triyaji-2026-08-19.md): Bu proje bir portfolyo
+# projesidir ve kapsamı donduruluyor. Donmuş bir repoda haftalık npm
+# sürüm-güncelleme (version-update) PR akışı anlamsız hâle geldi: pnpm
+# workspace + tek paylaşılan kök `pnpm-lock.yaml` kombinasyonu bilinen bir
+# dependabot-core kusuruyla (dependabot-core#10758) çakışıyor ve her PR
+# `ERR_PNPM_OUTDATED_LOCKFILE` ile kırmızı açılıyor — hiçbiri gerçek bir CI
+# sinyali taşımıyor. Biriken bayat/kırmızı PR'lar hiç PR olmamasından daha
+# kötü görünüyor, bu yüzden npm ecosystem girdisi TÜMDEN kaldırıldı (aşağıda
+# yoktur). Bu SADECE version-update akışını (bu dosyadaki `updates:` blokları)
+# kapatır — GitHub'ın Dependabot alerts / security updates mekanizması
+# (repo Settings → Code security → Dependabot) TAMAMEN AYRI bir sistemdir ve
+# bu dosyadan etkilenmez; npm bağımlılıklarındaki güvenlik açıkları için
+# uyarılar ve otomatik güvenlik PR'ları olduğu gibi açık kalır.
+#
+# Diğer üç ekosistem (pip, github-actions, docker × 2) bilinçli olarak açık
+# bırakıldı: hiçbiri npm'in yaşadığı kilit dosyası sorununu taşımıyor, hiçbiri
+# şu ana kadar bayat PR birikimi yaratmadı (bu turdaki 10 açık PR'ın tamamı
+# npm'den geldi — bkz. triyaj raporu), ve her biri kendi haftalık 5-PR
+# tavanıyla zaten ucuz. `github-actions` için ayrıca ürün-dışı bir gerekçe
+# var: kapsam donmuş olsa bile CI koşmaya devam edecek (portfolyo
+# değerlendiricileri fork/klonlayıp workflow'ları tetikleyebilir); action'lar
+# GitHub tarafından deprecate edilip kaldırılabiliyor, bu app-seviyesi bir
+# özellik borcu değil, CI'ın çalışır kalması için operasyonel bir bakım —
+# bu yüzden version-update burada tutuluyor.
+#
+# Yeniden aktive etmek istenirse: npm ecosystem girdisini
+# docs/discovery/dependabot-triyaji-2026-08-19.md §3'teki hazır yapılandırmayla
+# (`directory: '/'`, mevcut groups/ignore kuralları) geri ekle.
 
+updates:
   - package-ecosystem: pip
     directory: '/ai_backend'
     schedule:
