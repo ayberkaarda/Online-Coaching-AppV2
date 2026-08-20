@@ -11,6 +11,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ChangeEvent, FormEvent, JSX } from 'react'
 import { toast } from 'sonner'
 
+import { recordActivityEvent } from '@/lib/activity/emit'
 import { QueryState, SkeletonText } from '@/components/ui'
 import {
   resolveConversationClientId,
@@ -262,13 +263,18 @@ export default function MessagesTab({
     const file = attachmentFile ?? undefined
     clearAttachment()
     // Optimistic güncelleme ve hata toast'ı hook içinde yapılır.
-    sendMessage.mutate({
-      senderId: currentUserId,
-      receiverId: chatPartnerId,
-      message: text,
-      clientId,
-      file,
-    })
+    sendMessage.mutate(
+      {
+        senderId: currentUserId,
+        receiverId: chatPartnerId,
+        message: text,
+        clientId,
+        file,
+      },
+      // Faz 4.8 §7c — iyimser güncelleme geri alınabildiği için olay `mutate`
+      // çağrısında DEĞİL, yalnızca `onSuccess` dalında yayınlanır.
+      { onSuccess: () => recordActivityEvent('message_sent') }
+    )
   }
 
   if (userRole === 'coach' && selectedClientIds.length !== 1) {

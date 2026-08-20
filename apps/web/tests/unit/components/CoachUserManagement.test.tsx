@@ -46,6 +46,18 @@ vi.mock('recharts', async (importOriginal) => {
 
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
 
+// Faz 4.8 §7c dilim 3b: drawer'a eklenen "Etkinlik Özeti" bölümü kendi hook'larını
+// (`useMfaStatus`/`useActivityConsentState`/`useCoachActivitySummary`) çağırır ve
+// bunlar GERÇEK `useSupabaseClient()`/`useQuery()`e düşer — bu test dosyası ne bir
+// `SupabaseClientProvider` ne bir `QueryClientProvider` kuruyor. Bileşenin KENDİ
+// davranışı (üç rıza durumu, aal2 kapısı, saat/dakika göstermeme) BU dosyanın
+// kapsamı DEĞİLDİR — bkz. `apps/web/tests/unit/activity-views.test.tsx`. Burada
+// yalnızca "drawer hâlâ açılıyor ve trend/makro/poz akışı bozulmadı" testleri
+// kilitlenir; bu yüzden bileşen zararsız bir gövdeyle STUB'lanır.
+vi.mock('@/components/activity/CoachActivitySummary', () => ({
+  CoachActivitySummary: () => null,
+}))
+
 // Veri hook'larının HEPSİ mock'lanır (ağ yok); `TREND_RANGE_DAYS`,
 // `DEFAULT_TREND_RANGE_DAYS` ve `summarizeMetric` GERÇEK kalır — bileşenin
 // aralık listesi ve özeti hakkındaki iddialar gerçek sözleşmeye kurulsun.

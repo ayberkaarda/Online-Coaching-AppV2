@@ -14,6 +14,7 @@ import { Toaster } from 'sonner'
 import { getQueryClient } from '@repo/api-client/query/queryClient'
 
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
+import { ActivityTracker } from '@/lib/activity/tracker'
 import { clearLegacySupabaseAuthStorage } from '@/lib/legacy-auth-cleanup'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import { sonnerNotifier } from '@/lib/notifier'
@@ -75,6 +76,14 @@ export function Providers({
           <ThemeProvider attribute="class" defaultTheme="system" enableSystem nonce={nonce}>
             <ErrorBoundary>{children}</ErrorBoundary>
             <Toaster richColors closeButton position="top-right" />
+            {/* Faz 4.8 §7c dilim 2 — etkinlik heartbeat'i. `null` render eder: DOM'a,
+                layout'a veya CSS'e etkisi yok, sağlayıcı SIRASI değişmedi (mevcut
+                sağlayıcıların arasına girmez, en içteki ağaca kardeş olarak eklenir).
+                Buraya konmasının gerekçesi `@/lib/activity/tracker` başlığındadır:
+                `<SupabaseClientProvider>` İÇİNDE olmak zorunda (token +
+                `onAuthStateChange`) ve tüm rotaları TEK mount ile kapsamalı.
+                Rıza kapalıyken tek bir ağ isteği bile üretmez. */}
+            <ActivityTracker />
             {process.env.NODE_ENV === 'development' && <ReactQueryDevtools initialIsOpen={false} />}
           </ThemeProvider>
         </QueryClientProvider>

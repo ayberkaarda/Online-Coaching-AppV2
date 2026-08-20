@@ -22,6 +22,7 @@ import {
 } from '@repo/api-client'
 import { QueryState, SkeletonCard, SkeletonText } from '@/components/ui'
 import { SecuritySection } from '@/components/security/SecuritySection'
+import { ActivityConsent } from '@/components/activity/ActivityConsent'
 import { ALLOWED_IMAGE_MIME, validateImageFile } from '@repo/api-client/upload-validation'
 import { passwordChangeSchema, type PasswordChangeInput } from '@repo/types/schemas'
 import {
@@ -527,6 +528,14 @@ export default function ProfilePage(): JSX.Element {
           ################################################################### */}
       <div id="guvenlik" className="scroll-mt-8">
         <SecuritySection />
+      </div>
+
+      {/* Aktivite kaydı rızası (Faz 4.8 §7c, dilim 3a) — Güvenlik'in HEMEN yanında:
+          ikisi de "hesabımla ilgili ne oluyor" sorusuna cevap veren kalıcı kontroller.
+          `userId` burada garanti vardır (bu dal yalnızca `profile` yüklendiğinde render
+          edilir, ki `profile` yüklenmesi zaten geçerli bir oturum ister). */}
+      <div id="aktivite-kaydi" className="mt-8 scroll-mt-8">
+        <ActivityConsent userId={userId} />
       </div>
 
       {/* KVKK hesap silme — sayfanın EN ALTINDA ve görsel olarak ayrılmış ("tehlikeli

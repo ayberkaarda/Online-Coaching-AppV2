@@ -7847,14 +7847,21 @@ rollback;
 
 
 -- =============================================================================
--- 131) POLİTİKA SÜRÜKLENME TESTİ — 14/14, RESTRICTIVE, ALL, authenticated
+-- 131) POLİTİKA SÜRÜKLENME TESTİ — 16/16, RESTRICTIVE, ALL, authenticated
 --
 -- Politikanın VARLIĞI yetmez; YANLIŞ kurulmuş bir politika sessizce etkisizdir:
 --   * PERMISSIVE olsaydı mevcut politikalarla VEYA'lanır, hiçbir şeyi kısıtlamazdı;
 --   * `for select` olsaydı yazma yolu açık kalırdı;
 --   * `to public` olsaydı `postgres`/`service_role` da kapsanır görünürdü (yanıltıcı);
 --   * `with check` NULL olsaydı INSERT yolu ölçülemezdi.
--- Ayrıca 14 tablo listesinin ŞEMAYLA ayrışmadığı da burada ölçülür.
+-- Ayrıca tablo listesinin ŞEMAYLA ayrışmadığı da burada ölçülür.
+--
+-- FAZ 4.8 (2026-08-20): liste 14 -> 16. `activity_sessions` ve `activity_events`
+-- kapıya EKLENDİ (20260820090000_activity_log.sql KARAR 3b): muafiyet
+-- listesindekilerin aksine bu iki tablonun GERÇEK bir koç okuma politikası var
+-- (sıfır-politika değiller), dolayısıyla koç aal1'de danışanın davranış
+-- verisini — giriş saatleri, çevrimiçi örüntü — okuyabilirdi. Muafiyet listesi
+-- DEĞİŞMEDİ.
 -- =============================================================================
 begin;
 do $$
@@ -7863,14 +7870,16 @@ declare
     'profiles', 'notifications', 'messages', 'form_checks', 'daily_logs',
     'workout_logs', 'nutrition_logs', 'program_approvals', 'workout_plans',
     'workout_plan_exercises', 'nutrition_plans', 'nutrition_plan_meals',
-    'progress_entries', 'progress_photos'
+    'progress_entries', 'progress_photos',
+    -- Faz 4.8 (§7c) — etkinlik kaydı:
+    'activity_sessions', 'activity_events'
   ];
   v_ok      int;
   v_total   int;
   v_missing text;
   v_extra   text;
 begin
-  -- (a) 14 tablonun HEPSİNDE, doğru şekilde kurulmuş mu?
+  -- (a) 16 tablonun HEPSİNDE, doğru şekilde kurulmuş mu?
   select count(*) into v_ok
     from pg_policies p
    where p.schemaname = 'public'
@@ -7884,7 +7893,7 @@ begin
      and p.with_check like '%is_coach%'
      and p.with_check like '%aal2%';
 
-  if v_ok <> 14 then
+  if v_ok <> 16 then
     select string_agg(e, ', ' order by e) into v_missing
       from unnest(v_expected) as e
      where not exists (
@@ -7896,18 +7905,18 @@ begin
           and p.qual like '%is_coach%' and p.qual like '%aal2%'
           and p.with_check like '%is_coach%' and p.with_check like '%aal2%'
      );
-    raise exception 'BASARISIZ [131a]: 14 beklenirken % dogru politika var. Eksik/bozuk: %', v_ok, coalesce(v_missing, '(bilinmiyor)');
+    raise exception 'BASARISIZ [131a]: 16 beklenirken % dogru politika var. Eksik/bozuk: %', v_ok, coalesce(v_missing, '(bilinmiyor)');
   end if;
 
   -- (b) `mfa_aal2_gate` adıyla BAŞKA bir tabloya politika sızmış mı?
   select count(*) into v_total
     from pg_policies p
    where p.schemaname = 'public' and p.policyname = 'mfa_aal2_gate';
-  if v_total <> 14 then
-    raise exception 'BASARISIZ [131b]: mfa_aal2_gate adli politika sayisi % (14 bekleniyordu).', v_total;
+  if v_total <> 16 then
+    raise exception 'BASARISIZ [131b]: mfa_aal2_gate adli politika sayisi % (16 bekleniyordu).', v_total;
   end if;
 
-  -- (c) ŞEMA SÜRÜKLENMESİ: public'te, 14 kapılı tablo ve 4 bilinen muafiyet
+  -- (c) ŞEMA SÜRÜKLENMESİ: public'te, 16 kapılı tablo ve bilinen muafiyetler
   --     DIŞINDA bir tablo varsa, ya kapıya ya muafiyet listesine girmelidir.
   --     Yarın eklenen 15. danışan tablosu buradan GÜRÜLTÜLÜ geçer.
   select string_agg(t.tablename, ', ' order by t.tablename) into v_extra
@@ -7935,7 +7944,7 @@ begin
     raise exception 'BASARISIZ [131d]: public.is_coach() SECURITY DEFINER degil -- aal2 kapisi SESSIZCE ETKISIZ.';
   end if;
 
-  raise notice 'GECTI [131 14/14 mfa_aal2_gate RESTRICTIVE+ALL+authenticated, using+with_check dolu, sema surukleme yok, is_coach DEFINER]';
+  raise notice 'GECTI [131 16/16 mfa_aal2_gate RESTRICTIVE+ALL+authenticated, using+with_check dolu, sema surukleme yok, is_coach DEFINER]';
 end $$;
 rollback;
 
@@ -8321,8 +8330,1023 @@ rollback;
 
 
 -- =============================================================================
+-- ETKİNLİK KAYDI (Faz 4.8 / §7c) — 137) DANIŞAN KENDİ KAYDINI GÖRÜR,
+-- BAŞKASININKİNİ GÖRMEZ
+--
+-- §7c: "Danışan kendi kaydını görür" — koç görünümüyle SİMETRİK DEĞİL, danışan
+-- kendi geçmişine TAM erişir. Bu senaryo hem POZİTİF (kendi satırlarını
+-- gerçekten görüyor) hem NEGATİF (başkasınınkini görmüyor) yarıyı ölçer;
+-- yalnız negatif ölçmek "her şey 0" ile boş bir yeşil üretirdi.
+-- =============================================================================
+begin;
+
+-- Kurulum `postgres` kimliğiyle (KENDİ KURULUMUNU YAPMA KURALI).
+insert into public.activity_sessions (id, user_id, started_at, last_seen_at, platform) values
+  ('d0000000-0000-0000-0000-000000000137', '22222222-2222-2222-2222-222222222222',
+   now() - interval '2 hours', now() - interval '90 minutes', 'web'),
+  ('d0000000-0000-0000-0000-000000000237', '33333333-3333-3333-3333-333333333333',
+   now() - interval '2 hours', now() - interval '90 minutes', 'mobile');
+
+insert into public.activity_events (user_id, session_id, event, tab, duration_sec, occurred_at) values
+  ('22222222-2222-2222-2222-222222222222', 'd0000000-0000-0000-0000-000000000137',
+   'login', null, null, now() - interval '2 hours'),
+  ('22222222-2222-2222-2222-222222222222', 'd0000000-0000-0000-0000-000000000137',
+   'tab_view', 'antrenman', 120, now() - interval '110 minutes'),
+  ('33333333-3333-3333-3333-333333333333', 'd0000000-0000-0000-0000-000000000237',
+   'message_sent', null, null, now() - interval '100 minutes');
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+do $$
+declare
+  v_own_s   bigint;
+  v_own_e   bigint;
+  v_other_s bigint;
+  v_other_e bigint;
+begin
+  select count(*) into v_own_s from public.activity_sessions
+   where user_id = '22222222-2222-2222-2222-222222222222';
+  select count(*) into v_own_e from public.activity_events
+   where user_id = '22222222-2222-2222-2222-222222222222';
+
+  if v_own_s < 1 or v_own_e < 2 then
+    raise exception 'BASARISIZ [137 POZITIF]: danisan KENDI kaydini goremiyor (oturum=%, olay=%) -- §7c ihlali', v_own_s, v_own_e;
+  end if;
+
+  -- Filtresiz sorgu da yalnızca kendi satırlarını dönmeli (RLS, WHERE değil).
+  select count(*) into v_other_s from public.activity_sessions
+   where user_id <> '22222222-2222-2222-2222-222222222222';
+  select count(*) into v_other_e from public.activity_events
+   where user_id <> '22222222-2222-2222-2222-222222222222';
+
+  if v_other_s <> 0 or v_other_e <> 0 then
+    raise exception 'BASARISIZ [137 IZOLASYON]: danisan BASKASININ etkinlik kaydini gordu (oturum=%, olay=%)', v_other_s, v_other_e;
+  end if;
+
+  raise notice 'GECTI [137 danisan kendi etkinlik kaydini gorur (% oturum / % olay), baskasininkini GORMEZ]', v_own_s, v_own_e;
+end $$;
+reset role;
+rollback;
+
+
+-- =============================================================================
+-- ETKİNLİK KAYDI (Faz 4.8) — 138) DANIŞAN DOĞRUDAN YAZAMAZ — YAZMA YALNIZ
+-- SUNUCU YOLUNDAN (B-031'in bu yüzeydeki ilk kapanışı)
+--
+-- İki ayrı iddia:
+--   (a) TABLO: `authenticated` (danışan da koç da) INSERT/UPDATE/DELETE
+--       yapamaz — grant VAR ama YAZMA POLİTİKASI YOK (RLS + FORCE -> RED).
+--   (b) FONKSİYON: yazma/rıza/purge fonksiyonlarının HİÇBİRİ `authenticated`a
+--       ya da `anon`a AÇIK DEĞİL; hepsi SECURITY DEFINER ve `search_path` pinli.
+--       (Senaryo 118/124/132 ile AYNI felsefe: sertleştirme TAHMİN EDİLMEZ,
+--        ÖLÇÜLÜR.)
+-- =============================================================================
+begin;
+
+insert into public.activity_sessions (id, user_id, platform) values
+  ('d0000000-0000-0000-0000-000000000138', '22222222-2222-2222-2222-222222222222', 'web');
+insert into public.activity_events (id, user_id, session_id, event) values
+  ('d0000000-0000-0000-0000-000000000238', '22222222-2222-2222-2222-222222222222',
+   'd0000000-0000-0000-0000-000000000138', 'login');
+
+do $$
+declare
+  v_sig    text;
+  v_secdef boolean;
+  v_config text[];
+begin
+  foreach v_sig in array array[
+    'public.record_activity(uuid, text, text, uuid, text, integer, timestamp with time zone)',
+    'public.purge_expired_activity(integer)',
+    'public.grant_activity_consent(uuid, integer)',
+    'public.revoke_activity_consent(uuid)'
+  ] loop
+    select p.prosecdef, p.proconfig into v_secdef, v_config
+      from pg_proc p where p.oid = v_sig::regprocedure;
+
+    if v_secdef is null then
+      raise exception 'BASARISIZ [138b]: % YOK -- sunucu yolu PGRST202 alir', v_sig;
+    end if;
+    if not v_secdef then
+      raise exception 'BASARISIZ [138b SECURITY]: % SECURITY INVOKER olmus -- sifir yazma politikali tabloya yazamaz', v_sig;
+    end if;
+    if v_config is null or not (v_config @> array['search_path=public, pg_temp']) then
+      raise exception 'BASARISIZ [138b search_path]: % arama yolu pinlenmemis (%)', v_sig, v_config;
+    end if;
+    if has_function_privilege('authenticated', v_sig, 'EXECUTE') then
+      raise exception 'BASARISIZ [138b grant]: % AUTHENTICATED rolune ACIK -- tarayici dogrudan yazabilir (B-031 delinir)', v_sig;
+    end if;
+    if has_function_privilege('anon', v_sig, 'EXECUTE') then
+      raise exception 'BASARISIZ [138b grant]: % ANON rolune ACIK', v_sig;
+    end if;
+    if not has_function_privilege('service_role', v_sig, 'EXECUTE') then
+      raise exception 'BASARISIZ [138b grant]: service_role % yi CALISTIRAMIYOR -- sunucu yolu kirilir', v_sig;
+    end if;
+    if exists (
+      select 1 from pg_proc p, lateral aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a
+       where p.oid = v_sig::regprocedure and a.grantee = 0 and a.privilege_type = 'EXECUTE'
+    ) then
+      raise exception 'BASARISIZ [138b grant]: % PUBLIC a ACIK', v_sig;
+    end if;
+  end loop;
+
+  -- `service_role` tablolara DOĞRUDAN erişememeli (tek yazıcı DEFINER fonksiyon).
+  if has_table_privilege('service_role', 'public.activity_events', 'SELECT')
+     or has_table_privilege('service_role', 'public.activity_events', 'INSERT')
+     or has_table_privilege('service_role', 'public.activity_sessions', 'SELECT')
+     or has_table_privilege('service_role', 'public.activity_sessions', 'INSERT') then
+    raise exception 'BASARISIZ [138 service_role]: etkinlik tablolari service_role a DOGRUDAN acilmis -- PostgREST uzerinden tum danisanlarin davranis gecmisi okunabilir';
+  end if;
+end $$;
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+do $$
+declare
+  v_caught boolean;
+  v_state  text;
+  v_rows   int;
+begin
+  -- (a1) INSERT — KENDİ adına bile yazamaz.
+  v_caught := false;
+  begin
+    insert into public.activity_sessions (user_id, platform)
+    values ('22222222-2222-2222-2222-222222222222', 'web');
+  exception when insufficient_privilege then
+    v_caught := true; get stacked diagnostics v_state = returned_sqlstate;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [138a INSERT/sessions]: danisan oturum satiri YAZABILDI -- tarayicidan dogrudan yazim acik (B-031)';
+  end if;
+  if v_state is distinct from '42501' then
+    raise exception 'BASARISIZ [138a hata kodu]: beklenen 42501, gelen %', v_state;
+  end if;
+
+  v_caught := false;
+  begin
+    insert into public.activity_events (user_id, session_id, event)
+    values ('22222222-2222-2222-2222-222222222222',
+            'd0000000-0000-0000-0000-000000000138', 'ai_generated');
+  exception when insufficient_privilege then
+    v_caught := true;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [138a INSERT/events]: danisan olay satiri YAZABILDI -- sahte aktivite uretilebilir';
+  end if;
+
+  -- (a2) UPDATE / DELETE: politika olmadığı için HİÇBİR SATIRA ULAŞAMAZ
+  --      (RLS'te politikasız UPDATE/DELETE hata değil, 0 satırdır).
+  update public.activity_events set duration_sec = 9999;
+  get diagnostics v_rows = row_count;
+  if v_rows <> 0 then
+    raise exception 'BASARISIZ [138a UPDATE]: danisan % etkinlik satirini GUNCELLEDI', v_rows;
+  end if;
+
+  delete from public.activity_events;
+  get diagnostics v_rows = row_count;
+  if v_rows <> 0 then
+    raise exception 'BASARISIZ [138a DELETE]: danisan % etkinlik satirini SILDI -- kendi izini temizleyebilir', v_rows;
+  end if;
+
+  delete from public.activity_sessions;
+  get diagnostics v_rows = row_count;
+  if v_rows <> 0 then
+    raise exception 'BASARISIZ [138a DELETE/sessions]: danisan % oturum satirini SILDI', v_rows;
+  end if;
+
+  -- (a3) Rıza damgasını KENDİ eliyle basamaz (profiles_guard_activity_consent).
+  v_caught := false;
+  begin
+    update public.profiles
+       set activity_consent_granted_at = now(), activity_consent_version = 1
+     where id = '22222222-2222-2222-2222-222222222222';
+  exception when insufficient_privilege then
+    v_caught := true;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [138a RIZA]: danisan riza damgasini KENDI yazabildi -- geriye tarihli riza uretilebilir';
+  end if;
+
+  raise notice 'GECTI [138 danisan etkinlik tablolarina yazamaz/silemez/guncelleyemez, riza damgasini basamaz; yazma fonksiyonlari yalnizca service_role da]';
+end $$;
+reset role;
+
+-- Satırlar GERÇEKTEN yerinde mi (yani UPDATE/DELETE'i RLS mi engelledi) — pozitif kontrol.
+do $$
+begin
+  if (select count(*) from public.activity_events where id = 'd0000000-0000-0000-0000-000000000238') <> 1
+     or (select count(*) from public.activity_sessions where id = 'd0000000-0000-0000-0000-000000000138') <> 1 then
+    raise exception 'BASARISIZ [138 POZITIF]: kurulum satirlari authenticated tarafindan DEGISTIRILMIS/SILINMIS';
+  end if;
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- ETKİNLİK KAYDI (Faz 4.8) — 139) KOÇ OKUR (aal2) / OKUYAMAZ (aal1)
+--
+-- KARAR 3b (20260820090000 §3): iki tablo da `mfa_aal2_gate` kapısına girdi.
+-- Bu senaryo kapının İKİ YÖNÜNÜ de ölçer:
+--   (a) aal2 koç TÜM danışanları görür (pozitif kontrol — politika `false`
+--       sabiti değil, gerçekten AÇILIYOR),
+--   (b) aal1 (ve `aal` claim'i OLMAYAN) koç HİÇBİR ŞEY göremez.
+-- (b) olmasaydı, koçun parolasını ele geçiren biri ikinci faktör olmadan her
+-- danışanın giriş saatlerini ve çevrimiçi örüntüsünü okuyabilirdi.
+-- =============================================================================
+begin;
+
+insert into public.activity_sessions (id, user_id, platform) values
+  ('d0000000-0000-0000-0000-000000000139', '22222222-2222-2222-2222-222222222222', 'web'),
+  ('d0000000-0000-0000-0000-000000000239', '33333333-3333-3333-3333-333333333333', 'mobile');
+insert into public.activity_events (user_id, session_id, event) values
+  ('22222222-2222-2222-2222-222222222222', 'd0000000-0000-0000-0000-000000000139', 'login'),
+  ('33333333-3333-3333-3333-333333333333', 'd0000000-0000-0000-0000-000000000239', 'login');
+
+-- (a) aal2 KOÇ — POZİTİF KONTROL
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","aal":"aal2"}';
+do $$
+declare
+  v_s bigint;
+  v_e bigint;
+  v_u bigint;
+begin
+  select count(*) into v_s from public.activity_sessions;
+  select count(*) into v_e from public.activity_events;
+  select count(distinct user_id) into v_u from public.activity_events;
+
+  if v_s < 2 or v_e < 2 then
+    raise exception 'BASARISIZ [139a]: aal2 koc etkinlik kaydini okuyamiyor (oturum=%, olay=%)', v_s, v_e;
+  end if;
+  if v_u < 2 then
+    raise exception 'BASARISIZ [139a]: aal2 koc yalnizca % danisanin kaydini gordu -- koc TUM danisanlari gormeli', v_u;
+  end if;
+  raise notice 'GECTI [139a aal2 koc % oturum / % olay / % danisan gordu]', v_s, v_e, v_u;
+end $$;
+reset role;
+
+-- (b) aal1 KOÇ ve `aal` claim'i OLMAYAN KOÇ — KAPI KAPALI
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","aal":"aal1"}';
+do $$
+declare
+  v_s bigint;
+  v_e bigint;
+begin
+  select count(*) into v_s from public.activity_sessions;
+  select count(*) into v_e from public.activity_events;
+  if v_s <> 0 or v_e <> 0 then
+    raise exception 'BASARISIZ [139b aal1]: aal1 koc % oturum / % olay GORDU -- ikinci faktor olmadan davranis profili okunabiliyor', v_s, v_e;
+  end if;
+end $$;
+
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+do $$
+declare
+  v_s bigint;
+  v_e bigint;
+begin
+  select count(*) into v_s from public.activity_sessions;
+  select count(*) into v_e from public.activity_events;
+  if v_s <> 0 or v_e <> 0 then
+    raise exception 'BASARISIZ [139b aal claim YOK]: kapi fail-closed degil (% oturum / % olay)', v_s, v_e;
+  end if;
+  raise notice 'GECTI [139b aal1 koc VE aal claim i olmayan koc etkinlik kaydinin HICBIRINI goremez]';
+end $$;
+reset role;
+rollback;
+
+
+-- =============================================================================
+-- ETKİNLİK KAYDI (Faz 4.8) — 140) record_activity(): RIZA KAPISI + POZİTİF
+-- KONTROL + KAPALI LİSTE + BAŞKASININ OTURUMU + 30 DK BAYATLAMA
+--
+-- KARAR 2'nin ASIL GEREKÇESİ burada ölçülür: rıza kontrolü fonksiyonun İÇİNDE
+-- fail-closed durur, yani "route'ta unutulursa ne olur" sorusu HİÇ DOĞMAZ.
+-- =============================================================================
+begin;
+
+-- Kurulum: danışan A'nın rızası HENÜZ YOK ('undecided').
+update public.profiles
+   set activity_consent_granted_at = null,
+       activity_consent_revoked_at = null,
+       activity_consent_version    = null
+ where id = '22222222-2222-2222-2222-222222222222';
+
+do $$
+begin
+  if public.activity_consent_state('22222222-2222-2222-2222-222222222222') is distinct from 'undecided' then
+    raise exception 'BASARISIZ [140 kurulum]: baslangic durumu undecided degil -> %',
+      public.activity_consent_state('22222222-2222-2222-2222-222222222222');
+  end if;
+end $$;
+
+set local role service_role;
+do $$
+declare
+  v_caught boolean;
+  v_state  text;
+  v_res    jsonb;
+  v_sid    uuid;
+  v_res2   jsonb;
+begin
+  -- (a) RIZA YOK ('undecided') -> 42501, HİÇBİR SATIR YAZILMAZ.
+  v_caught := false;
+  begin
+    perform public.record_activity('22222222-2222-2222-2222-222222222222'::uuid, 'web', 'login');
+  exception when insufficient_privilege then
+    v_caught := true; get stacked diagnostics v_state = returned_sqlstate;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [140a]: RIZA YOKKEN etkinlik yazildi -- KVKK acik riza sarti delindi';
+  end if;
+  if v_state is distinct from '42501' then
+    raise exception 'BASARISIZ [140a hata kodu]: beklenen 42501, gelen %', v_state;
+  end if;
+
+  -- (b) RIZA VER -> POZİTİF KONTROL: kapı gerçekten AÇILIYOR.
+  perform public.grant_activity_consent('22222222-2222-2222-2222-222222222222'::uuid, 1);
+  if public.activity_consent_state('22222222-2222-2222-2222-222222222222') is distinct from 'granted' then
+    raise exception 'BASARISIZ [140b]: grant_activity_consent sonrasi durum granted degil';
+  end if;
+
+  v_res := public.record_activity('22222222-2222-2222-2222-222222222222'::uuid, 'web', 'login');
+  v_sid := (v_res ->> 'session_id')::uuid;
+  if v_sid is null or not (v_res ->> 'session_started')::boolean then
+    raise exception 'BASARISIZ [140b]: ilk cagri yeni oturum acmadi -> %', v_res;
+  end if;
+  if (v_res ->> 'event_id') is null then
+    raise exception 'BASARISIZ [140b]: olay satiri yazilmadi -> %', v_res;
+  end if;
+  perform set_config('zz.activity_140_session', v_sid::text, true);
+
+  -- (c) HEARTBEAT = OLAYSIZ ÇAĞRI: aynı oturum, YENİ SATIR YOK.
+  v_res2 := public.record_activity('22222222-2222-2222-2222-222222222222'::uuid, 'web', null, v_sid);
+  if (v_res2 ->> 'session_id')::uuid is distinct from v_sid then
+    raise exception 'BASARISIZ [140c]: heartbeat yeni oturum acti (% -> %)', v_sid, v_res2 ->> 'session_id';
+  end if;
+  if (v_res2 ->> 'event_id') is not null then
+    raise exception 'BASARISIZ [140c]: heartbeat OLAY SATIRI yazdi -- iki tablo karari anlamsizlasir';
+  end if;
+
+  -- (d) KAPALI LİSTE: tanımsız olay 23514 ile reddedilir (tek kaynak: tablo CHECK).
+  v_caught := false;
+  begin
+    perform public.record_activity('22222222-2222-2222-2222-222222222222'::uuid, 'web', 'sifre_calindi', v_sid);
+  exception when check_violation then
+    v_caught := true; get stacked diagnostics v_state = returned_sqlstate;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [140d]: kapali liste disi olay KABUL EDILDI';
+  end if;
+  if v_state is distinct from '23514' then
+    raise exception 'BASARISIZ [140d hata kodu]: beklenen 23514, gelen %', v_state;
+  end if;
+
+  -- (e) GEÇERSİZ PLATFORM da kapalı listedir.
+  v_caught := false;
+  begin
+    perform public.record_activity('22222222-2222-2222-2222-222222222222'::uuid, 'desktop');
+  exception when check_violation then
+    v_caught := true;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [140e]: platform kapali listesi calismiyor';
+  end if;
+end $$;
+reset role;
+
+-- (f) BAŞKASININ OTURUMU: danışan B'nin oturumuna A adına olay yazılamaz.
+insert into public.activity_sessions (id, user_id, platform) values
+  ('d0000000-0000-0000-0000-000000000140', '33333333-3333-3333-3333-333333333333', 'web');
+
+set local role service_role;
+do $$
+declare
+  v_caught boolean := false;
+  v_state  text;
+  v_old    uuid := current_setting('zz.activity_140_session')::uuid;
+  v_res    jsonb;
+begin
+  begin
+    perform public.record_activity('22222222-2222-2222-2222-222222222222'::uuid, 'web', 'login',
+                                   'd0000000-0000-0000-0000-000000000140'::uuid);
+  exception when insufficient_privilege then
+    v_caught := true; get stacked diagnostics v_state = returned_sqlstate;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [140f]: BASKASININ oturumuna olay yazildi -- user_id/session_id capraz baglanabiliyor';
+  end if;
+  if v_state is distinct from '42501' then
+    raise exception 'BASARISIZ [140f hata kodu]: beklenen 42501, gelen %', v_state;
+  end if;
+end $$;
+reset role;
+
+-- (g) 30 DK BAYATLAMA kurulumu `postgres` kimliğiyle: `service_role`ün
+-- `activity_sessions` üzerinde DOĞRUDAN UPDATE yetkisi YOKTUR (bilinçli
+-- tasarım — senaryo 138'de ölçülüyor), o yüzden oturumu geriye almak burada
+-- yapılır. ÖLÇÜLEN ifade yine rol taklidinden SONRA gelen `record_activity()`tir.
+update public.activity_sessions
+   set started_at   = now() - interval '3 hours',
+       last_seen_at = now() - interval '45 minutes'
+ where id = current_setting('zz.activity_140_session')::uuid;
+
+set local role service_role;
+do $$
+declare
+  v_old uuid := current_setting('zz.activity_140_session')::uuid;
+  v_res jsonb;
+begin
+  v_res := public.record_activity('22222222-2222-2222-2222-222222222222'::uuid, 'web', 'tab_view', v_old, 'beslenme', 30);
+  if not (v_res ->> 'session_started')::boolean then
+    raise exception 'BASARISIZ [140g]: 45 dk bayat oturum YENILENMEDI -> %', v_res;
+  end if;
+  if (v_res ->> 'session_id')::uuid = v_old then
+    raise exception 'BASARISIZ [140g]: bayat oturumun id si degismedi (%)', v_old;
+  end if;
+  perform set_config('zz.activity_140_session2', v_res ->> 'session_id', true);
+end $$;
+reset role;
+
+-- Yazılanlar GERÇEKTEN yerinde mi (service_role tablolari OKUYAMAZ -> dogrulama
+-- `postgres` kimligiyle; senaryo 134'teki AYNI desen).
+do $$
+declare
+  v_s1 uuid := current_setting('zz.activity_140_session')::uuid;
+  v_s2 uuid := current_setting('zz.activity_140_session2')::uuid;
+begin
+  if (select count(*) from public.activity_sessions where id in (v_s1, v_s2)) <> 2 then
+    raise exception 'BASARISIZ [140 POZITIF]: iki oturum satiri de yerinde degil';
+  end if;
+  if (select count(*) from public.activity_events where session_id = v_s1) <> 1 then
+    raise exception 'BASARISIZ [140 POZITIF]: ilk oturumun login olayi YOK';
+  end if;
+  if (select count(*) from public.activity_events
+       where session_id = v_s2 and event = 'tab_view' and tab = 'beslenme' and duration_sec = 30) <> 1 then
+    raise exception 'BASARISIZ [140 POZITIF]: yeni oturumun tab_view olayi beklenen alanlarla yazilmadi';
+  end if;
+  raise notice 'GECTI [140 riza kapisi fail-closed (42501); riza verilince GERCEKTEN yazar; heartbeat olay uretmez; kapali liste 23514; baskasinin oturumu 42501; 30 dk bayatlama yeni oturum acar]';
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- ETKİNLİK KAYDI (Faz 4.8) — 141) RIZA GERİ ÇEKME = DURDUR + SİL
+--
+-- KARAR 1'in ikinci yarısı: toplamanın tek dayanağı AÇIK RIZADIR (§7c meşru
+-- menfaati bilerek reddetti). Dayanak düşünce SAKLAMA dayanağı da düşer
+-- (KVKK m.7) — veri 180 günlük pencerede "erimeye" BIRAKILMAZ, ANINDA silinir.
+-- Ayrıca silmenin BAŞKA kullanıcıya dokunmadığı ölçülür (filtresiz delete YOK).
+-- =============================================================================
+begin;
+
+update public.profiles
+   set activity_consent_granted_at = now() - interval '10 days',
+       activity_consent_revoked_at = null,
+       activity_consent_version    = 1
+ where id in ('22222222-2222-2222-2222-222222222222', '33333333-3333-3333-3333-333333333333');
+
+insert into public.activity_sessions (id, user_id, platform) values
+  ('d0000000-0000-0000-0000-000000000141', '22222222-2222-2222-2222-222222222222', 'web'),
+  ('d0000000-0000-0000-0000-000000000241', '33333333-3333-3333-3333-333333333333', 'mobile');
+insert into public.activity_events (user_id, session_id, event) values
+  ('22222222-2222-2222-2222-222222222222', 'd0000000-0000-0000-0000-000000000141', 'login'),
+  ('22222222-2222-2222-2222-222222222222', 'd0000000-0000-0000-0000-000000000141', 'message_sent'),
+  ('33333333-3333-3333-3333-333333333333', 'd0000000-0000-0000-0000-000000000241', 'login');
+
+set local role service_role;
+do $$
+declare
+  v_res jsonb;
+begin
+  v_res := public.revoke_activity_consent('22222222-2222-2222-2222-222222222222'::uuid);
+  if (v_res ->> 'events_deleted')::int <> 2 then
+    raise exception 'BASARISIZ [141 sayim]: events_deleted=% (beklenen 2)', v_res ->> 'events_deleted';
+  end if;
+  if (v_res ->> 'sessions_deleted')::int <> 1 then
+    raise exception 'BASARISIZ [141 sayim]: sessions_deleted=% (beklenen 1)', v_res ->> 'sessions_deleted';
+  end if;
+end $$;
+reset role;
+
+do $$
+begin
+  -- (a) DURDUR: durum artık 'revoked' -> yazma kapısı kapalı.
+  if public.activity_consent_state('22222222-2222-2222-2222-222222222222') is distinct from 'revoked' then
+    raise exception 'BASARISIZ [141 DURUM]: geri cekme sonrasi durum revoked degil -> %',
+      public.activity_consent_state('22222222-2222-2222-2222-222222222222');
+  end if;
+
+  -- (b) SİL: kullanıcının HİÇBİR satırı kalmamalı.
+  if (select count(*) from public.activity_events   where user_id = '22222222-2222-2222-2222-222222222222') <> 0
+     or (select count(*) from public.activity_sessions where user_id = '22222222-2222-2222-2222-222222222222') <> 0 then
+    raise exception 'BASARISIZ [141 SIL]: geri cekmeden sonra satirlar KALDI -- 180 gun "erimeye" birakilmis, KVKK m.7 ihlali';
+  end if;
+
+  -- (c) İZOLASYON: danışan B'nin kaydı ETKİLENMEMELİ (filtresiz delete YOK).
+  if (select count(*) from public.activity_events   where user_id = '33333333-3333-3333-3333-333333333333') <> 1
+     or (select count(*) from public.activity_sessions where user_id = '33333333-3333-3333-3333-333333333333') <> 1 then
+    raise exception 'BASARISIZ [141 IZOLASYON]: BASKA kullanicinin kaydi silindi -- FILTRESIZ DELETE!';
+  end if;
+  if public.activity_consent_state('33333333-3333-3333-3333-333333333333') is distinct from 'granted' then
+    raise exception 'BASARISIZ [141 IZOLASYON]: BASKA kullanicinin rizasi geri cekildi';
+  end if;
+
+  raise notice 'GECTI [141 geri cekme = DURDUR + SIL: durum revoked, kullanicinin tum satirlari gitti, BASKA kullanici etkilenmedi]';
+end $$;
+
+-- (d) Geri çekildikten sonra yazma yolu GERÇEKTEN kapalı mı?
+set local role service_role;
+do $$
+declare
+  v_caught boolean := false;
+begin
+  begin
+    perform public.record_activity('22222222-2222-2222-2222-222222222222'::uuid, 'web', 'login');
+  exception when insufficient_privilege then
+    v_caught := true;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [141d]: riza geri cekilmisken etkinlik YENIDEN yazilabildi';
+  end if;
+  raise notice 'GECTI [141d riza geri cekilmisken record_activity 42501 ile REDDEDIYOR]';
+end $$;
+reset role;
+rollback;
+
+
+-- =============================================================================
+-- ETKİNLİK KAYDI (Faz 4.8) — 142) PURGE 180 GÜNDEN ESKİYİ SİLER, YENİSİNE
+-- DOKUNMAZ + ZAMANLAYICI KAYITLI
+--
+-- §7c "Saklama 180 gün". İki yarısı da ölçülür: eskisi GİTMELİ (yoksa saklama
+-- politikası bir dilek olur), yenisi KALMALI (yoksa purge veri kaybıdır).
+-- Ayrıca `p_retention_days < 1`'in reddedildiği — yani "hepsini sil" kısayolu
+-- olmadığı — ve pg_cron job'unun kayıtlı olduğu doğrulanır.
+-- =============================================================================
+begin;
+
+insert into public.activity_sessions (id, user_id, started_at, last_seen_at, platform) values
+  -- ESKİ (200 gün) ve YENİ (2 gün)
+  ('d0000000-0000-0000-0000-000000000142', '22222222-2222-2222-2222-222222222222',
+   now() - interval '200 days', now() - interval '200 days', 'web'),
+  ('d0000000-0000-0000-0000-000000000242', '22222222-2222-2222-2222-222222222222',
+   now() - interval '2 days', now() - interval '2 days', 'web');
+
+insert into public.activity_events (id, user_id, session_id, event, occurred_at) values
+  ('d0000000-0000-0000-0000-000000000342', '22222222-2222-2222-2222-222222222222',
+   'd0000000-0000-0000-0000-000000000142', 'login', now() - interval '200 days'),
+  ('d0000000-0000-0000-0000-000000000442', '22222222-2222-2222-2222-222222222222',
+   'd0000000-0000-0000-0000-000000000242', 'login', now() - interval '2 days');
+
+set local role service_role;
+do $$
+declare
+  v_caught boolean := false;
+  v_res    jsonb;
+begin
+  -- (a) "Hepsini sil" kısayolu YOK.
+  begin
+    perform public.purge_expired_activity(0);
+  exception when others then
+    v_caught := true;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [142a]: purge_expired_activity(0) KABUL EDILDI -- filtresiz silme kisayolu acik';
+  end if;
+
+  -- (b) Gerçek purge.
+  v_res := public.purge_expired_activity(180);
+  if (v_res ->> 'events_deleted')::int < 1 then
+    raise exception 'BASARISIZ [142b]: 200 gunluk olay SILINMEDI -> %', v_res;
+  end if;
+  if (v_res ->> 'sessions_deleted')::int < 1 then
+    raise exception 'BASARISIZ [142b]: 200 gunluk oturum SILINMEDI -> %', v_res;
+  end if;
+end $$;
+reset role;
+
+do $$
+begin
+  -- (c) ESKİ gitti mi?
+  if (select count(*) from public.activity_events where id = 'd0000000-0000-0000-0000-000000000342') <> 0 then
+    raise exception 'BASARISIZ [142c]: 200 gunluk olay HALA DURUYOR -- 180 gunluk saklama uygulanmiyor';
+  end if;
+  if (select count(*) from public.activity_sessions where id = 'd0000000-0000-0000-0000-000000000142') <> 0 then
+    raise exception 'BASARISIZ [142c]: 200 gunluk oturum HALA DURUYOR';
+  end if;
+
+  -- (d) YENİ duruyor mu? (purge veri kaybi DEGILDIR)
+  if (select count(*) from public.activity_events where id = 'd0000000-0000-0000-0000-000000000442') <> 1 then
+    raise exception 'BASARISIZ [142d]: 2 gunluk olay SILINDI -- purge fazla siliyor';
+  end if;
+  if (select count(*) from public.activity_sessions where id = 'd0000000-0000-0000-0000-000000000242') <> 1 then
+    raise exception 'BASARISIZ [142d]: 2 gunluk oturum SILINDI';
+  end if;
+
+  -- (e) ZAMANLAYICI: pg_cron kuruluysa job MUTLAKA olmali (yarim kurulum YOK).
+  if exists (select 1 from pg_extension where extname = 'pg_cron') then
+    if (select count(*) from cron.job where jobname = 'activity_log_purge_daily' and active) <> 1 then
+      raise exception 'BASARISIZ [142e]: pg_cron KURULU ama activity_log_purge_daily job u YOK/pasif -- 180 gunluk saklama zamanlayicisi eksik';
+    end if;
+  else
+    raise notice 'NOT [142e]: pg_cron kurulu degil -- saklama siniri record_activity() icindeki firsatci purge ile ayakta';
+  end if;
+
+  raise notice 'GECTI [142 purge 180 gunden eskiyi siler, yenisine DOKUNMAZ; purge(0) reddedilir; cron job kayitli]';
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- ETKİNLİK KAYDI (Faz 4.8) — 143) HESAP SİLME (KVKK) ETKİNLİK KAYDINI DA
+-- SÜPÜRÜR — MANİFEST 15 -> 17
+--
+-- `delete_account()` FAIL-CLOSED'dır: silme sonrası manifest'i YENİDEN ölçer ve
+-- `row_total <> 0` ise TÜM transaksiyonu geri sarar. İki yeni tablo manifest'e
+-- EKLENMESEYDİ hesap silme onları hiç GÖRMEZ, cascade bozulsa bile sessizce
+-- "başarılı" derdi. Bu senaryo üç şeyi birden ölçer:
+--   (a) manifest 17 anahtar döndürüyor ve iki yeni anahtar DOĞRU sayıyor,
+--   (b) `rows_deleted` jsonb'sine iki yeni anahtar giriyor,
+--   (c) silme sonrası iki tabloda da satır KALMIYOR.
+-- =============================================================================
+begin;
+
+insert into auth.users (
+  instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
+  raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
+  confirmation_token, email_change, email_change_token_new, recovery_token
+)
+values ('00000000-0000-0000-0000-000000000000', 'c0000000-0000-0000-0000-000000000143',
+   'authenticated', 'authenticated', 'zz-143-silinecek@example.com', 'x', now(),
+   '{"provider":"email","providers":["email"]}'::jsonb, '{"full_name":"zz-143 Silinecek"}'::jsonb,
+   now(), now(), '', '', '', '');
+
+-- Rıza + etkinlik kaydı: yazma yolu GERÇEK yol (record_activity) üzerinden
+-- kurulur ki senaryo, elle INSERT'le üretilmiş yapay bir duruma değil ürünün
+-- kendi ürettiği satırlara dayansın.
+set local role service_role;
+do $$
+declare
+  v_res jsonb;
+  v_sid uuid;
+begin
+  perform public.grant_activity_consent('c0000000-0000-0000-0000-000000000143'::uuid, 1);
+  v_res := public.record_activity('c0000000-0000-0000-0000-000000000143'::uuid, 'web', 'login');
+  v_sid := (v_res ->> 'session_id')::uuid;
+  perform public.record_activity('c0000000-0000-0000-0000-000000000143'::uuid, 'web', 'tab_view', v_sid, 'antrenman', 45);
+  perform public.record_activity('c0000000-0000-0000-0000-000000000143'::uuid, 'web', 'logout', v_sid);
+end $$;
+reset role;
+
+do $$
+begin
+  if (select count(*) from public.activity_events where user_id = 'c0000000-0000-0000-0000-000000000143') <> 3 then
+    raise exception 'BASARISIZ [143 kurulum]: 3 olay bekleniyordu, % var',
+      (select count(*) from public.activity_events where user_id = 'c0000000-0000-0000-0000-000000000143');
+  end if;
+end $$;
+
+set local role service_role;
+do $$
+declare
+  v_before jsonb;
+  v_result jsonb;
+  v_keys   int;
+begin
+  v_before := public.account_deletion_manifest('c0000000-0000-0000-0000-000000000143'::uuid);
+
+  -- (a) MANİFEST 17 ANAHTAR
+  select count(*) into v_keys from jsonb_object_keys(v_before -> 'rows');
+  if v_keys <> 17 then
+    raise exception 'BASARISIZ [143a]: manifest % tablo sayiyor (17 bekleniyordu) -- iki yeni tablo eklenmemis olabilir', v_keys;
+  end if;
+  if not (v_before -> 'rows' ? 'activity_sessions') or not (v_before -> 'rows' ? 'activity_events') then
+    raise exception 'BASARISIZ [143a]: manifest activity_* anahtarlarini DONDURMUYOR';
+  end if;
+  if (v_before -> 'rows' ->> 'activity_sessions')::int <> 1 then
+    raise exception 'BASARISIZ [143a sayim]: activity_sessions=% (beklenen 1)', v_before -> 'rows' ->> 'activity_sessions';
+  end if;
+  if (v_before -> 'rows' ->> 'activity_events')::int <> 3 then
+    raise exception 'BASARISIZ [143a sayim]: activity_events=% (beklenen 3)', v_before -> 'rows' ->> 'activity_events';
+  end if;
+
+  -- (b) SİLME + rows_deleted
+  v_result := public.delete_account('c0000000-0000-0000-0000-000000000143'::uuid);
+  if (v_result ->> 'already_deleted')::boolean then
+    raise exception 'BASARISIZ [143b]: var olan kullanici icin already_deleted=true dondu';
+  end if;
+  if ((v_result -> 'rows_deleted') ->> 'activity_sessions')::int <> 1
+     or ((v_result -> 'rows_deleted') ->> 'activity_events')::int <> 3 then
+    raise exception 'BASARISIZ [143b rows_deleted]: activity_sessions=%, activity_events=%',
+      (v_result -> 'rows_deleted') ->> 'activity_sessions',
+      (v_result -> 'rows_deleted') ->> 'activity_events';
+  end if;
+end $$;
+reset role;
+
+do $$
+begin
+  -- (c) CASCADE GERÇEKTEN SÜPÜRDÜ MÜ
+  if (select count(*) from public.activity_events   where user_id = 'c0000000-0000-0000-0000-000000000143') <> 0
+     or (select count(*) from public.activity_sessions where user_id = 'c0000000-0000-0000-0000-000000000143') <> 0 then
+    raise exception 'BASARISIZ [143c]: silme sonrasi etkinlik satirlari KALDI -- fail-closed kapisi bu tablolari gormemis';
+  end if;
+
+  -- TANIK: seed koc ve danisanlar ETKILENMEMELI (fazla silme yok).
+  if (select count(*) from public.profiles) < 3 then
+    raise exception 'BASARISIZ [143 TANIK]: seed profilleri silinmis -- KATASTROFIK fazla silme';
+  end if;
+
+  raise notice 'GECTI [143 hesap silme etkinlik kaydini da supurur; manifest 17 tablo sayiyor; rows_deleted iki yeni anahtari tasiyor]';
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- ETKİNLİK KAYDI (Faz 4.8) — 144) coach_activity_summary(): KOÇ SORGUSU HAM
+-- ZAMAN DAMGASI DÖNDÜRMEZ; SECURITY INVOKER; aal2 KAPISI VE RIZA KAPISI AYAKTA
+--
+-- Dilim 3c'nin (20260820140000_coach_activity_summary.sql) TEK senaryosu.
+-- Dilim 3b koç görünümünü ham satır çekip TARAYICIDA toplayarak yapıyordu:
+-- §7c'nin "koça saat/dakika gösterilmez" kuralı yalnızca ARAYÜZ NEZAKETİ
+-- seviyesinde duruyordu, çünkü ham `started_at`/`occurred_at` zaten koçun
+-- tarayıcısına iniyordu. Bu senaryo sınırın artık VERİ KATMANINDA olduğunu
+-- ölçer:
+--   (a) fonksiyon SECURITY INVOKER'dır (katalog) VE aal1 koç HİÇBİR ŞEY
+--       göremez (davranış) — DEFINER olsaydı aal2 kapısı ATLANIRDI,
+--   (b) aal2 koç DOĞRU gün toplamlarını alır (pozitif kontrol) ve dönen
+--       kümede ham zaman damgası taşıyan BİR KOLON BİLE yoktur,
+--   (c) danışan BAŞKASININ özetini alamaz (ama KENDİ özetini alabilir),
+--   (d) RIZA KAPALIYSA satırlar DURUYOR OLSA BİLE küme BOŞTUR ve HATA YOKTUR.
+-- =============================================================================
+begin;
+
+-- Kurulum: danışan A'nın rızası VAR.
+set local role service_role;
+do $$
+begin
+  perform public.grant_activity_consent('22222222-2222-2222-2222-222222222222'::uuid, 1);
+end $$;
+reset role;
+
+-- BİLİNEN gün toplamları. Zaman damgaları YEREL GÜNE (Europe/Istanbul) çapa
+-- atılır — düz `now() - interval` kullanılsaydı test gece yarısı penceresinde
+-- bir gün kayar ve KENDİ ölçtüğü hatayı ÜRETİRDİ.
+--   * BUGÜN      : 1800 sn oturum + login x1 + tab_view x2
+--   * DÜN        :  600 sn oturum + message_sent x1
+--   * 60 GÜN ÖNCE:  300 sn oturum  -> 30 günlük varsayılan pencerenin DIŞINDA
+--   * danışan B'nin BUGÜNKÜ oturumu (1200 sn) -> A'nın özetine SIZMAMALI
+with d as (select (now() at time zone 'Europe/Istanbul')::date as today)
+insert into public.activity_sessions (id, user_id, started_at, last_seen_at, platform)
+select x.id, x.uid, x.s, x.e, x.p from d,
+  lateral (values
+    ('d0000000-0000-0000-0000-000000000144'::uuid, '22222222-2222-2222-2222-222222222222'::uuid,
+     (d.today + time '09:00') at time zone 'Europe/Istanbul',
+     (d.today + time '09:30') at time zone 'Europe/Istanbul', 'web'),
+    ('d0000000-0000-0000-0000-000000000244'::uuid, '22222222-2222-2222-2222-222222222222'::uuid,
+     ((d.today - 1) + time '22:00') at time zone 'Europe/Istanbul',
+     ((d.today - 1) + time '22:10') at time zone 'Europe/Istanbul', 'web'),
+    ('d0000000-0000-0000-0000-000000000344'::uuid, '22222222-2222-2222-2222-222222222222'::uuid,
+     ((d.today - 60) + time '10:00') at time zone 'Europe/Istanbul',
+     ((d.today - 60) + time '10:05') at time zone 'Europe/Istanbul', 'web'),
+    ('d0000000-0000-0000-0000-000000000444'::uuid, '33333333-3333-3333-3333-333333333333'::uuid,
+     (d.today + time '11:00') at time zone 'Europe/Istanbul',
+     (d.today + time '11:20') at time zone 'Europe/Istanbul', 'mobile')
+  ) as x(id, uid, s, e, p);
+
+with d as (select (now() at time zone 'Europe/Istanbul')::date as today)
+insert into public.activity_events (user_id, session_id, event, occurred_at)
+select x.uid, x.sid, x.ev, x.oat from d,
+  lateral (values
+    ('22222222-2222-2222-2222-222222222222'::uuid, 'd0000000-0000-0000-0000-000000000144'::uuid,
+     'login',        (d.today + time '09:00') at time zone 'Europe/Istanbul'),
+    ('22222222-2222-2222-2222-222222222222'::uuid, 'd0000000-0000-0000-0000-000000000144'::uuid,
+     'tab_view',     (d.today + time '09:10') at time zone 'Europe/Istanbul'),
+    ('22222222-2222-2222-2222-222222222222'::uuid, 'd0000000-0000-0000-0000-000000000144'::uuid,
+     'tab_view',     (d.today + time '09:20') at time zone 'Europe/Istanbul'),
+    ('22222222-2222-2222-2222-222222222222'::uuid, 'd0000000-0000-0000-0000-000000000244'::uuid,
+     'message_sent', ((d.today - 1) + time '22:05') at time zone 'Europe/Istanbul'),
+    ('33333333-3333-3333-3333-333333333333'::uuid, 'd0000000-0000-0000-0000-000000000444'::uuid,
+     'login',        (d.today + time '11:00') at time zone 'Europe/Istanbul')
+  ) as x(uid, sid, ev, oat);
+
+-- --- (a1) KATALOG: SECURITY INVOKER + pinli search_path + yetki yüzeyi ------
+do $$
+declare
+  c_sig    constant text := 'public.coach_activity_summary(uuid, integer)';
+  v_secdef boolean;
+  v_config text[];
+  v_result text;
+begin
+  select p.prosecdef, p.proconfig into v_secdef, v_config
+    from pg_proc p where p.oid = c_sig::regprocedure;
+  if v_secdef is null then
+    raise exception 'BASARISIZ [144a1]: % YOK.', c_sig;
+  end if;
+  if v_secdef then
+    raise exception 'BASARISIZ [144a1]: % SECURITY DEFINER (prosecdef=true) -- aal2 kapisi ATLANIR, aal1 koc tum danisanlarin davranis ozetini okur (ADR-0026).', c_sig;
+  end if;
+  if v_config is null or not (v_config @> array['search_path=public, pg_temp']) then
+    raise exception 'BASARISIZ [144a1]: % arama yolu pinlenmemis (%).', c_sig, v_config;
+  end if;
+  if not has_function_privilege('authenticated', c_sig, 'EXECUTE') then
+    raise exception 'BASARISIZ [144a1]: authenticated % yi calistiramiyor.', c_sig;
+  end if;
+  if has_function_privilege('anon', c_sig, 'EXECUTE') then
+    raise exception 'BASARISIZ [144a1]: % ANON a acik.', c_sig;
+  end if;
+  if has_function_privilege('service_role', c_sig, 'EXECUTE') then
+    raise exception 'BASARISIZ [144a1]: % service_role a acik -- INVOKER fonksiyon RLS siz bir rolle calistirilabilir.', c_sig;
+  end if;
+
+  -- *** SÖZLEŞMENİN ASIL MADDESİ *** — dönüş kümesinde HAM ZAMAN DAMGASI YOK.
+  v_result := pg_get_function_result(c_sig::regprocedure);
+  if v_result is distinct from 'TABLE(day date, total_seconds integer, event_counts jsonb)' then
+    raise exception 'BASARISIZ [144a1]: % donus sozlesmesi -> %. Beklenen: TABLE(day date, total_seconds integer, event_counts jsonb). (started_at/last_seen_at/occurred_at donduren bir kolon eklenmis ya da day kolonu timestamptz olmus olabilir.)', c_sig, v_result;
+  end if;
+  raise notice 'GECTI [144a1 coach_activity_summary SECURITY INVOKER, search_path pinli, EXECUTE yalnizca authenticated, donus kumesinde ham zaman damgasi YOK]';
+end $$;
+
+-- --- (a2) DAVRANIŞ: aal1 koç (ve `aal` claim'i OLMAYAN koç) HİÇBİR ŞEY görmez
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","aal":"aal1"}';
+do $$
+declare
+  v_rows bigint;
+begin
+  select count(*) into v_rows
+    from public.coach_activity_summary('22222222-2222-2222-2222-222222222222'::uuid, 90);
+  if v_rows <> 0 then
+    raise exception 'BASARISIZ [144a2 aal1]: aal1 koc % gun satiri GORDU -- ikinci faktor olmadan davranis ozeti okunabiliyor', v_rows;
+  end if;
+end $$;
+
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+do $$
+declare
+  v_rows bigint;
+begin
+  select count(*) into v_rows
+    from public.coach_activity_summary('22222222-2222-2222-2222-222222222222'::uuid, 90);
+  if v_rows <> 0 then
+    raise exception 'BASARISIZ [144a2 aal claim YOK]: kapi fail-closed degil (% gun satiri)', v_rows;
+  end if;
+  raise notice 'GECTI [144a2 aal1 koc VE aal claim i olmayan koc gun ozetini de goremez]';
+end $$;
+reset role;
+
+-- --- (b) POZİTİF KONTROL: aal2 koç DOĞRU gün toplamlarını alır --------------
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","aal":"aal2"}';
+do $$
+declare
+  v_today  date := (now() at time zone 'Europe/Istanbul')::date;
+  v_rows   bigint;
+  v_secs   integer;
+  v_counts jsonb;
+  v_days   date[];
+begin
+  -- Varsayılan pencere (30 gün): BUGÜN + DÜN görünür, 60 gün önceki GÖRÜNMEZ.
+  select count(*) into v_rows
+    from public.coach_activity_summary('22222222-2222-2222-2222-222222222222'::uuid);
+  if v_rows <> 2 then
+    raise exception 'BASARISIZ [144b pencere]: varsayilan 30 gunluk pencere % satir dondu (2 bekleniyordu -- 60 gun onceki kayit sizmis ya da bir gun kaybolmus olabilir)', v_rows;
+  end if;
+
+  -- Sıralama YENİDEN ESKİYE.
+  select array_agg(s.day order by s.ord) into v_days
+    from (select c.day, row_number() over () as ord
+            from public.coach_activity_summary('22222222-2222-2222-2222-222222222222'::uuid) c) s;
+  if v_days is distinct from array[v_today, v_today - 1] then
+    raise exception 'BASARISIZ [144b sira]: gunler % (beklenen %)', v_days, array[v_today, v_today - 1];
+  end if;
+
+  -- BUGÜN: 1800 sn (danışan B'nin 1200 sn'si SIZMAMALI) + login x1 + tab_view x2.
+  select c.total_seconds, c.event_counts into v_secs, v_counts
+    from public.coach_activity_summary('22222222-2222-2222-2222-222222222222'::uuid) c
+   where c.day = v_today;
+  if v_secs is distinct from 1800 then
+    raise exception 'BASARISIZ [144b bugun sure]: total_seconds=% (1800 bekleniyordu -- baska danisanin oturumu sizmis olabilir)', v_secs;
+  end if;
+  if v_counts is distinct from '{"login": 1, "tab_view": 2}'::jsonb then
+    raise exception 'BASARISIZ [144b bugun sayac]: event_counts=% (beklenen login:1, tab_view:2)', v_counts;
+  end if;
+
+  -- DÜN: 600 sn + message_sent x1.
+  select c.total_seconds, c.event_counts into v_secs, v_counts
+    from public.coach_activity_summary('22222222-2222-2222-2222-222222222222'::uuid) c
+   where c.day = v_today - 1;
+  if v_secs is distinct from 600 then
+    raise exception 'BASARISIZ [144b dun sure]: total_seconds=% (600 bekleniyordu)', v_secs;
+  end if;
+  if v_counts is distinct from '{"message_sent": 1}'::jsonb then
+    raise exception 'BASARISIZ [144b dun sayac]: event_counts=%', v_counts;
+  end if;
+
+  -- 90 günlük pencere 60 gün öncekini DE getirir (pencere gerçekten p_days'e bağlı).
+  select count(*) into v_rows
+    from public.coach_activity_summary('22222222-2222-2222-2222-222222222222'::uuid, 90);
+  if v_rows <> 3 then
+    raise exception 'BASARISIZ [144b p_days]: 90 gunluk pencere % satir dondu (3 bekleniyordu)', v_rows;
+  end if;
+
+  -- `p_days = 0` bir "tum gecmis" kisayolu DEGILDIR.
+  begin
+    perform * from public.coach_activity_summary('22222222-2222-2222-2222-222222222222'::uuid, 0);
+    raise exception 'BASARISIZ [144b p_days=0]: KABUL EDILDI';
+  exception when invalid_parameter_value then
+    null;
+  end;
+
+  raise notice 'GECTI [144b aal2 koc gun toplamlarini DOGRU alir: bugun 1800 sn, dun 600 sn, tur kirilimi dogru, pencere p_days e bagli]';
+end $$;
+reset role;
+
+-- --- (c) DANIŞAN BAŞKASININ ÖZETİNİ ALAMAZ ----------------------------------
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"33333333-3333-3333-3333-333333333333","role":"authenticated"}';
+do $$
+declare
+  v_rows bigint;
+begin
+  select count(*) into v_rows
+    from public.coach_activity_summary('22222222-2222-2222-2222-222222222222'::uuid, 90);
+  if v_rows <> 0 then
+    raise exception 'BASARISIZ [144c]: danisan B, danisan A nin % gun satirini GORDU -- INVOKER fonksiyon RLS i atlamis', v_rows;
+  end if;
+end $$;
+reset role;
+
+-- POZİTİF KONTROL: danışan KENDİ özetini alabilir (fonksiyon "herkese boş
+-- dönen" bir kabuk değil; (c) gerçekten RLS'in ürünü).
+set local role service_role;
+do $$
+begin
+  perform public.grant_activity_consent('33333333-3333-3333-3333-333333333333'::uuid, 1);
+end $$;
+reset role;
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"33333333-3333-3333-3333-333333333333","role":"authenticated"}';
+do $$
+declare
+  v_secs integer;
+begin
+  select c.total_seconds into v_secs
+    from public.coach_activity_summary('33333333-3333-3333-3333-333333333333'::uuid) c
+   where c.day = (now() at time zone 'Europe/Istanbul')::date;
+  if v_secs is distinct from 1200 then
+    raise exception 'BASARISIZ [144c POZITIF]: danisan KENDI ozetini alamadi (total_seconds=%, 1200 bekleniyordu)', v_secs;
+  end if;
+  raise notice 'GECTI [144c danisan baskasinin ozetini ALAMAZ, kendi ozetini ALIR]';
+end $$;
+reset role;
+
+-- --- (d) RIZA KAPALIYSA: SATIRLAR DURUYOR OLSA BİLE BOŞ KÜME, HATA YOK ------
+--     Rıza damgası BURADA doğrudan çevriliyor (senaryo 140'ın kurulum deseni):
+--     `revoke_activity_consent()` çağrılsaydı satırlar da SİLİNİRDİ ve test
+--     "satır yok, o yüzden boş" tautolojisine düşerdi. Ölçülmek istenen şey
+--     tam olarak SATIRLAR DURURKEN rıza kapısının çalışmasıdır.
+update public.profiles
+   set activity_consent_revoked_at = now() + interval '1 second'
+ where id = '22222222-2222-2222-2222-222222222222';
+
+do $$
+begin
+  if public.activity_consent_state('22222222-2222-2222-2222-222222222222') is distinct from 'revoked' then
+    raise exception 'BASARISIZ [144d kurulum]: durum revoked degil -> %',
+      public.activity_consent_state('22222222-2222-2222-2222-222222222222');
+  end if;
+  -- Satırlar GERÇEKTEN duruyor (yani (d) bir tautoloji değil).
+  if (select count(*) from public.activity_events where user_id = '22222222-2222-2222-2222-222222222222') = 0 then
+    raise exception 'BASARISIZ [144d kurulum]: olay satirlari silinmis -- test tautolojiye dustu';
+  end if;
+end $$;
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","aal":"aal2"}';
+do $$
+declare
+  v_rows bigint;
+begin
+  -- HATA FIRLATMAMALI (koç durumu zaten rıza rozetinden görüyor; burada hata
+  -- fırlatmak arayüzde "özet okunamadı" ile "rıza kapalı"yı ayrılmaz kılardı).
+  select count(*) into v_rows
+    from public.coach_activity_summary('22222222-2222-2222-2222-222222222222'::uuid, 90);
+  if v_rows <> 0 then
+    raise exception 'BASARISIZ [144d]: riza GERI CEKILMISKEN aal2 koc % gun satiri gordu -- riza kapisi fail-closed degil', v_rows;
+  end if;
+  raise notice 'GECTI [144d riza kapaliyken satirlar DURSA BILE kume BOS ve HATA YOK]';
+end $$;
+reset role;
+rollback;
+
+
+-- =============================================================================
 -- TOPLAM ÖZET
--- Bu noktaya yalnızca YUKARIDAKİ 136 senaryonun HEPSİ GECTI verdiyse ulaşılır --
+-- Bu noktaya yalnızca YUKARIDAKİ 144 senaryonun HEPSİ GECTI verdiyse ulaşılır --
 -- herhangi biri BASARISIZ olsaydı raise exception + ON_ERROR_STOP psql'i
 -- daha önce sıfırdan farklı çıkış koduyla durdururdu.
 --   * 1–19  : Faz 1a ve öncesi (profiles, notifications, form_checks, daily_logs,
@@ -8464,6 +9488,56 @@ rollback;
 --             kapısı DIŞINDaki bir yoldan (ham `auth.users` DELETE) koç
 --             hesabı silinse dahi `coach_actions` satırı KALIR, yalnızca
 --             `actor_id` NULL'a düşer (`ON DELETE SET NULL`) (136)
+--   * 137–143: Faz 4.8 dilim 1 — ETKİNLİK KAYDI (§7c)
+--             (20260820090000_activity_log.sql): danışan KENDİ etkinlik
+--             kaydını görür (§7c kararı) ama başkasınınkini GÖRMEZ — pozitif
+--             ve negatif yarı birlikte ölçülür (137); danışan tablolara
+--             DOĞRUDAN yazamaz/silemez/güncelleyemez ve rıza damgasını kendi
+--             basamaz — yazma yalnız sunucu yolundan, dört fonksiyonun da
+--             EXECUTE'u yalnızca `service_role`de, `service_role`ün DOĞRUDAN
+--             tablo yetkisi YOK (138, B-031'in bu yüzeydeki ilk kapanışı);
+--             aal2 koç TÜM danışanları okur (pozitif kontrol) ama aal1 koç ve
+--             `aal` claim'i olmayan koç HİÇBİRİNİ göremez — iki yeni tablo
+--             `mfa_aal2_gate` kapısına GİRDİ, 14 -> 16 (139);
+--             `record_activity()` rıza kapısı FAIL-CLOSED'dır (rıza yokken
+--             42501, hiçbir satır yazılmaz), rıza verilince GERÇEKTEN yazar,
+--             heartbeat = olaysız çağrı (yeni satır üretmez), kapalı
+--             olay/platform listesi 23514 ile reddeder, BAŞKASININ oturumuna
+--             yazılamaz (42501) ve 30 dk bayat oturum YENİ oturum açar (140);
+--             rıza geri çekme = DURDUR + SİL — durum 'revoked' olur,
+--             kullanıcının TÜM satırları ANINDA gider (180 gün "erimez",
+--             KVKK m.7), BAŞKA kullanıcı ETKİLENMEZ (filtresiz DELETE yok) ve
+--             sonrasında yazma yolu kapalıdır (141); purge 180 günden eskiyi
+--             siler, YENİSİNE DOKUNMAZ, `purge_expired_activity(0)`
+--             ("hepsini sil" kısayolu) REDDEDİLİR ve pg_cron job'u
+--             kayıtlı+aktiftir (142); HESAP SİLME ETKİLEŞİMİ — manifest
+--             15 -> 17, iki yeni anahtar doğru sayar, `rows_deleted`e yansır
+--             ve silme sonrası etkinlik satırı KALMAZ (143)
+--   * 144    : Faz 4.8 dilim 3c — KOÇ ÖZETİNİN SQL'E TAŞINMASI
+--             (20260820140000_coach_activity_summary.sql): dilim 3b koç
+--             görünümünü ham satır çekip TARAYICIDA toplayarak yapıyordu, yani
+--             §7c'nin "koça saat/dakika gösterilmez" kuralı yalnızca ARAYÜZ
+--             NEZAKETİ seviyesindeydi — ham `started_at`/`occurred_at` zaten
+--             koçun tarayıcısına iniyordu. `coach_activity_summary(uuid,
+--             integer)` sınırı VERİ KATMANINA taşır: KATALOG yarısı —
+--             `prosecdef = false` (SECURITY INVOKER; DEFINER olsaydı aal2
+--             kapısı ATLANIRDI), pinli `search_path`, EXECUTE yalnızca
+--             `authenticated` (anon ve `service_role` DAHİL kapalı) ve dönüş
+--             sözleşmesi `TABLE(day date, total_seconds integer, event_counts
+--             jsonb)` — yani kümede ham zaman damgası taşıyan BİR KOLON BİLE
+--             yok (144a1); DAVRANIŞ yarısı — aal1 koç ve `aal` claim'i
+--             olmayan koç HİÇBİR gün satırı göremez (144a2); *** POZİTİF
+--             KONTROL *** aal2 koç DOĞRU gün toplamlarını alır (bugün 1800 sn
+--             + login/tab_view kırılımı, dün 600 sn), BAŞKA danışanın oturumu
+--             sızmaz, sıralama yeniden eskiye, pencere gerçekten `p_days`e
+--             bağlıdır (30 -> 2 gün, 90 -> 3 gün) ve `p_days = 0` reddedilir
+--             (144b); danışan BAŞKASININ özetini alamaz ama KENDİ özetini
+--             alır — yani (c) bir "herkese boş dönen kabuk" değil, RLS'in
+--             ürünüdür (144c); RIZA GERİ ÇEKİLMİŞKEN satırlar HÂLÂ DURUYOR
+--             olsa bile küme BOŞTUR ve HATA FIRLATILMAZ (rıza kapalı olması
+--             bir arıza değildir; koç durumu zaten rıza rozetinden görür) —
+--             kurulum satırların gerçekten durduğunu doğrular, yani test
+--             tautoloji değildir (144d)
 --
 -- NOT: `nutrition_logs`, `progress_entries` ve `progress_photos` ayrıca senaryo
 -- 73 (yetki) ve 74 (RLS+FORCE) tarafından DİNAMİK olarak kapsanır — o iki
@@ -8471,5 +9545,5 @@ rollback;
 -- =============================================================================
 do $$
 begin
-  raise notice 'TUM RLS TESTLERI GECTI (136 senaryo)';
+  raise notice 'TUM RLS TESTLERI GECTI (144 senaryo)';
 end $$;

@@ -1159,7 +1159,7 @@ format/build/audit hepsi temiz. Üç yeni borç açıldı (B-061, B-062, B-063 �
 
 ---
 
-## 7c. Faz 4.8 — Etkinlik Kaydı (PLANLANDI)
+## 7c. Faz 4.8 — Etkinlik Kaydı (TAMAMLANDI)
 
 Koç panelinde danışan aktivitesinin (sekme görüntüleme, günlük giriş, form
 check yükleme, mesaj gönderme, AI üretimi, giriş/çıkış) **gün hassasiyetinde**
@@ -1189,13 +1189,33 @@ görünür olması. Kapsam ve kararlar Fable danışmasıyla alındı.
 
 ### Dilimler
 
-1. Şema + RLS + `delete_account()` genişletmesi + purge (pg_cron).
-2. `POST /api/activity` + istemci heartbeat (`fetch(keepalive:true)`).
-3. Rıza/aydınlatma akışı + iki görünüm (danışan kendi kaydı, koç gün
-   hassasiyetinde özet).
-4. Fırsat: **B-009** (`42501` RLS reddi sunucu tarafına hiç ulaşmıyor) aynı
-   uçla (`POST /api/activity`'nin loglama altyapısı) kapatılabilir mi —
-   değerlendirilecek, garanti değil.
+1. **TAMAMLANDI** — Şema + RLS + `delete_account()` genişletmesi + purge
+   (pg_cron). `supabase/migrations/20260820090000_activity_log.sql`; RLS
+   136 → 143, `delete_account()` manifesti 15 → 17.
+2. **TAMAMLANDI** — `POST /api/activity` + `POST`/`DELETE /api/activity/
+consent` + istemci heartbeat (`fetch(keepalive:true)`, `sendBeacon` DEĞİL).
+3. **TAMAMLANDI** — üç alt dilime bölündü ve bu sırayla yürütüldü:
+   - 3b: iki görünüm (danışan `/verilerim` tam ayrıntı, koç
+     `CoachUserManagement` içinde gün bazlı özet).
+   - 3c: mahremiyet sınırının istemciden veri katmanına taşınması —
+     `coach_activity_summary()` RPC'si (`supabase/migrations/
+20260820140000_coach_activity_summary.sql`, `returns table(...)`,
+     `SECURITY INVOKER`); RLS 143 → 144.
+   - 3a: rıza/aydınlatma arayüzü (`ActivityConsent.tsx`) — zorunlu
+     ilk-giriş modalı bilinçli olarak reddedildi, kontrol `/profile` ve
+     `/verilerim`e kondu.
+4. **Değerlendirildi, KAPATILMADI** — B-009 (`42501` RLS reddi sunucu
+   tarafına hiç ulaşmıyor) aynı uçla kapatılabilir miydi diye
+   değerlendirildi; borcun güvenlik yarısını kapatmadığı (rapor istemciden
+   gelir, doğrudan PostgREST'i sondalayan kişi raporlamaz) ve kimlikli her
+   kullanıcıya güvenlik log akışına sahte satır yazma yetkisi vereceği
+   gerekçesiyle kod yazılmadı. Kök neden B-031'de kalıyor; B-009 açık borç
+   olarak duruyor (`docs/PROGRESS.md` §3). Ayrıntı:
+   `docs/archive/progress-faz-4.8-etkinlik-kaydi.md` "Dilim 4".
+
+Sonuç: RLS 136 → **144/144**, vitest 793 → **868/868** (68 dosya), E2E 54
+passed / 4 skipped. Tam kapanış kaydı:
+`docs/archive/progress-faz-4.8-etkinlik-kaydi.md`.
 
 ---
 

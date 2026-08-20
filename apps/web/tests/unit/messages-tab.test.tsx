@@ -384,13 +384,19 @@ describe('MessagesTab — mesaj gönderme', () => {
     await user.type(input, 'Bugün nasıl geçti?')
     await user.click(screen.getByRole('button', { name: 'Gönder' }))
 
-    expect(sendMessage.mutate).toHaveBeenCalledWith({
-      senderId: COACH_ID,
-      receiverId: CLIENT_ID,
-      message: 'Bugün nasıl geçti?',
-      clientId: CLIENT_ID,
-      file: undefined,
-    })
+    // Faz 4.8 §7c: `mutate` artık İKİNCİ bir argüman da alıyor (`{ onSuccess }` —
+    // `message_sent` etkinlik olayı yalnızca BAŞARI dalında yayınlanır). Payload
+    // iddiası birebir korunuyor; ikinci argüman `expect.anything()` ile geçiliyor.
+    expect(sendMessage.mutate).toHaveBeenCalledWith(
+      {
+        senderId: COACH_ID,
+        receiverId: CLIENT_ID,
+        message: 'Bugün nasıl geçti?',
+        clientId: CLIENT_ID,
+        file: undefined,
+      },
+      expect.anything()
+    )
     expect(input).toHaveValue('')
   })
 
@@ -462,7 +468,8 @@ describe('MessagesTab — fotoğraf eki seçimi', () => {
     await user.click(screen.getByRole('button', { name: 'Gönder' }))
 
     expect(sendMessage.mutate).toHaveBeenCalledWith(
-      expect.objectContaining({ message: 'İşte fotoğraf', file: goodFile })
+      expect.objectContaining({ message: 'İşte fotoğraf', file: goodFile }),
+      expect.anything()
     )
   })
 })

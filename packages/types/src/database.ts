@@ -36,6 +36,83 @@ export type Database = {
         }
         Relationships: []
       }
+      activity_events: {
+        Row: {
+          duration_sec: number | null
+          event: string
+          id: string
+          occurred_at: string
+          session_id: string
+          tab: string | null
+          user_id: string
+        }
+        Insert: {
+          duration_sec?: number | null
+          event: string
+          id?: string
+          occurred_at?: string
+          session_id: string
+          tab?: string | null
+          user_id: string
+        }
+        Update: {
+          duration_sec?: number | null
+          event?: string
+          id?: string
+          occurred_at?: string
+          session_id?: string
+          tab?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_events_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "activity_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activity_events_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      activity_sessions: {
+        Row: {
+          id: string
+          last_seen_at: string
+          platform: string
+          started_at: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          last_seen_at?: string
+          platform: string
+          started_at?: string
+          user_id: string
+        }
+        Update: {
+          id?: string
+          last_seen_at?: string
+          platform?: string
+          started_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_sessions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       coach_actions: {
         Row: {
           action: string
@@ -475,6 +552,9 @@ export type Database = {
       }
       profiles: {
         Row: {
+          activity_consent_granted_at: string | null
+          activity_consent_revoked_at: string | null
+          activity_consent_version: number | null
           avatar_path: string | null
           created_at: string
           current_streak: number
@@ -488,6 +568,9 @@ export type Database = {
           workout_plan: string | null
         }
         Insert: {
+          activity_consent_granted_at?: string | null
+          activity_consent_revoked_at?: string | null
+          activity_consent_version?: number | null
           avatar_path?: string | null
           created_at?: string
           current_streak?: number
@@ -501,6 +584,9 @@ export type Database = {
           workout_plan?: string | null
         }
         Update: {
+          activity_consent_granted_at?: string | null
+          activity_consent_revoked_at?: string | null
+          activity_consent_version?: number | null
           avatar_path?: string | null
           created_at?: string
           current_streak?: number
@@ -793,6 +879,7 @@ export type Database = {
     }
     Functions: {
       account_deletion_manifest: { Args: { p_user_id: string }; Returns: Json }
+      activity_consent_state: { Args: { p_user_id: string }; Returns: string }
       approve_program: {
         Args: { p_approval_id: string; p_client_id: string; p_plan: Json }
         Returns: undefined
@@ -835,6 +922,14 @@ export type Database = {
           rows_pending: number
         }[]
       }
+      coach_activity_summary: {
+        Args: { p_client_id: string; p_days?: number }
+        Returns: {
+          day: string
+          event_counts: Json
+          total_seconds: number
+        }[]
+      }
       consume_attachment_verification: {
         Args: { p_bucket: string; p_path: string }
         Returns: boolean
@@ -856,6 +951,10 @@ export type Database = {
         Returns: number
       }
       form_check_entry_date: { Args: { p_created_at: string }; Returns: string }
+      grant_activity_consent: {
+        Args: { p_user_id: string; p_version: number }
+        Returns: Json
+      }
       increment_streak: { Args: { user_id: string }; Returns: number }
       is_coach: { Args: { uid?: string }; Returns: boolean }
       is_coach_profile: { Args: { target: string }; Returns: boolean }
@@ -905,6 +1004,22 @@ export type Database = {
         Returns: Database["public"]["Enums"]["user_role"]
       }
       progress_photo_owner: { Args: { p_name: string }; Returns: string }
+      purge_expired_activity: {
+        Args: { p_retention_days?: number }
+        Returns: Json
+      }
+      record_activity: {
+        Args: {
+          p_duration_sec?: number
+          p_event?: string
+          p_occurred_at?: string
+          p_platform: string
+          p_session_id?: string
+          p_tab?: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
       record_attachment_verification: {
         Args: {
           p_bucket: string
@@ -923,6 +1038,7 @@ export type Database = {
         }
         Returns: string
       }
+      revoke_activity_consent: { Args: { p_user_id: string }; Returns: Json }
       save_nutrition_plan: {
         Args: { p_client_ids: string[]; p_plan: Json }
         Returns: number

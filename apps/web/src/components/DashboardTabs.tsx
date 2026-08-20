@@ -16,11 +16,12 @@ import {
   TriangleAlert,
   Users,
 } from 'lucide-react'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { JSX, KeyboardEvent } from 'react'
 import { toast } from 'sonner'
 
 import { useNotifications, useProfile } from '@repo/api-client'
+import { recordTabView } from '@/lib/activity/emit'
 import type { Profile, UserRole } from '@repo/types'
 
 import AnnouncementsTab from './tabs/AnnouncementsTab'
@@ -57,6 +58,16 @@ export function DashboardTabs({
   clients,
 }: DashboardTabsProps): JSX.Element {
   const [activeTab, setActiveTab] = useState<TabKey>('formCheck')
+
+  // Faz 4.8 §7c — `tab_view`. `activeTab` URL'de DEĞİL yerel state'te durduğu için
+  // etkinlik izleyicisi bunu rotadan türetemez; tek kaynak burasıdır. `recordTabView`
+  // ÇALIŞMA ZAMANI BAĞIMLILIĞI OLMAYAN bir kapıdır (bkz. `@/lib/activity/emit`): rıza
+  // kapalıyken, izleyici mount olmadan ve testlerde SESSİZ NO-OP'tur. Önceki sekmenin
+  // `duration_sec`'i denetleyicide kapatılır, burada süre muhasebesi YAPILMAZ.
+  useEffect(() => {
+    recordTabView(activeTab)
+  }, [activeTab])
+
   const exportRef = useRef<HTMLDivElement | null>(null)
   const tabRefs = useRef<Partial<Record<TabKey, HTMLButtonElement | null>>>({})
 

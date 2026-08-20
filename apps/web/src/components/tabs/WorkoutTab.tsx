@@ -61,6 +61,7 @@ import {
   useWorkoutPlanExercises,
   type SessionExercise,
 } from '@repo/api-client/hooks/useWorkoutSession'
+import { recordActivityEvent } from '@/lib/activity/emit'
 import { DAYS, getTodayName } from '@/lib/utils'
 import { aiWorkoutSchema, type AiWorkoutInput } from '@repo/types/schemas'
 import {
@@ -234,6 +235,8 @@ export default function WorkoutTab({
 
   const onGenerateSmartWorkout = handleSubmit(async (values) => {
     const result = await generateWorkout.mutateAsync(values)
+    // Faz 4.8 §7c — AI üretimi yalnızca BAŞARIDA sayılır (mutateAsync hatada fırlatır).
+    recordActivityEvent('ai_generated')
 
     const next = emptyWorkoutPlan()
     for (const day of DAY_NAMES) {

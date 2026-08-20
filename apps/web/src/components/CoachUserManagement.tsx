@@ -35,7 +35,7 @@
 // # değildir (migration KARAR 4).                                             #
 // ###########################################################################
 
-import { Bell, Clock, ImageOff } from 'lucide-react'
+import { Activity, Bell, Clock, ImageOff } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { JSX } from 'react'
 import {
@@ -52,6 +52,7 @@ import {
 } from 'recharts'
 import { toast } from 'sonner'
 
+import { CoachActivitySummary } from '@/components/activity/CoachActivitySummary'
 import { EmptyState, SkeletonCard, SkeletonChart } from '@/components/ui'
 import { tokens } from '@/design/tokens'
 import {
@@ -642,6 +643,23 @@ export function CoachUserManagement({ clients }: CoachUserManagementProps): JSX.
                         </div>
                       )}
                     </figure>
+                  </div>
+
+                  {/* --- ETKİNLİK ÖZETİ (Faz 4.8 §7c, dilim 3b) ---
+                      Konum kararı: bu drawer zaten "seçili danışan" bağlamını taşıyan TEK
+                      yüzey (trend/makro/poz kıyaslama hepsi burada) — ayrı bir sekme/route
+                      açmak aynı "danışan durumu" bilgisini ikinci bir yerde tekrar ederdi
+                      (bkz. dosya başı, bekleyen form check kuyruğu için aynı gerekçe).
+                      İÇERİK BİLEREK GÜN HASSASİYETİNDEDİR: `CoachActivitySummary` saat/dakika
+                      damgası TAŞIMAYAN bir tip üzerinden çalışır (bkz. o dosyanın başlığı) —
+                      danışanın "Verilerim" sayfasındaki (`apps/web/src/app/verilerim`) tam
+                      ayrıntılı görünümle KARIŞTIRILMAMALIDIR. */}
+                  <div className="rounded-panel border border-border bg-surface p-6">
+                    <h3 className="mb-4 flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-fg-muted">
+                      <Activity aria-hidden="true" className="h-4 w-4 shrink-0" />
+                      Etkinlik Özeti
+                    </h3>
+                    <CoachActivitySummary clientId={selectedClient.id} />
                   </div>
 
                   {poses.length > 0 && (

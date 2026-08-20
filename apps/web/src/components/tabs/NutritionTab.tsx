@@ -36,6 +36,7 @@ import {
   type NutritionTotals,
 } from '@repo/api-client'
 import { todayIsoDate } from '@repo/api-client/date'
+import { recordActivityEvent } from '@/lib/activity/emit'
 import { DAYS, downloadCSV, formatDateTR } from '@/lib/utils'
 import { aiDietSchema, type AiDietInput } from '@repo/types/schemas'
 import {
@@ -802,6 +803,8 @@ export default function NutritionTab({
   const onGenerate = handleSubmit(async (values) => {
     // İstek Next.js proxy route'una gider; hata mesajları hook/proxy tarafından verilir.
     const result = await generateDiet.mutateAsync(values)
+    // Faz 4.8 §7c — AI üretimi yalnızca BAŞARIDA sayılır (mutateAsync hatada fırlatır).
+    recordActivityEvent('ai_generated')
 
     setTargetCalories(result.target_calories)
 

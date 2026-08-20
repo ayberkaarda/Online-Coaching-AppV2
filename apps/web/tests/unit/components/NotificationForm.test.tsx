@@ -28,6 +28,10 @@ function makeProfile(overrides: Partial<Profile> = {}): Profile {
     workout_plan: null,
     current_streak: 0,
     last_checkin_at: null,
+    // Faz 4.8 (§7c) etkinlik kaydı rıza kolonları — profiles Row'un parçası.
+    activity_consent_granted_at: null,
+    activity_consent_revoked_at: null,
+    activity_consent_version: null,
     created_at: '2026-01-01T00:00:00.000Z',
     updated_at: '2026-01-01T00:00:00.000Z',
     ...overrides,

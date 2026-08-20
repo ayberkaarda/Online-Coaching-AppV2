@@ -17,6 +17,7 @@ import { toast } from 'sonner'
 import { EmptyState, QueryState, SkeletonCard } from '@/components/ui'
 import { useFormChecks, useSubmitFormCheck } from '@repo/api-client'
 import { ALLOWED_IMAGE_MIME, validateImageFile } from '@repo/api-client/upload-validation'
+import { recordActivityEvent } from '@/lib/activity/emit'
 import { formatDateTR, formatDateTimeTR } from '@/lib/utils'
 import { formCheckSchema, type FormCheckInput } from '@repo/types/schemas'
 import type { UserRole } from '@repo/types'
@@ -110,6 +111,9 @@ export default function FormCheckTab({
       frontFile: poseFile,
       notes: 'Yeni form',
     })
+
+    // Faz 4.8 §7c — yalnızca BAŞARIDA (mutateAsync hatada fırlatır).
+    recordActivityEvent('form_check_uploaded')
 
     reset()
     setPoseFile(null)

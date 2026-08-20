@@ -12,6 +12,7 @@ import { toast } from 'sonner'
 import { QueryState, SkeletonCard } from '@/components/ui'
 import { useCreateDailyLog, useDailyLogs } from '@repo/api-client'
 import { todayIsoDate } from '@repo/api-client/date'
+import { recordActivityEvent } from '@/lib/activity/emit'
 import { downloadCSV, formatDateTR, getMacroPercentage } from '@/lib/utils'
 import { dailyLogSchema, type DailyLogInput } from '@repo/types/schemas'
 import type { UserRole } from '@repo/types'
@@ -58,6 +59,9 @@ export default function DailyLogTab({
       // rapor DÜNÜN kaydını ezerdi (bkz. `@repo/api-client/date`).
       log_date: todayIsoDate(),
     })
+    // Faz 4.8 §7c — `mutateAsync` hatada FIRLATTIĞI için bu satıra yalnızca BAŞARIDA
+    // ulaşılır. Fire-and-forget: etkinlik kaydı kullanıcının işini bekletmez.
+    recordActivityEvent('daily_log_submitted')
     reset()
   })
 
