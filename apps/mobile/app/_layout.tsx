@@ -1,3 +1,5 @@
+import '../lib/crypto-polyfill'
+
 import { useIsCoach, useMfaStatus, useSession } from '@repo/api-client'
 import { useFonts } from 'expo-font'
 import { Stack } from 'expo-router'
