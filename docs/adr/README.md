@@ -87,4 +87,5 @@ ama karar metni silinmez — tarihsel bağlam korunur.
 | [0026](0026-totp-mfa-ve-aal2-kapisi.md)                             | TOTP MFA ve koç hesabı için `aal2` RLS kapısı                                | Kabul edildi                                | 2026-08-19 |
 | [0027](0027-danisan-daveti.md)                                      | Danışan daveti: `inviteUserByEmail`, açık `aal2` kapısı ve iki fazlı denetim | Kabul edildi                                | 2026-08-20 |
 | [0028](0028-mobil-koc-acil-erisim.md)                               | Mobil koç acil-erişim (B-052'nin tersine çevrilmesi)                         | Kabul edildi                                | 2026-08-21 |
+| [0029](0029-kapsam-dondurma-v1.md)                                  | Kapsam dondurma: Sarmal v1                                                   | Kabul edildi                                | 2026-08-21 |
 | [0030](0030-motion-doktrini.md)                                     | Motion doktrini (web + mobil hareket disiplini)                              | Kabul edildi                                | 2026-08-21 |
