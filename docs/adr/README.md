@@ -86,3 +86,4 @@ ama karar metni silinmez — tarihsel bağlam korunur.
 | [0025](0025-hesap-silme-ve-service-role-sunucu-yolu.md)             | KVKK hesap silme akışı ve `service_role`'ün ilk sunucu yolu                  | Kabul edildi                                | 2026-08-19 |
 | [0026](0026-totp-mfa-ve-aal2-kapisi.md)                             | TOTP MFA ve koç hesabı için `aal2` RLS kapısı                                | Kabul edildi                                | 2026-08-19 |
 | [0027](0027-danisan-daveti.md)                                      | Danışan daveti: `inviteUserByEmail`, açık `aal2` kapısı ve iki fazlı denetim | Kabul edildi                                | 2026-08-20 |
+| [0028](0028-mobil-koc-acil-erisim.md)                               | Mobil koç acil-erişim (B-052'nin tersine çevrilmesi)                         | Kabul edildi                                | 2026-08-21 |
