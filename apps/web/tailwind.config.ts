@@ -1,5 +1,6 @@
 import plugin from 'tailwindcss/plugin'
 
+import { durations, easings } from './src/design/motion'
 import { tokens } from './src/design/tokens'
 
 import type { TokenName } from './src/design/tokens'
@@ -91,14 +92,30 @@ const config: Config = {
         card: '12px',
         panel: '16px',
       },
+      // Motion Doktrini (src/design/motion.ts) — TEK KAYNAK. Süre/eğri burada
+      // ms/cubic-bezier olarak ELLE yazılmaz; `duration-fast|base|slow` ve
+      // `ease-standard|decelerate` yardımcı sınıfları bu nesnelerden üretilir.
+      transitionDuration: {
+        fast: `${durations.fast}ms`,
+        base: `${durations.base}ms`,
+        slow: `${durations.slow}ms`,
+      },
+      transitionTimingFunction: {
+        standard: easings.standard,
+        decelerate: easings.decelerate,
+      },
       keyframes: {
+        // "demir zıplamaz": Faz 4.5'te bu keyframe bir `translateY` kayması
+        // içeriyordu (dikey hareket). Motion Doktrini turunda (2026-08-21)
+        // düz opaklık geçişine indirgendi — kalan tek "hareket" opaklıktır.
         fadeIn: {
-          '0%': { opacity: '0', transform: 'translateY(4px)' },
-          '100%': { opacity: '1', transform: 'translateY(0)' },
+          '0%': { opacity: '0' },
+          '100%': { opacity: '1' },
         },
       },
       animation: {
-        fadeIn: 'fadeIn 0.25s ease-out',
+        // Skeleton -> içerik geçişi (mikro #4). Süre/eğri motion.ts'ten.
+        fadeIn: `fadeIn ${durations.base}ms ${easings.decelerate}`,
       },
     },
   },

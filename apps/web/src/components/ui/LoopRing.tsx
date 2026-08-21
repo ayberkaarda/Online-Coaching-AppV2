@@ -46,7 +46,7 @@
 // # Kanıt: `tests/unit/loop-ring.test.tsx`.                                  #
 // ###########################################################################
 
-import { useSyncExternalStore } from 'react'
+import { useEffect, useState, useSyncExternalStore } from 'react'
 import type { JSX, ReactNode } from 'react'
 
 /** ADR-0017'nin izin verdiği ÜÇ kullanım yeri. Dördüncüsü yoktur. */
@@ -55,6 +55,35 @@ export const LOOP_RING_PURPOSES = ['weekly-cycle', 'gym-session', 'coach-triage'
 export type LoopRingPurpose = (typeof LOOP_RING_PURPOSES)[number]
 
 const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)'
+
+/**
+ * "Mount oldu mu" sinyali — imza hareket #2'nin (arc çizimi) tetikleyicisi.
+ *
+ * NEDEN `useSyncExternalStore` DEĞİL: `ThemeToggle`/`reset-password` sayfasındaki
+ * "sunucu/ilk hidrasyonda false, istemci mount'undan sonra true" deseni yalnızca
+ * UYGULAMANIN İLK hidrasyon sınırında false->true döner — LoopRing tipik olarak
+ * hidrasyon TAMAMLANDIKTAN çok sonra (bir sorgu verisi geldiğinde) mount olur, o
+ * noktada `useSyncExternalStore` ilk render'da zaten `true` döner ve çizim animasyonu
+ * hiç OYNAMAZDI. Burada gerçekten "BU ÖRNEK mount olduktan bir kare sonra" gerekiyor.
+ *
+ * NEDEN yine de `react-hooks/set-state-in-effect`i İHLAL ETMİYOR: `setState` effect
+ * gövdesinde SENKRON çağrılmıyor, bir `requestAnimationFrame` GERİ ÇAĞIRIMI içinde
+ * çağrılıyor — kural bu deseni kabul eder (bkz. `src/app/reset-password/page.tsx`daki
+ * Promise-callback örneği: "setState burada bir PROMISE CALLBACK'İ içinde çağrılıyor
+ * (senkron değil, effect gövdesinin kendisinde değil) — kural bu deseni kabul eder").
+ * `requestAnimationFrame` ayrıca bir yan fayda sağlar: tarayıcının "dolgusuz" ilk
+ * durumu GERÇEKTEN BOYAMASINI garanti eder (senkron bir efekt/`useLayoutEffect`
+ * kullanılsaydı iki state güncellemesi TEK boyama turunda birleşebilir ve CSS
+ * `transition`i hiç TETİKLENMEZDİ).
+ */
+function useHasDrawnOnce(): boolean {
+  const [hasDrawn, setHasDrawn] = useState(false)
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setHasDrawn(true))
+    return () => cancelAnimationFrame(id)
+  }, [])
+  return hasDrawn
+}
 
 /** Hareket azaltma tercihi okunamıyorsa (SSR/jsdom) "azaltma yok" varsayılır. */
 function readReducedMotion(): boolean {
@@ -150,6 +179,7 @@ export function LoopRing({
   // Hook'lar KOŞULSUZ çağrılır (React kuralı); tek anlam kuralının çalışma
   // zamanı kilidi hemen ardından gelir.
   const reducedMotion = usePrefersReducedMotion()
+  const hasDrawn = useHasDrawnOnce()
 
   // Tek anlam kuralının ÇALIŞMA ZAMANI kilidi: tip sistemini `as never` ile
   // atlayan bir çağrı (ör. purpose="avatar-frame") sessizce dekoratif bir halka
@@ -164,16 +194,37 @@ export function LoopRing({
   const { center, radius, circumference } = loopRingGeometry(size, strokeWidth)
   const progress = loopRingProgress(value, max)
 
+  // İMZA HAREKET #2 — mount'ta tek seferlik arc çizimi (Motion Doktrini).
+  //
+  // `hasDrawn` (yukarıda çağrıldı) sunucu/ilk hidrasyonda `false`, istemci mount'u
+  // tamamlanınca `true` olur — yani TEK SEFERLİK, mount sonrası bir kez. İlk boyama
+  // dolgusuz (tam çevre) çizilir, `true`ya dönünce gerçek `progress`e geçilir;
+  // aşağıdaki `motionClass` zaten var olan CSS `transition`i bu geçişi "çizim" gibi
+  // gösterir. Sonraki `value`/`max` güncellemeleri `hasDrawn` true kaldığı için
+  // doğrudan `progress`i izler — mount sonrası davranış ESKİSİYLE AYNIDIR, yalnızca
+  // İLK boyama farklıdır.
+  //
+  // AC-1.6.7'yi İHLAL ETMEZ: dolgu hâlâ SADECE state'ten gelir (`hasDrawn ? progress
+  // : 0`), hiçbir `@keyframes`/`animation` yok. Ekran okuyucuya giden `aria-valuenow`/
+  // `aria-valuetext` HER ZAMAN gerçek `value`dir (aşağıda `progress`ten değil ham
+  // prop'lardan okunur) — yalnızca GÖRSEL dolgu bir kare gecikir, ÖLÇÜM asla gecikmez.
+  // Hareket azaltma altında zaten `transition-none` uygulanır (aşağıda), yani bu iki
+  // state arasındaki geçiş görsel olarak ANINDA olur — sıçrama göze çarpmaz.
+  const visualProgress = hasDrawn ? progress : 0
+
   // Hareket azaltma altında geçiş TAMAMEN düşer: kutlama rengi ANINDA değişir
   // (geçişsiz düz renk değişimi), dolgu DEĞERİ değişmez — bilgi kaybı YOK.
   //
   // Geçiş bir CLASS ile verilir, inline `style` ile değil: değerler SVG sunum
   // ÖZNİTELİĞİ (`stroke-dashoffset`) olarak yazıldığı için stil nesnesinde
   // saklanacak bir şey kalmıyor, ayrıca `motion-reduce:` varyantı JS hidrasyonu
-  // beklemeden ilk boyamada da doğru davranışı verir.
+  // beklemeden ilk boyamada da doğru davranışı verir. Süre/eğri `src/design/
+  // motion.ts`ten (`duration-slow`/`ease-decelerate`) — bu halkanın turdaki İKİ
+  // imza hareketten biri olması bilinçli olarak en ağır süreyi (450ms) taşımasının
+  // gerekçesidir; kimlik "ağır"dır (ADR-0015).
   const motionClass = reducedMotion
     ? 'transition-none'
-    : 'transition-[stroke-dashoffset,stroke] duration-300 ease-out motion-reduce:transition-none'
+    : 'transition-[stroke-dashoffset,stroke] duration-slow ease-decelerate motion-reduce:transition-none'
 
   const strokeClass = celebrating ? 'stroke-success' : 'stroke-accent'
 
@@ -221,12 +272,12 @@ export function LoopRing({
             // Hiçbir `@keyframes`/`animation` yoktur, bu yüzden globals.css'teki
             // `animation-duration: 0.01ms !important` kuralı bu değeri DONDURAMAZ.
             strokeDasharray={circumference}
-            strokeDashoffset={loopRingDashOffset(circumference, progress)}
+            strokeDashoffset={loopRingDashOffset(circumference, visualProgress)}
           />
         ) : (
           renderSegments({
             segments,
-            progress,
+            progress: visualProgress,
             center,
             radius,
             circumference,

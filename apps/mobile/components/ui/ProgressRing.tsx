@@ -4,15 +4,25 @@
 // kilo hedefine ilerleme). Dekorasyon — avatar çerçevesi, buton süsü, arka plan deseni —
 // YASAKTIR. Web'deki `LoopRing` ile aynı sözleşme.
 //
-// KRİTİK KISIT (ADR-0017): dolgu YALNIZCA state kaynaklı `strokeDashoffset`tir. Hiçbir
-// animasyon/keyframe yoktur — hareket azaltma tercihi halkayı yanlış bir değerde
-// donduramaz; değer her zaman gerçek veridir.
+// KRİTİK KISIT (ADR-0017): dolgu her zaman state kaynaklı gerçek değerdir — hiçbir pulse/loop/
+// kutlama animasyonu YOK. Tek istisna (Motion Doktrini): sürekli halkada (segmentsiz) mount'ta
+// mevcut değere TEK SEFERLİK bir çizim geçişi oynar (boştan gerçek değere, `slow` + decelerate);
+// bu geçiş halkanın döngü anlamına giden yoldur, sonraki veri güncellemeleri ANINDA (animasyonsuz)
+// yansır — halka asla eski/yanlış bir değerde donmaz. Hareket azaltma açıkken çizim atlanır,
+// halka doğrudan gerçek değerde açılır. Segmentli halka (haftalık seri) sabit kalır: ayrık
+// segmentleri sırayla açmak liste "stagger" izlenimi verir (KAÇIN listesinde), o yüzden
+// segment durumları her zaman anlık/gerçek.
 
-import type { ReactNode } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 import { StyleSheet, View } from 'react-native'
 import Svg, { Circle, G } from 'react-native-svg'
+import Animated, { useAnimatedProps, useSharedValue, withTiming } from 'react-native-reanimated'
 
+import { duration, easing } from '../../lib/motion'
 import { useTheme } from '../../lib/theme'
+import { motionDuration, useReducedMotion } from '../../lib/useReducedMotion'
+
+const AnimatedCircle = Animated.createAnimatedComponent(Circle)
 
 /** Ham değeri 0–1'e indirger; geçersiz girdide 0 (halka asla uydurma dolgu göstermez). */
 export function ringProgress(value: number, max: number): number {
@@ -49,6 +59,7 @@ export function ProgressRing({
   children,
 }: ProgressRingProps) {
   const theme = useTheme()
+  const reducedMotion = useReducedMotion()
   const center = size / 2
   const radius = Math.max(0, (size - strokeWidth) / 2)
   const circumference = 2 * Math.PI * radius
@@ -57,11 +68,33 @@ export function ProgressRing({
   const track = theme.colors.border
   const fill = celebrating ? theme.colors.success : theme.colors.accent
 
+  // Sürekli halkanın dolum ofseti — mount'ta boştan (circumference) gerçek değere tek
+  // seferlik geçiş yapar; sonraki güncellemeler anında (animasyonsuz) uygulanır.
+  const dashOffset = useSharedValue(circumference)
+  const hasDrawn = useRef(false)
+
+  useEffect(() => {
+    if (segments !== undefined) return // segmentli halka bu geçişe girmez
+    const target = circumference * (1 - progress)
+    if (!hasDrawn.current) {
+      hasDrawn.current = true
+      const d = motionDuration(duration.slow, reducedMotion)
+      dashOffset.value =
+        d === 0 ? target : withTiming(target, { duration: d, easing: easing.decelerate })
+    } else {
+      dashOffset.value = target
+    }
+  }, [circumference, progress, segments, reducedMotion, dashOffset])
+
+  const animatedDashProps = useAnimatedProps(() => ({
+    strokeDashoffset: dashOffset.value,
+  }))
+
   const nodes = []
   if (segments === undefined) {
-    // Sürekli halka: tek dolgu dairesi, offset state'ten.
+    // Sürekli halka: tek dolgu dairesi, ofseti mount'ta çizilen paylaşılan değerden gelir.
     nodes.push(
-      <Circle
+      <AnimatedCircle
         key="progress"
         cx={center}
         cy={center}
@@ -71,7 +104,7 @@ export function ProgressRing({
         strokeWidth={strokeWidth}
         strokeLinecap="round"
         strokeDasharray={circumference}
-        strokeDashoffset={circumference * (1 - progress)}
+        animatedProps={animatedDashProps}
       />
     )
   } else {

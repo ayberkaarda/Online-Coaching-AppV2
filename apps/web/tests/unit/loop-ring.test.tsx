@@ -18,7 +18,7 @@
 //      olarak yayımlanır.
 
 import { render, screen } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
   LOOP_RING_PURPOSES,
@@ -32,6 +32,8 @@ import {
 const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)'
 
 const originalMatchMedia = window.matchMedia
+const originalRAF = window.requestAnimationFrame
+const originalCAF = window.cancelAnimationFrame
 
 /** `prefers-reduced-motion` tercihini test başına ayarlar. */
 function setReducedMotion(enabled: boolean): void {
@@ -47,8 +49,28 @@ function setReducedMotion(enabled: boolean): void {
   })) as unknown as typeof window.matchMedia
 }
 
+// `LoopRing`in mount'ta tek seferlik arc çizimi (imza hareket #2) `useHasDrawnOnce`
+// içinde bir `requestAnimationFrame` GERİ ÇAĞIRIMI içinde `setState` çağırır —
+// bilerek SENKRON değil (bkz. bileşen dosyasındaki gerekçe: `react-hooks/
+// set-state-in-effect` kuralı effect gövdesinde senkron `setState`i yasaklıyor).
+// jsdom'un gerçek `requestAnimationFrame`'i bir sonraki GERÇEK animasyon karesini
+// (gerçek zamanlayıcı) bekler; bu dosyadaki testler `render()` sonrası SENKRON
+// doğrulama yapıyor (ÇİZİM ANİMASYONUNU değil DEĞERİN DOĞRULUĞUNU kanıtlıyorlar —
+// bkz. dosya başlığı). Bu yüzden rAF'ı test başına SENKRONA çeviriyoruz: gerçek
+// tarayıcıda hâlâ bir sonraki karede çalışır, yalnızca jsdom'daki testler
+// "mount'tan bir kare sonra"yı beklemeden doğrulayabilsin diye.
+beforeEach(() => {
+  window.requestAnimationFrame = ((callback: FrameRequestCallback): number => {
+    callback(0)
+    return 0
+  }) as typeof window.requestAnimationFrame
+  window.cancelAnimationFrame = (() => {}) as typeof window.cancelAnimationFrame
+})
+
 afterEach(() => {
   window.matchMedia = originalMatchMedia
+  window.requestAnimationFrame = originalRAF
+  window.cancelAnimationFrame = originalCAF
   vi.restoreAllMocks()
 })
 

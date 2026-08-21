@@ -80,6 +80,55 @@
   border-radius: 4px;
 }
 
+/* Motion Doktrini — mikro #3 (hover/focus). Kod tabanında ayrı bir `Button`/`Card`
+   bileşeni YOK (düzinelerce yerde ham `<button>`/`<a>` + Tailwind sınıfı kullanılıyor);
+   bu yüzden geçiş TEK bir yapısal kuralla, gerçek etkileşimli elemanların kendisine
+   bağlanıyor — dosya dosya dolaşıp elle eklemek yerine. Yalnızca renk+border geçer,
+   transform/scale YOK ("demir zıplamaz"). Süre/eğri src/design/motion.ts'ten
+   (tailwind.config.ts üzerinden `duration-fast`/`ease-standard`) — burada ham değer
+   yazılmaz. Bu, bir ALT SINIR: bir bileşen kendi `transition-colors` sınıfını zaten
+   taşıyorsa (14 dosyada var) o daha spesifik kural kazanır, bu kural yalnızca hiç
+   geçişi olmayan ham etkileşimli elemanları kapsar. */
+button,
+a,
+[role='button'] {
+  transition-property: color, background-color, border-color;
+  /* `theme()` bu değerleri `tailwind.config.ts` üzerinden src/design/motion.ts'ten
+     okur (Tailwind PostCSS eklentisi derleme sırasında çözer) — burada ikinci bir
+     ham sayı/eğri yazılmaz. */
+  transition-duration: theme('transitionDuration.fast');
+  transition-timing-function: theme('transitionTimingFunction.standard');
+}
+
+/* İmza hareket #1 — rota geçişi. `src/app/template.tsx` her navigasyonda YENİDEN
+   MONTE olur (`layout.tsx` App Router'da KALICIDIR — bkz. `node_modules/next/dist/
+   docs/01-app/02-guides/view-transitions.md`, "Put the wrapper in each page.tsx,
+   not the layout: Layouts persist across navigations"). React'ın `<ViewTransition>`
+   bileşeni bu projede KULLANILAMAZ: kurulu `react` sürümü (19.2.4, kararlı) bu
+   ihracatı içermiyor ve `next.config.mjs`'te `experimental.viewTransition`/canary
+   yoktur (doğrulama: `node -e "console.log(Object.keys(require('react')))"` içinde
+   `ViewTransition` YOK). Saf CSS `@view-transition { navigation: auto }` (MPA/
+   cross-document) da yanlış seçim olurdu: Next.js istemci-taraflı navige eder, bu
+   at-rule yalnızca TAM DOKÜMAN (sunucu) navigasyonunda tetiklenir — burada HİÇ
+   çalışmaz. Bu yüzden üçüncü, gerçekten çalışan yol: `@starting-style` ile
+   deklaratif bir giriş geçişi. `template.tsx` her rota değişiminde yeni bir DOM
+   düğümü olarak eklenir, tarayıcı ilk stil hesaplamasında `@starting-style`
+   değerinden (opacity: 0) gerçek değere (opacity: 1) geçiş yapar — JS state'i,
+   hydration gecikmesi veya SSR'da "görünmez içerik" riski YOKTUR (no-JS/yavaş JS
+   durumunda içerik zaten opacity:1 ile render edilir, yalnızca geçiş animasyonu
+   JS'siz çalışmaz). Süre/eğri className'de Tailwind sınıfı olarak verilir
+   (`duration-base ease-decelerate`, motion.ts kaynaklı); burada yalnızca "nereden
+   geldiği" (0) tarif edilir. Tarayıcı desteği: Chrome 117+, Safari 17.5+,
+   Firefox 129+ — desteklenmeyen tarayıcıda içerik geçişsiz, doğrudan görünür olur. */
+.route-fade {
+  opacity: 1;
+}
+@starting-style {
+  .route-fade {
+    opacity: 0;
+  }
+}
+
 /* Hareket azaltma tercihi: animate-pulse / animate-ping / animate-bounce bolca kullanılıyor. */
 @media (prefers-reduced-motion: reduce) {
   *,
@@ -89,6 +138,16 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+    /* View Transitions API bu turda HİÇBİR yerde kullanılmıyor (yukarıdaki
+       `.route-fade` notuna bakın) ama yapısal güvenlik ağı bilerek burada da
+       duruyor: ileride biri ekleyip bu bloğu güncellemeyi unutursa yine söner. */
+    view-transition-name: none !important;
+  }
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0s !important;
   }
 }
 
