@@ -1,4 +1,5 @@
 // Çıkış düğmesi — paylaşılan `useSignOut` hook'unu (@repo/api-client) tüketir.
+// Ayar sheet'i içinde kullanılır (Panel gövdesinden çıkarıldı). Mantık AYNI.
 //
 // `useSignOut` `supabase.auth.signOut({ scope: 'local' })` çağırır (yalnız BU cihazdan
 // çıkar, diğer oturumları düşürmez — useSession.ts başlığı), önbelleği temizler ve
@@ -7,18 +8,18 @@
 // yönlendirme yoktur.
 
 import { useSignOut } from '@repo/api-client'
-import { Button, View } from 'react-native'
+
+import { Button } from './ui'
 
 export function SignOutButton() {
   const signOut = useSignOut()
   return (
-    <View>
-      <Button
-        title={signOut.isPending ? 'Çıkış yapılıyor…' : 'Çıkış yap'}
-        color="#c1121f"
-        onPress={() => signOut.mutate()}
-        disabled={signOut.isPending}
-      />
-    </View>
+    <Button
+      title="Çıkış yap"
+      variant="secondary"
+      pending={signOut.isPending}
+      onPress={() => signOut.mutate()}
+      accessibilityLabel="Hesaptan çıkış yap"
+    />
   )
 }

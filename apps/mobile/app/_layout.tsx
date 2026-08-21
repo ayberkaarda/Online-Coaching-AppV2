@@ -1,11 +1,16 @@
 import { useIsCoach, useMfaStatus, useSession } from '@repo/api-client'
+import { useFonts } from 'expo-font'
 import { Stack } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
+import * as SplashScreen from 'expo-splash-screen'
+import { useEffect } from 'react'
 
+import { fontAssets } from '../lib/fonts'
 import { AppProviders } from '../lib/providers'
+import { fontFamily, useTheme } from '../lib/theme'
 
 // Kök yerleşim (B-052): önce paylaşılan sağlayıcılar (Supabase/Notifier/Query enjeksiyonu),
-// sonra OTURUM + ROL + MFA kapısı.
+// sonra OTURUM + ROL + MFA kapısı. Faz 4.7+: ADR-0015 fontları + tema.
 //
 // KAPI — Fable kararları (mobil YALNIZ danışan uygulamasıdır):
 //   * oturum yok            -> giriş ekranı
@@ -16,6 +21,11 @@ import { AppProviders } from '../lib/providers'
 // `Stack.Protected` (expo-router 57) kullanılır: guard `false` olan ekran ağaçtan düşer ve
 // router ilk uygun ekrana otomatik geçer — elle `router.replace` gerekmez. Durumlar birbirini
 // dışlar, bu yüzden aynı anda YALNIZCA bir guard `true`'dur.
+
+// ADR-0015 tipografisi yüklenene kadar açılış ekranı görünür kalsın — fontsuz ilk boyama
+// (sistem fontuyla "flaş") engellenir.
+void SplashScreen.preventAutoHideAsync()
+
 type Gate = 'loading' | 'signed-out' | 'coach' | 'mfa' | 'client'
 
 function useGate(): Gate {
@@ -50,14 +60,26 @@ function useGate(): Gate {
 
 function RootNavigator() {
   const gate = useGate()
+  const theme = useTheme()
 
   return (
-    <Stack>
+    <Stack
+      screenOptions={{
+        headerStyle: { backgroundColor: theme.colors.bg },
+        headerTintColor: theme.colors.textPrimary,
+        headerTitleStyle: {
+          fontFamily: fontFamily.displaySemibold,
+          color: theme.colors.textPrimary,
+        },
+        headerShadowVisible: false,
+        contentStyle: { backgroundColor: theme.colors.bg },
+      }}
+    >
       <Stack.Protected guard={gate === 'loading'}>
         <Stack.Screen name="loading" options={{ headerShown: false }} />
       </Stack.Protected>
       <Stack.Protected guard={gate === 'signed-out'}>
-        <Stack.Screen name="sign-in" options={{ title: 'Giriş' }} />
+        <Stack.Screen name="sign-in" options={{ headerShown: false }} />
       </Stack.Protected>
       <Stack.Protected guard={gate === 'coach'}>
         <Stack.Screen name="coach-web" options={{ title: 'Koç paneli' }} />
@@ -73,6 +95,18 @@ function RootNavigator() {
 }
 
 export default function RootLayout() {
+  const [fontsLoaded, fontError] = useFonts(fontAssets)
+
+  // Fontlar yüklenince (veya yüklenemezse) açılış ekranını kapat. Hata olsa da uygulama
+  // sistem fontuyla açılır — kilitlenmez.
+  useEffect(() => {
+    if (fontsLoaded || fontError) {
+      void SplashScreen.hideAsync()
+    }
+  }, [fontsLoaded, fontError])
+
+  if (!fontsLoaded && !fontError) return null
+
   return (
     <AppProviders>
       <RootNavigator />

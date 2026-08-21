@@ -10,6 +10,7 @@ export default function MfaWebScreen() {
     <PlaceholderScreen
       title="İki adımlı doğrulama gerekli"
       description="Hesabınızda iki adımlı doğrulama (MFA) açık. Mobil uygulama şimdilik MFA doğrulamasını desteklemiyor — lütfen web uygulamasından giriş yapın."
+      icon="shield-checkmark-outline"
     >
       <SignOutButton />
     </PlaceholderScreen>

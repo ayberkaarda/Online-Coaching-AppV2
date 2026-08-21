@@ -7,25 +7,34 @@ import {
 } from '@repo/api-client'
 import { todayIsoDate } from '@repo/api-client/date'
 import { useState } from 'react'
-import {
-  ActivityIndicator,
-  Button,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native'
+import { View } from 'react-native'
 
+import {
+  Badge,
+  Body,
+  Button,
+  Card,
+  EmptyState,
+  ErrorState,
+  Input,
+  LoadingState,
+  Mono,
+  Screen,
+  SectionHeader,
+} from '../../components/ui'
+import { useTheme } from '../../lib/theme'
 import { useCurrentUserId } from '../../lib/useCurrentUserId'
 
-// İLERLEME sekmesi (B-052 dilim 3) — tek YAZMA yolu: günün kilosu.
+// İLERLEME sekmesi (B-052 dilim 3 + Faz 4.7 zenginleştirme) — tek YAZMA yolu: günün kilosu.
+// ADR-0015 kimliği; sayılar IBM Plex Mono; bölüm başlığı ikonları. Doğrulama/mutation/hook
+// mantığı DEĞİŞMEDİ.
 //
 // Web'deki `StatsTab`'in mantığı paket üzerinden mobilde tüketilir: `validateProgressEntry`
 // (CHECK kısıtlarının istemci karşılığı), `useUpsertProgressEntry` (AC-4.1: aynı güne ikinci
 // giriş satırı GÜNCELLER) ve `useProgressTrend` (AC-4.2: tek endpoint). Grafik KÜTÜPHANESİ
 // eklenmedi (kapsam dışı) — trend, ölçüm noktalarının metinsel listesi olarak gösterilir.
 export default function ProgressScreen() {
+  const theme = useTheme()
   const userId = useCurrentUserId()
   const trend = useProgressTrend(userId)
   const upsert = useUpsertProgressEntry()
@@ -63,108 +72,73 @@ export default function ProgressScreen() {
         .reverse()
     : []
 
+  const delta = summary?.delta
+  const hasDelta = delta !== null && delta !== undefined
+
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <View style={styles.card}>
-        <Text style={styles.cardLabel}>Bugünün kilosu (kg)</Text>
-        <TextInput
-          style={styles.input}
+    <Screen>
+      <SectionHeader icon="scale" title="GÜNLÜK KİLO KAYDI" />
+      <Card variant="panel">
+        <Input
+          label="BUGÜNÜN KİLOSU (KG)"
           placeholder="Örn. 72.5"
           keyboardType="decimal-pad"
           value={weight}
           onChangeText={setWeight}
           editable={!upsert.isPending}
+          error={validationError}
+          mono
         />
-        {validationError ? <Text style={styles.error}>{validationError}</Text> : null}
-        {upsert.isPending ? (
-          <ActivityIndicator />
-        ) : (
-          <Button title="Kaydet" onPress={handleSave} disabled={weight.trim().length === 0} />
-        )}
+        <Button
+          title="Kilo ekle"
+          onPress={handleSave}
+          pending={upsert.isPending}
+          disabled={weight.trim().length === 0}
+          accessibilityLabel="Bugünün kilosunu kaydet"
+        />
+      </Card>
+
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+        <SectionHeader icon="trending-up" title="SON 30 GÜN" />
+        {hasDelta ? (
+          <Badge
+            label={`${delta > 0 ? '+' : ''}${delta.toFixed(1)} kg · ${summary?.count} ölçüm`}
+            tone={delta > 0 ? 'warning' : 'success'}
+          />
+        ) : null}
       </View>
 
-      <Text style={styles.sectionTitle}>Son 30 gün</Text>
-
       {trend.isLoading ? (
-        <ActivityIndicator />
+        <LoadingState label="Trend yükleniyor" />
       ) : trend.isError ? (
-        <Text style={styles.error}>Trend yüklenemedi.</Text>
+        <ErrorState message="Trend yüklenemedi." onRetry={() => void trend.refetch()} />
       ) : measured.length === 0 ? (
-        <Text style={styles.empty}>Bu aralıkta ölçüm yok.</Text>
+        <EmptyState
+          title="Ölçüm yok"
+          description="Bu aralıkta kilo ölçümü bulunmuyor. Yukarıdan ilk kaydını ekle."
+        />
       ) : (
-        <>
-          {summary?.delta !== null && summary?.delta !== undefined ? (
-            <Text style={styles.delta}>
-              Değişim: {summary.delta > 0 ? '+' : ''}
-              {summary.delta.toFixed(1)} kg ({summary.count} ölçüm)
-            </Text>
-          ) : null}
-          {measured.map((point) => (
-            <View key={point.date} style={styles.row}>
-              <Text style={styles.rowDate}>{point.label}</Text>
-              <Text style={styles.rowValue}>{point.weight_kg} kg</Text>
+        <Card style={{ gap: 0, paddingVertical: 4 }}>
+          {measured.map((point, index) => (
+            <View
+              key={point.date}
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                paddingVertical: 12,
+                borderTopWidth: index === 0 ? 0 : 1,
+                borderTopColor: theme.colors.border,
+              }}
+            >
+              <Body variant="bodySm" color="textSecondary">
+                {point.label}
+              </Body>
+              <Mono variant="monoMd">{point.weight_kg} kg</Mono>
             </View>
           ))}
-        </>
+        </Card>
       )}
-    </ScrollView>
+    </Screen>
   )
 }
-
-const styles = StyleSheet.create({
-  container: {
-    padding: 20,
-    gap: 14,
-  },
-  card: {
-    borderWidth: 1,
-    borderColor: '#e2e2e7',
-    borderRadius: 12,
-    padding: 16,
-    gap: 10,
-  },
-  cardLabel: {
-    fontSize: 13,
-    opacity: 0.6,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#c7c7cc',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 16,
-  },
-  sectionTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    marginTop: 8,
-  },
-  delta: {
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  row: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#e2e2e7',
-  },
-  rowDate: {
-    fontSize: 15,
-    opacity: 0.7,
-  },
-  rowValue: {
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  error: {
-    color: '#c1121f',
-    fontSize: 14,
-  },
-  empty: {
-    fontSize: 15,
-    opacity: 0.6,
-  },
-})

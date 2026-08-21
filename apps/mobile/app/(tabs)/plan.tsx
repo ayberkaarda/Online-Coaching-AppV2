@@ -1,31 +1,45 @@
+import { Ionicons } from '@expo/vector-icons'
 import { useWorkoutPlan } from '@repo/api-client'
 import { DAY_NAMES } from '@repo/types'
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { View } from 'react-native'
 
+import {
+  Badge,
+  Body,
+  Card,
+  EmptyState,
+  ErrorState,
+  LoadingState,
+  Screen,
+  SectionHeader,
+} from '../../components/ui'
+import { useTheme } from '../../lib/theme'
 import { useCurrentUserId } from '../../lib/useCurrentUserId'
 
-// ANTRENMAN sekmesi (B-052 dilim 2) — GERÇEK veri, salt okuma.
+// ANTRENMAN sekmesi (B-052 dilim 2 + Faz 4.7 zenginleştirme) — GERÇEK veri, salt okuma.
+// ADR-0015 kart listesi + bölüm başlığı ikonu. Veri/hook mantığı DEĞİŞMEDİ.
 //
 // `useWorkoutPlan` aktif planı `workout_plans` + `workout_plan_exercises`'ten okuyup gün
 // bazında `Record<gün, string>` şekline geri üretir (paketteki `rowsToWorkoutPlan`). Web ile
 // AYNI hook, AYNI şekil; gün sırası tek kaynak `DAY_NAMES`'ten gelir.
 export default function PlanScreen() {
+  const theme = useTheme()
   const userId = useCurrentUserId()
   const plan = useWorkoutPlan(userId)
 
   if (plan.isLoading) {
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" />
-      </View>
+      <Screen scroll={false} center>
+        <LoadingState label="Antrenman planı yükleniyor" />
+      </Screen>
     )
   }
 
   if (plan.isError || !plan.data) {
     return (
-      <View style={styles.centered}>
-        <Text style={styles.error}>Antrenman planı yüklenemedi.</Text>
-      </View>
+      <Screen>
+        <ErrorState message="Antrenman planı yüklenemedi." onRetry={() => void plan.refetch()} />
+      </Screen>
     )
   }
 
@@ -33,57 +47,27 @@ export default function PlanScreen() {
 
   if (days.length === 0) {
     return (
-      <View style={styles.centered}>
-        <Text style={styles.empty}>Henüz aktif bir antrenman planınız yok.</Text>
-      </View>
+      <Screen scroll={false} center>
+        <EmptyState
+          title="Aktif plan yok"
+          description="Henüz aktif bir antrenman planınız yok. Koçunuz plan atadığında burada görünür."
+        />
+      </Screen>
     )
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <Screen>
+      <SectionHeader icon="barbell" title={`ANTRENMAN PROGRAMI · ${days.length} GÜN`} />
       {days.map((day) => (
-        <View key={day} style={styles.dayCard}>
-          <Text style={styles.dayTitle}>{day}</Text>
-          <Text style={styles.dayBody}>{plan.data[day].trim()}</Text>
-        </View>
+        <Card key={day}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Ionicons name="calendar-outline" size={16} color={theme.colors.accent} />
+            <Badge label={day} tone="accent" />
+          </View>
+          <Body variant="body">{plan.data[day].trim()}</Body>
+        </Card>
       ))}
-    </ScrollView>
+    </Screen>
   )
 }
-
-const styles = StyleSheet.create({
-  container: {
-    padding: 20,
-    gap: 14,
-  },
-  centered: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 24,
-  },
-  dayCard: {
-    borderWidth: 1,
-    borderColor: '#e2e2e7',
-    borderRadius: 12,
-    padding: 16,
-    gap: 8,
-  },
-  dayTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-  },
-  dayBody: {
-    fontSize: 15,
-    lineHeight: 22,
-  },
-  error: {
-    color: '#c1121f',
-    fontSize: 15,
-  },
-  empty: {
-    fontSize: 15,
-    opacity: 0.6,
-    textAlign: 'center',
-  },
-})

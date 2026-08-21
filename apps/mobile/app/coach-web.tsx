@@ -10,6 +10,7 @@ export default function CoachWebScreen() {
     <PlaceholderScreen
       title="Koç paneli web'de"
       description="Koçluk yönetimi (danışanlar, planlar, onaylar) yalnızca web uygulamasında kullanılabilir. Mobil uygulama danışanlar içindir."
+      icon="desktop-outline"
     >
       <SignOutButton />
     </PlaceholderScreen>

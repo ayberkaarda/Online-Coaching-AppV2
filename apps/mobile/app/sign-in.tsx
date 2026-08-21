@@ -1,9 +1,14 @@
+import { Ionicons } from '@expo/vector-icons'
 import { useSupabaseClient } from '@repo/api-client/context'
 import { useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { ActivityIndicator, Button, StyleSheet, Text, TextInput, View } from 'react-native'
+import { View } from 'react-native'
 
-// GERÇEK giriş ekranı (B-052 dilim 1).
+import { Body, Button, Card, Heading, Input, Screen } from '../components/ui'
+import { useTheme } from '../lib/theme'
+
+// GERÇEK giriş ekranı (B-052 dilim 1). Faz 4.7: ADR-0015 kimliğiyle güzelleştirildi —
+// marka başlığı + tanımlı kart + ikonlu girişler.
 //
 // NEDEN `useSignIn` (paket hook'u) DEĞİL, doğrudan `supabase.auth.signInWithPassword`:
 // `useSignIn` girişi kendi SUNUCUMUZUN `/api/auth/sign-in` ucuna taşır (uygulama katmanı
@@ -13,8 +18,10 @@ import { ActivityIndicator, Button, StyleSheet, Text, TextInput, View } from 're
 //
 // Oturum başarıda SecureStore'a yazılır (fabrika `persistSession: true`); `useSession`'ın
 // `onAuthStateChange` dinleyicisi oturum önbelleğini doldurur ve `app/_layout.tsx` kapısı
-// otomatik olarak doğru ekrana geçer — burada elle yönlendirme YOKTUR.
+// otomatik olarak doğru ekrana geçer — burada elle yönlendirme YOKTUR. Sunum değişti,
+// veri/oturum mantığı AYNI kaldı.
 export default function SignInScreen() {
+  const theme = useTheme()
   const supabase = useSupabaseClient()
   const queryClient = useQueryClient()
   const [email, setEmail] = useState('')
@@ -45,71 +52,63 @@ export default function SignInScreen() {
     }
   }
 
+  const canSubmit = email.trim().length > 0 && password.length > 0
+
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Giriş</Text>
-      <Text style={styles.note}>Danışan hesabınızla giriş yapın.</Text>
+    <Screen center scroll={false} edgeTop contentStyle={{ gap: 24 }}>
+      {/* Marka başlığı — accent işaret + ad. Halka DEĞİL (tek anlam kuralı). */}
+      <View style={{ alignItems: 'center', gap: 12 }}>
+        <View
+          style={{
+            width: 56,
+            height: 56,
+            borderRadius: theme.radius.panel,
+            backgroundColor: theme.colors.accent,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <Ionicons name="fitness" size={30} color={theme.colors.accentContrast} />
+        </View>
+        <Heading variant="displayLg">Sarmal</Heading>
+        <Body variant="bodyLg" color="textSecondary" style={{ textAlign: 'center' }}>
+          Danışan hesabınızla giriş yapın.
+        </Body>
+      </View>
 
-      <TextInput
-        style={styles.input}
-        placeholder="E-posta"
-        autoCapitalize="none"
-        autoCorrect={false}
-        keyboardType="email-address"
-        textContentType="emailAddress"
-        value={email}
-        onChangeText={setEmail}
-        editable={!submitting}
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="Şifre"
-        secureTextEntry
-        textContentType="password"
-        value={password}
-        onChangeText={setPassword}
-        editable={!submitting}
-      />
-
-      {error ? <Text style={styles.error}>{error}</Text> : null}
-
-      {submitting ? (
-        <ActivityIndicator />
-      ) : (
+      <Card variant="panel" style={{ width: '100%', gap: 16 }}>
+        <Input
+          label="E-POSTA"
+          leftIcon="mail-outline"
+          placeholder="ornek@eposta.com"
+          autoCapitalize="none"
+          autoCorrect={false}
+          keyboardType="email-address"
+          textContentType="emailAddress"
+          value={email}
+          onChangeText={setEmail}
+          editable={!submitting}
+        />
+        <Input
+          label="ŞİFRE"
+          leftIcon="lock-closed-outline"
+          placeholder="••••••••"
+          secureTextEntry
+          textContentType="password"
+          value={password}
+          onChangeText={setPassword}
+          editable={!submitting}
+          error={error}
+        />
         <Button
           title="Giriş yap"
           onPress={handleSignIn}
-          disabled={email.trim().length === 0 || password.length === 0}
+          pending={submitting}
+          disabled={!canSubmit}
+          style={{ marginTop: 4 }}
+          accessibilityLabel="Danışan hesabıyla giriş yap"
         />
-      )}
-    </View>
+      </Card>
+    </Screen>
   )
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    gap: 12,
-    paddingHorizontal: 24,
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: '700',
-  },
-  note: {
-    fontSize: 14,
-    opacity: 0.7,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#c7c7cc',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
-  error: {
-    color: '#c1121f',
-    fontSize: 14,
-  },
-})
