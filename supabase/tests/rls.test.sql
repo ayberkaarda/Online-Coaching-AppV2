@@ -6049,31 +6049,35 @@ set local time zone 'UTC';
 
 -- KURULUM (postgres) --------------------------------------------------------
 insert into public.form_checks (id, client_id, current_weight, notes, created_at) values
+  -- TARİHLER BİLİNÇLİ OLARAK UZAK-GEÇMİŞTE (2019-03): seed göreli tarihlidir
+  -- (en eski now()-120g ~4 ay); 2019'a ASLA inmez -> bu senaryonun sabit günü
+  -- seed satırlarıyla HİÇBİR gün ÇAKIŞMAZ (kalıcı flake düzeltmesi). Saatler ve
+  -- +03 ofseti KORUNDU: iki "ayni gun" satiri hala 2019-03-15'e düşer.
   ('cccc0113-0000-4000-8000-000000000001'::uuid, '33333333-3333-3333-3333-333333333333'::uuid,
-   70.00, 'zz-113 ayni gun ESKI',  timestamptz '2026-08-15 08:00:00+03'),
+   70.00, 'zz-113 ayni gun ESKI',  timestamptz '2019-03-15 08:00:00+03'),
   ('cccc0113-0000-4000-8000-000000000002'::uuid, '33333333-3333-3333-3333-333333333333'::uuid,
-   71.50, 'zz-113 ayni gun YENI',  timestamptz '2026-08-15 20:00:00+03'),
+   71.50, 'zz-113 ayni gun YENI',  timestamptz '2019-03-15 20:00:00+03'),
   ('cccc0113-0000-4000-8000-000000000003'::uuid, '33333333-3333-3333-3333-333333333333'::uuid,
-   66.60, 'zz-113 elle giris gunu', timestamptz '2026-08-16 10:00:00+03'),
+   66.60, 'zz-113 elle giris gunu', timestamptz '2019-03-16 10:00:00+03'),
   ('cccc0113-0000-4000-8000-000000000004'::uuid, '33333333-3333-3333-3333-333333333333'::uuid,
-   64.40, 'zz-113 null kilo gunu',  timestamptz '2026-08-17 10:00:00+03');
+   64.40, 'zz-113 null kilo gunu',  timestamptz '2019-03-17 10:00:00+03');
 
 -- (a) hedefi BOŞALT -> backfill'in kendisi yazsın
 delete from public.progress_entries
  where client_id = '33333333-3333-3333-3333-333333333333'::uuid
-   and entry_date = date '2026-08-15';
+   and entry_date = date '2019-03-15';
 
 -- (b) ELLE düzeltilmiş satır (trigger'ın yazdığı değer kullanıcı tarafından değiştirildi)
 update public.progress_entries
    set weight_kg = 60.10, notes = 'zz-113 elle duzeltildi'
  where client_id = '33333333-3333-3333-3333-333333333333'::uuid
-   and entry_date = date '2026-08-16';
+   and entry_date = date '2019-03-16';
 
 -- (c) o gün tartılmamış: kilo NULL, yalnızca çevre ölçüsü var
 update public.progress_entries
    set weight_kg = null, waist_cm = 75.50
  where client_id = '33333333-3333-3333-3333-333333333333'::uuid
-   and entry_date = date '2026-08-17';
+   and entry_date = date '2019-03-17';
 
 do $$
 declare
@@ -6087,7 +6091,7 @@ begin
 
   -- (a) EN YENİSİ kazanır
   select weight_kg into v_w from public.progress_entries
-   where client_id = '33333333-3333-3333-3333-333333333333'::uuid and entry_date = date '2026-08-15';
+   where client_id = '33333333-3333-3333-3333-333333333333'::uuid and entry_date = date '2019-03-15';
   if v_w is distinct from 71.50 then
     raise exception 'BASARISIZ [113a]: ayni gunde EN YENI form check kazanmadi (beklenen 71.50, gelen %)', v_w;
   end if;
@@ -6097,7 +6101,7 @@ begin
 
   -- (b) elle düzeltilmiş satır EZİLMEZ
   select weight_kg, notes into v_w, v_notes from public.progress_entries
-   where client_id = '33333333-3333-3333-3333-333333333333'::uuid and entry_date = date '2026-08-16';
+   where client_id = '33333333-3333-3333-3333-333333333333'::uuid and entry_date = date '2019-03-16';
   if v_w is distinct from 60.10 then
     raise exception 'BASARISIZ [113b]: backfill ELLE duzeltilen kiloyu EZDI (60.10 -> %)', v_w;
   end if;
@@ -6107,7 +6111,7 @@ begin
 
   -- (c) NULL kilo dolar, çevre ölçüsü korunur
   select weight_kg, waist_cm into v_w, v_waist from public.progress_entries
-   where client_id = '33333333-3333-3333-3333-333333333333'::uuid and entry_date = date '2026-08-17';
+   where client_id = '33333333-3333-3333-3333-333333333333'::uuid and entry_date = date '2019-03-17';
   if v_w is distinct from 64.40 then
     raise exception 'BASARISIZ [113c]: NULL weight_kg backfill ile DOLMADI (gelen %)', v_w;
   end if;
@@ -7862,6 +7866,11 @@ rollback;
 -- (sıfır-politika değiller), dolayısıyla koç aal1'de danışanın davranış
 -- verisini — giriş saatleri, çevrimiçi örüntü — okuyabilirdi. Muafiyet listesi
 -- DEĞİŞMEDİ.
+--
+-- İMZA DİLİMİ (20260821120000_bb_signature_slice.sql): liste 16 -> 18.
+-- `workout_sessions` ve `mesocycles` kapıya EKLENDİ: ikisi de danışan-verisi
+-- tablosudur (danışan kendi satırını okur/yazar, koçun gerçek okuma yolu var),
+-- muafiyet gerekçesi yoktur. Muafiyet listesi yine DEĞİŞMEDİ.
 -- =============================================================================
 begin;
 do $$
@@ -7872,14 +7881,16 @@ declare
     'workout_plan_exercises', 'nutrition_plans', 'nutrition_plan_meals',
     'progress_entries', 'progress_photos',
     -- Faz 4.8 (§7c) — etkinlik kaydı:
-    'activity_sessions', 'activity_events'
+    'activity_sessions', 'activity_events',
+    -- İmza Dilimi (20260821120000_bb_signature_slice.sql) — 16 -> 18:
+    'workout_sessions', 'mesocycles'
   ];
   v_ok      int;
   v_total   int;
   v_missing text;
   v_extra   text;
 begin
-  -- (a) 16 tablonun HEPSİNDE, doğru şekilde kurulmuş mu?
+  -- (a) 18 tablonun HEPSİNDE, doğru şekilde kurulmuş mu?
   select count(*) into v_ok
     from pg_policies p
    where p.schemaname = 'public'
@@ -7893,7 +7904,7 @@ begin
      and p.with_check like '%is_coach%'
      and p.with_check like '%aal2%';
 
-  if v_ok <> 16 then
+  if v_ok <> 18 then
     select string_agg(e, ', ' order by e) into v_missing
       from unnest(v_expected) as e
      where not exists (
@@ -7905,18 +7916,18 @@ begin
           and p.qual like '%is_coach%' and p.qual like '%aal2%'
           and p.with_check like '%is_coach%' and p.with_check like '%aal2%'
      );
-    raise exception 'BASARISIZ [131a]: 16 beklenirken % dogru politika var. Eksik/bozuk: %', v_ok, coalesce(v_missing, '(bilinmiyor)');
+    raise exception 'BASARISIZ [131a]: 18 beklenirken % dogru politika var. Eksik/bozuk: %', v_ok, coalesce(v_missing, '(bilinmiyor)');
   end if;
 
   -- (b) `mfa_aal2_gate` adıyla BAŞKA bir tabloya politika sızmış mı?
   select count(*) into v_total
     from pg_policies p
    where p.schemaname = 'public' and p.policyname = 'mfa_aal2_gate';
-  if v_total <> 16 then
-    raise exception 'BASARISIZ [131b]: mfa_aal2_gate adli politika sayisi % (16 bekleniyordu).', v_total;
+  if v_total <> 18 then
+    raise exception 'BASARISIZ [131b]: mfa_aal2_gate adli politika sayisi % (18 bekleniyordu).', v_total;
   end if;
 
-  -- (c) ŞEMA SÜRÜKLENMESİ: public'te, 16 kapılı tablo ve bilinen muafiyetler
+  -- (c) ŞEMA SÜRÜKLENMESİ: public'te, 18 kapılı tablo ve bilinen muafiyetler
   --     DIŞINDA bir tablo varsa, ya kapıya ya muafiyet listesine girmelidir.
   --     Yarın eklenen 15. danışan tablosu buradan GÜRÜLTÜLÜ geçer.
   select string_agg(t.tablename, ', ' order by t.tablename) into v_extra
@@ -7944,7 +7955,7 @@ begin
     raise exception 'BASARISIZ [131d]: public.is_coach() SECURITY DEFINER degil -- aal2 kapisi SESSIZCE ETKISIZ.';
   end if;
 
-  raise notice 'GECTI [131 16/16 mfa_aal2_gate RESTRICTIVE+ALL+authenticated, using+with_check dolu, sema surukleme yok, is_coach DEFINER]';
+  raise notice 'GECTI [131 18/18 mfa_aal2_gate RESTRICTIVE+ALL+authenticated, using+with_check dolu, sema surukleme yok, is_coach DEFINER]';
 end $$;
 rollback;
 
@@ -10078,9 +10089,10 @@ rollback;
 
 
 -- =============================================================================
--- HESAP AKTIF/PASIF — 149) PASIF DANISAN 15 TABLOYU OKUYAMAZ, YALNIZCA KENDI
+-- HESAP AKTIF/PASIF — 149) PASIF DANISAN 17 TABLOYU OKUYAMAZ, YALNIZCA KENDI
 -- profiles SATIRINI OKUR (20260820180000_account_active_state.sql,
 -- account_active_gate + is_active_user + KRITIK profiles istisnasi)
+-- (İmza Dilimi'nde 15 -> 17: workout_sessions, mesocycles kapiya eklendi)
 --   (a) KURULUM/BOS-GECME KONTROLU: AKTIF danisan A kendi + kocu gorur (>=2
 --       profil) ve daily_logs'ta verisi var (>0) -- pasif olcumu anlamli olsun.
 --   (b) A pasiflestirilir (postgres, RLS bypass).
@@ -10113,12 +10125,14 @@ set local role authenticated;
 set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated","aal":"aal1"}';
 do $$
 declare
-  -- 16 kapili tablonun profiles DISINDAKI 15'i.
+  -- 18 kapili tablonun profiles DISINDAKI 17'si.
   v_tables text[] := array[
     'notifications', 'messages', 'form_checks', 'daily_logs', 'workout_logs',
     'nutrition_logs', 'program_approvals', 'workout_plans', 'workout_plan_exercises',
     'nutrition_plans', 'nutrition_plan_meals', 'progress_entries', 'progress_photos',
-    'activity_sessions', 'activity_events'
+    'activity_sessions', 'activity_events',
+    -- İmza Dilimi (20260821120000_bb_signature_slice.sql):
+    'workout_sessions', 'mesocycles'
   ];
   v_table text;
   v_n     bigint;
@@ -10132,8 +10146,8 @@ begin
     end if;
     v_seen := v_seen + 1;
   end loop;
-  if v_seen <> 15 then
-    raise exception 'BASARISIZ [149]: 15 tablo beklenirken % olculdu.', v_seen;
+  if v_seen <> 17 then
+    raise exception 'BASARISIZ [149]: 17 tablo beklenirken % olculdu.', v_seen;
   end if;
 
   -- KRITIK ISTISNA: kendi profiles satirini OKUYABILMELI (pasif ekran).
@@ -10146,7 +10160,7 @@ begin
     raise exception 'BASARISIZ [149]: PASIF A KENDI profil satirini OKUYAMADI -- pasif ekran (is_active/full_name) cizilemez';
   end if;
 
-  raise notice 'GECTI [149 PASIF A 15 tablonun HICBIRINI goremez; yalnizca KENDI profiles satirini okur (istisna dogru)]';
+  raise notice 'GECTI [149 PASIF A 17 tablonun HICBIRINI goremez; yalnizca KENDI profiles satirini okur (istisna dogru)]';
 end $$;
 rollback;
 
@@ -10389,11 +10403,13 @@ declare
     'profiles', 'notifications', 'messages', 'form_checks', 'daily_logs',
     'workout_logs', 'nutrition_logs', 'program_approvals', 'workout_plans',
     'workout_plan_exercises', 'nutrition_plans', 'nutrition_plan_meals',
-    'progress_entries', 'progress_photos', 'activity_sessions', 'activity_events'
+    'progress_entries', 'progress_photos', 'activity_sessions', 'activity_events',
+    -- İmza Dilimi (20260821120000_bb_signature_slice.sql) — 16 -> 18:
+    'workout_sessions', 'mesocycles'
   ];
   v_ok int; v_total int; v_extra text; v_prof_using text; v_prof_check text;
 begin
-  -- 16 tablonun HEPSI dogru kurulmus mu?
+  -- 18 tablonun HEPSI dogru kurulmus mu?
   select count(*) into v_ok
     from pg_policies p
    where p.schemaname='public' and p.policyname='account_active_gate'
@@ -10401,15 +10417,15 @@ begin
      and p.permissive='RESTRICTIVE' and p.cmd='ALL'
      and p.roles='{authenticated}'::name[]
      and p.qual like '%is_active_user%' and p.with_check like '%is_active_user%';
-  if v_ok <> 16 then
-    raise exception 'BASARISIZ [152c]: 16 beklenirken % dogru account_active_gate politikasi', v_ok;
+  if v_ok <> 18 then
+    raise exception 'BASARISIZ [152c]: 18 beklenirken % dogru account_active_gate politikasi', v_ok;
   end if;
 
-  -- Baska tabloya sizmis mi? (tam 16)
+  -- Baska tabloya sizmis mi? (tam 18)
   select count(*) into v_total
     from pg_policies where schemaname='public' and policyname='account_active_gate';
-  if v_total <> 16 then
-    raise exception 'BASARISIZ [152c]: account_active_gate politika sayisi % (16 bekleniyordu)', v_total;
+  if v_total <> 18 then
+    raise exception 'BASARISIZ [152c]: account_active_gate politika sayisi % (18 bekleniyordu)', v_total;
   end if;
 
   -- profiles ISTISNASI: using auth.uid() TASIR, with_check TASIMAZ.
@@ -10444,14 +10460,309 @@ begin
     raise exception 'BASARISIZ [152c]: public.is_active_user() SECURITY DEFINER degil';
   end if;
 
-  raise notice 'GECTI [152c 16/16 account_active_gate RESTRICTIVE+ALL+authenticated, profiles istisnasi dogru, surukleme yok, is_active_user DEFINER]';
+  raise notice 'GECTI [152c 18/18 account_active_gate RESTRICTIVE+ALL+authenticated, profiles istisnasi dogru, surukleme yok, is_active_user DEFINER]';
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- İMZA DİLİMİ — 153) DANISAN KENDI workout_sessions'INI GORUR/YAZAR; BASKA
+-- DANISAN GOREMEZ (20260821120000_bb_signature_slice.sql, workout_sessions RLS)
+--   (a) KURULUM (postgres): A'ya ait bir oturum uretilir (sabit id).
+--   (b) A: kendi oturumunu GORUR (1) ve kendi adina YENI oturum YAZAR.
+--   (c) A: BASKASI (B) adina oturum YAZAMAZ (with check client_id=auth.uid()).
+--   (d) B: A'nin oturumunu GOREMEZ (0).
+-- =============================================================================
+begin;
+-- (a) Kurulum postgres kimligiyle (RLS bypass), ROLLBACK ile geri alinir.
+insert into public.workout_sessions (id, client_id, source)
+values ('15300000-0000-0000-0000-000000000001', '22222222-2222-2222-2222-222222222222', 'freestyle');
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+do $$
+declare v_n int; v_caught boolean;
+begin
+  -- (b) A kendi oturumunu gorur
+  select count(*) into v_n from public.workout_sessions
+   where id = '15300000-0000-0000-0000-000000000001';
+  if v_n <> 1 then
+    raise exception 'BASARISIZ [153b]: A kendi workout_sessions satirini goremedi (%).', v_n;
+  end if;
+  -- A kendi adina yeni oturum yazabilir
+  insert into public.workout_sessions (client_id, source)
+  values ('22222222-2222-2222-2222-222222222222', 'program');
+
+  -- (c) A baskasi (B) adina oturum YAZAMAZ
+  v_caught := false;
+  begin
+    insert into public.workout_sessions (client_id, source)
+    values ('33333333-3333-3333-3333-333333333333', 'freestyle');
+  exception when insufficient_privilege then v_caught := true;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [153c]: A, B adina workout_sessions YAZABILDI (with check kirik).';
+  end if;
+  raise notice 'GECTI [153 A kendi oturumunu gorur/yazar; B adina yazamaz]';
+end $$;
+reset role;
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"33333333-3333-3333-3333-333333333333","role":"authenticated"}';
+do $$
+declare v_n int;
+begin
+  -- (d) B, A'nin oturumunu goremez
+  select count(*) into v_n from public.workout_sessions
+   where id = '15300000-0000-0000-0000-000000000001';
+  if v_n <> 0 then
+    raise exception 'BASARISIZ [153d]: B, A''nin workout_sessions satirini GORDU (%).', v_n;
+  end if;
+  raise notice 'GECTI [153d B, A''nin oturumunu goremez]';
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- İMZA DİLİMİ — 154) DANISAN KENDI mesocycles'INI GORUR/YAZAR (plan sahipligi);
+-- BASKA DANISAN GOREMEZ (mesocycles RLS plan uzerinden turetilir)
+--   (a) KURULUM (postgres): A'ya ait bir plan (is_active=false, cakisma yok) +
+--       o plana bir mezosiklu.
+--   (b) A: kendi mezosiklusunu GORUR ve YENI mezosiklu YAZAR.
+--   (c) B: A'nin mezosiklusunu GOREMEZ (0) ve A'nin planina mezosiklu YAZAMAZ.
+-- =============================================================================
+begin;
+insert into public.workout_plans (id, client_id, owner_id, version, is_active)
+values ('15400000-0000-0000-0000-000000000001', '22222222-2222-2222-2222-222222222222',
+        '22222222-2222-2222-2222-222222222222', 9999, false);
+insert into public.mesocycles (id, plan_id, name, weeks, goal, position)
+values ('15400000-0000-0000-0000-000000000002', '15400000-0000-0000-0000-000000000001',
+        'Hazirlik', 4, 'bulk', 0);
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+do $$
+declare v_n int;
+begin
+  -- (b) A kendi mezosiklusunu gorur
+  select count(*) into v_n from public.mesocycles
+   where id = '15400000-0000-0000-0000-000000000002';
+  if v_n <> 1 then
+    raise exception 'BASARISIZ [154b]: A kendi mesocycles satirini goremedi (%).', v_n;
+  end if;
+  -- A kendi planina yeni mezosiklu yazabilir
+  insert into public.mesocycles (plan_id, name, weeks, deload_week, goal, position)
+  values ('15400000-0000-0000-0000-000000000001', 'Yukleme', 6, 6, 'recomp', 1);
+  raise notice 'GECTI [154b A kendi mesocycles satirini gorur/yazar]';
+end $$;
+reset role;
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"33333333-3333-3333-3333-333333333333","role":"authenticated"}';
+do $$
+declare v_n int; v_caught boolean;
+begin
+  -- (c) B, A'nin mezosiklusunu goremez
+  select count(*) into v_n from public.mesocycles
+   where id = '15400000-0000-0000-0000-000000000002';
+  if v_n <> 0 then
+    raise exception 'BASARISIZ [154c]: B, A''nin mesocycles satirini GORDU (%).', v_n;
+  end if;
+  -- B, A'nin planina mezosiklu YAZAMAZ (with check EXISTS plan false)
+  v_caught := false;
+  begin
+    insert into public.mesocycles (plan_id, name, weeks, goal, position)
+    values ('15400000-0000-0000-0000-000000000001', 'Sizinti', 3, 'cut', 9);
+  exception when insufficient_privilege then v_caught := true;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [154c]: B, A''nin planina mesocycles YAZABILDI.';
+  end if;
+  raise notice 'GECTI [154c B, A''nin mezosiklusunu goremez ve planina yazamaz]';
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- İMZA DİLİMİ — 155) KOC (aal2) ATANMIS DANISANIN workout_sessions VE
+-- mesocycles SATIRLARINI GORUR (tek koclu model, is_coach())
+--   KURULUM: A'ya oturum + A'ya plan + mezosiklu. Koc (aal2) hepsini GORUR.
+-- =============================================================================
+begin;
+insert into public.workout_sessions (id, client_id, source)
+values ('15500000-0000-0000-0000-000000000001', '22222222-2222-2222-2222-222222222222', 'freestyle');
+insert into public.workout_plans (id, client_id, owner_id, version, is_active)
+values ('15500000-0000-0000-0000-000000000010', '22222222-2222-2222-2222-222222222222',
+        '22222222-2222-2222-2222-222222222222', 9999, false);
+insert into public.mesocycles (id, plan_id, name, weeks, goal, position)
+values ('15500000-0000-0000-0000-000000000011', '15500000-0000-0000-0000-000000000010',
+        'KocGorur', 5, 'contest_prep', 0);
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","aal":"aal2"}';
+do $$
+declare v_s int; v_m int;
+begin
+  select count(*) into v_s from public.workout_sessions
+   where id = '15500000-0000-0000-0000-000000000001';
+  if v_s <> 1 then
+    raise exception 'BASARISIZ [155]: aal2 koc, A''nin workout_sessions satirini GOREMEDI (%).', v_s;
+  end if;
+  select count(*) into v_m from public.mesocycles
+   where id = '15500000-0000-0000-0000-000000000011';
+  if v_m <> 1 then
+    raise exception 'BASARISIZ [155]: aal2 koc, A''nin mesocycles satirini GOREMEDI (%).', v_m;
+  end if;
+  raise notice 'GECTI [155 aal2 koc atanmis danisanin oturum + mezosiklu satirlarini gorur]';
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- İMZA DİLİMİ — 156) aal1 KOC YENI TABLOLARI GOREMEZ (mfa_aal2_gate)
+--   Senaryo 155 ile AYNI kurulum, TEK FARK: koc claim'i aal1. RESTRICTIVE
+--   kapi devreye girer -> koc HICBIR yeni satir goremez (fail-closed).
+-- =============================================================================
+begin;
+insert into public.workout_sessions (id, client_id, source)
+values ('15600000-0000-0000-0000-000000000001', '22222222-2222-2222-2222-222222222222', 'freestyle');
+insert into public.workout_plans (id, client_id, owner_id, version, is_active)
+values ('15600000-0000-0000-0000-000000000010', '22222222-2222-2222-2222-222222222222',
+        '22222222-2222-2222-2222-222222222222', 9999, false);
+insert into public.mesocycles (id, plan_id, name, weeks, goal, position)
+values ('15600000-0000-0000-0000-000000000011', '15600000-0000-0000-0000-000000000010',
+        'Aal1Gizli', 5, 'bulk', 0);
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","aal":"aal1"}';
+do $$
+declare v_s bigint; v_m bigint;
+begin
+  select count(*) into v_s from public.workout_sessions;
+  if v_s <> 0 then
+    raise exception 'BASARISIZ [156]: aal1 koc workout_sessions''ta % satir GORDU -- mfa_aal2_gate ETKISIZ.', v_s;
+  end if;
+  select count(*) into v_m from public.mesocycles;
+  if v_m <> 0 then
+    raise exception 'BASARISIZ [156]: aal1 koc mesocycles''ta % satir GORDU -- mfa_aal2_gate ETKISIZ.', v_m;
+  end if;
+  raise notice 'GECTI [156 aal1 koc yeni tablolari GOREMEZ (mfa_aal2_gate fail-closed)]';
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- İMZA DİLİMİ — 157) PASIF DANISAN YENI TABLOLARI YAZAMAZ/GOREMEZ
+-- (account_active_gate)
+--   (a) KURULUM (postgres): A'ya oturum + plan; sonra A pasiflestirilir.
+--   (b) PASIF A: workout_sessions'i GOREMEZ (0), YENI oturum YAZAMAZ (42501),
+--       kendi planina mezosiklu YAZAMAZ (42501).
+-- =============================================================================
+begin;
+insert into public.workout_sessions (id, client_id, source)
+values ('15700000-0000-0000-0000-000000000001', '22222222-2222-2222-2222-222222222222', 'freestyle');
+insert into public.workout_plans (id, client_id, owner_id, version, is_active)
+values ('15700000-0000-0000-0000-000000000010', '22222222-2222-2222-2222-222222222222',
+        '22222222-2222-2222-2222-222222222222', 9999, false);
+update public.profiles set is_active = false where id = '22222222-2222-2222-2222-222222222222';
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated","aal":"aal1"}';
+do $$
+declare v_n bigint; v_caught boolean;
+begin
+  -- (b) PASIF A goremez
+  select count(*) into v_n from public.workout_sessions;
+  if v_n <> 0 then
+    raise exception 'BASARISIZ [157]: PASIF A workout_sessions''ta % satir GORDU -- account_active_gate ETKISIZ.', v_n;
+  end if;
+
+  -- PASIF A yeni oturum YAZAMAZ
+  v_caught := false;
+  begin
+    insert into public.workout_sessions (client_id, source)
+    values ('22222222-2222-2222-2222-222222222222', 'freestyle');
+  exception when insufficient_privilege then v_caught := true;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [157]: PASIF A workout_sessions''a YAZABILDI.';
+  end if;
+
+  -- PASIF A kendi planina mezosiklu YAZAMAZ
+  v_caught := false;
+  begin
+    insert into public.mesocycles (plan_id, name, weeks, goal, position)
+    values ('15700000-0000-0000-0000-000000000010', 'PasifYazamaz', 4, 'bulk', 0);
+  exception when insufficient_privilege then v_caught := true;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [157]: PASIF A mesocycles''a YAZABILDI.';
+  end if;
+  raise notice 'GECTI [157 PASIF A yeni tablolari goremez/yazamaz (account_active_gate)]';
+end $$;
+rollback;
+
+
+-- =============================================================================
+-- İMZA DİLİMİ — 158) OFFLINE IDEMPOTENCY: client_mutation_id KISMI TEKIL
+-- INDEKSI AYNI MUTASYONU IKINCI KEZ REDDEDER (23505)
+--   (a) workout_sessions: ayni (client_id, client_mutation_id) ikinci insert RED.
+--   (b) workout_logs: ayni (client_id, client_mutation_id) ikinci insert RED.
+--   NOT: NULL serbesttir -- iki NULL client_mutation_id CAKISMAZ (kismi indeks).
+-- =============================================================================
+begin;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+do $$
+declare v_caught boolean; v_state text;
+begin
+  -- (a) workout_sessions idempotency
+  insert into public.workout_sessions (client_id, source, client_mutation_id)
+  values ('22222222-2222-2222-2222-222222222222', 'freestyle',
+          '15800000-0000-0000-0000-0000000000aa');
+  v_caught := false;
+  begin
+    insert into public.workout_sessions (client_id, source, client_mutation_id)
+    values ('22222222-2222-2222-2222-222222222222', 'program',
+            '15800000-0000-0000-0000-0000000000aa');
+  exception when unique_violation then
+    v_caught := true; get stacked diagnostics v_state = returned_sqlstate;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [158a]: workout_sessions ayni client_mutation_id IKINCI kez yazildi -- idempotency indeksi YOK.';
+  end if;
+  if v_state is distinct from '23505' then
+    raise exception 'BASARISIZ [158a hata kodu]: beklenen 23505, gelen %', v_state;
+  end if;
+
+  -- (b) workout_logs idempotency
+  insert into public.workout_logs (client_id, exercise_name, client_mutation_id)
+  values ('22222222-2222-2222-2222-222222222222', 'Bench Press',
+          '15800000-0000-0000-0000-0000000000bb');
+  v_caught := false;
+  begin
+    insert into public.workout_logs (client_id, exercise_name, client_mutation_id)
+    values ('22222222-2222-2222-2222-222222222222', 'Bench Press',
+            '15800000-0000-0000-0000-0000000000bb');
+  exception when unique_violation then v_caught := true;
+  end;
+  if not v_caught then
+    raise exception 'BASARISIZ [158b]: workout_logs ayni client_mutation_id IKINCI kez yazildi -- idempotency indeksi YOK.';
+  end if;
+
+  -- (c) NULL client_mutation_id iki kez SERBEST (kismi indeks NULL'lari kapsamaz)
+  insert into public.workout_sessions (client_id, source) values
+    ('22222222-2222-2222-2222-222222222222', 'freestyle'),
+    ('22222222-2222-2222-2222-222222222222', 'freestyle');
+
+  raise notice 'GECTI [158 offline idempotency: ayni client_mutation_id ikinci kez RED (23505); NULL serbest]';
 end $$;
 rollback;
 
 
 -- =============================================================================
 -- TOPLAM ÖZET
--- Bu noktaya yalnızca YUKARIDAKİ 152 senaryonun HEPSİ GECTI verdiyse ulaşılır --
+-- Bu noktaya yalnızca YUKARIDAKİ 158 senaryonun HEPSİ GECTI verdiyse ulaşılır --
 -- herhangi biri BASARISIZ olsaydı raise exception + ON_ERROR_STOP psql'i
 -- daha önce sıfırdan farklı çıkış koduyla durdururdu.
 --   * 1–19  : Faz 1a ve öncesi (profiles, notifications, form_checks, daily_logs,
@@ -10708,6 +11019,18 @@ rollback;
 --             RESTRICTIVE+ALL+authenticated (profiles with_check auth.uid()
 --             İSTİSNASINI TAŞIMAZ), şema sürükleme yok, is_active_user DEFINER
 --             (152)
+--   * 153–158: İmza Dilimi — workout_sessions / mesocycles / offline idempotency
+--             (20260821120000_bb_signature_slice.sql): danışan kendi
+--             workout_sessions'ını görür/yazar, başka danışana ve B adına
+--             yazma KAPALI (153); danışan kendi mesocycles'ını (plan sahipliği)
+--             görür/yazar, başka danışan göremez/yazamaz (154); aal2 koç atanmış
+--             danışanın oturum + mezosiklü satırlarını görür (155); aal1 koç yeni
+--             tabloları GÖREMEZ — mfa_aal2_gate fail-closed (156); PASİF danışan
+--             yeni tabloları göremez/yazamaz — account_active_gate (157);
+--             OFFLINE IDEMPOTENCY: aynı client_mutation_id ikinci kez 23505 ile
+--             RED (workout_sessions + workout_logs), NULL serbest (158); ayrıca
+--             mfa_aal2_gate ve account_active_gate 16 -> 18 (131 / 152c) ve pasif
+--             danışan artık 17 tabloyu göremez (149)
 --
 -- NOT: `nutrition_logs`, `progress_entries` ve `progress_photos` ayrıca senaryo
 -- 73 (yetki) ve 74 (RLS+FORCE) tarafından DİNAMİK olarak kapsanır — o iki
@@ -10715,5 +11038,5 @@ rollback;
 -- =============================================================================
 do $$
 begin
-  raise notice 'TUM RLS TESTLERI GECTI (152 senaryo)';
+  raise notice 'TUM RLS TESTLERI GECTI (158 senaryo)';
 end $$;

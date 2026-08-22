@@ -36,6 +36,15 @@ function makeLog(overrides: Partial<WorkoutLog> = {}): WorkoutLog {
     plan_exercise_id: null,
     completed_at: null,
     created_at: '2026-08-17T10:00:00.000Z',
+    // İmza Dilimi (20260821120000_bb_signature_slice.sql) — workout_logs yeni
+    // kolonları; şema varsayılanlarıyla (rir/session/superset/mutation NULL,
+    // set_type 'working').
+    session_id: null,
+    rir: null,
+    set_type: 'working',
+    superset_group: null,
+    client_mutation_id: null,
+    updated_at: '2026-08-17T10:00:00.000Z',
     ...overrides,
   }
 }
