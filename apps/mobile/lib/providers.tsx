@@ -15,6 +15,7 @@ import { useState, type ReactNode } from 'react'
 
 import { alertNotifier } from './notifier'
 import { createMobileSupabaseClient } from './supabase'
+import { SyncEngine } from './sync/SyncEngine'
 
 export function AppProviders({ children }: { children: ReactNode }) {
   // `useState` fabrikaları ZORUNLU (referans kararlılığı): Supabase istemcisi ve
@@ -26,7 +27,12 @@ export function AppProviders({ children }: { children: ReactNode }) {
   return (
     <SupabaseClientProvider client={supabaseClient}>
       <NotifierProvider notifier={alertNotifier}>
-        <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+        <QueryClientProvider client={queryClient}>
+          {/* Offline outbox sürücüsü (C4): supabase istemcisine erişmek için
+              QueryClientProvider İÇİNDE mount edilir; hiçbir şey render etmez. */}
+          <SyncEngine />
+          {children}
+        </QueryClientProvider>
       </NotifierProvider>
     </SupabaseClientProvider>
   )

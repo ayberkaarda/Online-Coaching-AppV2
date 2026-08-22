@@ -1,13 +1,14 @@
 import { Ionicons } from '@expo/vector-icons'
 import {
   rowsToSessionExercises,
-  useCompleteWorkoutSession,
-  useCreateWorkoutSet,
-  useStartWorkoutSession,
   useWorkoutPlanExercises,
   type SessionExercise,
 } from '@repo/api-client'
-import type { WorkoutLogInsert } from '@repo/api-client/api/workout-session'
+import type {
+  CompleteWorkoutSessionInput,
+  WorkoutLogInsert,
+  WorkoutSessionInsert,
+} from '@repo/api-client/api/workout-session'
 import { DAY_NAMES, type DayName, type Tables } from '@repo/types'
 import { Stack } from 'expo-router'
 import { useMemo, useState } from 'react'
@@ -27,14 +28,17 @@ import {
   Screen,
   SectionHeader,
 } from '../components/ui'
+import { enqueue } from '../lib/sync/queue'
+import { requestFlush, usePendingSyncCount } from '../lib/sync/syncStore'
 import { useTheme } from '../lib/theme'
 import { useCurrentUserId } from '../lib/useCurrentUserId'
 
-// AKTİF ANTRENMAN / GRANÜLER GÜNLÜK ekranı (C3) — "İmza Dilimi" Tur 2. ÖNCE SAF ONLINE
-// (Fable kararı): oturum başlatma + set yazımı C1'in yeni hook'larıyla DOĞRUDAN sunucuya
-// gider. C4 (sonraki checkpoint) bu yazımı offline kuyruğa bağlayacak — bu yüzden set
-// yazımının TAMAMI `logSet` TEK yerel handler'ından geçer (aşağıda işaretli), C4 yalnızca
-// o fonksiyonun GÖVDESİNİ bir kuyruk/flush adımıyla değiştirecek, çağrı yerlerine dokunmaz.
+// AKTİF ANTRENMAN / GRANÜLER GÜNLÜK ekranı (C3+C4) — "İmza Dilimi" Tur 2. C4'te bu ekran
+// artık TEK YAZMA YOLU olarak offline OUTBOX'a yazar (online olsa bile): oturum başlatma,
+// set yazımı ve oturum bitirme `enqueue(...)` ile `lib/sync` kuyruğuna gider; `requestFlush()`
+// online'sa hemen iter, değilse SyncEngine backoff/foreground ile dener. Set yazımının TAMAMI
+// hâlâ `logSet` TEK yerel handler'ından geçer (çağrı yerleri C3'ten beri DEĞİŞMEDİ); C4 yalnızca
+// o gövdeyi `createSet.mutate` → `enqueue` olarak değiştirdi. Rozet `usePendingSyncCount()` okur.
 //
 // `periodization.tsx` (C2) İLE AYNI konum deseni: `(tabs)` DIŞINDA kök `app/` altında bir
 // stack ekranı, `_layout.tsx`'e KAYITLI DEĞİL — expo-router dosya tabanlı routing'te bu
@@ -118,9 +122,7 @@ export default function WorkoutSessionScreen() {
   const userId = useCurrentUserId()
 
   const plan = useWorkoutPlanExercises(userId)
-  const startSession = useStartWorkoutSession()
-  const completeSession = useCompleteWorkoutSession(userId)
-  const createSet = useCreateWorkoutSet()
+  const pendingSyncCount = usePendingSyncCount()
 
   const todaysExercises = useMemo(
     () => rowsToSessionExercises(plan.data, todayDayName()),
@@ -155,12 +157,17 @@ export default function WorkoutSessionScreen() {
     setSessionSource(source)
     setSelectedExercise(source === 'program' ? (todaysExercises[0] ?? null) : null)
     setLoggedSets([])
-    startSession.mutate({
+    // C4: TEK yazma yolu — oturum konteyneri de kuyruğa gider (online olsa bile).
+    // `create_session` her zaman ilgili `create_set`'lerden ÖNCE eklendiği için
+    // FIFO flush FK sırasını (session→log) kendiliğinden korur.
+    const sessionRow: WorkoutSessionInsert = {
       id,
       client_id: userId,
       source,
       started_at: new Date().toISOString(),
-    })
+    }
+    enqueue('create_session', sessionRow)
+    requestFlush()
   }
 
   function selectPlanExercise(exercise: SessionExercise) {
@@ -176,15 +183,18 @@ export default function WorkoutSessionScreen() {
 
   /**
    * TEK yerel yazma noktası — set girişinin TAMAMI buradan geçer.
-   * C4: offline kuyruk buraya bağlanacak (bu gövde bir kuyruğa `enqueue` ile değişecek,
-   * çağrı yerleri — "Set ekle" butonu — DEĞİŞMEYECEK).
+   * C4: gövde artık offline OUTBOX'a yazıyor. Optimistic yerel liste ANINDA
+   * güncellenir (kullanıcı sunucuyu beklemez); `enqueue` mutasyonu kuyruğa koyar,
+   * `requestFlush()` online'sa hemen iter. Çağrı yerleri ("Set ekle" butonu)
+   * DEĞİŞMEDİ. `client_mutation_id` idempotency anahtarıdır (retry güvenli).
    */
   function logSet(row: WorkoutLogInsert) {
     setLoggedSets((prev) => [
       { localId: row.client_mutation_id ?? crypto.randomUUID(), row },
       ...prev,
     ])
-    createSet.mutate(row)
+    enqueue('create_set', row, row.client_mutation_id)
+    requestFlush()
   }
 
   function handleAddSet() {
@@ -227,14 +237,16 @@ export default function WorkoutSessionScreen() {
     const perceived_difficulty =
       difficultyTrimmed.length > 0 ? Number(difficultyTrimmed.replace(',', '.')) : null
 
-    completeSession.mutate({
+    const completion: CompleteWorkoutSessionInput = {
       id: activeSessionId,
       ended_at: new Date().toISOString(),
       perceived_difficulty:
         perceived_difficulty !== null && Number.isFinite(perceived_difficulty)
           ? perceived_difficulty
           : null,
-    })
+    }
+    enqueue('complete_session', completion)
+    requestFlush()
 
     setActiveSessionId(null)
     setSessionSource(null)
@@ -246,6 +258,33 @@ export default function WorkoutSessionScreen() {
   return (
     <Screen>
       <Stack.Screen options={{ title: 'Antrenman' }} />
+
+      {pendingSyncCount > 0 ? (
+        <Pressable
+          onPress={() => requestFlush()}
+          accessibilityRole="button"
+          accessibilityLabel={`${pendingSyncCount} kayıt senkron bekliyor. Şimdi denemek için dokun.`}
+          style={({ pressed }) => [
+            {
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 8,
+              borderWidth: 1,
+              borderColor: theme.colors.border,
+              backgroundColor: theme.colors.surface,
+              borderRadius: theme.radius.pill,
+              paddingHorizontal: 14,
+              paddingVertical: 8,
+              opacity: pressed ? 0.7 : 1,
+            },
+          ]}
+        >
+          <Ionicons name="cloud-upload-outline" size={16} color={theme.colors.accent} />
+          <Body variant="bodySm" color="textSecondary">
+            Senkron bekliyor ({pendingSyncCount}) · şimdi dene
+          </Body>
+        </Pressable>
+      ) : null}
 
       {activeSessionId === null ? (
         <>
@@ -265,7 +304,6 @@ export default function WorkoutSessionScreen() {
                 title="Bugünün Programını Başlat"
                 onPress={() => handleStartSession('program')}
                 disabled={todaysExercises.length === 0 || !userId}
-                pending={startSession.isPending && sessionSource === 'program'}
                 accessibilityLabel="Bugünün program egzersizleriyle antrenman başlat"
               />
               <Button
@@ -273,7 +311,6 @@ export default function WorkoutSessionScreen() {
                 variant="secondary"
                 onPress={() => handleStartSession('freestyle')}
                 disabled={!userId}
-                pending={startSession.isPending && sessionSource === 'freestyle'}
                 accessibilityLabel="Serbest antrenman başlat"
               />
             </Card>
@@ -391,7 +428,6 @@ export default function WorkoutSessionScreen() {
                   title="Set ekle"
                   onPress={handleAddSet}
                   disabled={repsText.trim().length === 0}
-                  pending={createSet.isPending}
                   accessibilityLabel="Bu seti kaydet"
                 />
               </Card>
@@ -455,7 +491,6 @@ export default function WorkoutSessionScreen() {
               title="Oturumu bitir"
               variant="secondary"
               onPress={handleCompleteSession}
-              pending={completeSession.isPending}
               accessibilityLabel="Antrenman oturumunu bitir"
             />
           </Card>
