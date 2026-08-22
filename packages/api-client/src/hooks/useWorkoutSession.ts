@@ -36,6 +36,8 @@ export interface PlanExerciseRow {
   target_sets: number | null
   target_reps: number | null
   video_url: string | null
+  target_rpe: number | null
+  target_percent_1rm: number | null
 }
 
 /** Gym modunun tükettiği, plan satırına BAĞLI egzersiz. */
@@ -106,7 +108,7 @@ export function useWorkoutPlanExercises(clientId?: string) {
       const { data, error } = await supabase
         .from('workout_plans')
         .select(
-          'id, workout_plan_exercises(id, day, position, raw_line, name, target_sets, target_reps, video_url)'
+          'id, workout_plan_exercises(id, day, position, raw_line, name, target_sets, target_reps, video_url, target_rpe, target_percent_1rm)'
         )
         .eq('client_id', clientId ?? '')
         .eq('is_active', true)

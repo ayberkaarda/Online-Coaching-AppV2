@@ -49,6 +49,9 @@ importers:
       '@repo/api-client':
         specifier: workspace:*
         version: link:../../packages/api-client
+      '@repo/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
       '@repo/logger':
         specifier: workspace:*
         version: link:../../packages/logger

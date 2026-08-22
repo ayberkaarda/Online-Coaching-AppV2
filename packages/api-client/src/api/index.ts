@@ -4,3 +4,4 @@
 export * from './types'
 export * from './client'
 export * from './ai'
+export * from './workout-session'

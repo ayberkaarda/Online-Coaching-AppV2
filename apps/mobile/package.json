@@ -27,6 +27,7 @@
     "@expo/metro-runtime": "~57.0.12",
     "@expo/vector-icons": "^15.1.1",
     "@repo/api-client": "workspace:*",
+    "@repo/domain": "workspace:*",
     "@repo/logger": "workspace:*",
     "@repo/types": "workspace:*",
     "@supabase/supabase-js": "^2.110.0",

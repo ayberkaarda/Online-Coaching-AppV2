@@ -1,11 +1,13 @@
 import { Ionicons } from '@expo/vector-icons'
 import { useWorkoutPlan } from '@repo/api-client'
 import { DAY_NAMES } from '@repo/types'
+import { useRouter } from 'expo-router'
 import { View } from 'react-native'
 
 import {
   Badge,
   Body,
+  Button,
   Card,
   EmptyState,
   ErrorState,
@@ -24,6 +26,7 @@ import { useCurrentUserId } from '../../lib/useCurrentUserId'
 // AYNI hook, AYNI şekil; gün sırası tek kaynak `DAY_NAMES`'ten gelir.
 export default function PlanScreen() {
   const theme = useTheme()
+  const router = useRouter()
   const userId = useCurrentUserId()
   const plan = useWorkoutPlan(userId)
 
@@ -51,6 +54,13 @@ export default function PlanScreen() {
         <EmptyState
           title="Aktif plan yok"
           description="Henüz aktif bir antrenman planınız yok. Koçunuz plan atadığında burada görünür."
+          action={
+            <Button
+              title="Antrenmanı Başlat"
+              onPress={() => router.push('/workout-session')}
+              accessibilityLabel="Antrenman oturumu ekranına git"
+            />
+          }
         />
       </Screen>
     )
@@ -68,6 +78,17 @@ export default function PlanScreen() {
           <Body variant="body">{plan.data[day].trim()}</Body>
         </Card>
       ))}
+      <Button
+        title="Antrenmanı Başlat"
+        onPress={() => router.push('/workout-session')}
+        accessibilityLabel="Antrenman oturumu ekranına git"
+      />
+      <Button
+        title="Periyodizasyon / Analiz"
+        variant="secondary"
+        onPress={() => router.push('/periodization')}
+        accessibilityLabel="Periyodizasyon ve analiz ekranına git"
+      />
     </Screen>
   )
 }

@@ -59,6 +59,10 @@ function makePlanRow(overrides: Partial<PlanExerciseRow> = {}): PlanExerciseRow 
     target_sets: 4,
     target_reps: 8,
     video_url: null,
+    // İmza Dilimi (20260821120000_bb_signature_slice.sql) — periyodizasyon hedefleri
+    // (Tur 2 C2): şema varsayılanlarıyla NULL.
+    target_rpe: null,
+    target_percent_1rm: null,
     ...overrides,
   }
 }

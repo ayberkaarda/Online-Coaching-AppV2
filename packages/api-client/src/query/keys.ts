@@ -46,6 +46,15 @@ export const queryKeyRoots = {
    * ÜÇÜ birden bayatlar, bu yüzden invalidate tek tek değil ön ekle yapılır.
    */
   progressEntries: ['progress-entries'] as const,
+  /** Periyodizasyon mezosiklüleri (`mesocycles`) — bkz. `useWorkoutSessions.ts::useMesocycles`. */
+  mesocycles: ['mesocycles'] as const,
+  /**
+   * Offline antrenman oturumu konteyneri (`workout_sessions`) — bkz.
+   * `useWorkoutSessions.ts`. `workoutLogs`'tan AYRI köktür: bir set eklemek
+   * oturum listesini invalidate ETMEZ (ayrı hook'lar bilinçli olarak
+   * kendi köklerini invalidate eder, bkz. dosya başı notu).
+   */
+  workoutSessions: ['workout-sessions'] as const,
 } as const
 
 export const queryKeys = {
@@ -132,4 +141,9 @@ export const queryKeys = {
    */
   progressEntries: (clientId?: string, rangeDays?: number) =>
     ['progress-entries', clientId ?? null, rangeDays ?? null] as const,
+
+  /** Aktif planın mezosiklüleri — `planId` DEĞİL `clientId` ile anahtarlanır (bkz. `useWorkoutPlanExercises` deseni: plan dolaylı, danışan doğrudan çağrı yüzeyidir). */
+  mesocycles: (clientId?: string) => ['mesocycles', clientId ?? null] as const,
+  /** Bir danışanın antrenman oturumları (offline konteyner, `workout_sessions`). */
+  workoutSessions: (clientId?: string) => ['workout-sessions', clientId ?? null] as const,
 } as const
