@@ -1,0 +1,24 @@
+{
+  "name": "@repo/domain",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Bağımlılıksız, UI'dan bağımsız bodybuilding hesap kütüphanesi (1RM tahmini, tonaj, RPE/RIR dönüşümleri, BMR/TDEE/makro hedefleri). Sarmal v1 dondurulduktan (ADR-0029) sonraki migration'ın uygulayacağı sözleşmeyi tanımlar — saf fonksiyonlar, yan etki yok. Build adımı YOK: TS kaynağı doğrudan yayınlanır, tüketen taraf transpile eder.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "type-check": "tsc --noEmit",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
+  },
+  "devDependencies": {
+    "@repo/config": "workspace:*",
+    "@vitest/coverage-v8": "^2.1.8",
+    "eslint": "^9",
+    "typescript": "~6.0.3",
+    "vitest": "^2.1.8"
+  }
+}

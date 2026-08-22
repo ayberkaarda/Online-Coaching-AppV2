@@ -41,6 +41,11 @@ export default defineConfig({
         // `database.ts` + kendi ayrı testi olan `schemas.ts`); paket taşıması yalnızca
         // adresini değiştirdi, ölçüm kümesini değiştirmemeli.
         `${repoRoot}/packages/types/src/**`,
+        // `@repo/domain` kendi paketinde %100 kapsamla test ediliyor (bkz.
+        // packages/domain/package.json test:coverage); apps/web onu henüz import
+        // ETMİYOR, dolayısıyla burada ölçülürse paydaya 0%'lik ölü satır olarak
+        // girer ve eşiği gerekçesiz düşürür — `packages/types` istisnasıyla AYNI mantık.
+        `${repoRoot}/packages/domain/src/**`,
       ],
       // `lines`/`statements` 60 → 52: ölçülen gerçek değer %53.85 (4975/9238), eşik onun
       // hemen altına TEK YÖNLÜ MANDAL olarak konuldu (bkz. docs/PROGRESS.md §3 B-046).
