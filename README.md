@@ -132,6 +132,16 @@ flowchart TD
     Foreground -.->|reset backoff, flush now| Engine
 ```
 
+<p align="center">
+  <img width="250" src="docs/screenshots/tur2-periodization.png" alt="Periodization screen: mesocycle overview with per-exercise %1RM target percentages and the deload week flagged">
+  <img width="250" src="docs/screenshots/tur2-offline-pending.png" alt="Airplane mode: two sets logged offline, queued behind a 'Senkron bekliyor (2)' badge">
+  <img width="250" src="docs/screenshots/tur2-offline-synced.png" alt="Same screen after reconnecting: the sync queue flushed and the pending badge cleared">
+</p>
+
+**Domain math in the UI.** The RPE→%1RM conversion is computed in `packages/domain` (`rpeToPercent`); the screen only renders the result — target percentages shown per exercise, deload week flagged.
+
+**Transactional outbox, proven.** Sets logged in airplane mode queue behind a _Senkron bekliyor (2)_ badge (left→center); on reconnect the engine flushes them idempotently and the badge clears (right). See [`docs/mobile/sync-protocol.md`](docs/mobile/sync-protocol.md).
+
 Every write goes through the queue, online or not — there is no separate online/offline code path. `SyncEngine` never imports Supabase itself; it drains the queue in FK-safe order (`id ASC`, a session's `create_session` is always enqueued before its `create_set` entries) and calls only the pure functions `@repo/api-client` already exposed for the C1 online data layer (`insertWorkoutSession`, `insertWorkoutSetIdempotent`). Idempotency is enforced two different ways for two different reasons: `workout_sessions.id` is a plain primary key generated **client-side** (`crypto.randomUUID()`), so a plain `.upsert(row, { onConflict: 'id', ignoreDuplicates: true })` works; `workout_logs` relies on a _partial_ unique index (`(client_id, client_mutation_id) WHERE client_mutation_id IS NOT NULL`) that PostgREST's `upsert` cannot target with a `WHERE` clause, so a plain `insert` is used instead and a `23505` on retry is treated client-side as a silent no-op. There is deliberately no `NetInfo` connectivity check — the strategy is just "try, fail, back off" (2s → 4s → … → 60s, capped), reset to zero either by the app returning to the foreground or by a manual tap on the "Senkron bekliyor (n)" badge.
 
 ### Airplane-mode proof
@@ -171,6 +181,12 @@ The frames are generated automatically against **demo accounts** on the local Su
 ![The /verilerim page: activity logging consent is on, sessions and events are listed with hour and minute stamps](docs/screenshots/verilerim.png)
 
 **The same records, at full resolution, for the person they belong to.** `/verilerim` ("my data") is the KVKK Art. 11 access right: with consent **on**, sessions and events are listed **with hour and minute stamps** — deliberately asymmetric with the day-level coach summary two frames up. Together the two screens are the visual proof of one privacy decision: the client sees everything, the coach sees the day. "Turn off activity logging" does not merely stop collection; it deletes the existing rows at that moment (see [decision #3](#3-the-consent-gate-is-inside-the-write-function)).
+
+### Mobile
+
+<p align="center"><img width="250" src="docs/screenshots/mobile-coach-stepup.png" alt="Mobile coach view prompting an aal2 step-up before any client data is shown"></p>
+
+**The RLS gate reaches mobile too.** Coach data on the phone is also behind an `aal2` step-up — the gate lives in RLS, not the route, so the client can't bypass it. The notice ("this ends your other sessions") closes B-061 on mobile. Captured on an Android emulator, not the Playwright script the four frames above come from. Tur 2's other mobile frames (periodization, offline sync) live in the [Tur 2 — İmza Dilimi](#tur-2--i̇mza-dilimi) section above.
 
 ---
 
