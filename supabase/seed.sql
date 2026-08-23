@@ -619,3 +619,117 @@ begin
   raise notice 'Giriş: coach@example.com / client1@example.com / client2@example.com  —  parola: Passw0rd!23';
 end
 $$;
+
+
+-- =============================================================================
+-- TUR 2 — İMZA DİLİMİ DEMO VERİSİ (mesocycles + periyodizasyon hedefleri)
+--
+--   Bağlam: "İmza Dilimi" turu (20260821120000_bb_signature_slice.sql) yalnızca
+--   şemayı ekledi — bu dosyada hiçbir `mesocycles` satırı YOKTU. Sonuç: mobil
+--   periyodizasyon ekranı "periyodizasyon tanımlı değil" boş durumunu
+--   gösteriyordu; ekran hiç gerçek veriyle denenmemişti.
+--
+--   Fable kararı: portfolyo için gerçek bir zafiyet. Seed geliştirme aracıdır
+--   (ADR-0029 v1-freeze prod şemasını dondurur, DEV seed verisini kapsamaz) —
+--   bu yüzden AYRI, açıkça işaretlenmiş bir "Tur 2" bloğu olarak eklenir;
+--   yukarıdaki §1-10 bloklarına karışmaz.
+--
+--   Kapsam: client2 (Elif Demir — kas kütlesi artışı odaklı danışan), §2b'de
+--   `save_workout_plan()` ile normalize tablolara yazılan AKTİF planı üzerine:
+--     (a) bir `mesocycles` satırı: 'Hipertrofi Bloğu 1', 6 hafta, 6. hafta
+--         deload, goal='bulk' (Elif'in beslenme/antrenman hedefiyle tutarlı).
+--     (b) bazı `workout_plan_exercises` satırlarına periyodizasyon hedefi:
+--         ana bileşik hareketlere `target_percent_1rm` (%65-80), yardımcı
+--         hareketlere `target_rpe` (7-9) — RPE 1-10 / %1RM 1-100 CHECK
+--         kısıtlarıyla uyumlu, gerçekçi değerler.
+--
+--   Plan id türetimi: §2b'nin ve `save_workout_plan()`'ın kullandığı BİREBİR
+--   AYNI desen — "client_id = Elif AND is_active" ile aktif plan aranır.
+--   Böylece plan-id'yi elle/sabit UUID ile tahmin etmek gerekmez ve plan
+--   gerçekten var olmadan (örn. §2b bir sebeple atlanırsa) mezosiklu YAZILMAZ.
+--
+--   Idempotency: (a) `insert ... select ... where not exists (...)` — aynı
+--   plan_id + name ikinci koşuda tekrar eklenmez. (b) hedef UPDATE'leri doğası
+--   gereği idempotenttir (aynı satırlara aynı değer tekrar yazılır, çoğalma
+--   YOKTUR).
+--
+--   test:rls (158/158) etkileşimi: senaryo 154-158 KENDİ workout_plans /
+--   mesocycles satırlarını sabit test-UUID'leriyle (15400000.../15500000...
+--   /15600000.../15700000...) `begin; ... rollback;` içinde kurar ve o
+--   satırları ya SABİT id'yle (154b/154c/155) ya da RLS-gate'li GLOBAL
+--   `count(*)` ile (156/157) sorgular. Bu blok Elif'in GERÇEK aktif planına
+--   yazdığı için test bloklarının sabit id'leriyle ASLA çakışmaz; 156/157'nin
+--   id'siz `count(*)` kontrolleri de satır SAYISINA değil, mfa_aal2_gate /
+--   account_active_gate RESTRICTIVE politikalarının yetkisiz rol için TÜM
+--   satırları (bu blok ekleseydi bile) 0'a indirmesine dayanır — dolayısıyla
+--   tabloda ek satır bulunması test sonucunu DEĞİŞTİRMEZ.
+-- =============================================================================
+
+-- (a) Elif'in aktif planına bir mezosiklu.
+do $$
+declare
+  v_plan_id uuid;
+begin
+  select wp.id
+    into v_plan_id
+    from public.workout_plans wp
+   where wp.client_id = '33333333-3333-3333-3333-333333333333'::uuid
+     and wp.is_active
+   limit 1;
+
+  if v_plan_id is null then
+    raise notice 'TUR 2 seed: Elif''in aktif plani bulunamadi, mezosiklu atlandi.';
+  else
+    insert into public.mesocycles (plan_id, name, weeks, deload_week, goal, position)
+    select v_plan_id, 'Hipertrofi Bloğu 1', 6, 6, 'bulk'::public.training_goal, 0
+    where not exists (
+      select 1 from public.mesocycles m
+       where m.plan_id = v_plan_id
+         and m.name = 'Hipertrofi Bloğu 1'
+    );
+  end if;
+end
+$$;
+
+-- (b) Bazı plan egzersiklerine periyodizasyon hedefi (%1RM veya RPE).
+--     Ana bileşik hareketler -> target_percent_1rm; yardımcı/izolasyon
+--     hareketler -> target_rpe. Her egzersik yalnızca BİRİNİ alır (CASE...ELSE
+--     mevcut değeri korur, diğer kolonu bozmaz). UPDATE idempotenttir.
+update public.workout_plan_exercises wpe
+   set target_percent_1rm = case wpe.name
+         when 'Squat'       then 75
+         when 'Bench Press' then 70
+         when 'Deadlift'    then 80
+         when 'Front Squat' then 65
+         else wpe.target_percent_1rm
+       end,
+       target_rpe = case wpe.name
+         when 'Leg Press'      then 8
+         when 'Hip Thrust'     then 8
+         when 'Overhead Press' then 8
+         when 'Lat Pulldown'   then 7
+         when 'Pull Up'        then 9
+         else wpe.target_rpe
+       end
+  from public.workout_plans wp
+ where wpe.plan_id = wp.id
+   and wp.client_id = '33333333-3333-3333-3333-333333333333'::uuid
+   and wp.is_active
+   and wpe.name in (
+         'Squat', 'Bench Press', 'Deadlift', 'Front Squat',
+         'Leg Press', 'Hip Thrust', 'Overhead Press', 'Lat Pulldown', 'Pull Up'
+       );
+
+do $$
+declare
+  v_meso  bigint;
+  v_1rm   bigint;
+  v_rpe   bigint;
+begin
+  select count(*) into v_meso from public.mesocycles;
+  select count(*) into v_1rm  from public.workout_plan_exercises where target_percent_1rm is not null;
+  select count(*) into v_rpe  from public.workout_plan_exercises where target_rpe is not null;
+  raise notice 'TUR 2 SEED TAMAM -> mesocycles=%, plan_exercises(target_percent_1rm dolu)=%, plan_exercises(target_rpe dolu)=%',
+    v_meso, v_1rm, v_rpe;
+end
+$$;

@@ -33,20 +33,21 @@ Three engineering choices are worth a reviewer's attention. **First, authorizati
 ## Contents
 
 1. [Engineering decisions](#engineering-decisions)
-2. [Screenshots](#screenshots)
-3. [Features](#features)
-4. [Architecture](#architecture)
-5. [Tech stack](#tech-stack)
-6. [Quick start](#quick-start)
-7. [Environment variables](#environment-variables)
-8. [Development commands](#development-commands)
-9. [Testing](#testing)
-10. [Database and RLS](#database-and-rls)
-11. [Running with Docker](#running-with-docker)
-12. [Deployment](#deployment)
-13. [Security](#security)
-14. [Project structure](#project-structure)
-15. [Contributing and license](#contributing-and-license)
+2. [Tur 2 — İmza Dilimi](#tur-2--i̇mza-dilimi)
+3. [Screenshots](#screenshots)
+4. [Features](#features)
+5. [Architecture](#architecture)
+6. [Tech stack](#tech-stack)
+7. [Quick start](#quick-start)
+8. [Environment variables](#environment-variables)
+9. [Development commands](#development-commands)
+10. [Testing](#testing)
+11. [Database and RLS](#database-and-rls)
+12. [Running with Docker](#running-with-docker)
+13. [Deployment](#deployment)
+14. [Security](#security)
+15. [Project structure](#project-structure)
+16. [Contributing and license](#contributing-and-license)
 
 ---
 
@@ -89,6 +90,65 @@ The most expensive accident available in this codebase is a `pnpm run build && p
 **[ADR-0018](docs/adr/0018-kimlik-gecisi-iki-katman-ve-ci-ratchet.md) · [`scripts/identity-ratchet.mjs`](scripts/identity-ratchet.mjs)**
 
 Doing the visual identity migration as one large "restyle PR" would have made the diff unreviewable; saying "it will sort itself out over time" would have meant two design languages living side by side permanently. The third option: a grep script counts the traces of the old language (`font-black`, `bg-gradient-to-*`, `rounded-3xl`, the raw brand purple, JSX emoji) and runs in CI, turning **every PR that goes above the ceiling red**. The ceiling never rises on its own; when a PR lowers a counter, the new value becomes the baseline. Where it stands today: `font-black` 49 → 25, gradients 14 → 12, `rounded-3xl` 17 → 15, raw `#8b5cf6` and emoji **locked at 0**. The raw color has a separate counter for its decimal RGB spelling (`139, 92, 246`) — the hex counter was not catching it.
+
+---
+
+## Tur 2 — İmza Dilimi
+
+_("Round 2 — Signature Slice.")_ v1 — the closed-loop coaching platform above — was frozen at [ADR-0029](docs/adr/0029-kapsam-dondurma-v1.md). The obvious next move would have been the eight-phase mobile bodybuilding pivot sketched out in `bodybuilding_app.md`; it was **consciously rejected** as a full rewrite. In its place, one narrow slice was chosen with the same discipline the freeze itself demonstrated: **periodization + granular set logging + offline-first sync**, all independent of any specific device or monetary flow — the same portfolio constraint (no App Store account, no payment processing) that shaped v1 in the first place.
+
+### Components
+
+- **[`packages/domain`](packages/domain/src/index.ts)** — a pure, framework-free TypeScript library for the training-science math: `estimate1RM` (Epley/Brzycki), `rpeToPercent`/`rirToRpe`/`rpeToRir` (RPE↔RIR↔%1RM), `bmrMifflinStJeor`/`tdee`/`macroSplit` (BMR → TDEE → goal-based macro split). No I/O, no Supabase, no React, 100% unit-tested — the same "pure core, injected boundary" discipline as [decision #5](#5-the-supabase-client-is-injected-never-imported).
+- **Migration** ([`20260821120000_bb_signature_slice.sql`](supabase/migrations/20260821120000_bb_signature_slice.sql)) — `workout_sessions` and `mesocycles` land under the exact same RLS discipline as every other table: the two **RESTRICTIVE** gates, `mfa_aal2_gate` and `account_active_gate`, are _extended_ from 16 to 18 tables rather than reinvented as one-off policies. `pnpm run test:rls` → **158/158**.
+- **Mobile screens** — a periodization screen where the domain calculations run directly in the UI (`domain.rpeToPercent` / `estimate1RM`, never re-derived ad hoc), and a granular set-logging screen for the active workout.
+- **The offline outbox engine** — see below.
+
+### Offline-sync architecture
+
+The offline surface is deliberately narrow: only the active-workout screen (`app/workout-session.tsx`) works without a connection — periodization and history stay online-only. SQLite here is **not** a local mirror of `workout_sessions` / `workout_logs`; it holds one generic `sync_queue` table, a FIFO log of mutations still owed to the server.
+
+```mermaid
+flowchart TD
+    Screen["Active workout screen<br/>(workout-session.tsx)"]
+    Enqueue["enqueue('create_session' | 'create_set' | 'complete_session')"]
+    Queue[("SQLite sync_queue<br/>transactional outbox, FIFO — status: pending")]
+    Badge["Badge — 'Senkron bekliyor (n)'<br/>usePendingSyncCount()"]
+    Engine["SyncEngine<br/>foreground trigger + exponential backoff (2s → 60s)"]
+    ApiClient["@repo/api-client pure functions<br/>insertWorkoutSession / insertWorkoutSetIdempotent"]
+    Supabase[("Supabase<br/>idempotent write — client_mutation_id, 23505 = no-op")]
+    MarkSynced["markSynced"]
+    Backoff["retry in 2s → 4s → … → 60s, item stays queued"]
+    Foreground["AppState 'active' (foreground return)"]
+
+    Screen --> Enqueue --> Queue
+    Queue -->|pending count| Badge
+    Badge -.->|tap: requestFlush| Engine
+    Screen -.->|"requestFlush() right after enqueue"| Engine
+    Engine -->|"read id ASC, stop-on-failure"| Queue
+    Engine --> ApiClient --> Supabase
+    Supabase -->|"200 OK"| MarkSynced --> Queue
+    Supabase -.->|fail| Backoff -.-> Engine
+    Foreground -.->|reset backoff, flush now| Engine
+```
+
+Every write goes through the queue, online or not — there is no separate online/offline code path. `SyncEngine` never imports Supabase itself; it drains the queue in FK-safe order (`id ASC`, a session's `create_session` is always enqueued before its `create_set` entries) and calls only the pure functions `@repo/api-client` already exposed for the C1 online data layer (`insertWorkoutSession`, `insertWorkoutSetIdempotent`). Idempotency is enforced two different ways for two different reasons: `workout_sessions.id` is a plain primary key generated **client-side** (`crypto.randomUUID()`), so a plain `.upsert(row, { onConflict: 'id', ignoreDuplicates: true })` works; `workout_logs` relies on a _partial_ unique index (`(client_id, client_mutation_id) WHERE client_mutation_id IS NOT NULL`) that PostgREST's `upsert` cannot target with a `WHERE` clause, so a plain `insert` is used instead and a `23505` on retry is treated client-side as a silent no-op. There is deliberately no `NetInfo` connectivity check — the strategy is just "try, fail, back off" (2s → 4s → … → 60s, capped), reset to zero either by the app returning to the foreground or by a manual tap on the "Senkron bekliyor (n)" badge.
+
+### Airplane-mode proof
+
+Verified live on an Android emulator (Pixel 8 AVD, `client2` account, local Supabase stack): one set logged while online flushed immediately, badge never appeared. Airplane mode on, two more sets logged (22 kg × 5 @RPE 9, 24 kg × 4 @RPE 10) — badge showed "Senkron bekliyor (2)". Airplane mode off — the `AppState` foreground trigger flushed the queue and the badge cleared. `workout_logs` ended with exactly **3/3 rows** (the online set plus the two offline ones), all carrying `session_id` and `client_mutation_id` — no duplicates survived the backoff retry loop. Full write-up: [`docs/mobile/sync-protocol.md`](docs/mobile/sync-protocol.md) §8.
+
+### Consciously out of scope
+
+The same discipline as v1's freeze applied here too — a documented boundary, not an oversight:
+
+- **No coach-side mesocycle CRUD UI.** The write path (`useSaveMesocycle`) already exists; nothing calls it yet.
+- **No last-write-wins conflict resolution.** Designed _for_ multi-device use — both new tables already carry `updated_at` and a `set_updated_at()` trigger — but the merge mechanism itself is out of scope: a single-device, append-only, no-delete scenario has no conflict class to resolve.
+- **No delete sync, no media sync.** The queue only ever carries `create_*` / `complete_*` operations.
+
+Full list and rationale: [`docs/mobile/sync-protocol.md`](docs/mobile/sync-protocol.md) §6. Related decisions: [ADR-0028](docs/adr/0028-mobil-koc-acil-erisim.md) (mobile coach emergency access), [ADR-0029](docs/adr/0029-kapsam-dondurma-v1.md) (the v1 freeze this slice builds on top of), [ADR-0030](docs/adr/0030-motion-doktrini.md) (motion doctrine, unchanged by this slice).
+
+> **A note on hosted parity.** The hosted demo (a Supabase project) is frozen at **v1 core parity** — the last migration applied there is `20260820160000`. Three later migrations were never pushed to it: `20260820170000_profile_body_metrics` (profile/body-metrics columns), `20260820180000_account_active_state`, and this slice's `20260821120000_bb_signature_slice`. The reason is mechanical, not a shortcut: all three carry a heavy self-verification block written for a local `supabase db reset`, which runs `set local role authenticated` to exercise RLS behavior from inside the migration itself — and under the hosted push's migration-role context that statement returns `permission denied for schema public (42501)`. The call, made deliberately as part of closing the project rather than fought over: freeze the hosted demo at v1 parity instead of reworking the migrations to survive a role context they were never written for, and let the newer layers — profile/body metrics, account-active state, and this signature slice — stand on **local Supabase + Android-emulator proof** instead (`pnpm run test:rls` **158/158**, the airplane-mode walkthrough above). In a portfolio context, the hosted project remains the live v1 demo; the newest layer is documented by local-and-emulator evidence rather than by a second hosted deploy.
 
 ---
 
