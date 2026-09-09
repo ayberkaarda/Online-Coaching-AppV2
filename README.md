@@ -33,7 +33,7 @@ Three engineering choices are worth a reviewer's attention. **First, authorizati
 ## Contents
 
 1. [Engineering decisions](#engineering-decisions)
-2. [Tur 2 — İmza Dilimi](#tur-2--i̇mza-dilimi)
+2. [Signature Slice](#tur-2--i̇mza-dilimi)
 3. [Screenshots](#screenshots)
 4. [Features](#features)
 5. [Architecture](#architecture)
@@ -93,7 +93,7 @@ Doing the visual identity migration as one large "restyle PR" would have made th
 
 ---
 
-## Tur 2 — İmza Dilimi
+## Signature Slice
 
 _("Round 2 — Signature Slice.")_ v1 — the closed-loop coaching platform above — was frozen at [ADR-0029](docs/adr/0029-kapsam-dondurma-v1.md). The obvious next move would have been the eight-phase mobile bodybuilding pivot sketched out in `bodybuilding_app.md`; it was **consciously rejected** as a full rewrite. In its place, one narrow slice was chosen with the same discipline the freeze itself demonstrated: **periodization + granular set logging + offline-first sync**, all independent of any specific device or monetary flow — the same portfolio constraint (no App Store account, no payment processing) that shaped v1 in the first place.
 
