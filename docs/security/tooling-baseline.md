@@ -231,6 +231,19 @@ En kötü senaryo: repoya yazma erişimi olan biri bozuk bir görsel commit'leyi
 
 **Gözden geçirme tarihi: 2026-11-19** (3 ay sonra). O tarihte `image-size` için bir yama yayınlanmışsa (ya da `metro`/`@expo/metro` bu paketi yamalı bir sürüme yükseltmişse) istisna kaldırılıp normal güncellemeye geçilmeli. Borç kaydı: `docs/PROGRESS.md` §3 B-053.
 
+### 10.2 `node-forge` ve `braces` — GHSA-86w9-cpqp-85rv, GHSA-vfj7-8cjw-p6xm
+
+**Tarih:** 2026-10-05
+
+| Alan                | Değer                                                                                                      |
+| ------------------- | ---------------------------------------------------------------------------------------------------------- |
+| GHSA                | `GHSA-86w9-cpqp-85rv` — `node-forge` 1.4.0                                                                 |
+| GHSA                | `GHSA-vfj7-8cjw-p6xm` — `braces` 3.0.3                                                                     |
+| Neden düzeltilemedi | Her iki paket için yayınlanmış yama sürümü **yok**.                                                        |
+| Kapsam              | İkisi de yalnızca `expo` CLI geliştirme aracı ağacında; üretim çalışma zamanında (web imajı) bulunmuyorlar. |
+
+**Uygulama:** kök `package.json` → `pnpm.auditConfig.ignoreGhsas` listesine iki GHSA eklendi; eşik (`--audit-level=high`) ve kapsam (`--prod`) değişmedi. Yama yayınlandığında istisna kaldırılır (bkz. 10.1 gözden geçirme tarihi 2026-11-19 ile birlikte değerlendirilir).
+
 **İstisna kabul kriterleri (gelecekteki kararlar için kural):**
 
 1. Yayınlanmış bir düzeltme **yok** VEYA mevcut düzeltme bu projenin ekosistem kısıtları içinde (ör. major sürüm sıçraması, peer dependency çakışması) uygulanamıyor.

@@ -1,4 +1,4 @@
-<p align="center"><img src="apps/web/public/brand/sarmal-logo.svg" width="216" alt="sarmal logo: a single-centre rising spiral beside the lowercase sarmal logotype"></p>
+<p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="apps/web/public/brand/sarmal-logo-dark.svg"><img src="apps/web/public/brand/sarmal-logo.svg" width="216" alt="sarmal logo: a single-centre rising spiral beside the lowercase sarmal logotype"></picture></p>
 
 # Sarmal
 
