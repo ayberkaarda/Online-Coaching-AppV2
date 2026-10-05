@@ -1,3 +1,5 @@
+<p align="center"><img src="apps/web/public/brand/sarmal-logo.svg" width="216" alt="sarmal logo: a single-centre rising spiral beside the lowercase sarmal logotype"></p>
+
 # Sarmal
 
 An online one-on-one fitness coaching platform: a coach manages clients' training, nutrition and progress data, and every AI-generated plan has to pass an explicit coach approval before it becomes a client's active program.
@@ -17,6 +19,16 @@ An online one-on-one fitness coaching platform: a coach manages clients' trainin
 _Sarmal_ is Turkish for _spiral_, and it names the thing the product is actually about. The coaching loop closes — coach assigns a plan, client trains, a report comes back, the coach responds — but a loop that closed onto itself would just be a circle, and training that returns exactly where it started is not progress. Each completed turn should start the next one a level higher. That is a spiral.
 
 The product's signature UI element is a **ring**, and it stays one: the ring on screen is a single turn of that spiral. It is governed by a single-meaning rule — the ring encodes loop state and nothing else, and decorative use (avatar frames, button ornaments, background patterns) is forbidden. The rule is written down in [ADR-0017](docs/adr/0017-imza-oge-halka.md), which also lists the exact three places a ring is allowed to appear. There is no "spiral chart" anywhere in the UI, and adding one would break the same rule.
+
+## Brand identity
+
+The visual identity is called **Kor & Kemik** ("ember & bone"), recorded in [ADR-0031](docs/adr/0031-kor-ve-kemik-kurumsal-kimlik.md); it supersedes the earlier "Demir & Tebeşir" direction of ADR-0015 and its cool purple-and-grey panel look. The idea behind it is _"the spiral turns; the axis rises"_: progressive overload repeats the same loop, some turns deliberately curl inward (deload, rest, coming back from injury), and the long axis is still progress.
+
+- **Symbol and logotype.** A single-centre Archimedean spiral whose outer end leaves along its tangent as a straight arm — no arrowhead, no chart, stairs or arrow "growth" imagery. It ships in three optical sizes (48 / 24 / 16) that drop turns rather than thicken the stroke, next to a lowercase `sarmal` logotype. Assets: [`apps/web/public/brand/`](apps/web/public/brand/).
+- **Colour.** Warm neutrals only — no purple, no pure grey. Light theme on **Kemik** `#F5F2EC`, dark theme on **Gece** `#121110`, and **Kor** `#B63D0B` (light) / `#FF8A4C` (dark) as the single accent: primary action, active tab, progress ring, PR moment — at most one filled Kor element per screen. A teal _Su_ (`#0E6E78` / `#4CC3CF`) is the second data series.
+- **Type.** Bricolage Grotesque for display, headings and big numbers; Instrument Sans for interface text; JetBrains Mono for data (sets, reps, kg, tables). Turkish glyphs (İ ı Ş ş Ğ ğ Ç ç Ö ö Ü ü) are checked in the delivered font files.
+- **Shape and motion.** 4px grid, 10 / 16 / 24 / 999 radii, one restrained shadow, no glassmorphism or decorative gradients, Lucide icons on both platforms. Motion describes state changes; reward motion is reserved for logged sets and personal records, and reduced-motion preferences are honoured.
+- **Parity.** Web and mobile share one named token contract (`apps/web/src/design/tokens.ts` ↔ `apps/mobile/lib/palette.ts`), and contrast plus web–mobile palette equality are tested.
 
 ## What it is
 
@@ -133,8 +145,8 @@ flowchart TD
 ```
 
 <p align="center">
-  <img width="250" src="docs/screenshots/tur2-periodization.png" alt="Periodization screen: mesocycle overview with per-exercise %1RM target percentages and the deload week flagged">
-  <img width="250" src="docs/screenshots/tur2-offline-pending.png" alt="Airplane mode: two sets logged offline, queued behind a 'Senkron bekliyor (2)' badge">
+  <img width="250" src="docs/screenshots/tur2-periodization.png" alt="Periodization screen in the Kor &amp; Kemik identity: the 'Hipertrofi Bloğu 1' mesocycle with its week-6 deload flagged, above the weekly plan">
+  <img width="250" src="docs/screenshots/tur2-offline-pending.png" alt="Airplane mode: three sets in the session, the two logged offline queued behind a 'Senkron bekliyor (2)' badge">
   <img width="250" src="docs/screenshots/tur2-offline-synced.png" alt="Same screen after reconnecting: the sync queue flushed and the pending badge cleared">
 </p>
 
@@ -164,9 +176,9 @@ Full list and rationale: [`docs/mobile/sync-protocol.md`](docs/mobile/sync-proto
 
 ## Screenshots
 
-The frames are generated automatically against **demo accounts** on the local Supabase stack (`supabase/seed.sql` — coach `coach@example.com`, client `client2@example.com`): [`scripts/capture-screenshots.mjs`](scripts/capture-screenshots.mjs) signs in with Playwright, raises the coach session to `aal2` with a real TOTP code, and writes a fixed 1440×900 desktop frame (scaled to 0.75 for file size, 1080×675 PNG) into `docs/screenshots/`. The script is **not** a test and is not wired into CI — it is run by hand when the UI changes (`node scripts/capture-screenshots.mjs [--only=<frame>]`). Every name, e-mail and measurement visible is seed data; no real personal data is involved. The UI is in Turkish.
+The frames are generated automatically against **demo accounts** on the local Supabase stack (`supabase/seed.sql` — coach `coach@example.com`, client `client2@example.com`): [`scripts/capture-screenshots.mjs`](scripts/capture-screenshots.mjs) signs in with Playwright, raises the coach session to `aal2` with a real TOTP code, and writes a fixed 1440×900 desktop frame (scaled to 0.75 for file size, 1080×675 PNG) into `docs/screenshots/`. The script is **not** a test and is not wired into CI — it is run by hand when the UI changes (`node scripts/capture-screenshots.mjs [--only=<frame>]`). Every name, e-mail and measurement visible is seed data; no real personal data is involved. The UI is in Turkish, and every frame shows the current Kor & Kemik identity (light theme; see [Brand identity](#brand-identity)).
 
-![Coach panel showing the selected client's summary: macro intake over the last 14 days and a day-level activity summary](docs/screenshots/coach-panel.png)
+![Coach panel showing the selected client's summary: 90-day weight trend, macro intake over the last 14 days and a day-level activity summary](docs/screenshots/coach-panel.png)
 
 **The coach's view stops at day precision.** The summary shows a date and how many tab views / sign-ins happened that day, with **no hour or minute stamp anywhere** — that limit comes from the `coach_activity_summary()` RPC signature, not from what this page chose to render. Opening the page at all requires an `aal2` coach session; an `aal1` coach sees the same layout filled with empty data.
 
@@ -632,7 +644,7 @@ apps/
     src/components/activity/  ActivityConsent, ClientActivityLog, CoachActivitySummary
     src/components/progress/  ProgressPhotos, BeforeAfterSlider
     src/components/workout/   GymMode
-    src/design/tokens.ts      light/dark design tokens (ADR-0015)
+    src/design/tokens.ts      light/dark design tokens (ADR-0031)
     src/lib/                  supabase/, api/ (proxy, rate limit, quota), security/,
                               logger.ts (pino branch), notifier.ts
     src/env.{shared,server}.ts  zod env validation + the hosted target guard

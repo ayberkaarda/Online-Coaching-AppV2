@@ -342,6 +342,12 @@ async function captureCoachPanel(page) {
   const drawer = page.getByRole('dialog')
   await drawer.waitFor({ state: 'visible' })
   await drawer.getByText('Etkinlik Özeti', { exact: true }).waitFor({ state: 'visible' })
+  // Seed serisi sabit tarihlidir; zaman ilerledikçe varsayılan 30 günlük aralık
+  // onu dışarıda bırakır ve kilo trendi boş görünür. 90 gün, Gelişim karesiyle aynı.
+  await drawer
+    .getByRole('group', { name: 'Trend aralığı' })
+    .getByRole('button', { name: '90 gün', exact: true })
+    .click()
   await page.waitForLoadState('networkidle')
 
   // Etkinlik özeti kartının ALTI viewport'un altına hizalanır: üstte makro
@@ -354,6 +360,8 @@ async function captureCoachPanel(page) {
     )
     heading?.closest('div')?.scrollIntoView({ block: 'end' })
   })
+  // Tıklamadan kalan imleç kaydırma sonrası grafiğin üstüne düşüp tooltip açmasın.
+  await page.mouse.move(0, 0)
   await page.waitForTimeout(500)
   await dismissToasts(page)
   return shoot(page, 'coach-panel')
