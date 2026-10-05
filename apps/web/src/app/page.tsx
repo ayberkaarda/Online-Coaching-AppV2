@@ -85,7 +85,7 @@ export default function DashboardPage(): JSX.Element {
         aria-live="polite"
         className="flex min-h-screen items-center justify-center bg-canvas"
       >
-        <div className="animate-pulse text-xl font-bold tracking-widest text-accent">
+        <div className="text-xl font-bold tracking-widest text-accent">
           SİSTEM YÜKLENİYOR...
         </div>
       </div>

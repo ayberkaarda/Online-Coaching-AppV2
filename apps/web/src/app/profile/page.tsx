@@ -220,7 +220,7 @@ function BodyMetricsSection({ profile }: { profile: ProfileWithAvatar }): JSX.El
                     ? 'birth-date-age'
                     : undefined
               }
-              className="w-full rounded-control border border-border bg-canvas p-3 text-sm font-medium text-fg outline-none focus:border-accent"
+              className="w-full rounded-control border border-border-control bg-canvas p-3 text-sm font-medium text-fg outline-none focus:border-accent"
               {...registerMetric('birth_date')}
             />
             {metricErrors.birth_date ? (
@@ -251,7 +251,7 @@ function BodyMetricsSection({ profile }: { profile: ProfileWithAvatar }): JSX.El
               autoComplete="off"
               aria-invalid={metricErrors.height_cm ? 'true' : 'false'}
               aria-describedby={metricErrors.height_cm ? 'height-cm-error' : undefined}
-              className="w-full rounded-control border border-border bg-canvas p-3 text-sm font-medium text-fg outline-none focus:border-accent"
+              className="w-full rounded-control border border-border-control bg-canvas p-3 text-sm font-medium text-fg outline-none focus:border-accent"
               {...registerMetric('height_cm')}
             />
             {metricErrors.height_cm ? (
@@ -334,7 +334,7 @@ function DeleteAccountSection(): JSX.Element {
   return (
     <section
       aria-labelledby="delete-account-heading"
-      className="mt-8 rounded-card border-2 border-danger/30 bg-danger/60 p-6"
+      className="mt-8 rounded-card border-2 border-danger/30 bg-surface p-6"
     >
       <h2
         id="delete-account-heading"
@@ -344,7 +344,7 @@ function DeleteAccountSection(): JSX.Element {
         Hesabımı Sil
       </h2>
 
-      <p className="text-sm font-medium leading-relaxed text-danger/90">
+      <p className="text-sm font-medium leading-relaxed text-danger">
         Hesabınızı sildiğinizde <strong>geri dönüşü yoktur</strong>. Şunların tamamı kalıcı olarak
         silinir: profiliniz, antrenman ve beslenme programlarınız, antrenman ve öğün kayıtlarınız,
         günlük takipleriniz, ilerleme ölçümleriniz, form check ve ilerleme fotoğraflarınız,
@@ -356,7 +356,7 @@ function DeleteAccountSection(): JSX.Element {
         <button
           type="button"
           onClick={() => setIsArmed(true)}
-          className="mt-4 inline-flex items-center gap-2 rounded-control border-2 border-danger px-5 py-3 text-sm font-bold text-danger transition-colors hover:bg-danger/90 hover:text-surface"
+          className="mt-4 inline-flex items-center gap-2 rounded-control border-2 border-danger px-5 py-3 text-sm font-bold text-danger transition-colors hover:bg-surface-sunken"
         >
           <Trash2 aria-hidden="true" className="h-4 w-4 shrink-0" />
           Hesabımı Sil
@@ -365,7 +365,7 @@ function DeleteAccountSection(): JSX.Element {
         <div className="mt-4 space-y-3">
           <label htmlFor="delete-confirmation" className="block text-sm font-bold text-danger">
             Onaylamak için aşağıdaki kutuya{' '}
-            <code className="rounded bg-danger/15 px-1.5 py-0.5 font-mono text-danger">
+            <code className="rounded bg-surface-sunken px-1.5 py-0.5 font-mono text-danger">
               {DELETE_ACCOUNT_CONFIRMATION}
             </code>{' '}
             yazın
@@ -382,9 +382,9 @@ function DeleteAccountSection(): JSX.Element {
             autoCorrect="off"
             spellCheck={false}
             aria-describedby="delete-confirmation-hint"
-            className="w-full max-w-sm rounded-control border-2 border-danger/40 bg-surface p-3 text-sm font-medium focus:border-danger focus:outline-none"
+            className="w-full max-w-sm rounded-control border-2 border-border-control bg-surface p-3 text-sm font-medium focus:border-danger focus:outline-none"
           />
-          <p id="delete-confirmation-hint" className="text-xs font-medium text-danger/80">
+          <p id="delete-confirmation-hint" className="text-xs font-medium text-danger">
             {isPhraseCorrect
               ? 'Onay metni doğru. Aşağıdaki düğmeye bastığınızda hesabınız kalıcı olarak silinecek.'
               : 'Silme düğmesi, onay metnini birebir yazana kadar etkinleşmez.'}

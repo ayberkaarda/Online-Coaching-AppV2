@@ -475,7 +475,7 @@ export default function MessagesTab({
           value={newMessage}
           onChange={(e) => setNewMessage(e.target.value)}
           placeholder="Mesajınızı yazın..."
-          className="flex-1 rounded-card border border-border bg-canvas p-3 text-sm text-fg placeholder:text-fg-muted focus:border-accent focus:outline-none"
+          className="flex-1 rounded-card border border-border-control bg-canvas p-3 text-sm text-fg placeholder:text-fg-muted focus:border-accent focus:outline-none"
         />
         <button
           type="submit"

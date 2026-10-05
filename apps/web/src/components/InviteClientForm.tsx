@@ -117,7 +117,7 @@ export function InviteClientForm(): JSX.Element {
             autoComplete="email"
             aria-invalid={errors.email ? 'true' : 'false'}
             aria-describedby={errors.email ? 'invite-client-email-error' : undefined}
-            className="w-full rounded-control border border-border bg-canvas p-3 text-sm text-fg focus:border-accent focus:outline-none"
+            className="w-full rounded-control border border-border-control bg-canvas p-3 text-sm text-fg focus:border-accent focus:outline-none"
             placeholder="danisan@ornek.com"
             {...register('email')}
           />
@@ -143,7 +143,7 @@ export function InviteClientForm(): JSX.Element {
             id="invite-client-full-name"
             type="text"
             autoComplete="name"
-            className="w-full rounded-control border border-border bg-canvas p-3 text-sm text-fg focus:border-accent focus:outline-none"
+            className="w-full rounded-control border border-border-control bg-canvas p-3 text-sm text-fg focus:border-accent focus:outline-none"
             placeholder="Ayşe Yılmaz"
             {...register('full_name')}
           />

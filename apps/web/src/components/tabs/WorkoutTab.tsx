@@ -600,7 +600,7 @@ export default function WorkoutTab({
                   {...register('split_type')}
                   defaultValue=""
                   aria-invalid={errors.split_type ? 'true' : 'false'}
-                  className="w-full rounded-control border border-border bg-canvas p-3 text-sm font-semibold text-fg outline-none focus:border-accent"
+                  className="w-full rounded-control border border-border-control bg-canvas p-3 text-sm font-semibold text-fg outline-none focus:border-accent"
                 >
                   <option value="">Şablon Seçin...</option>
                   <option value="ppl_torso_limbs">PPL + Torso + Limbs (5 Günlük)</option>
@@ -623,7 +623,7 @@ export default function WorkoutTab({
                   placeholder="Yaş"
                   {...register('age')}
                   aria-invalid={errors.age ? 'true' : 'false'}
-                  className="w-full rounded-control border border-border bg-canvas p-3 text-sm text-fg outline-none focus:border-accent"
+                  className="w-full rounded-control border border-border-control bg-canvas p-3 text-sm text-fg outline-none focus:border-accent"
                 />
                 {errors.age ? (
                   <p role="alert" className="mt-1 text-[10px] font-bold text-danger">
@@ -641,7 +641,7 @@ export default function WorkoutTab({
                   placeholder="Kilo (kg)"
                   {...register('weight')}
                   aria-invalid={errors.weight ? 'true' : 'false'}
-                  className="w-full rounded-control border border-border bg-canvas p-3 text-sm text-fg outline-none focus:border-accent"
+                  className="w-full rounded-control border border-border-control bg-canvas p-3 text-sm text-fg outline-none focus:border-accent"
                 />
                 {errors.weight ? (
                   <p role="alert" className="mt-1 text-[10px] font-bold text-danger">
@@ -683,7 +683,7 @@ export default function WorkoutTab({
                 id="ai-workout-prompt"
                 {...register('user_prompt')}
                 placeholder="Örn: Çarşamba dinlenme. Sadece dumbell kullanacağım..."
-                className="min-h-[60px] w-full rounded-control border border-border bg-canvas p-3 text-xs text-fg outline-none focus:border-accent"
+                className="min-h-[60px] w-full rounded-control border border-border-control bg-canvas p-3 text-xs text-fg outline-none focus:border-accent"
               />
             </div>
           </div>
@@ -794,7 +794,7 @@ export default function WorkoutTab({
               placeholder="Hareket Ara (Örn: Incline...)"
               value={recommenderFilter}
               onChange={(e) => setRecommenderFilter(e.target.value)}
-              className="mb-4 w-full rounded-control border border-border bg-canvas p-2.5 text-xs text-fg outline-none focus:border-accent"
+              className="mb-4 w-full rounded-control border border-border-control bg-canvas p-2.5 text-xs text-fg outline-none focus:border-accent"
             />
 
             <label htmlFor="exercise-target-day" className="sr-only">
@@ -804,7 +804,7 @@ export default function WorkoutTab({
               id="exercise-target-day"
               value={keyboardTargetDay}
               onChange={(e) => setKeyboardTargetDay(e.target.value as DayName)}
-              className="mb-4 w-full rounded-control border border-border bg-canvas p-2.5 text-xs text-fg outline-none focus:border-accent"
+              className="mb-4 w-full rounded-control border border-border-control bg-canvas p-2.5 text-xs text-fg outline-none focus:border-accent"
             >
               {DAYS.map((d) => (
                 <option key={d} value={d}>

@@ -173,7 +173,7 @@ function ProgressEntryForm({ clientId }: { clientId: string }): JSX.Element {
             value={entryDate}
             max={todayIsoDate()}
             onChange={(e) => setEntryDate(e.target.value)}
-            className="w-full rounded-control border border-border bg-canvas p-2.5 text-sm text-fg outline-none focus:border-accent"
+            className="w-full rounded-control border border-border-control bg-canvas p-2.5 text-sm text-fg outline-none focus:border-accent"
           />
         </div>
 
@@ -193,7 +193,7 @@ function ProgressEntryForm({ clientId }: { clientId: string }): JSX.Element {
               step={0.1}
               value={draft[metric.key]}
               onChange={(e) => setDraft((prev) => ({ ...prev, [metric.key]: e.target.value }))}
-              className="w-full rounded-control border border-border bg-canvas p-2.5 text-sm text-fg outline-none focus:border-accent"
+              className="w-full rounded-control border border-border-control bg-canvas p-2.5 text-sm text-fg outline-none focus:border-accent"
             />
           </div>
         ))}
@@ -211,7 +211,7 @@ function ProgressEntryForm({ clientId }: { clientId: string }): JSX.Element {
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           placeholder="Örn: sabah aç karnına ölçüldü"
-          className="min-h-[70px] w-full rounded-control border border-border bg-canvas p-2.5 text-sm text-fg outline-none focus:border-accent"
+          className="min-h-[70px] w-full rounded-control border border-border-control bg-canvas p-2.5 text-sm text-fg outline-none focus:border-accent"
         />
       </div>
 
@@ -415,7 +415,7 @@ export default function StatsTab({
             id="progress-metric"
             value={metricKey}
             onChange={(e) => setMetricKey(e.target.value as ProgressMetricKey)}
-            className="rounded-control border border-border bg-surface p-2 text-xs font-bold text-fg outline-none focus:border-accent"
+            className="rounded-control border border-border-control bg-surface p-2 text-xs font-bold text-fg outline-none focus:border-accent"
           >
             {PROGRESS_METRICS.map((item) => (
               <option key={item.key} value={item.key}>

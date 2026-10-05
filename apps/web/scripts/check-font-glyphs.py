@@ -20,20 +20,28 @@ for f in faces:
     w = re.search(r'font-weight:\s*(\d+)', f).group(1)
     url = re.search(r'url\(([^)]+)\)', f).group(1).strip('\'"')
     groups[(fam, w)].append(url)
-ok = True
+ok = bool(groups)
+if not groups:
+    print('HATA: Kontrol edilecek font bulunamadı.', file=sys.stderr)
 for (fam, w), urls in sorted(groups.items()):
     cmap = set()
     feats = set()
     for u in urls:
         path = NEXT / u.split('/_next/')[-1]
+        if not path.is_file():
+            print(f'HATA: Font bulunamadı: {path}', file=sys.stderr)
+            ok = False
+            continue
         font = TTFont(str(path))
         cmap |= set(font.getBestCmap().keys())
         if 'GSUB' in font and font['GSUB'].table.FeatureList:
             feats |= {fr.FeatureTag for fr in font['GSUB'].table.FeatureList.FeatureRecord}
     missing = [f'U+{c:04X}' for c in REQ if c not in cmap]
     tnum = 'tnum' in feats
+    # JetBrains Mono zaten eş aralıklıdır; bu ailede tnum beklenmez.
+    requires_tnum = 'jetbrainsmono' not in re.sub(r'[^a-z]', '', fam.lower())
     status = 'OK' if not missing else 'EKSIK ' + ','.join(missing)
-    if missing:
+    if missing or (requires_tnum and not tnum):
         ok = False
     print(f'{fam:40s} {w}  dosya={len(urls)}  turkce={status}  tnum={"var" if tnum else "yok"}')
 sys.exit(0 if ok else 1)

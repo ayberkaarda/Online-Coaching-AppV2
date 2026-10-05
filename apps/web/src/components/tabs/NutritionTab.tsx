@@ -326,7 +326,7 @@ function CoachTargetEditor({ clientId }: { clientId: string }): JSX.Element {
               placeholder={placeholder}
               value={draft[key]}
               onChange={(e) => setDraft((prev) => ({ ...prev, [key]: e.target.value }))}
-              className="w-full rounded-control border border-border bg-canvas p-2.5 text-sm text-fg outline-none focus:border-accent"
+              className="w-full rounded-control border border-border-control bg-canvas p-2.5 text-sm text-fg outline-none focus:border-accent"
             />
           </div>
         ))}
@@ -507,7 +507,7 @@ function ClientMealSection({ clientId, logs, foodDB }: ClientMealSectionProps): 
             value={assistFood}
             onChange={(e) => setAssistFood(e.target.value)}
             placeholder="Katalogdan besin ara..."
-            className="w-full rounded-control border border-border bg-canvas p-2.5 text-sm text-fg outline-none focus:border-accent"
+            className="w-full rounded-control border border-border-control bg-canvas p-2.5 text-sm text-fg outline-none focus:border-accent"
           />
           <datalist id="nutrition-log-food-options">
             {foodDB.map((food) => (
@@ -528,7 +528,7 @@ function ClientMealSection({ clientId, logs, foodDB }: ClientMealSectionProps): 
             min={0}
             value={assistGrams}
             onChange={(e) => setAssistGrams(e.target.value)}
-            className="w-full rounded-control border border-border bg-canvas p-2.5 text-sm text-fg outline-none focus:border-accent"
+            className="w-full rounded-control border border-border-control bg-canvas p-2.5 text-sm text-fg outline-none focus:border-accent"
           />
         </div>
         <button
@@ -552,7 +552,7 @@ function ClientMealSection({ clientId, logs, foodDB }: ClientMealSectionProps): 
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           placeholder="Örn: Izgara tavuk + pilav"
-          className="w-full rounded-control border border-border bg-canvas p-2.5 text-sm text-fg outline-none focus:border-accent"
+          className="w-full rounded-control border border-border-control bg-canvas p-2.5 text-sm text-fg outline-none focus:border-accent"
         />
       </div>
 
@@ -570,7 +570,7 @@ function ClientMealSection({ clientId, logs, foodDB }: ClientMealSectionProps): 
             min={0}
             value={kcal}
             onChange={(e) => setKcal(e.target.value)}
-            className="w-full rounded-control border border-border bg-canvas p-2.5 text-sm text-fg outline-none focus:border-accent"
+            className="w-full rounded-control border border-border-control bg-canvas p-2.5 text-sm text-fg outline-none focus:border-accent"
           />
         </div>
         <div>
@@ -586,7 +586,7 @@ function ClientMealSection({ clientId, logs, foodDB }: ClientMealSectionProps): 
             min={0}
             value={protein}
             onChange={(e) => setProtein(e.target.value)}
-            className="w-full rounded-control border border-border bg-canvas p-2.5 text-sm text-fg outline-none focus:border-accent"
+            className="w-full rounded-control border border-border-control bg-canvas p-2.5 text-sm text-fg outline-none focus:border-accent"
           />
         </div>
         <div>
@@ -602,7 +602,7 @@ function ClientMealSection({ clientId, logs, foodDB }: ClientMealSectionProps): 
             min={0}
             value={carb}
             onChange={(e) => setCarb(e.target.value)}
-            className="w-full rounded-control border border-border bg-canvas p-2.5 text-sm text-fg outline-none focus:border-accent"
+            className="w-full rounded-control border border-border-control bg-canvas p-2.5 text-sm text-fg outline-none focus:border-accent"
           />
         </div>
         <div>
@@ -618,7 +618,7 @@ function ClientMealSection({ clientId, logs, foodDB }: ClientMealSectionProps): 
             min={0}
             value={fat}
             onChange={(e) => setFat(e.target.value)}
-            className="w-full rounded-control border border-border bg-canvas p-2.5 text-sm text-fg outline-none focus:border-accent"
+            className="w-full rounded-control border border-border-control bg-canvas p-2.5 text-sm text-fg outline-none focus:border-accent"
           />
         </div>
       </div>
@@ -942,7 +942,7 @@ export default function NutritionTab({
                 placeholder="Yaş"
                 {...register('age')}
                 aria-invalid={errors.age ? 'true' : 'false'}
-                className="w-full rounded-control border border-border bg-canvas p-3 text-xs text-fg outline-none focus:border-accent"
+                className="w-full rounded-control border border-border-control bg-canvas p-3 text-xs text-fg outline-none focus:border-accent"
               />
               {errors.age ? (
                 <p role="alert" className="mt-1 text-[10px] font-bold text-danger">
@@ -960,7 +960,7 @@ export default function NutritionTab({
                 placeholder="Boy (cm)"
                 {...register('height_cm')}
                 aria-invalid={errors.height_cm ? 'true' : 'false'}
-                className="w-full rounded-control border border-border bg-canvas p-3 text-xs text-fg outline-none focus:border-accent"
+                className="w-full rounded-control border border-border-control bg-canvas p-3 text-xs text-fg outline-none focus:border-accent"
               />
               {errors.height_cm ? (
                 <p role="alert" className="mt-1 text-[10px] font-bold text-danger">
@@ -978,7 +978,7 @@ export default function NutritionTab({
                 placeholder="Kilo (kg)"
                 {...register('weight_kg')}
                 aria-invalid={errors.weight_kg ? 'true' : 'false'}
-                className="w-full rounded-control border border-border bg-canvas p-3 text-xs text-fg outline-none focus:border-accent"
+                className="w-full rounded-control border border-border-control bg-canvas p-3 text-xs text-fg outline-none focus:border-accent"
               />
               {errors.weight_kg ? (
                 <p role="alert" className="mt-1 text-[10px] font-bold text-danger">
@@ -993,7 +993,7 @@ export default function NutritionTab({
               <select
                 id="ai-diet-gender"
                 {...register('gender')}
-                className="w-full rounded-control border border-border bg-canvas p-3 text-xs text-fg outline-none focus:border-accent"
+                className="w-full rounded-control border border-border-control bg-canvas p-3 text-xs text-fg outline-none focus:border-accent"
               >
                 <option value="male">Erkek</option>
                 <option value="female">Kadın</option>
@@ -1006,7 +1006,7 @@ export default function NutritionTab({
               <select
                 id="ai-diet-steps"
                 {...register('steps')}
-                className="w-full rounded-control border border-border bg-canvas p-3 text-xs text-fg outline-none focus:border-accent"
+                className="w-full rounded-control border border-border-control bg-canvas p-3 text-xs text-fg outline-none focus:border-accent"
               >
                 <option value={4000}>&lt; 5.000 Adım (Masa Başı)</option>
                 <option value={6500}>5.000 - 8.000 Adım</option>
@@ -1039,7 +1039,7 @@ export default function NutritionTab({
               id="ai-diet-prompt"
               {...register('user_prompt')}
               placeholder="Örn: Yulaf ve tavuk yemem alternatif öner. Yağı zeytinyağı + kuruyemiş olarak ayarla..."
-              className="min-h-[90px] w-full rounded-control border border-border bg-canvas p-3 text-xs text-fg outline-none focus:border-accent"
+              className="min-h-[90px] w-full rounded-control border border-border-control bg-canvas p-3 text-xs text-fg outline-none focus:border-accent"
             />
             <div className="flex items-center gap-3">
               {targetCalories > 0 && (
@@ -1084,7 +1084,7 @@ export default function NutritionTab({
             id="quick-add-day"
             value={quickAddDay}
             onChange={(e) => setQuickAddDay(e.target.value as DayName)}
-            className="w-full rounded-control border border-border bg-surface p-2.5 text-sm text-fg outline-none"
+            className="w-full rounded-control border border-border-control bg-surface p-2.5 text-sm text-fg outline-none"
           >
             {DAYS.map((d) => (
               <option key={d} value={d}>
@@ -1117,7 +1117,7 @@ export default function NutritionTab({
               setActiveIndex(-1)
             }}
             onKeyDown={handleSearchKeyDown}
-            className="w-full rounded-control border border-border bg-surface p-2.5 text-sm text-fg outline-none focus:border-accent"
+            className="w-full rounded-control border border-border-control bg-surface p-2.5 text-sm text-fg outline-none focus:border-accent"
           />
           {isListOpen && (
             <div
@@ -1161,7 +1161,7 @@ export default function NutritionTab({
             type="number"
             value={quickAddGrams}
             onChange={(e) => setQuickAddGrams(e.target.value)}
-            className="w-full rounded-control border border-border bg-surface p-2.5 text-sm text-fg outline-none focus:border-accent"
+            className="w-full rounded-control border border-border-control bg-surface p-2.5 text-sm text-fg outline-none focus:border-accent"
           />
         </div>
 
@@ -1219,7 +1219,7 @@ export default function NutritionTab({
                       value={nutritionData[day].items}
                       onChange={(e) => handleManualNutritionChange(day, e.target.value)}
                       placeholder="Manuel de yazabilirsiniz..."
-                      className="w-full rounded-control border border-transparent bg-transparent p-2 text-fg outline-none transition-all hover:border-border focus:border-accent"
+                      className="w-full rounded-control border border-transparent bg-transparent p-2 text-fg outline-none transition-all hover:border-border-control focus:border-accent"
                     />
                   </td>
                   <td className="p-3 font-bold text-accent">

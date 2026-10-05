@@ -336,7 +336,7 @@ export default function GymMode({
                     type="number"
                     value={weight}
                     onChange={(e) => onWeightChange(e.target.value)}
-                    className="w-full rounded-control border-2 border-border bg-surface p-4 text-center font-mono text-lg font-bold tabular-nums text-fg outline-none focus:border-accent"
+                    className="w-full rounded-control border-2 border-border-control bg-surface p-4 text-center font-mono text-lg font-bold tabular-nums text-fg outline-none focus:border-accent"
                   />
                 </div>
                 <div className="flex-1">
@@ -352,7 +352,7 @@ export default function GymMode({
                     value={reps}
                     onChange={(e) => onRepsChange(e.target.value)}
                     placeholder={currentExercise.reps.toString()}
-                    className="w-full rounded-control border-2 border-border bg-surface p-4 text-center font-mono text-lg font-bold tabular-nums text-fg outline-none focus:border-accent"
+                    className="w-full rounded-control border-2 border-border-control bg-surface p-4 text-center font-mono text-lg font-bold tabular-nums text-fg outline-none focus:border-accent"
                   />
                 </div>
               </div>

@@ -57,7 +57,7 @@ export function Button({
   const pressProgress = useSharedValue(0)
 
   const pressedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: 1 - pressProgress.value * (1 - PRESS_SCALE) }],
+    transform: reducedMotion ? [] : [{ scale: 1 - pressProgress.value * (1 - PRESS_SCALE) }],
     opacity: 1 - pressProgress.value * 0.15,
   }))
 

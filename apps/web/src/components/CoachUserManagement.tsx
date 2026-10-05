@@ -385,7 +385,7 @@ export function CoachUserManagement({ clients }: CoachUserManagementProps): JSX.
                       }
                       placeholder="Geri bildiriminizi yazın..."
                       rows={2}
-                      className="w-full rounded-control border border-border bg-canvas p-2 text-sm text-fg focus:border-accent focus:outline-none"
+                      className="w-full rounded-control border border-border-control bg-canvas p-2 text-sm text-fg focus:border-accent focus:outline-none"
                     />
                     <button
                       type="button"
@@ -802,11 +802,11 @@ export function CoachUserManagement({ clients }: CoachUserManagementProps): JSX.
                                 loading="lazy"
                                 className="h-full w-full object-cover"
                               />
-                              <div className="absolute bottom-0 left-0 w-full bg-black/70 p-4">
+                              <div className="absolute bottom-0 left-0 w-full bg-surface-sunken p-4">
                                 <span className="rounded bg-fg px-2 py-1 text-xs font-bold uppercase tracking-[0.06em] text-canvas">
                                   Before
                                 </span>
-                                <p className="mt-1 font-bold text-white">
+                                <p className="mt-1 font-bold text-fg">
                                   {beforePose.current_weight} kg
                                 </p>
                               </div>

@@ -158,7 +158,7 @@ export function ProgressPhotos({ clientId, readOnly }: ProgressPhotosProps): JSX
                 id="progress-photo-angle"
                 value={angle}
                 onChange={(event) => setAngle(event.target.value as ProgressPhotoAngle)}
-                className="w-full rounded-control border border-border bg-canvas p-2.5 text-sm text-fg outline-none focus:border-accent"
+                className="w-full rounded-control border border-border-control bg-canvas p-2.5 text-sm text-fg outline-none focus:border-accent"
               >
                 {PROGRESS_PHOTO_ANGLES.map((value) => (
                   <option key={value} value={value}>
@@ -231,7 +231,7 @@ export function ProgressPhotos({ clientId, readOnly }: ProgressPhotosProps): JSX
                   id="progress-photo-compare-angle"
                   value={compareAngle}
                   onChange={(event) => setCompareAngle(event.target.value as ProgressPhotoAngle)}
-                  className="rounded-control border border-border bg-canvas p-2 text-xs font-bold text-fg outline-none focus:border-accent"
+                  className="rounded-control border border-border-control bg-canvas p-2 text-xs font-bold text-fg outline-none focus:border-accent"
                 >
                   {PROGRESS_PHOTO_ANGLES.map((value) => (
                     <option key={value} value={value}>
@@ -256,7 +256,7 @@ export function ProgressPhotos({ clientId, readOnly }: ProgressPhotosProps): JSX
                       id="progress-photo-before"
                       value={beforeId ?? ''}
                       onChange={(event) => setBeforeOverride(event.target.value)}
-                      className="w-full rounded-control border border-border bg-canvas p-2 text-xs font-bold text-fg outline-none"
+                      className="w-full rounded-control border border-border-control bg-canvas p-2 text-xs font-bold text-fg outline-none"
                     >
                       {compareList.map((photo) => (
                         <option key={photo.id} value={photo.id}>
@@ -276,7 +276,7 @@ export function ProgressPhotos({ clientId, readOnly }: ProgressPhotosProps): JSX
                       id="progress-photo-after"
                       value={afterId ?? ''}
                       onChange={(event) => setAfterOverride(event.target.value)}
-                      className="w-full rounded-control border border-border bg-canvas p-2 text-xs font-bold text-fg outline-none"
+                      className="w-full rounded-control border border-border-control bg-canvas p-2 text-xs font-bold text-fg outline-none"
                     >
                       {compareList.map((photo) => (
                         <option key={photo.id} value={photo.id}>
