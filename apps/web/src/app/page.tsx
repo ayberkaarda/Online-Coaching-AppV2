@@ -15,6 +15,7 @@ import {
   useSession,
   useSignOut,
 } from '@repo/api-client'
+import { SarmalLogo } from '@/components/brand/SarmalMark'
 import { DashboardTabs } from '@/components/DashboardTabs'
 import { NotificationForm } from '@/components/NotificationForm'
 import { PassiveClientScreen } from '@/components/PassiveClientScreen'
@@ -82,9 +83,9 @@ export default function DashboardPage(): JSX.Element {
       <div
         role="status"
         aria-live="polite"
-        className="flex min-h-screen items-center justify-center bg-slate-50 dark:bg-[#0f0f12]"
+        className="flex min-h-screen items-center justify-center bg-canvas"
       >
-        <div className="animate-pulse text-xl font-black tracking-widest text-accent">
+        <div className="animate-pulse text-xl font-bold tracking-widest text-accent">
           SİSTEM YÜKLENİYOR...
         </div>
       </div>
@@ -118,13 +119,13 @@ export default function DashboardPage(): JSX.Element {
               aria-expanded={showNotifs}
               aria-haspopup="menu"
               aria-controls="notification-panel"
-              className="relative rounded-lg p-2 transition-all hover:bg-gray-100 dark:hover:bg-zinc-800"
+              className="relative rounded-lg p-2 transition-all hover:bg-surface-sunken"
             >
               <Bell aria-hidden="true" className="h-5 w-5" />
               {unreadCount > 0 && (
                 <span className="absolute right-1 top-1 flex h-3 w-3">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75"></span>
-                  <span className="relative inline-flex h-3 w-3 rounded-full bg-red-500"></span>
+                  <span className="absolute inline-flex h-full w-full rounded-full bg-danger opacity-75"></span>
+                  <span className="relative inline-flex h-3 w-3 rounded-full bg-danger"></span>
                   <span className="sr-only">{unreadCount} okunmamış bildirim</span>
                 </span>
               )}
@@ -135,29 +136,25 @@ export default function DashboardPage(): JSX.Element {
                 id="notification-panel"
                 role="region"
                 aria-label="Gelen kutusu"
-                className="absolute left-0 top-12 w-80 overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-2xl dark:border-zinc-800 dark:bg-[#16161d]"
+                className="absolute left-0 top-12 w-80 overflow-hidden rounded-card border border-border bg-surface-raised shadow-raised"
               >
-                <div className="border-b bg-gray-50 p-4 text-sm font-bold dark:border-zinc-800 dark:bg-zinc-950">
-                  Gelen Kutusu
-                </div>
+                <div className="border-b bg-surface-sunken p-4 text-sm font-bold">Gelen Kutusu</div>
                 <div className="max-h-72 overflow-y-auto">
                   {notifList.length === 0 ? (
-                    <div className="p-6 text-center text-sm text-gray-500">
+                    <div className="p-6 text-center text-sm text-fg-muted">
                       Yeni bildiriminiz yok.
                     </div>
                   ) : (
                     notifList.map((notif) => (
                       <div
                         key={notif.id}
-                        className="border-b p-4 transition-colors hover:bg-gray-50 dark:border-zinc-800 dark:hover:bg-zinc-900"
+                        className="border-b p-4 transition-colors hover:bg-surface-sunken"
                       >
                         <h4 className="mb-1 text-sm font-bold text-accent">{notif.title}</h4>
-                        <p className="mb-3 text-xs text-gray-600 dark:text-gray-300">
-                          {notif.message}
-                        </p>
+                        <p className="mb-3 text-xs text-fg-muted">{notif.message}</p>
                         <button
                           onClick={() => markAsRead.mutate({ id: notif.id, userId })}
-                          className="flex items-center gap-1 text-xs font-bold text-emerald-500 hover:text-emerald-600"
+                          className="flex items-center gap-1 text-xs font-bold text-success hover:text-success"
                         >
                           ✓ Okundu İşaretle
                         </button>
@@ -194,7 +191,7 @@ export default function DashboardPage(): JSX.Element {
         <button
           onClick={handleLogout}
           aria-label="Çıkış Yap"
-          className="flex items-center gap-2 rounded-lg p-2 text-sm font-bold text-red-500 transition-all hover:bg-red-50 dark:hover:bg-red-500/10"
+          className="flex items-center gap-2 rounded-lg p-2 text-sm font-bold text-danger transition-all hover:bg-danger/10"
         >
           <LogOut aria-hidden="true" className="h-4 w-4" />{' '}
           <span className="hidden sm:inline">Çıkış Yap</span>
@@ -204,10 +201,10 @@ export default function DashboardPage(): JSX.Element {
       <ThemeToggle />
 
       <header className="mb-12 mt-12 space-y-2 text-center md:mt-0">
-        <h1 className="bg-gradient-to-r from-accent to-purple-400 bg-clip-text text-3xl font-black tracking-tight text-transparent md:text-5xl">
-          Sarmal
+        <h1 className="flex justify-center">
+          <SarmalLogo fontSize={39} />
         </h1>
-        <p className="text-sm font-medium uppercase tracking-widest text-gray-500 dark:text-gray-400 md:text-base">
+        <p className="text-sm font-medium text-fg-muted md:text-base">
           {role === 'coach' ? 'Koç Paneli' : 'Danışan Paneli'}
         </p>
       </header>

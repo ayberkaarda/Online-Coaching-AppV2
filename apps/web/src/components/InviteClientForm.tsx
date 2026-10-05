@@ -83,7 +83,7 @@ export function InviteClientForm(): JSX.Element {
       {inviteClient.isSuccess && (
         <div
           role="status"
-          className="mb-4 rounded-control border border-emerald-500/30 bg-emerald-500/10 p-4 text-sm font-bold text-emerald-600 dark:text-emerald-400"
+          className="mb-4 rounded-control border border-success/30 bg-success/10 p-4 text-sm font-bold text-success"
         >
           Davet e-postası gönderildi.
         </div>
@@ -92,7 +92,7 @@ export function InviteClientForm(): JSX.Element {
       {error && (
         <div
           role="alert"
-          className="mb-4 space-y-2 rounded-control border border-red-500/30 bg-red-500/10 p-4 text-sm font-bold text-red-600 dark:text-red-400"
+          className="mb-4 space-y-2 rounded-control border border-danger/30 bg-danger/10 p-4 text-sm font-bold text-danger"
         >
           <p>{isApiError ? (error as ApiError).message : GENERIC_ERROR_MESSAGE}</p>
           {isMfaRequired && (
@@ -107,7 +107,7 @@ export function InviteClientForm(): JSX.Element {
         <div>
           <label
             htmlFor="invite-client-email"
-            className="mb-1 block text-xs font-bold uppercase tracking-wider text-fg-muted"
+            className="mb-1 block text-xs font-bold uppercase tracking-[0.06em] text-fg-muted"
           >
             E-posta
           </label>
@@ -125,7 +125,7 @@ export function InviteClientForm(): JSX.Element {
             <p
               id="invite-client-email-error"
               role="alert"
-              className="mt-1 text-xs font-bold text-red-500"
+              className="mt-1 text-xs font-bold text-danger"
             >
               {errors.email.message}
             </p>
@@ -135,7 +135,7 @@ export function InviteClientForm(): JSX.Element {
         <div>
           <label
             htmlFor="invite-client-full-name"
-            className="mb-1 block text-xs font-bold uppercase tracking-wider text-fg-muted"
+            className="mb-1 block text-xs font-bold uppercase tracking-[0.06em] text-fg-muted"
           >
             Ad Soyad (opsiyonel)
           </label>

@@ -85,14 +85,10 @@ export default function DailyLogTab({
   return (
     <div className="animate-fadeIn space-y-6">
       {userRole === 'client' && (
-        <form
-          onSubmit={onSubmit}
-          noValidate
-          className="space-y-4 border-b pb-6 dark:border-zinc-800"
-        >
+        <form onSubmit={onSubmit} noValidate className="space-y-4 border-b pb-6">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label htmlFor="daily-water" className="mb-1 block text-xs font-bold text-gray-500">
+              <label htmlFor="daily-water" className="mb-1 block text-xs font-bold text-fg-muted">
                 SU (Litre)
               </label>
               <input
@@ -102,20 +98,20 @@ export default function DailyLogTab({
                 {...register('water_lt')}
                 aria-invalid={errors.water_lt ? 'true' : 'false'}
                 aria-describedby={errors.water_lt ? 'daily-water-error' : undefined}
-                className="w-full rounded-xl border p-3 outline-none focus:border-accent"
+                className="w-full rounded-control border p-3 outline-none focus:border-accent"
               />
               {errors.water_lt ? (
                 <p
                   id="daily-water-error"
                   role="alert"
-                  className="mt-1 text-xs font-bold text-red-500"
+                  className="mt-1 text-xs font-bold text-danger"
                 >
                   {errors.water_lt.message}
                 </p>
               ) : null}
             </div>
             <div>
-              <label htmlFor="daily-sodium" className="mb-1 block text-xs font-bold text-gray-500">
+              <label htmlFor="daily-sodium" className="mb-1 block text-xs font-bold text-fg-muted">
                 SODYUM (mg)
               </label>
               <input
@@ -124,13 +120,13 @@ export default function DailyLogTab({
                 {...register('sodium_mg')}
                 aria-invalid={errors.sodium_mg ? 'true' : 'false'}
                 aria-describedby={errors.sodium_mg ? 'daily-sodium-error' : undefined}
-                className="w-full rounded-xl border p-3 outline-none focus:border-accent"
+                className="w-full rounded-control border p-3 outline-none focus:border-accent"
               />
               {errors.sodium_mg ? (
                 <p
                   id="daily-sodium-error"
                   role="alert"
-                  className="mt-1 text-xs font-bold text-red-500"
+                  className="mt-1 text-xs font-bold text-danger"
                 >
                   {errors.sodium_mg.message}
                 </p>
@@ -150,13 +146,13 @@ export default function DailyLogTab({
                 {...register('protein')}
                 aria-invalid={errors.protein ? 'true' : 'false'}
                 aria-describedby={errors.protein ? 'daily-protein-error' : undefined}
-                className="w-full rounded-xl border p-3 outline-none"
+                className="w-full rounded-control border p-3 outline-none"
               />
               {errors.protein ? (
                 <p
                   id="daily-protein-error"
                   role="alert"
-                  className="mt-1 text-xs font-bold text-red-500"
+                  className="mt-1 text-xs font-bold text-danger"
                 >
                   {errors.protein.message}
                 </p>
@@ -173,13 +169,13 @@ export default function DailyLogTab({
                 {...register('carb')}
                 aria-invalid={errors.carb ? 'true' : 'false'}
                 aria-describedby={errors.carb ? 'daily-carb-error' : undefined}
-                className="w-full rounded-xl border p-3 outline-none"
+                className="w-full rounded-control border p-3 outline-none"
               />
               {errors.carb ? (
                 <p
                   id="daily-carb-error"
                   role="alert"
-                  className="mt-1 text-xs font-bold text-red-500"
+                  className="mt-1 text-xs font-bold text-danger"
                 >
                   {errors.carb.message}
                 </p>
@@ -196,14 +192,10 @@ export default function DailyLogTab({
                 {...register('fat')}
                 aria-invalid={errors.fat ? 'true' : 'false'}
                 aria-describedby={errors.fat ? 'daily-fat-error' : undefined}
-                className="w-full rounded-xl border p-3 outline-none"
+                className="w-full rounded-control border p-3 outline-none"
               />
               {errors.fat ? (
-                <p
-                  id="daily-fat-error"
-                  role="alert"
-                  className="mt-1 text-xs font-bold text-red-500"
-                >
+                <p id="daily-fat-error" role="alert" className="mt-1 text-xs font-bold text-danger">
                   {errors.fat.message}
                 </p>
               ) : null}
@@ -214,7 +206,7 @@ export default function DailyLogTab({
             type="submit"
             disabled={isSaving}
             aria-busy={isSaving}
-            className="w-full rounded-xl bg-accent py-3 font-bold text-white shadow-lg disabled:opacity-50"
+            className="w-full rounded-control bg-accent py-3 font-bold text-accent-fg disabled:opacity-50"
           >
             Antrenörüme Gönder
           </button>
@@ -228,14 +220,12 @@ export default function DailyLogTab({
       ) : (
         <>
           <div className="flex items-center justify-between">
-            <h4 className="font-bold text-gray-800 dark:text-zinc-200">
-              Rapor Geçmişi ve Makro Dağılımı
-            </h4>
+            <h4 className="font-bold text-fg">Rapor Geçmişi ve Makro Dağılımı</h4>
             {logs.length > 0 && (
               <button
                 type="button"
                 onClick={handleDownload}
-                className="flex items-center gap-1.5 rounded-lg bg-blue-500/10 px-3 py-1.5 text-xs font-bold text-blue-600"
+                className="flex items-center gap-1.5 rounded-lg bg-info/10 px-3 py-1.5 text-xs font-bold text-info"
               >
                 <FileSpreadsheet aria-hidden="true" className="h-3.5 w-3.5 shrink-0" /> Excel İndir
               </button>
@@ -261,34 +251,34 @@ export default function DailyLogTab({
                 return (
                   <div
                     key={log.id}
-                    className="rounded-3xl border bg-gray-50 p-5 text-sm shadow-sm hover:border-accent/30 dark:bg-zinc-950"
+                    className="rounded-card border bg-surface-sunken p-5 text-sm hover:border-accent/30"
                   >
                     <div className="mb-4 flex items-center justify-between">
                       <span className="font-bold">{formatDateTR(log.log_date)}</span>
                       {/* Sodyum için lucide setinde bir "tuzluk" ikonu yok; emoji
                           yerine düz metin etiket kullanılır (ADR-0016: ikon
                           bulunmuyorsa metne indirilir). */}
-                      <span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500/10 px-3 py-1 font-black text-emerald-500">
+                      <span className="inline-flex items-center gap-1.5 rounded-lg bg-success/10 px-3 py-1 font-bold text-success">
                         <Droplet aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
                         {log.water_lt}L | Sodyum {log.sodium_mg}mg
                       </span>
                     </div>
                     <div className="space-y-2">
                       <div className="flex justify-between text-xs font-bold">
-                        <span className="text-red-500">Pro: {log.macros.protein}g</span>
-                        <span className="text-blue-500">Karb: {log.macros.carb}g</span>
-                        <span className="text-yellow-500">Yağ: {log.macros.fat}g</span>
+                        <span className="text-danger">Pro: {log.macros.protein}g</span>
+                        <span className="text-info">Karb: {log.macros.carb}g</span>
+                        <span className="text-fg-muted">Yağ: {log.macros.fat}g</span>
                       </div>
                       <div
                         role="img"
                         aria-label={`Protein %${Math.round(percent.p)}, karbonhidrat %${Math.round(
                           percent.c
                         )}, yağ %${Math.round(percent.f)}`}
-                        className="flex h-3 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-zinc-800"
+                        className="flex h-3 w-full overflow-hidden rounded-full bg-border"
                       >
-                        <div style={{ width: `${percent.p}%` }} className="h-full bg-red-500" />
-                        <div style={{ width: `${percent.c}%` }} className="h-full bg-blue-500" />
-                        <div style={{ width: `${percent.f}%` }} className="h-full bg-yellow-500" />
+                        <div style={{ width: `${percent.p}%` }} className="h-full bg-danger" />
+                        <div style={{ width: `${percent.c}%` }} className="h-full bg-info" />
+                        <div style={{ width: `${percent.f}%` }} className="h-full bg-fg-muted" />
                       </div>
                     </div>
                   </div>

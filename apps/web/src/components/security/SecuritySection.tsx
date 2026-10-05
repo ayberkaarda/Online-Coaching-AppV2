@@ -52,7 +52,7 @@ function TotpCodeInput({
 }): JSX.Element {
   return (
     <div>
-      <label htmlFor={id} className="mb-1 block text-sm font-bold text-gray-800 dark:text-zinc-200">
+      <label htmlFor={id} className="mb-1 block text-sm font-bold text-fg">
         Kimlik doğrulayıcı uygulamadaki 6 haneli kod
       </label>
       <input
@@ -64,7 +64,7 @@ function TotpCodeInput({
         value={code}
         onChange={(event) => onCodeChange(normalizeTotpCode(event.target.value))}
         placeholder="123456"
-        className="w-full max-w-[12rem] rounded-xl border-2 border-gray-300 bg-gray-50 p-3 text-center font-mono text-lg tracking-[0.3em] focus:border-accent focus:outline-none dark:border-zinc-700 dark:bg-zinc-950"
+        className="w-full max-w-[12rem] rounded-control border-2 border-border-control bg-surface-sunken p-3 text-center font-mono text-lg tracking-[0.3em] focus:border-accent focus:outline-none"
       />
     </div>
   )
@@ -80,7 +80,7 @@ function EnrollFlow(): JSX.Element {
 
   return (
     <div className="space-y-4">
-      <p className="text-sm font-medium leading-relaxed text-gray-700 dark:text-gray-300">
+      <p className="text-sm font-medium leading-relaxed text-fg">
         Hesabınıza kimlik doğrulayıcı uygulama (Google Authenticator, 1Password, Authy vb.) ile
         ikinci bir güvenlik katmanı ekleyin.
       </p>
@@ -91,7 +91,7 @@ function EnrollFlow(): JSX.Element {
           onClick={() => enrollTotp.mutate()}
           disabled={enrollTotp.isPending}
           aria-busy={enrollTotp.isPending}
-          className="inline-flex items-center gap-2 rounded-xl bg-accent px-5 py-3 text-sm font-bold text-white transition-transform active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex items-center gap-2 rounded-control bg-accent px-5 py-3 text-sm font-bold text-accent-fg transition-transform active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50"
         >
           <ShieldCheck aria-hidden="true" className="h-4 w-4 shrink-0" />
           {enrollTotp.isPending ? 'Kurulum başlatılıyor...' : 'Kurulumu Başlat'}
@@ -103,26 +103,26 @@ function EnrollFlow(): JSX.Element {
             <img
               src={enrollment.qrDataUrl}
               alt="TOTP kurulum QR kodu"
-              className="h-40 w-40 shrink-0 rounded-xl border-2 border-gray-200 bg-white p-2 dark:border-zinc-700"
+              className="h-40 w-40 shrink-0 rounded-control border-2 border-border bg-white p-2"
             />
             <div className="w-full space-y-2">
-              <p className="text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+              <p className="text-xs font-bold uppercase tracking-[0.06em] text-fg-muted">
                 QR okutamıyorsanız bu kodu elle girin
               </p>
               <div className="flex flex-wrap items-center gap-2">
-                <code className="select-all break-all rounded-lg bg-gray-100 px-3 py-2 font-mono text-sm text-gray-900 dark:bg-zinc-900 dark:text-zinc-100">
+                <code className="select-all break-all rounded-lg bg-surface-sunken px-3 py-2 font-mono text-sm text-fg">
                   {enrollment.secret}
                 </code>
                 <button
                   type="button"
                   onClick={() => void copySecretToClipboard(enrollment.secret)}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 px-3 py-2 text-xs font-bold text-gray-700 transition-colors hover:bg-gray-100 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-xs font-bold text-fg transition-colors hover:bg-surface-sunken"
                 >
                   <Copy aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
                   Kopyala
                 </button>
               </div>
-              <p className="rounded-xl border-2 border-amber-300 bg-amber-50 p-3 text-xs font-bold leading-relaxed text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+              <p className="rounded-control border-2 border-warning/40 bg-warning/10 p-3 text-xs font-bold leading-relaxed text-warning">
                 Bu kod, kurtarma yolunun TAMAMIDIR: parola kasanıza kaydedin. Bunu sıfırlayan bir
                 sunucu ucu YOKTUR — böyle bir uç, hesabınız ele geçirilirse tüm danışanlarınızın
                 ikinci faktörünü tek hamlede yok eden bir devralma yüzeyi olurdu.
@@ -142,7 +142,7 @@ function EnrollFlow(): JSX.Element {
               }
               disabled={!isValidTotpCode(code) || verifyTotp.isPending}
               aria-busy={verifyTotp.isPending}
-              className="h-fit rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white transition-transform active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+              className="h-fit rounded-control bg-success px-5 py-3 text-sm font-bold text-surface transition-transform active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50"
             >
               {verifyTotp.isPending ? 'Doğrulanıyor...' : 'Doğrula ve Etkinleştir'}
             </button>
@@ -162,7 +162,7 @@ function StepUpFlow({ factor }: { factor: Factor }): JSX.Element {
     <div className="space-y-4">
       <div
         role="alert"
-        className="flex items-start gap-2 rounded-xl border-2 border-amber-300 bg-amber-50 p-3 text-sm font-bold text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200"
+        className="flex items-start gap-2 rounded-control border-2 border-warning/40 bg-warning/10 p-3 text-sm font-bold text-warning"
       >
         <ShieldAlert aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" />
         <span>
@@ -179,7 +179,7 @@ function StepUpFlow({ factor }: { factor: Factor }): JSX.Element {
           }
           disabled={!isValidTotpCode(code) || verifyTotp.isPending}
           aria-busy={verifyTotp.isPending}
-          className="h-fit rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white transition-transform active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+          className="h-fit rounded-control bg-success px-5 py-3 text-sm font-bold text-surface transition-transform active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50"
         >
           {verifyTotp.isPending ? 'Doğrulanıyor...' : 'Doğrula'}
         </button>
@@ -202,13 +202,13 @@ function FactorList({ factors }: { factors: Factor[] }): JSX.Element {
           return (
             <li
               key={factor.id}
-              className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-200 p-3 dark:border-zinc-800"
+              className="flex flex-wrap items-center justify-between gap-3 rounded-control border border-border p-3"
             >
               <div className="flex items-center gap-2">
                 <KeyRound aria-hidden="true" className="h-4 w-4 shrink-0 text-accent" />
                 <div>
-                  <p className="text-sm font-bold text-gray-800 dark:text-zinc-200">{label}</p>
-                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                  <p className="text-sm font-bold text-fg">{label}</p>
+                  <p className="text-xs font-medium text-fg-muted">
                     Eklendi: {new Date(factor.created_at).toLocaleString('tr-TR')}
                   </p>
                 </div>
@@ -219,16 +219,14 @@ function FactorList({ factors }: { factors: Factor[] }): JSX.Element {
                   type="button"
                   onClick={() => setArmedFactorId(factor.id)}
                   aria-label={`${label} faktörünü kaldır`}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-red-300 px-3 py-2 text-xs font-bold text-red-700 transition-colors hover:bg-red-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950/30"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-danger/40 px-3 py-2 text-xs font-bold text-danger transition-colors hover:bg-danger/10"
                 >
                   <Trash2 aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
                   Kaldır
                 </button>
               ) : (
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-xs font-bold text-red-700 dark:text-red-400">
-                    Emin misiniz?
-                  </span>
+                  <span className="text-xs font-bold text-danger">Emin misiniz?</span>
                   <button
                     type="button"
                     onClick={() => {
@@ -237,14 +235,14 @@ function FactorList({ factors }: { factors: Factor[] }): JSX.Element {
                     }}
                     disabled={unenrollFactor.isPending}
                     aria-busy={unenrollFactor.isPending}
-                    className="rounded-lg bg-red-600 px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="rounded-lg bg-danger px-3 py-2 text-xs font-bold text-surface transition-colors hover:bg-danger/90 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Evet, kaldır
                   </button>
                   <button
                     type="button"
                     onClick={() => setArmedFactorId(null)}
-                    className="rounded-lg border px-3 py-2 text-xs font-bold text-gray-700 transition-colors hover:bg-gray-100 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                    className="rounded-lg border px-3 py-2 text-xs font-bold text-fg transition-colors hover:bg-surface-sunken"
                   >
                     Vazgeç
                   </button>
@@ -255,7 +253,7 @@ function FactorList({ factors }: { factors: Factor[] }): JSX.Element {
         })}
       </ul>
 
-      <p className="rounded-xl border-2 border-amber-300 bg-amber-50 p-3 text-xs font-bold leading-relaxed text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+      <p className="rounded-control border-2 border-warning/40 bg-warning/10 p-3 text-xs font-bold leading-relaxed text-warning">
         Son faktörünüzü kaldırırsanız bir sonraki girişinizde koç verilerine erişemezsiniz; tekrar
         erişim için yeniden kayıt olmanız gerekir.
       </p>
@@ -277,12 +275,9 @@ export function SecuritySection(): JSX.Element {
   return (
     <section
       aria-labelledby="security-heading"
-      className="mt-8 rounded-2xl border-2 border-gray-200 bg-white p-6 dark:border-zinc-800 dark:bg-[#16161d]"
+      className="mt-8 rounded-card border-2 border-border bg-surface p-6"
     >
-      <h2
-        id="security-heading"
-        className="mb-3 flex items-center gap-2 text-lg font-bold text-gray-800 dark:text-zinc-200"
-      >
+      <h2 id="security-heading" className="mb-3 flex items-center gap-2 text-lg font-bold text-fg">
         <ShieldCheck aria-hidden="true" className="h-5 w-5 shrink-0 text-accent" />
         İki Adımlı Doğrulama (TOTP)
       </h2>

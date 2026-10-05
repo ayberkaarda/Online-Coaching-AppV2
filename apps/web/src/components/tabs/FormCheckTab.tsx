@@ -129,17 +129,15 @@ export default function FormCheckTab({
 
   return (
     <div className="animate-fadeIn space-y-6">
-      <div className="flex items-center justify-between border-b pb-3 dark:border-zinc-800">
-        <h4 className="text-lg font-bold text-gray-800 dark:text-zinc-200">
-          Form Geçmişi ve Kıyaslama
-        </h4>
+      <div className="flex items-center justify-between border-b pb-3">
+        <h4 className="text-lg font-bold text-fg">Form Geçmişi ve Kıyaslama</h4>
         {formChecks.length >= 2 && (
           <button
             type="button"
             onClick={() => setCompareMode(!compareMode)}
             aria-pressed={compareMode}
             className={`rounded-lg px-4 py-2 text-xs font-bold transition-all ${
-              compareMode ? 'bg-red-500 text-white' : 'bg-accent/10 text-accent hover:bg-accent/20'
+              compareMode ? 'bg-danger text-surface' : 'bg-accent/10 text-accent hover:bg-accent/20'
             }`}
           >
             {compareMode ? 'Kıyaslamayı Kapat' : 'Öncesi / Sonrası Yap'}
@@ -148,16 +146,12 @@ export default function FormCheckTab({
       </div>
 
       {userRole === 'client' && !compareMode && (
-        <form
-          onSubmit={onSubmit}
-          noValidate
-          className="space-y-4 border-b pb-6 dark:border-zinc-800"
-        >
+        <form onSubmit={onSubmit} noValidate className="space-y-4 border-b pb-6">
           <div className="flex flex-col gap-4 md:flex-row">
             <div className="w-full md:w-1/2">
               <label
                 htmlFor="formcheck-weight"
-                className="mb-1 block text-xs font-bold text-gray-500"
+                className="mb-1 block text-xs font-bold text-fg-muted"
               >
                 GÜNCEL KİLO (KG)
               </label>
@@ -168,13 +162,13 @@ export default function FormCheckTab({
                 {...register('weight')}
                 aria-invalid={errors.weight ? 'true' : 'false'}
                 aria-describedby={errors.weight ? 'formcheck-weight-error' : undefined}
-                className="w-full rounded-xl border border-gray-200 bg-gray-50 p-3 text-sm focus:border-accent focus:outline-none dark:border-zinc-800 dark:bg-zinc-950"
+                className="w-full rounded-control border border-border-control bg-surface-sunken p-3 text-sm focus:border-accent focus:outline-none"
               />
               {errors.weight ? (
                 <p
                   id="formcheck-weight-error"
                   role="alert"
-                  className="mt-1 text-xs font-bold text-red-500"
+                  className="mt-1 text-xs font-bold text-danger"
                 >
                   {errors.weight.message}
                 </p>
@@ -183,7 +177,7 @@ export default function FormCheckTab({
             <div className="w-full md:w-1/2">
               <label
                 htmlFor="formcheck-pose"
-                className="mb-1 block text-xs font-bold text-gray-500"
+                className="mb-1 block text-xs font-bold text-fg-muted"
               >
                 PODYUM FOTOĞRAFI
               </label>
@@ -198,13 +192,13 @@ export default function FormCheckTab({
                 onChange={handleFileChange}
                 aria-invalid={fileError ? 'true' : 'false'}
                 aria-describedby={fileError ? 'formcheck-pose-error' : undefined}
-                className="w-full cursor-pointer text-xs text-gray-500 transition-all file:mr-4 file:rounded-xl file:border-0 file:bg-accent/10 file:px-4 file:py-2.5 file:font-bold file:text-accent hover:file:bg-accent/20"
+                className="w-full cursor-pointer text-xs text-fg-muted transition-all file:mr-4 file:rounded-control file:border-0 file:bg-accent/10 file:px-4 file:py-2.5 file:font-bold file:text-accent hover:file:bg-accent/20"
               />
               {fileError ? (
                 <p
                   id="formcheck-pose-error"
                   role="alert"
-                  className="mt-1 text-xs font-bold text-red-500"
+                  className="mt-1 text-xs font-bold text-danger"
                 >
                   {fileError}
                 </p>
@@ -215,7 +209,7 @@ export default function FormCheckTab({
             type="submit"
             disabled={isUploading}
             aria-busy={isUploading}
-            className="w-full rounded-xl bg-accent py-3 text-sm font-bold text-white disabled:opacity-50"
+            className="w-full rounded-control bg-accent py-3 text-sm font-bold text-accent-fg disabled:opacity-50"
           >
             {isUploading ? 'Yükleniyor...' : 'Formu Antrenörüme Gönder'}
           </button>
@@ -237,11 +231,9 @@ export default function FormCheckTab({
           onRetry={() => void refetch()}
         >
           {compareMode ? (
-            <div className="flex flex-col gap-6 rounded-2xl border border-gray-200 bg-gray-50 p-6 dark:border-zinc-800 dark:bg-zinc-950 md:flex-row">
+            <div className="flex flex-col gap-6 rounded-card border border-border bg-surface-sunken p-6 md:flex-row">
               <div className="flex-1 space-y-3">
-                <span className="block border-b pb-2 text-center text-sm font-bold uppercase tracking-wide">
-                  Öncesi
-                </span>
+                <span className="block border-b pb-2 text-center text-sm font-bold">Öncesi</span>
                 <label htmlFor="formcheck-before" className="sr-only">
                   Öncesi kaydını seç
                 </label>
@@ -257,7 +249,7 @@ export default function FormCheckTab({
                     </option>
                   ))}
                 </select>
-                <div className="relative aspect-[3/4] w-full overflow-hidden rounded-2xl border-4 border-gray-200 shadow-lg dark:border-zinc-800">
+                <div className="relative aspect-[3/4] w-full overflow-hidden rounded-card border-4 border-border">
                   {beforeCheck?.frontPoseSignedUrl ? (
                     <img
                       src={beforeCheck.frontPoseSignedUrl}
@@ -274,7 +266,7 @@ export default function FormCheckTab({
                 </div>
               </div>
               <div className="flex-1 space-y-3">
-                <span className="block border-b pb-2 text-center text-sm font-bold uppercase tracking-wide text-accent">
+                <span className="block border-b pb-2 text-center text-sm font-bold text-accent">
                   Sonrası
                 </span>
                 <label htmlFor="formcheck-after" className="sr-only">
@@ -292,7 +284,7 @@ export default function FormCheckTab({
                     </option>
                   ))}
                 </select>
-                <div className="relative aspect-[3/4] w-full overflow-hidden rounded-2xl border-4 border-accent shadow-lg">
+                <div className="relative aspect-[3/4] w-full overflow-hidden rounded-card border-4 border-accent">
                   {afterCheck?.frontPoseSignedUrl ? (
                     <img
                       src={afterCheck.frontPoseSignedUrl}
@@ -319,19 +311,19 @@ export default function FormCheckTab({
                   // kuyruk kartlarıyla AYNI desen — kart tek, belirsizliksiz bir
                   // hedeftir (bkz. tests/e2e/form-check.spec.ts).
                   aria-label={`Form check kaydı, ${check.current_weight} kg`}
-                  className="flex items-center gap-4 rounded-2xl border bg-gray-50 p-4 shadow-sm transition-transform hover:scale-[1.02] dark:bg-zinc-950"
+                  className="flex items-center gap-4 rounded-card border bg-surface-sunken p-4 transition-transform"
                 >
                   {check.frontPoseSignedUrl ? (
                     <img
                       src={check.frontPoseSignedUrl}
                       alt={`${formatDateTR(check.created_at)} tarihli form fotoğrafı`}
                       loading="lazy"
-                      className="h-20 w-20 rounded-xl object-cover"
+                      className="h-20 w-20 rounded-control object-cover"
                     />
                   ) : (
                     <div
                       aria-hidden="true"
-                      className="flex h-20 w-20 items-center justify-center rounded-xl bg-gray-200 text-gray-400 dark:bg-zinc-800"
+                      className="flex h-20 w-20 items-center justify-center rounded-control bg-border text-fg-muted"
                     >
                       <ImageOff className="h-7 w-7" />
                     </div>

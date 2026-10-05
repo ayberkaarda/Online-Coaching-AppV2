@@ -11,6 +11,8 @@ import { useForm } from 'react-hook-form'
 import { useSignIn } from '@repo/api-client'
 import { loginSchema, type LoginInput } from '@repo/types/schemas'
 
+import { SarmalLogo } from '@/components/brand/SarmalMark'
+
 export default function LoginPage(): JSX.Element {
   const router = useRouter()
   const signIn = useSignIn()
@@ -36,21 +38,19 @@ export default function LoginPage(): JSX.Element {
   })
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 p-4 dark:bg-[#0f0f12]">
-      <div className="w-full max-w-md rounded-3xl border border-gray-100 bg-white p-8 shadow-2xl dark:border-zinc-800 dark:bg-[#16161d]">
+    <div className="flex min-h-screen items-center justify-center bg-canvas p-4">
+      <div className="w-full max-w-md rounded-card border border-border bg-surface p-8">
         <div className="mb-8 text-center">
-          <h1 className="mb-2 bg-gradient-to-r from-accent to-purple-500 bg-clip-text text-3xl font-black text-transparent">
-            Sarmal
+          <h1 className="mb-3 flex justify-center">
+            <SarmalLogo fontSize={31} />
           </h1>
-          <p className="text-sm font-medium uppercase tracking-widest text-gray-500">
-            Sisteme Giriş Yapın
-          </p>
+          <p className="text-sm font-medium text-fg-muted">Sisteme Giriş Yapın</p>
         </div>
 
         {errorMsg && (
           <div
             role="alert"
-            className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-center text-sm font-bold text-red-600 dark:border-red-500/50 dark:bg-red-500/10 dark:text-red-400"
+            className="mb-6 rounded-control border border-danger/30 bg-danger/10 p-4 text-center text-sm font-bold text-danger"
           >
             {errorMsg}
           </div>
@@ -60,7 +60,7 @@ export default function LoginPage(): JSX.Element {
           <div>
             <label
               htmlFor="login-email"
-              className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-500"
+              className="mb-2 block text-xs font-bold uppercase tracking-[0.06em] text-fg-muted"
             >
               E-POSTA ADRESİ
             </label>
@@ -70,16 +70,12 @@ export default function LoginPage(): JSX.Element {
               autoComplete="email"
               aria-invalid={errors.email ? 'true' : 'false'}
               aria-describedby={errors.email ? 'login-email-error' : undefined}
-              className="w-full rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm transition-colors focus:border-accent focus:outline-none dark:border-zinc-800 dark:bg-zinc-950"
+              className="w-full rounded-control border border-border-control bg-surface-sunken p-4 text-sm transition-colors focus:border-accent focus:outline-none"
               placeholder="ornek@email.com"
               {...register('email')}
             />
             {errors.email && (
-              <p
-                id="login-email-error"
-                role="alert"
-                className="mt-1 text-xs font-bold text-red-500"
-              >
+              <p id="login-email-error" role="alert" className="mt-1 text-xs font-bold text-danger">
                 {errors.email.message}
               </p>
             )}
@@ -88,7 +84,7 @@ export default function LoginPage(): JSX.Element {
           <div>
             <label
               htmlFor="login-password"
-              className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-500"
+              className="mb-2 block text-xs font-bold uppercase tracking-[0.06em] text-fg-muted"
             >
               ŞİFRE
             </label>
@@ -98,7 +94,7 @@ export default function LoginPage(): JSX.Element {
               autoComplete="current-password"
               aria-invalid={errors.password ? 'true' : 'false'}
               aria-describedby={errors.password ? 'login-password-error' : undefined}
-              className="w-full rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm transition-colors focus:border-accent focus:outline-none dark:border-zinc-800 dark:bg-zinc-950"
+              className="w-full rounded-control border border-border-control bg-surface-sunken p-4 text-sm transition-colors focus:border-accent focus:outline-none"
               placeholder="••••••••"
               {...register('password')}
             />
@@ -106,14 +102,14 @@ export default function LoginPage(): JSX.Element {
               <p
                 id="login-password-error"
                 role="alert"
-                className="mt-1 text-xs font-bold text-red-500"
+                className="mt-1 text-xs font-bold text-danger"
               >
                 {errors.password.message}
               </p>
             )}
             <Link
               href="/forgot-password"
-              className="mt-2 inline-block text-xs font-bold uppercase tracking-wider text-gray-500 hover:text-accent"
+              className="mt-2 inline-block text-xs font-bold uppercase tracking-[0.06em] text-fg-muted hover:text-accent"
             >
               Şifremi unuttum
             </Link>
@@ -122,7 +118,7 @@ export default function LoginPage(): JSX.Element {
           <button
             type="submit"
             disabled={isPending}
-            className="w-full rounded-xl bg-gradient-to-r from-accent to-purple-600 py-4 text-sm font-black text-white shadow-lg shadow-purple-500/30 transition-all hover:from-purple-600 hover:to-accent disabled:opacity-50"
+            className="w-full rounded-control bg-accent py-4 text-sm font-bold text-accent-fg transition-colors hover:bg-accent/90 disabled:opacity-50"
           >
             {isPending ? 'GİRİŞ YAPILIYOR...' : 'GİRİŞ YAP'}
           </button>

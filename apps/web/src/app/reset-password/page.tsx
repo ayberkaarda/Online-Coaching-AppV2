@@ -227,17 +227,15 @@ export default function ResetPasswordPage(): JSX.Element {
   })
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 p-4 dark:bg-[#0f0f12]">
-      <div className="w-full max-w-md rounded-2xl border border-gray-100 bg-white p-8 shadow-2xl dark:border-zinc-800 dark:bg-[#16161d]">
+    <div className="flex min-h-screen items-center justify-center bg-canvas p-4">
+      <div className="w-full max-w-md rounded-card border border-border bg-surface p-8">
         <div className="mb-8 text-center">
-          <h1 className="mb-2 text-3xl font-bold text-gray-800 dark:text-zinc-200">{copy.title}</h1>
-          <p className="text-sm font-medium uppercase tracking-widest text-gray-500">
-            {copy.subtitle}
-          </p>
+          <h1 className="mb-2 text-3xl font-bold text-fg">{copy.title}</h1>
+          <p className="text-sm font-medium text-fg-muted">{copy.subtitle}</p>
         </div>
 
         {status === 'checking' && (
-          <p className="text-center text-sm font-medium text-gray-500" role="status">
+          <p className="text-center text-sm font-medium text-fg-muted" role="status">
             Bağlantı doğrulanıyor...
           </p>
         )}
@@ -246,13 +244,13 @@ export default function ResetPasswordPage(): JSX.Element {
           <div className="space-y-6">
             <div
               role="alert"
-              className="rounded-xl border border-red-200 bg-red-50 p-4 text-center text-sm font-bold text-red-600 dark:border-red-500/50 dark:bg-red-500/10 dark:text-red-400"
+              className="rounded-control border border-danger/30 bg-danger/10 p-4 text-center text-sm font-bold text-danger"
             >
               {linkErrorMessage}
             </div>
             <Link
               href="/forgot-password"
-              className="block w-full rounded-xl bg-accent py-4 text-center text-sm font-bold text-white shadow-lg shadow-accent/30 transition-opacity hover:opacity-90"
+              className="block w-full rounded-control bg-accent py-4 text-center text-sm font-bold text-accent-fg transition-opacity hover:opacity-90"
             >
               YENİ BAĞLANTI İSTE
             </Link>
@@ -263,14 +261,14 @@ export default function ResetPasswordPage(): JSX.Element {
           <div className="space-y-6">
             <div
               role="status"
-              className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-center text-sm font-bold text-emerald-700 dark:border-emerald-500/50 dark:bg-emerald-500/10 dark:text-emerald-400"
+              className="rounded-control border border-success/30 bg-success/10 p-4 text-center text-sm font-bold text-success"
             >
               {copy.successMessage}
             </div>
             <button
               type="button"
               onClick={() => router.push('/login')}
-              className="block w-full rounded-xl bg-accent py-4 text-center text-sm font-bold text-white shadow-lg shadow-accent/30 transition-opacity hover:opacity-90"
+              className="block w-full rounded-control bg-accent py-4 text-center text-sm font-bold text-accent-fg transition-opacity hover:opacity-90"
             >
               GİRİŞE GİT
             </button>
@@ -280,14 +278,12 @@ export default function ResetPasswordPage(): JSX.Element {
         {status === 'ready' && !done && (
           <form onSubmit={onSubmit} className="space-y-5" noValidate>
             {copy.intro && (
-              <p className="text-center text-sm font-medium text-gray-600 dark:text-gray-400">
-                {copy.intro}
-              </p>
+              <p className="text-center text-sm font-medium text-fg-muted">{copy.intro}</p>
             )}
             {updatePassword.error && (
               <div
                 role="alert"
-                className="rounded-xl border border-red-200 bg-red-50 p-4 text-center text-sm font-bold text-red-600 dark:border-red-500/50 dark:bg-red-500/10 dark:text-red-400"
+                className="rounded-control border border-danger/30 bg-danger/10 p-4 text-center text-sm font-bold text-danger"
               >
                 {updatePassword.error.message}
               </div>
@@ -296,7 +292,7 @@ export default function ResetPasswordPage(): JSX.Element {
             <div>
               <label
                 htmlFor="reset-password-new"
-                className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-500"
+                className="mb-2 block text-xs font-bold uppercase tracking-[0.06em] text-fg-muted"
               >
                 {copy.passwordLabel}
               </label>
@@ -306,7 +302,7 @@ export default function ResetPasswordPage(): JSX.Element {
                 autoComplete="new-password"
                 aria-invalid={errors.password ? 'true' : 'false'}
                 aria-describedby={errors.password ? 'reset-password-new-error' : undefined}
-                className="w-full rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm transition-colors focus:border-accent focus:outline-none dark:border-zinc-800 dark:bg-zinc-950"
+                className="w-full rounded-control border border-border-control bg-surface-sunken p-4 text-sm transition-colors focus:border-accent focus:outline-none"
                 placeholder="••••••••"
                 {...register('password')}
               />
@@ -314,7 +310,7 @@ export default function ResetPasswordPage(): JSX.Element {
                 <p
                   id="reset-password-new-error"
                   role="alert"
-                  className="mt-1 text-xs font-bold text-red-500"
+                  className="mt-1 text-xs font-bold text-danger"
                 >
                   {errors.password.message}
                 </p>
@@ -324,7 +320,7 @@ export default function ResetPasswordPage(): JSX.Element {
             <button
               type="submit"
               disabled={updatePassword.isPending}
-              className="w-full rounded-xl bg-accent py-4 text-sm font-bold text-white shadow-lg shadow-accent/30 transition-opacity hover:opacity-90 disabled:opacity-50"
+              className="w-full rounded-control bg-accent py-4 text-sm font-bold text-accent-fg transition-opacity hover:opacity-90 disabled:opacity-50"
             >
               {updatePassword.isPending ? copy.submitPending : copy.submitIdle}
             </button>

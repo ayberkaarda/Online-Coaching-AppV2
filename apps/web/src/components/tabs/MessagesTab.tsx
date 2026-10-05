@@ -286,7 +286,7 @@ export default function MessagesTab({
   }
 
   return (
-    <div className="flex h-[500px] flex-col overflow-hidden rounded-panel border border-border bg-canvas shadow-inner">
+    <div className="flex h-[500px] flex-col overflow-hidden rounded-panel border border-border bg-canvas">
       {/* Sohbet Başlığı */}
       <div className="flex items-center justify-between border-b border-border bg-surface-raised p-4">
         <div className="flex items-center gap-2">
@@ -308,7 +308,7 @@ export default function MessagesTab({
           <span className="relative flex h-2.5 w-2.5" aria-hidden="true">
             {isTargetOnline ? (
               <>
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-75" />
+                <span className="absolute inline-flex h-full w-full rounded-full bg-success opacity-75" />
                 <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-success" />
               </>
             ) : (
@@ -377,7 +377,7 @@ export default function MessagesTab({
                       className={`max-w-[70%] rounded-panel p-3 text-sm ${
                         isMe
                           ? 'rounded-br-none bg-accent text-accent-fg'
-                          : 'rounded-bl-none border border-border bg-surface-raised text-fg shadow-sm'
+                          : 'rounded-bl-none border border-border bg-surface-raised text-fg'
                       }`}
                     >
                       <span className="sr-only">{isMe ? 'Sen: ' : 'Karşı taraf: '}</span>
@@ -480,7 +480,7 @@ export default function MessagesTab({
         <button
           type="submit"
           disabled={!newMessage.trim() || sendMessage.isPending}
-          className="rounded-card bg-accent px-6 py-3 font-bold text-accent-fg shadow-md transition-transform active:scale-95 disabled:opacity-50"
+          className="rounded-card bg-accent px-6 py-3 font-bold text-accent-fg transition-transform active:scale-[0.97] disabled:opacity-50"
         >
           Gönder
         </button>

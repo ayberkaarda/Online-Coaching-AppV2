@@ -1,4 +1,4 @@
-// Görsel kimlik token'larının sözleşme testi (AC-1.6.1 ve AC-1.6.5 karşılığı).
+// Görsel kimlik token'larının sözleşme testi — "Kor & Kemik" (marka kararı v2 §3).
 //
 // NEDEN axe DEĞİL: axe-core'un `color-contrast` kuralı jsdom'da ÇALIŞMAZ. Kural gerçek
 // layout ve boyama (getComputedStyle üzerinden çözülmüş efektif zemin rengi, örtüşen
@@ -21,8 +21,10 @@ import type { ThemeName, TokenName } from '@/design/tokens'
 const TOKEN_NAMES: TokenName[] = [
   'bg',
   'surface',
+  'surfaceSunken',
   'surfaceRaised',
   'border',
+  'borderControl',
   'textPrimary',
   'textSecondary',
   'accent',
@@ -30,6 +32,7 @@ const TOKEN_NAMES: TokenName[] = [
   'success',
   'warning',
   'danger',
+  'info',
   'focusRing',
 ]
 
@@ -67,8 +70,8 @@ describe('kontrast yardımcısı (formülün kendisi doğrulanır)', () => {
   })
 
   it('aynı renk için 1:1 verir ve simetriktir', () => {
-    expect(contrastRatio('#5B48D9', '#5B48D9')).toBeCloseTo(1, 5)
-    expect(contrastRatio('#14161B', '#F4F4F1')).toBeCloseTo(contrastRatio('#F4F4F1', '#14161B'), 10)
+    expect(contrastRatio('#B63D0B', '#B63D0B')).toBeCloseTo(1, 5)
+    expect(contrastRatio('#121110', '#F5F2EC')).toBeCloseTo(contrastRatio('#F5F2EC', '#121110'), 10)
   })
 
   it('bilinen bir referans değeri yeniden üretir (WCAG örneği)', () => {
@@ -77,12 +80,12 @@ describe('kontrast yardımcısı (formülün kendisi doğrulanır)', () => {
   })
 })
 
-describe('AC-1.6.1 — tokens.ts sözleşmesi', () => {
+describe('tokens.ts sözleşmesi', () => {
   it('light ve dark olmak üzere tam olarak iki değer seti içerir', () => {
     expect(Object.keys(tokens).sort()).toEqual(['dark', 'light'])
   })
 
-  it.each(THEMES)('%s setinde 12 semantik anahtarın tamamı tanımlı', (theme) => {
+  it.each(THEMES)('%s setinde 15 semantik anahtarın tamamı tanımlı', (theme) => {
     expect(Object.keys(tokens[theme]).sort()).toEqual([...TOKEN_NAMES].sort())
   })
 
@@ -108,106 +111,190 @@ describe('AC-1.6.1 — tokens.ts sözleşmesi', () => {
     }
   })
 
-  it("ADR-0015'in altı adlandırılmış hex'i birebir korunuyor", () => {
-    expect(tokens.light.bg).toBe('#F4F4F1') // Tebeşir
-    expect(tokens.dark.bg).toBe('#14161B') // Demir
-    expect(tokens.light.accent).toBe('#5B48D9') // Menevis
-    expect(tokens.dark.accent).toBe('#A79BFF') // Menevis, koyu tema durağı
-    expect(tokens.light.success).toBe('#0F7A4C') // Kapanış
-    expect(tokens.light.warning).toBe('#A65600') // Kehribar (2026-08-17 revizyonu)
-    expect(tokens.light.danger).toBe('#C22F2F') // Plaka Kırmızısı
+  it('Kor & Kemik adlandırılmış çekirdek renkleri birebir korunuyor', () => {
+    expect(tokens.light.bg).toBe('#F5F2EC') // Kemik
+    expect(tokens.dark.bg).toBe('#121110') // Gece
+    expect(tokens.light.accent).toBe('#B63D0B') // Kor
+    expect(tokens.dark.accent).toBe('#FF8A4C') // Kor, koyu tema durağı
+    expect(tokens.light.info).toBe('#0E6E78') // Su
+    expect(tokens.dark.info).toBe('#4CC3CF') // Su, koyu tema durağı
   })
 
-  it('eski marka moru (violet-500) hiçbir token değerinde yok (AC-1.6.2)', () => {
+  it('accentContrast ve focusRing sözleşmesi korunuyor (focusRing = accent)', () => {
+    for (const theme of THEMES) {
+      expect(tokens[theme].focusRing).toBe(tokens[theme].accent)
+    }
+    expect(tokens.light.accentContrast).toBe('#FFFFFF')
+    expect(tokens.dark.accentContrast).toBe(tokens.dark.bg)
+  })
+
+  it('nötrler saf gri değil, sıcak gridir (R ≥ G ≥ B ve R > B)', () => {
+    const neutrals = [
+      'bg',
+      'surfaceSunken',
+      'border',
+      'borderControl',
+      'textPrimary',
+      'textSecondary',
+    ] as const
+    for (const theme of THEMES) {
+      for (const name of neutrals) {
+        const [r, g, b] = channels(tokens[theme][name])
+        expect(r >= g && g >= b && r > b, `${theme}.${name} sıcak olmalı`).toBe(true)
+      }
+    }
+  })
+
+  it('eski marka morları (violet-500, Menevis) hiçbir token değerinde yok', () => {
     // Hex parçalı yazılıyor ki ratchet script'inin ham-hex sayacı bu dosyayı
     // yanlış pozitif olarak saymasın (ADR-0018: grep tabanlı sayaç).
-    const legacyBrandPurple = '#8b' + '5cf6'
+    const legacy = ['#8b' + '5cf6', '#5b' + '48d9', '#a7' + '9bff']
     for (const theme of THEMES) {
       for (const name of TOKEN_NAMES) {
-        expect(tokens[theme][name].toLowerCase()).not.toBe(legacyBrandPurple)
+        expect(legacy).not.toContain(tokens[theme][name].toLowerCase())
       }
     }
   })
 })
 
-// Eşikler: metin için WCAG AA 4.5:1, gövde metni için AAA 7:1, UI bileşeni
-// (odak halkası) için 1.4.11 uyarınca 3:1.
-const THRESHOLDS: { label: string; fg: TokenName; bg: TokenName; min: number }[] = [
-  { label: 'accentContrast / accent', fg: 'accentContrast', bg: 'accent', min: 4.5 },
-  { label: 'accent / bg', fg: 'accent', bg: 'bg', min: 4.5 },
-  { label: 'textPrimary / bg', fg: 'textPrimary', bg: 'bg', min: 7 },
-  { label: 'textSecondary / bg', fg: 'textSecondary', bg: 'bg', min: 4.5 },
-  { label: 'focusRing / bg', fg: 'focusRing', bg: 'bg', min: 3 },
-  { label: 'success / bg', fg: 'success', bg: 'bg', min: 4.5 },
-  { label: 'warning / bg', fg: 'warning', bg: 'bg', min: 4.5 },
-  { label: 'danger / bg', fg: 'danger', bg: 'bg', min: 4.5 },
+// ── Kontrast matrisi (marka kararı v2 §3) ─────────────────────────────────────
+// Açık temada metin token'ları bg / surface (= surfaceRaised) / surfaceSunken üstünde;
+// koyu temada bg / surface / surfaceSunken / surfaceRaised üstünde ölçülür. Beklenen
+// değerler öneride hesaplanıp yayımlanan matristir (2 ondalığa yuvarlanmış).
+const GROUNDS: Record<ThemeName, TokenName[]> = {
+  light: ['bg', 'surface', 'surfaceSunken'],
+  dark: ['bg', 'surface', 'surfaceSunken', 'surfaceRaised'],
+}
+
+const MATRIX: Record<ThemeName, Partial<Record<TokenName, number[]>>> = {
+  light: {
+    textPrimary: [16.33, 18.25, 14.82],
+    textSecondary: [6.42, 7.17, 5.82],
+    accent: [5.13, 5.74, 4.66],
+    focusRing: [5.13, 5.74, 4.66],
+    success: [5.08, 5.68, 4.61],
+    warning: [5.24, 5.86, 4.76],
+    danger: [6.06, 6.78, 5.5],
+    info: [5.34, 5.97, 4.84],
+    borderControl: [3.85, 4.3, 3.49],
+  },
+  dark: {
+    textPrimary: [16.46, 15.15, 17.26, 13.84],
+    textSecondary: [7.19, 6.62, 7.54, 6.05],
+    accent: [8.08, 7.43, 8.47, 6.79],
+    focusRing: [8.08, 7.43, 8.47, 6.79],
+    success: [9.17, 8.44, 9.62, 7.71],
+    warning: [10.25, 9.44, 10.75, 8.62],
+    danger: [6.94, 6.39, 7.28, 5.84],
+    info: [8.99, 8.28, 9.43, 7.57],
+    borderControl: [3.98, 3.66, 4.17, 3.34],
+  },
+}
+
+const TEXT_TOKENS: TokenName[] = [
+  'textPrimary',
+  'textSecondary',
+  'accent',
+  'success',
+  'warning',
+  'danger',
+  'info',
 ]
 
-describe('AC-1.6.5 — WCAG kontrast eşikleri (token seviyesinde hesaplanmış)', () => {
+describe('kontrast matrisi — her metin token her yüzeyde AA, her kontrol sınırı 3:1', () => {
   for (const theme of THEMES) {
     describe(`${theme} teması`, () => {
-      it.each(THRESHOLDS)('$label >= $min', ({ fg, bg, min }) => {
-        const ratio = contrastRatio(tokens[theme][fg], tokens[theme][bg])
-        expect(
-          ratio,
-          `${theme}: ${fg} (${tokens[theme][fg]}) / ${bg} (${tokens[theme][bg]}) = ${ratio.toFixed(2)}:1`
-        ).toBeGreaterThanOrEqual(min)
+      for (const [fg, expected] of Object.entries(MATRIX[theme]) as [TokenName, number[]][]) {
+        it(`${fg} yayımlanan matrisi yeniden üretir`, () => {
+          GROUNDS[theme].forEach((ground, i) => {
+            const ratio = contrastRatio(tokens[theme][fg], tokens[theme][ground])
+            // Yayımlanan değerler 2 ondalığa yuvarlanmıştır; ±0.006 yuvarlama payıdır.
+            expect(
+              Math.abs(ratio - (expected[i] ?? Number.NaN)),
+              `${theme}: ${fg} / ${ground} = ${ratio.toFixed(3)} (beklenen ${expected[i]})`
+            ).toBeLessThanOrEqual(0.006)
+          })
+        })
+      }
+
+      it.each(TEXT_TOKENS)('%s her yüzeyde ≥ 4.5:1', (fg) => {
+        for (const ground of GROUNDS[theme]) {
+          const ratio = contrastRatio(tokens[theme][fg], tokens[theme][ground])
+          expect(ratio, `${theme}: ${fg} / ${ground} = ${ratio.toFixed(2)}`).toBeGreaterThanOrEqual(
+            4.5
+          )
+        }
       })
 
-      it('ikincil metin en açık/en koyu yüzeyde de AA geçiyor', () => {
+      it('borderControl ve focusRing her yüzeyde ≥ 3:1 (WCAG 1.4.11)', () => {
+        for (const ground of GROUNDS[theme]) {
+          for (const fg of ['borderControl', 'focusRing'] as const) {
+            expect(contrastRatio(tokens[theme][fg], tokens[theme][ground])).toBeGreaterThanOrEqual(
+              3
+            )
+          }
+        }
+      })
+
+      it('gövde metni zeminde AAA (≥ 7:1)', () => {
+        expect(contrastRatio(tokens[theme].textPrimary, tokens[theme].bg)).toBeGreaterThanOrEqual(7)
+      })
+
+      it('accentContrast kor dolgu üstünde ≥ 4.5:1', () => {
         expect(
-          contrastRatio(tokens[theme].textSecondary, tokens[theme].surface)
+          contrastRatio(tokens[theme].accentContrast, tokens[theme].accent)
         ).toBeGreaterThanOrEqual(4.5)
-        expect(
-          contrastRatio(tokens[theme].textSecondary, tokens[theme].surfaceRaised)
-        ).toBeGreaterThanOrEqual(4.5)
-      })
-
-      it('odak halkası yüksek kademe yüzeyde de görünür (3:1)', () => {
-        expect(
-          contrastRatio(tokens[theme].focusRing, tokens[theme].surfaceRaised)
-        ).toBeGreaterThanOrEqual(3)
-      })
-
-      it('yüzey kademeleri birbirinden ayrışıyor (bg < surface < surfaceRaised)', () => {
-        const l = (name: TokenName): number => relativeLuminance(tokens[theme][name])
-        // Her iki temada da "yükselme" = aydınlanma yönündedir.
-        expect(Math.sign(l('surface') - l('bg'))).toBe(1)
-        expect(Math.sign(l('surfaceRaised') - l('surface'))).toBe(1)
       })
     })
   }
 
-  // Kehribar borcu 2026-08-17'de kapatıldı (#B45D00 → #A65600, ADR-0015 revizyonu).
-  // Eski değer yalnızca `bg` üstünde değil `surface` üstünde de (4.46:1) eşiğin altındaydı;
-  // bu yüzden uyarı rengi HER ÜÇ açık tema zemininde ayrı ayrı kilitleniyor — borç
-  // bir daha yüzey kademesinden sızamaz.
-  it('uyarı rengi her üç açık tema zemininde de AA geçiyor', () => {
-    for (const ground of ['bg', 'surface', 'surfaceRaised'] as const) {
-      const ratio = contrastRatio(tokens.light.warning, tokens.light[ground])
-      expect(ratio, `light.warning / ${ground} = ${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(4.5)
+  it('accentContrast / accent yayımlanan değerleri tutar (5.74 / 8.08)', () => {
+    expect(contrastRatio(tokens.light.accentContrast, tokens.light.accent)).toBeCloseTo(5.74, 2)
+    expect(contrastRatio(tokens.dark.accentContrast, tokens.dark.accent)).toBeCloseTo(8.08, 2)
+  })
+
+  it('dolgu üstü metin: beyaz/success 5.68, beyaz/danger 6.78 (açık tema)', () => {
+    expect(contrastRatio('#FFFFFF', tokens.light.success)).toBeCloseTo(5.68, 2)
+    expect(contrastRatio('#FFFFFF', tokens.light.danger)).toBeCloseTo(6.78, 2)
+  })
+
+  it('durum dolguları üstündeki `text-surface` iki temada da ≥ 4.5:1', () => {
+    for (const theme of THEMES) {
+      for (const fill of ['success', 'warning', 'danger', 'info'] as const) {
+        const ratio = contrastRatio(tokens[theme].surface, tokens[theme][fill])
+        expect(ratio, `${theme}: surface / ${fill} = ${ratio.toFixed(2)}`).toBeGreaterThanOrEqual(
+          4.5
+        )
+      }
     }
   })
 
-  it('uyarı rengi diğer durum renkleriyle aynı emniyet bandında (4.8–5.2)', () => {
-    // Kapanış 4.88 · Kehribar 4.82 · Plaka Kırmızısı 5.09 — üçü de sınırda değil.
-    for (const name of ['success', 'warning', 'danger'] as const) {
-      expect(contrastRatio(tokens.light[name], tokens.light.bg)).toBeGreaterThan(4.7)
-    }
+  it('koyu temada yükselme açılmayla verilir (sunken < bg < surface < raised)', () => {
+    const l = (name: TokenName): number => relativeLuminance(tokens.dark[name])
+    expect(l('surfaceSunken')).toBeLessThan(l('bg'))
+    expect(l('bg')).toBeLessThan(l('surface'))
+    expect(l('surface')).toBeLessThan(l('surfaceRaised'))
+  })
+
+  it('açık temada sunken zeminden koyudur; kart ve raised beyazdır', () => {
+    const l = (name: TokenName): number => relativeLuminance(tokens.light[name])
+    expect(l('surfaceSunken')).toBeLessThan(l('bg'))
+    expect(tokens.light.surface).toBe('#FFFFFF')
+    expect(tokens.light.surfaceRaised).toBe('#FFFFFF')
   })
 })
 
 describe('hexToRgbChannels — Tailwind <alpha-value> köprüsü', () => {
   it("hex'i boşlukla ayrılmış ham RGB kanallarına çevirir", () => {
-    expect(hexToRgbChannels('#5B48D9')).toBe('91 72 217')
-    expect(hexToRgbChannels('#F4F4F1')).toBe('244 244 241')
-    expect(hexToRgbChannels('#14161B')).toBe('20 22 27')
+    expect(hexToRgbChannels('#B63D0B')).toBe('182 61 11')
+    expect(hexToRgbChannels('#F5F2EC')).toBe('245 242 236')
+    expect(hexToRgbChannels('#121110')).toBe('18 17 16')
     expect(hexToRgbChannels('#000000')).toBe('0 0 0')
     expect(hexToRgbChannels('#FFFFFF')).toBe('255 255 255')
   })
 
   it('küçük harfli hex de kabul edilir', () => {
-    expect(hexToRgbChannels('#a79bff')).toBe('167 155 255')
+    expect(hexToRgbChannels('#ff8a4c')).toBe('255 138 76')
   })
 
   it('çıktı rgb() SARMALAYICISI içermez — aksi hâlde opaklık değiştiricileri sessizce bozulur', () => {

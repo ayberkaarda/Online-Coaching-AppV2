@@ -6,6 +6,11 @@
 
 import type { JSX } from 'react'
 
+import { tokens } from '@/design/tokens'
+
+// Tailwind olmayabilir; renkler yine tek kaynaktan (açık tema) gelir.
+const t = tokens.light
+
 export default function GlobalError({
   error,
   reset,
@@ -26,8 +31,8 @@ export default function GlobalError({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          backgroundColor: '#fef2f2',
-          color: '#7f1d1d',
+          backgroundColor: t.bg,
+          color: t.textPrimary,
           padding: '2rem',
           fontFamily: 'system-ui, sans-serif',
         }}
@@ -35,41 +40,40 @@ export default function GlobalError({
         <div
           role="alert"
           style={{
-            backgroundColor: '#ffffff',
+            backgroundColor: t.surface,
             padding: '2rem',
-            borderRadius: '1.5rem',
-            boxShadow: '0 20px 40px rgba(0,0,0,0.15)',
-            border: '1px solid #fecaca',
+            borderRadius: '16px',
+            border: `1px solid ${t.border}`,
             maxWidth: '32rem',
             width: '100%',
           }}
         >
           <h2
-            style={{ fontSize: '1.5rem', fontWeight: 900, marginBottom: '1rem', color: '#dc2626' }}
+            style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: '1rem', color: t.danger }}
           >
             Bir şeyler ters gitti
           </h2>
           <p style={{ fontWeight: 700, marginBottom: '0.5rem' }}>
-            Uygulama başlatılırken beklenmeyen bir hata oluştu.
+            Uygulama başlatılamadı. Sayfayı yeniden dene; sorun sürerse koçuna haber ver.
           </p>
           {isDev && (
             <pre
               style={{
-                backgroundColor: '#fee2e2',
-                color: '#991b1b',
+                backgroundColor: t.surfaceSunken,
+                color: t.danger,
                 padding: '1rem',
-                borderRadius: '0.75rem',
+                borderRadius: '10px',
                 overflow: 'auto',
                 fontSize: '0.8rem',
                 marginBottom: '1.5rem',
-                border: '1px solid #fecaca',
+                border: `1px solid ${t.border}`,
               }}
             >
               {error.message}
             </pre>
           )}
           {error.digest && (
-            <p style={{ fontSize: '0.75rem', color: '#b91c1c', marginBottom: '1.5rem' }}>
+            <p style={{ fontSize: '0.75rem', color: t.textSecondary, marginBottom: '1.5rem' }}>
               Hata kodu: {error.digest}
             </p>
           )}
@@ -78,10 +82,10 @@ export default function GlobalError({
             style={{
               width: '100%',
               padding: '0.75rem 1.5rem',
-              backgroundColor: '#dc2626',
-              color: '#ffffff',
+              backgroundColor: t.accent,
+              color: t.accentContrast,
               fontWeight: 700,
-              borderRadius: '0.75rem',
+              borderRadius: '10px',
               border: 'none',
               cursor: 'pointer',
             }}

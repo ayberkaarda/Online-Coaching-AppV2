@@ -40,9 +40,12 @@ describe('EmptyState', () => {
     expect(icon).toHaveAttribute('aria-hidden', 'true')
   })
 
-  it('icon verilmezse hiç render edilmez', () => {
+  it('icon verilmezse yerine dekoratif ince sarmal sembolü çizilir', () => {
     const { container } = render(<EmptyState title="Kayıt bulunamadı." />)
 
-    expect(container.querySelector('[aria-hidden="true"]')).not.toBeInTheDocument()
+    const decorative = container.querySelectorAll('[aria-hidden="true"]')
+    expect(decorative).toHaveLength(1)
+    expect(decorative[0]?.tagName.toLowerCase()).toBe('svg')
+    expect(decorative[0]?.getAttribute('viewBox')).toBe('0 0 48 48')
   })
 })

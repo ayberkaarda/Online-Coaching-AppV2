@@ -115,7 +115,7 @@ function CoachActivityDays({ clientId }: { clientId?: string }): JSX.Element {
   return (
     <div className="space-y-3">
       {summary.lastActiveDate && (
-        <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-fg-muted">
+        <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.06em] text-fg-muted">
           <CalendarClock aria-hidden="true" className="h-4 w-4 shrink-0" />
           Son aktif: {formatDayLabel(summary.lastActiveDate)}
         </p>

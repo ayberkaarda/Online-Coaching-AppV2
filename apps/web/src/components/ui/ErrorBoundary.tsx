@@ -48,24 +48,22 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     return (
       <div
         role="alert"
-        className="space-y-3 rounded-2xl border border-red-200 bg-red-50 p-6 text-center dark:border-red-900/40 dark:bg-red-950/20"
+        className="space-y-3 rounded-card border border-danger/30 bg-danger/10 p-6 text-center"
       >
-        <TriangleAlert aria-hidden="true" className="mx-auto h-7 w-7 text-red-500" />
-        <h2 className="text-base font-black text-red-600 dark:text-red-400">
-          Bir şeyler ters gitti
-        </h2>
-        <p className="text-sm text-gray-600 dark:text-gray-300">
+        <TriangleAlert aria-hidden="true" className="mx-auto h-7 w-7 text-danger" />
+        <h2 className="text-base font-bold text-danger">Bir şeyler ters gitti</h2>
+        <p className="text-sm text-fg-muted">
           Bu bölüm yüklenirken beklenmeyen bir hata oluştu. Lütfen tekrar deneyin.
         </p>
         {isDev && (
-          <pre className="overflow-x-auto rounded-lg bg-white p-3 text-left text-[11px] text-red-500 dark:bg-black">
+          <pre className="overflow-x-auto rounded-lg bg-surface-sunken p-3 text-left font-mono text-[11px] text-danger">
             {error.message}
           </pre>
         )}
         <button
           type="button"
           onClick={this.reset}
-          className="rounded-xl bg-accent px-5 py-2.5 text-sm font-bold text-white transition-transform active:scale-95"
+          className="rounded-control bg-accent px-5 py-2.5 text-sm font-bold text-accent-fg transition-transform active:scale-[0.97]"
         >
           Tekrar Dene
         </button>

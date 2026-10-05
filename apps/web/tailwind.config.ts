@@ -12,7 +12,7 @@ import type { Config } from 'tailwindcss'
  * KRİTİK: CSS değişkenine `rgb()` SARMALAYICISI OLMADAN, ham kanal olarak yazılır.
  * Yalnızca böyle yazıldığında Tailwind'in `<alpha-value>` yer tutucusu opaklık
  * değiştiricileriyle (`bg-accent/10`, `border-accent/20`, …) geçerli bir
- * `rgb(91 72 217 / 0.1)` üretebilir. Değişkene düz hex yazılırsa bu kullanımlar
+ * `rgb(182 61 11 / 0.1)` üretebilir. Değişkene düz hex yazılırsa bu kullanımlar
  * hata vermeden SESSİZCE renk üretmez.
  */
 export function hexToRgbChannels(hex: string): string {
@@ -26,8 +26,10 @@ export function hexToRgbChannels(hex: string): string {
 const cssVariableName: Record<TokenName, string> = {
   bg: '--color-canvas',
   surface: '--color-surface',
+  surfaceSunken: '--color-surface-sunken',
   surfaceRaised: '--color-surface-raised',
   border: '--color-border',
+  borderControl: '--color-border-control',
   textPrimary: '--color-fg',
   textSecondary: '--color-fg-muted',
   accent: '--color-accent',
@@ -35,6 +37,7 @@ const cssVariableName: Record<TokenName, string> = {
   success: '--color-success',
   warning: '--color-warning',
   danger: '--color-danger',
+  info: '--color-info',
   focusRing: '--color-focus-ring',
 }
 
@@ -58,8 +61,10 @@ const config: Config = {
       colors: {
         canvas: withAlpha('--color-canvas'),
         surface: withAlpha('--color-surface'),
+        'surface-sunken': withAlpha('--color-surface-sunken'),
         'surface-raised': withAlpha('--color-surface-raised'),
         border: withAlpha('--color-border'),
+        'border-control': withAlpha('--color-border-control'),
         fg: withAlpha('--color-fg'),
         'fg-muted': withAlpha('--color-fg-muted'),
         accent: withAlpha('--color-accent'),
@@ -67,7 +72,13 @@ const config: Config = {
         success: withAlpha('--color-success'),
         warning: withAlpha('--color-warning'),
         danger: withAlpha('--color-danger'),
+        info: withAlpha('--color-info'),
         'focus-ring': withAlpha('--color-focus-ring'),
+      },
+      // Düz `border` / `divide` sınıfları da dekoratif ayırıcı token'ını kullanır —
+      // `dark:border-*` eşleştirmesine gerek kalmaz.
+      borderColor: {
+        DEFAULT: withAlpha('--color-border'),
       },
       fontFamily: {
         // next/font (src/app/layout.tsx) bu değişkenleri <html> üzerinde tanımlar.
@@ -76,38 +87,43 @@ const config: Config = {
         mono: ['var(--font-mono)', 'ui-monospace', 'SFMono-Regular', 'monospace'],
       },
       fontSize: {
-        // ADR-0015 tipografi ölçeği: 12 / 14 / 16 / 18 / 22 / 28 / 36.
-        // 12=text-xs, 14=text-sm, 16=text-base, 18=text-lg, 36=text-4xl karşılıkları
-        // Tailwind varsayılanlarında zaten var; varsayılanlar EZİLMEZ (mevcut
-        // `text-*` kullanımları kırılmasın). Yalnızca ölçekte eksik olan iki adım eklenir.
-        '22': ['1.375rem', { lineHeight: '1.75rem' }],
-        '28': ['1.75rem', { lineHeight: '2.125rem' }],
+        // Kor & Kemik tipografi ölçeği (1.25 oranı): 12 · 14 · 16 · 20 · 25 · 31 · 39 · 49.
+        // 12/14/16 Tailwind'in xs/sm/base varsayılanlarıdır. Gövde satır yüksekliği 1.5,
+        // başlık/sayaç 1.15. Varsayılan `text-*` anahtarları EZİLMEZ.
+        '20': ['1.25rem', { lineHeight: '1.5' }],
+        '25': ['1.5625rem', { lineHeight: '1.15' }],
+        '31': ['1.9375rem', { lineHeight: '1.15' }],
+        '39': ['2.4375rem', { lineHeight: '1.15' }],
+        '49': ['3.0625rem', { lineHeight: '1.15' }],
       },
       borderRadius: {
-        // ADR-0015 yarıçap ölçeği: 8 / 12 / 16. Bu üç değer sayısal olarak Tailwind'in
-        // lg / xl / 2xl varsayılanlarına eşittir; burada semantik adlar eklenir ki
-        // Katman B (Faz 2) `rounded-3xl` (24px) kullanımlarını bunlarla değiştirebilsin.
-        // Varsayılan anahtarlar KALDIRILMAZ — 17 `rounded-3xl` kullanımı hâlâ çalışıyor.
-        control: '8px',
-        card: '12px',
-        panel: '16px',
+        // Kor & Kemik şekil dili — adlar korunur, değerler mobil ile birebir aynı.
+        sm: '6px', // badge
+        control: '10px', // input, buton
+        card: '16px', // kart
+        panel: '24px', // sheet / büyük panel
+        pill: '999px', // chip, halka
+      },
+      boxShadow: {
+        // Açık temada TEK kademe (yalnız surfaceRaised: modal, popover, sheet).
+        // Koyu temada gölge yok — değişken `.dark` altında `none` olur (aşağıdaki plugin).
+        raised: 'var(--shadow-raised)',
       },
       // Motion Doktrini (src/design/motion.ts) — TEK KAYNAK. Süre/eğri burada
-      // ms/cubic-bezier olarak ELLE yazılmaz; `duration-fast|base|slow` ve
-      // `ease-standard|decelerate` yardımcı sınıfları bu nesnelerden üretilir.
+      // ms/cubic-bezier olarak ELLE yazılmaz; `duration-fast|base|reward` ve
+      // `ease-standard|decelerate|accelerate` yardımcı sınıfları bu nesnelerden üretilir.
       transitionDuration: {
         fast: `${durations.fast}ms`,
         base: `${durations.base}ms`,
-        slow: `${durations.slow}ms`,
+        reward: `${durations.reward}ms`,
       },
       transitionTimingFunction: {
         standard: easings.standard,
         decelerate: easings.decelerate,
+        accelerate: easings.accelerate,
       },
       keyframes: {
-        // "demir zıplamaz": Faz 4.5'te bu keyframe bir `translateY` kayması
-        // içeriyordu (dikey hareket). Motion Doktrini turunda (2026-08-21)
-        // düz opaklık geçişine indirgendi — kalan tek "hareket" opaklıktır.
+        // Düz opaklık geçişi — dikey kayma yok ("ritim, gösteri değil").
         fadeIn: {
           '0%': { opacity: '0' },
           '100%': { opacity: '1' },
@@ -116,6 +132,8 @@ const config: Config = {
       animation: {
         // Skeleton -> içerik geçişi (mikro #4). Süre/eğri motion.ts'ten.
         fadeIn: `fadeIn ${durations.base}ms ${easings.decelerate}`,
+        // Skeleton nabzı — sistemdeki TEK döngüsel animasyon (1.6s).
+        pulse: 'pulse 1.6s cubic-bezier(0.4, 0, 0.6, 1) infinite',
       },
     },
   },
@@ -125,8 +143,16 @@ const config: Config = {
     // ile birlikte tema değişimi tüm token'ları aynı anda çevirir.
     plugin(({ addBase }) => {
       addBase({
-        ':root': themeVariables(tokens.light),
-        '.dark': themeVariables(tokens.dark),
+        ':root': {
+          ...themeVariables(tokens.light),
+          '--shadow-raised': '0 1px 2px rgba(23, 21, 15, 0.06), 0 8px 24px rgba(23, 21, 15, 0.08)',
+          colorScheme: 'light',
+        },
+        '.dark': {
+          ...themeVariables(tokens.dark),
+          '--shadow-raised': 'none',
+          colorScheme: 'dark',
+        },
       })
     }),
   ],

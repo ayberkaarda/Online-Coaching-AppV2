@@ -219,12 +219,12 @@ export function LoopRing({
   // ÖZNİTELİĞİ (`stroke-dashoffset`) olarak yazıldığı için stil nesnesinde
   // saklanacak bir şey kalmıyor, ayrıca `motion-reduce:` varyantı JS hidrasyonu
   // beklemeden ilk boyamada da doğru davranışı verir. Süre/eğri `src/design/
-  // motion.ts`ten (`duration-slow`/`ease-decelerate`) — bu halkanın turdaki İKİ
+  // motion.ts`ten (`duration-reward`/`ease-decelerate`) — bu halkanın turdaki İKİ
   // imza hareketten biri olması bilinçli olarak en ağır süreyi (450ms) taşımasının
   // gerekçesidir; kimlik "ağır"dır (ADR-0015).
   const motionClass = reducedMotion
     ? 'transition-none'
-    : 'transition-[stroke-dashoffset,stroke] duration-slow ease-decelerate motion-reduce:transition-none'
+    : 'transition-[stroke-dashoffset,stroke] duration-reward ease-decelerate motion-reduce:transition-none'
 
   const strokeClass = celebrating ? 'stroke-success' : 'stroke-accent'
 

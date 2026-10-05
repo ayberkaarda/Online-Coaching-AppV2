@@ -54,7 +54,7 @@ function WorkoutPlanView({ plan }: { plan: WorkoutPlan }): JSX.Element {
 
   if (!hasContent) {
     return (
-      <p className="text-sm font-medium leading-relaxed text-gray-700 dark:text-gray-300">
+      <p className="text-sm font-medium leading-relaxed text-fg">
         Koçunuz henüz bir antrenman programı atamadı.
       </p>
     )
@@ -64,9 +64,9 @@ function WorkoutPlanView({ plan }: { plan: WorkoutPlan }): JSX.Element {
     <ul className="space-y-3">
       {DAY_NAMES.map((day) => (
         <li key={day} className="text-sm">
-          <span className="font-bold text-gray-800 dark:text-zinc-200">{day}: </span>
+          <span className="font-bold text-fg">{day}: </span>
           {/* Bir günün metni birden çok hareket satırı içerebilir ('\n' ile birleşik). */}
-          <span className="whitespace-pre-line font-medium text-gray-700 dark:text-gray-300">
+          <span className="whitespace-pre-line font-medium text-fg">
             {plan[day].trim() ? plan[day] : '—'}
           </span>
         </li>
@@ -89,7 +89,7 @@ function NutritionPlanView({ plan }: { plan: NutritionPlan }): JSX.Element {
 
   if (!hasContent) {
     return (
-      <p className="text-sm font-medium leading-relaxed text-gray-700 dark:text-gray-300">
+      <p className="text-sm font-medium leading-relaxed text-fg">
         Koçunuz henüz bir beslenme programı atamadı.
       </p>
     )
@@ -101,8 +101,8 @@ function NutritionPlanView({ plan }: { plan: NutritionPlan }): JSX.Element {
         const entry = plan[day]
         return (
           <li key={day} className="text-sm">
-            <span className="font-bold text-gray-800 dark:text-zinc-200">{day}: </span>
-            <span className="whitespace-pre-line font-medium text-gray-700 dark:text-gray-300">
+            <span className="font-bold text-fg">{day}: </span>
+            <span className="whitespace-pre-line font-medium text-fg">
               {entry.items.trim() ? `${entry.items} (${entry.total} kcal)` : '—'}
             </span>
           </li>
@@ -334,17 +334,17 @@ function DeleteAccountSection(): JSX.Element {
   return (
     <section
       aria-labelledby="delete-account-heading"
-      className="mt-8 rounded-2xl border-2 border-red-200 bg-red-50/60 p-6 dark:border-red-900/60 dark:bg-red-950/20"
+      className="mt-8 rounded-card border-2 border-danger/30 bg-danger/60 p-6"
     >
       <h2
         id="delete-account-heading"
-        className="mb-3 flex items-center gap-2 text-lg font-bold text-red-700 dark:text-red-400"
+        className="mb-3 flex items-center gap-2 text-lg font-bold text-danger"
       >
         <AlertTriangle aria-hidden="true" className="h-5 w-5 shrink-0" />
         Hesabımı Sil
       </h2>
 
-      <p className="text-sm font-medium leading-relaxed text-red-900/90 dark:text-red-200/90">
+      <p className="text-sm font-medium leading-relaxed text-danger/90">
         Hesabınızı sildiğinizde <strong>geri dönüşü yoktur</strong>. Şunların tamamı kalıcı olarak
         silinir: profiliniz, antrenman ve beslenme programlarınız, antrenman ve öğün kayıtlarınız,
         günlük takipleriniz, ilerleme ölçümleriniz, form check ve ilerleme fotoğraflarınız,
@@ -356,19 +356,16 @@ function DeleteAccountSection(): JSX.Element {
         <button
           type="button"
           onClick={() => setIsArmed(true)}
-          className="mt-4 inline-flex items-center gap-2 rounded-xl border-2 border-red-600 px-5 py-3 text-sm font-bold text-red-700 transition-colors hover:bg-red-600 hover:text-white dark:border-red-500 dark:text-red-400 dark:hover:bg-red-600 dark:hover:text-white"
+          className="mt-4 inline-flex items-center gap-2 rounded-control border-2 border-danger px-5 py-3 text-sm font-bold text-danger transition-colors hover:bg-danger/90 hover:text-surface"
         >
           <Trash2 aria-hidden="true" className="h-4 w-4 shrink-0" />
           Hesabımı Sil
         </button>
       ) : (
         <div className="mt-4 space-y-3">
-          <label
-            htmlFor="delete-confirmation"
-            className="block text-sm font-bold text-red-900 dark:text-red-200"
-          >
+          <label htmlFor="delete-confirmation" className="block text-sm font-bold text-danger">
             Onaylamak için aşağıdaki kutuya{' '}
-            <code className="rounded bg-red-100 px-1.5 py-0.5 font-mono text-red-800 dark:bg-red-900/60 dark:text-red-100">
+            <code className="rounded bg-danger/15 px-1.5 py-0.5 font-mono text-danger">
               {DELETE_ACCOUNT_CONFIRMATION}
             </code>{' '}
             yazın
@@ -385,12 +382,9 @@ function DeleteAccountSection(): JSX.Element {
             autoCorrect="off"
             spellCheck={false}
             aria-describedby="delete-confirmation-hint"
-            className="w-full max-w-sm rounded-xl border-2 border-red-300 bg-white p-3 text-sm font-medium focus:border-red-600 focus:outline-none dark:border-red-900 dark:bg-zinc-950"
+            className="w-full max-w-sm rounded-control border-2 border-danger/40 bg-surface p-3 text-sm font-medium focus:border-danger focus:outline-none"
           />
-          <p
-            id="delete-confirmation-hint"
-            className="text-xs font-medium text-red-800/80 dark:text-red-300/80"
-          >
+          <p id="delete-confirmation-hint" className="text-xs font-medium text-danger/80">
             {isPhraseCorrect
               ? 'Onay metni doğru. Aşağıdaki düğmeye bastığınızda hesabınız kalıcı olarak silinecek.'
               : 'Silme düğmesi, onay metnini birebir yazana kadar etkinleşmez.'}
@@ -402,7 +396,7 @@ function DeleteAccountSection(): JSX.Element {
               onClick={handleDelete}
               disabled={!canSubmit}
               aria-busy={deleteAccount.isPending}
-              className="inline-flex items-center gap-2 rounded-xl bg-red-600 px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-40"
+              className="inline-flex items-center gap-2 rounded-control bg-danger px-5 py-3 text-sm font-bold text-surface transition-colors hover:bg-danger/90 disabled:cursor-not-allowed disabled:opacity-40"
             >
               <Trash2 aria-hidden="true" className="h-4 w-4 shrink-0" />
               {deleteAccount.isPending ? 'Siliniyor...' : 'Hesabımı kalıcı olarak sil'}
@@ -414,7 +408,7 @@ function DeleteAccountSection(): JSX.Element {
                 setConfirmation('')
               }}
               disabled={deleteAccount.isPending}
-              className="rounded-xl border px-5 py-3 text-sm font-bold text-gray-700 transition-colors hover:bg-gray-100 disabled:opacity-40 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
+              className="rounded-control border px-5 py-3 text-sm font-bold text-fg transition-colors hover:bg-surface-sunken disabled:opacity-40"
             >
               Vazgeç
             </button>
@@ -526,26 +520,23 @@ export default function ProfilePage(): JSX.Element {
           ← Ana Sayfaya Dön
         </button>
 
-        <h1 className="mb-6 text-3xl font-bold text-gray-800 dark:text-zinc-200">Profilim</h1>
+        <h1 className="mb-6 text-3xl font-bold text-fg">Profilim</h1>
 
         <div
           role="alert"
-          className="mb-8 flex items-start gap-3 rounded-2xl border-2 border-amber-300 bg-amber-50 p-6 dark:border-amber-800 dark:bg-amber-950/30"
+          className="mb-8 flex items-start gap-3 rounded-card border-2 border-warning/40 bg-warning/10 p-6"
         >
-          <ShieldAlert
-            aria-hidden="true"
-            className="mt-0.5 h-6 w-6 shrink-0 text-amber-700 dark:text-amber-400"
-          />
+          <ShieldAlert aria-hidden="true" className="mt-0.5 h-6 w-6 shrink-0 text-warning" />
           <div className="space-y-1">
-            <p className="font-bold text-amber-900 dark:text-amber-200">
+            <p className="font-bold text-warning">
               Hesabınız iki adımlı doğrulama tamamlanana kadar kilitli
             </p>
-            <p className="text-sm font-medium leading-relaxed text-amber-900/90 dark:text-amber-200/90">
+            <p className="text-sm font-medium leading-relaxed text-warning/90">
               Koç hesapları için iki adımlı doğrulama zorunludur. Profil bilgilerinize ve danışan
               verilerinize erişebilmek için önce aşağıdan doğrulamayı tamamlayın.
             </p>
             {isProfileError && profileError && (
-              <p className="text-xs font-medium text-amber-800/70 dark:text-amber-300/70">
+              <p className="text-xs font-medium text-warning/70">
                 Teknik detay: {profileError.message}
               </p>
             )}
@@ -568,10 +559,10 @@ export default function ProfilePage(): JSX.Element {
         ← Ana Sayfaya Dön
       </button>
 
-      <div className="mb-8 flex flex-col items-center gap-8 rounded-3xl border border-gray-100 bg-white p-8 shadow-xl dark:border-zinc-800 dark:bg-[#16161d] md:flex-row md:items-start">
+      <div className="mb-8 flex flex-col items-center gap-8 rounded-card border border-border bg-surface p-8 md:flex-row md:items-start">
         {/* Avatar Bölümü */}
         <div className="group relative cursor-pointer">
-          <div className="flex h-32 w-32 items-center justify-center overflow-hidden rounded-full border-4 border-accent/20 bg-gray-100 transition-all group-hover:border-accent dark:bg-zinc-900">
+          <div className="flex h-32 w-32 items-center justify-center overflow-hidden rounded-full border-4 border-accent/20 bg-surface-sunken transition-all group-hover:border-accent">
             {/* Avatar private bucket'tadır: adres imzalıdır ve süreye bağlıdır.
                 İmza üretilemezse (dosya yok/erişim yok) kırık görsel yerine
                 nötr bir kullanıcı ikonu gösterilir. */}
@@ -584,7 +575,7 @@ export default function ProfilePage(): JSX.Element {
                 className="h-full w-full object-cover"
               />
             ) : (
-              <User aria-hidden="true" className="h-12 w-12 text-gray-400" />
+              <User aria-hidden="true" className="h-12 w-12 text-fg-muted" />
             )}
           </div>
           <input
@@ -610,14 +601,12 @@ export default function ProfilePage(): JSX.Element {
         {/* Kullanıcı Bilgileri & Şifre */}
         <div className="w-full flex-1 space-y-4">
           <div>
-            <h1 className="text-3xl font-black text-gray-800 dark:text-zinc-200">
-              {profile.full_name}
-            </h1>
-            <p className="font-medium text-gray-500">{session?.user.email}</p>
+            <h1 className="text-3xl font-bold text-fg">{profile.full_name}</h1>
+            <p className="font-medium text-fg-muted">{session?.user.email}</p>
           </div>
           <form
             onSubmit={onSubmitPassword}
-            className="flex max-w-md flex-col gap-3 border-t pt-4 dark:border-zinc-800 sm:flex-row"
+            className="flex max-w-md flex-col gap-3 border-t pt-4 sm:flex-row"
             noValidate
           >
             <div className="flex-1">
@@ -631,14 +620,14 @@ export default function ProfilePage(): JSX.Element {
                 autoComplete="new-password"
                 aria-invalid={errors.password ? 'true' : 'false'}
                 aria-describedby={errors.password ? 'new-password-error' : undefined}
-                className="w-full rounded-xl border bg-gray-50 p-3 text-sm focus:border-accent focus:outline-none dark:border-zinc-800 dark:bg-zinc-950"
+                className="w-full rounded-control border bg-surface-sunken p-3 text-sm focus:border-accent focus:outline-none"
                 {...register('password')}
               />
               {errors.password && (
                 <p
                   id="new-password-error"
                   role="alert"
-                  className="mt-1 text-xs font-bold text-red-500"
+                  className="mt-1 text-xs font-bold text-danger"
                 >
                   {errors.password.message}
                 </p>
@@ -647,7 +636,7 @@ export default function ProfilePage(): JSX.Element {
             <button
               type="submit"
               disabled={updatePassword.isPending}
-              className="h-fit rounded-xl bg-zinc-800 px-6 py-3 text-sm font-bold text-white transition-all hover:bg-black disabled:opacity-50 dark:bg-white dark:text-black dark:hover:bg-gray-200"
+              className="h-fit rounded-control bg-fg px-6 py-3 text-sm font-bold text-canvas transition-colors hover:bg-fg/90 disabled:opacity-50"
             >
               Güncelle
             </button>
@@ -657,8 +646,8 @@ export default function ProfilePage(): JSX.Element {
 
       {/* Program Görüntüleme Alanı */}
       <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
-        <div className="rounded-3xl border border-gray-100 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-[#16161d]">
-          <h3 className="mb-4 flex items-center gap-2 border-b pb-3 text-lg font-black text-accent dark:border-zinc-800">
+        <div className="rounded-card border border-border bg-surface p-6">
+          <h3 className="mb-4 flex items-center gap-2 border-b pb-3 text-lg font-bold text-accent">
             <Salad aria-hidden="true" className="h-5 w-5 shrink-0" />
             Beslenme Programım
           </h3>
@@ -673,8 +662,8 @@ export default function ProfilePage(): JSX.Element {
           </QueryState>
         </div>
 
-        <div className="rounded-3xl border border-gray-100 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-[#16161d]">
-          <h3 className="mb-4 flex items-center gap-2 border-b pb-3 text-lg font-black text-emerald-500 dark:border-zinc-800">
+        <div className="rounded-card border border-border bg-surface p-6">
+          <h3 className="mb-4 flex items-center gap-2 border-b pb-3 text-lg font-bold text-success">
             <Dumbbell aria-hidden="true" className="h-5 w-5 shrink-0" />
             Antrenman Programım
           </h3>

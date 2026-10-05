@@ -1,35 +1,31 @@
-// Hareket kimliğinin TEK KAYNAĞI — "Motion Doktrini" (Fable, 2026-08-21).
+// Hareket kimliğinin TEK KAYNAĞI — "Ritim, gösteri değil" (marka kararı v2 "Kor & Kemik").
 //
 // `tokens.ts`nin renk için yaptığını bu dosya süre/eğri (easing) için yapar: tüm
 // geçiş/animasyon süresi ve zamanlama eğrisi BURADAN türetilir, çağrı yerlerine
 // ham `200ms` / `cubic-bezier(...)` serpiştirilmez. `tailwind.config.ts` bu
-// değerleri `duration-fast` / `duration-base` / `duration-slow` ve
-// `ease-standard` / `ease-decelerate` Tailwind yardımcı sınıflarına çevirir
-// (bkz. `theme.extend.transitionDuration` / `transitionTimingFunction`).
+// değerleri `duration-fast` / `duration-base` / `duration-reward` ve
+// `ease-standard` / `ease-decelerate` / `ease-accelerate` yardımcı sınıflarına çevirir.
 //
-// Kimlik ADR-0015 "Demir & Tebeşir": sakin, ağır, disiplinli. Bu yüzden yalnızca
-// ÜÇ süre ve İKİ eğri vardır — spring/bounce/elastic yok, "accelerate" eğrisi
-// yok (hiçbir imza hareket bu turda çıkışta hızlanan bir öğe içermiyor).
+// Hareket yalnızca durum değişimini anlatır. Set tamamlama ve PR tek iki ödül anıdır;
+// döngüsel animasyon yoktur (tek istisna skeleton nabzı). Spring/bounce yoktur.
 //
-//   fast (120ms)  — mikro etkileşim: hover/focus renk+border geçişi.
-//   base (200ms)  — orta ölçek: rota geçişi, skeleton->içerik geçişi.
-//   slow (450ms)  — imza hareket: LoopRing mount'ta tek seferlik arc çizimi
-//                   (bilinçli olarak en ağır süre — "ağır" kimliğin kendisi).
+//   fast   (120ms) — hover/press: renk+border geçişi.
+//   base   (220ms) — sayfa/sheet: rota geçişi, skeleton->içerik geçişi.
+//   reward (600ms) — set/PR: ilerleme halkasının dolması, sembol kolunun çizimi.
 //
-//   standard    — yerinde değişen bir öğe (ör. zaten ekrandaki bir butonun
-//                 rengi). Materyal hareketindeki "standard" eğriye karşılık gelir.
-//   decelerate  — EKRANA GİREN bir öğe (rota içeriği, skeleton'un yerini alan
-//                 gerçek içerik, LoopRing'in ilk çizimi). Giriş yavaşlayarak
-//                 biter — "demir zıplamaz", ama durağan da değildir.
+//   standard    — yerinde değişen öğe.
+//   decelerate  — EKRANA GİREN öğe (giriş yavaşlayarak biter).
+//   accelerate  — EKRANDAN ÇIKAN öğe (çıkış hızlanarak biter).
 export const durations = {
   fast: 120,
-  base: 200,
-  slow: 450,
+  base: 220,
+  reward: 600,
 } as const
 
 export const easings = {
   standard: 'cubic-bezier(0.2, 0, 0, 1)',
-  decelerate: 'cubic-bezier(0, 0, 0.2, 1)',
+  decelerate: 'cubic-bezier(0, 0, 0, 1)',
+  accelerate: 'cubic-bezier(0.3, 0, 1, 1)',
 } as const
 
 export type DurationName = keyof typeof durations

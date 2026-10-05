@@ -160,19 +160,15 @@ export function DashboardTabs({
     <div className="mt-4 w-full">
       {/* Danışan Başlığı (Streak) */}
       {userRole === 'client' && (
-        <div className="mb-6 flex items-center justify-between rounded-2xl border border-orange-500/20 bg-gradient-to-r from-orange-500/10 to-transparent p-4">
+        <div className="mb-6 flex items-center justify-between rounded-card border border-accent/30 bg-accent/10 p-4">
           <div>
-            <h3 className="flex items-center gap-2 text-sm font-black text-orange-600 dark:text-orange-400">
+            <h3 className="flex items-center gap-2 text-sm font-bold text-accent">
               <Flame aria-hidden="true" className="h-4 w-4 shrink-0" />
               GÜNLÜK SERİ (STREAK)
             </h3>
-            <p className="text-xs text-gray-600 dark:text-gray-300">
-              Raporları aksatmadan ilerliyorsun, bozma!
-            </p>
+            <p className="text-xs text-fg-muted">Raporları aksatmadan ilerliyorsun, bozma!</p>
           </div>
-          <div className="animate-pulse text-3xl font-black text-orange-500 drop-shadow-md">
-            {currentStreak} GÜN
-          </div>
+          <div className="font-display text-31 font-bold text-accent">{currentStreak} GÜN</div>
         </div>
       )}
 
@@ -180,10 +176,10 @@ export function DashboardTabs({
       {userRole === 'coach' && (
         <>
           {criticalClients.length > 0 && (
-            <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 p-4 dark:border-red-900/30 dark:bg-red-900/10">
-              <h3 className="mb-3 flex items-center gap-2 text-xs font-black uppercase tracking-widest text-red-600 dark:text-red-400">
-                <span className="h-2 w-2 animate-ping rounded-full bg-red-500" aria-hidden="true" />{' '}
-                Acil İlgilenilmesi Gerekenler
+            <div className="mb-6 rounded-card border border-danger/30 bg-danger/10 p-4">
+              <h3 className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.06em] text-danger">
+                <span className="h-2 w-2 rounded-full bg-danger" aria-hidden="true" /> Acil
+                İlgilenilmesi Gerekenler
               </h3>
               <div className="hide-scrollbar flex gap-3 overflow-x-auto">
                 {criticalClients.map((c) => (
@@ -193,7 +189,7 @@ export function DashboardTabs({
                     onClick={() => toggleClient(c.id)}
                     aria-pressed={selectedClientIds.includes(c.id)}
                     aria-label={`${c.full_name ?? 'Danışan'} seç`}
-                    className="flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-xl border border-red-100 bg-white px-3 py-2 text-xs font-bold text-gray-700 shadow-sm transition-transform hover:scale-105 dark:border-red-900/20 dark:bg-[#16161d] dark:text-gray-300"
+                    className="flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-control border border-danger/20 bg-surface px-3 py-2 text-xs font-bold text-fg transition-transform"
                   >
                     <TriangleAlert aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
                     {(c.full_name ?? '').split(' ')[0] ?? ''}
@@ -203,17 +199,15 @@ export function DashboardTabs({
             </div>
           )}
 
-          <div className="mb-8 overflow-hidden rounded-3xl border border-gray-200 bg-white p-5 shadow-sm transition-all dark:border-zinc-800 dark:bg-[#16161d]">
-            <div className="mb-6 flex flex-col items-start justify-between gap-4 border-b border-gray-100 pb-4 dark:border-zinc-800 md:flex-row md:items-center">
+          <div className="mb-8 overflow-hidden rounded-card border border-border bg-surface p-5 transition-all">
+            <div className="mb-6 flex flex-col items-start justify-between gap-4 border-b border-border pb-4 md:flex-row md:items-center">
               <div>
-                <h3 className="text-sm font-black uppercase tracking-widest text-accent">
-                  Danışan Yönetimi
-                </h3>
+                <h3 className="text-sm font-bold text-accent">Danışan Yönetimi</h3>
               </div>
               <div className="relative w-full md:w-64">
                 <Search
                   aria-hidden="true"
-                  className="absolute inset-y-0 left-3 my-auto h-4 w-4 text-gray-400"
+                  className="absolute inset-y-0 left-3 my-auto h-4 w-4 text-fg-muted"
                 />
                 <label htmlFor="client-search" className="sr-only">
                   Danışan Ara
@@ -227,14 +221,14 @@ export function DashboardTabs({
                     setSearchTerm(e.target.value)
                     setCurrentPage(0)
                   }}
-                  className="w-full rounded-xl border border-gray-200 bg-gray-50 py-2.5 pl-9 pr-3 text-sm transition-all focus:border-accent focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
+                  className="w-full rounded-control border border-border-control bg-surface-sunken py-2.5 pl-9 pr-3 text-sm transition-all focus:border-accent focus:outline-none"
                 />
               </div>
               <div className="flex w-full items-center justify-between gap-4 md:w-auto">
                 <button
                   type="button"
                   onClick={selectAll}
-                  className="whitespace-nowrap rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-bold text-gray-600 transition-all hover:bg-accent hover:text-white dark:bg-zinc-800 dark:text-gray-300"
+                  className="whitespace-nowrap rounded-lg bg-surface-sunken px-3 py-1.5 text-xs font-bold text-fg-muted transition-all hover:bg-accent hover:text-accent-fg"
                 >
                   {selectedClientIds.length === filteredClients.length && filteredClients.length > 0
                     ? 'SEÇİMİ TEMİZLE'
@@ -246,7 +240,7 @@ export function DashboardTabs({
                     onClick={prevBtn}
                     disabled={currentPage === 0}
                     aria-label="Önceki sayfa"
-                    className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-100 transition-all hover:bg-accent hover:text-white disabled:opacity-30 dark:bg-zinc-800"
+                    className="flex h-8 w-8 items-center justify-center rounded-full bg-surface-sunken transition-all hover:bg-accent hover:text-accent-fg disabled:opacity-30"
                   >
                     <span aria-hidden="true">{'<'}</span>
                   </button>
@@ -255,7 +249,7 @@ export function DashboardTabs({
                     onClick={nextBtn}
                     disabled={currentPage >= totalPages - 1 || totalPages === 0}
                     aria-label="Sonraki sayfa"
-                    className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-100 transition-all hover:bg-accent hover:text-white disabled:opacity-30 dark:bg-zinc-800"
+                    className="flex h-8 w-8 items-center justify-center rounded-full bg-surface-sunken transition-all hover:bg-accent hover:text-accent-fg disabled:opacity-30"
                   >
                     <span aria-hidden="true">{'>'}</span>
                   </button>
@@ -265,7 +259,7 @@ export function DashboardTabs({
 
             <div className="relative h-24 w-full overflow-hidden">
               {filteredClients.length === 0 ? (
-                <div className="flex h-full items-center justify-center text-xs font-bold text-gray-400">
+                <div className="flex h-full items-center justify-center text-xs font-bold text-fg-muted">
                   Aramayla eşleşen danışan bulunamadı.
                 </div>
               ) : (
@@ -304,21 +298,21 @@ export function DashboardTabs({
                                   )}&background=random&color=fff&bold=true`}
                                   alt=""
                                   loading="lazy"
-                                  className={`h-14 w-14 rounded-full object-cover shadow-sm transition-all duration-300 ${
+                                  className={`h-14 w-14 rounded-full object-cover transition-all duration-base ${
                                     isSelected
                                       ? 'scale-110 ring-4 ring-accent'
-                                      : 'opacity-60 grayscale hover:grayscale-0 group-hover:scale-105 group-hover:opacity-100'
+                                      : 'opacity-60 grayscale hover:grayscale-0 group-hover:opacity-100'
                                   }`}
                                 />
                                 {client.current_streak > 0 && (
-                                  <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border-2 border-white bg-orange-500 text-[9px] font-black text-white dark:border-zinc-900">
+                                  <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border-2 border-surface bg-accent text-[9px] font-bold text-accent-fg">
                                     {client.current_streak}
                                   </span>
                                 )}
                               </div>
                               <span
                                 className={`w-full truncate text-center text-[10px] font-bold ${
-                                  isSelected ? 'text-accent' : 'text-gray-500'
+                                  isSelected ? 'text-accent' : 'text-fg-muted'
                                 }`}
                               >
                                 {firstName}
@@ -340,7 +334,7 @@ export function DashboardTabs({
         role="tablist"
         aria-label="Panel sekmeleri"
         onKeyDown={handleTabKeyDown}
-        className="hide-scrollbar flex gap-6 overflow-x-auto border-b border-gray-200 pb-2 text-sm font-medium dark:border-zinc-800"
+        className="hide-scrollbar flex gap-6 overflow-x-auto border-b border-border pb-2 text-sm font-medium"
       >
         {TABS.map((tab) => (
           <button
@@ -356,16 +350,14 @@ export function DashboardTabs({
             }}
             onClick={() => setActiveTab(tab)}
             className={`relative flex items-center gap-2 whitespace-nowrap pb-2 transition-all ${
-              activeTab === tab
-                ? 'font-bold text-accent'
-                : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
+              activeTab === tab ? 'font-bold text-accent' : 'text-fg-muted hover:text-fg'
             }`}
           >
             {tab === 'announcements' && (
               <>
                 <Bell aria-hidden="true" className="h-4 w-4 shrink-0" /> Duyurular{' '}
                 {announcements.length > 0 && (
-                  <span className="animate-bounce rounded-full bg-red-500 px-2 py-0.5 text-[10px] text-white">
+                  <span className="rounded-full bg-danger px-2 py-0.5 text-[10px] text-surface">
                     {announcements.length}
                   </span>
                 )}
@@ -404,9 +396,8 @@ export function DashboardTabs({
             {activeTab === tab && (
               <span
                 aria-hidden="true"
-                // Kutu gölgesi CSS değişkenine bağlanır: `rgb(var(--color-accent) / N)`
-                // globals.css'teki aynı desendir, ham marka moru bırakmaz.
-                className="absolute bottom-[-9px] left-0 h-[2px] w-full bg-accent shadow-[0_0_8px_rgb(var(--color-accent)_/_0.8)]"
+                // Aktif sekme: düz kor çizgi (parıltı/gölge yok — Kor & Kemik).
+                className="absolute bottom-[-9px] left-0 h-[2px] w-full rounded-pill bg-accent"
               />
             )}
           </button>
@@ -420,10 +411,10 @@ export function DashboardTabs({
         id={`panel-${activeTab}`}
         aria-labelledby={`tab-${activeTab}`}
         tabIndex={0}
-        className="mt-4 min-h-[400px] rounded-3xl border border-gray-100 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-[#16161d] md:p-8"
+        className="mt-4 min-h-[400px] rounded-card border border-border bg-surface p-5 md:p-8"
       >
         {userRole === 'coach' && selectedClientIds.length === 0 ? (
-          <div className="flex h-64 flex-col items-center justify-center text-sm font-bold text-gray-500">
+          <div className="flex h-64 flex-col items-center justify-center text-sm font-bold text-fg-muted">
             <Users aria-hidden="true" className="mb-3 h-10 w-10 opacity-50" />
             Lütfen yukarıdaki panelden en az bir danışan seçin.
           </div>

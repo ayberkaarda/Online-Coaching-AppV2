@@ -3,7 +3,7 @@
 
 import { cn } from '@/lib/utils'
 
-const BASE = 'animate-pulse rounded-xl bg-gray-200 dark:bg-zinc-800'
+const BASE = 'animate-pulse rounded-control bg-border'
 
 export interface SkeletonProps {
   className?: string
@@ -38,7 +38,7 @@ export function SkeletonCard() {
     <div
       role="status"
       aria-live="polite"
-      className="space-y-4 rounded-3xl border border-gray-100 p-6 dark:border-zinc-800"
+      className="space-y-4 rounded-card border border-border p-6"
     >
       <LoadingLabel />
       <Skeleton className="h-5 w-1/3" />
@@ -59,7 +59,7 @@ export function SkeletonTable({ rows = 5, cols = 3 }: SkeletonTableProps) {
     <div
       role="status"
       aria-live="polite"
-      className="overflow-hidden rounded-xl border border-gray-200 dark:border-zinc-800"
+      className="overflow-hidden rounded-control border border-border"
     >
       <LoadingLabel />
       <div className="space-y-3 p-4">

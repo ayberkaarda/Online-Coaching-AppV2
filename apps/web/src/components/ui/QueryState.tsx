@@ -43,14 +43,14 @@ export function QueryState({
     return (
       <div
         role="alert"
-        className="space-y-3 rounded-2xl border border-red-200 bg-red-50 p-5 text-center dark:border-red-900/40 dark:bg-red-950/20"
+        className="space-y-3 rounded-card border border-danger/30 bg-danger/10 p-5 text-center"
       >
-        <p className="text-sm font-bold text-red-600 dark:text-red-400">{toMessage(error)}</p>
+        <p className="text-sm font-bold text-danger">{toMessage(error)}</p>
         {onRetry ? (
           <button
             type="button"
             onClick={onRetry}
-            className="rounded-xl bg-accent px-5 py-2 text-xs font-bold text-white transition-transform active:scale-95"
+            className="rounded-control bg-accent px-5 py-2 text-xs font-bold text-accent-fg transition-transform active:scale-[0.97]"
           >
             Tekrar Dene
           </button>

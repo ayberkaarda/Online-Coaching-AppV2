@@ -527,7 +527,7 @@ export default function WorkoutTab({
     <div className="animate-fadeIn space-y-8">
       {userRole === 'coach' && firstApproval ? (
         <div className="rounded-panel border border-warning/30 bg-warning/10 p-5">
-          <h4 className="mb-2 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-warning">
+          <h4 className="mb-2 flex items-center gap-2 text-sm font-bold text-warning">
             <TriangleAlert aria-hidden="true" className="h-4 w-4 shrink-0" /> ONAY BEKLEYEN PROGRAM
             VAR
           </h4>
@@ -547,7 +547,7 @@ export default function WorkoutTab({
               onClick={handleApprove}
               disabled={approveProgram.isPending}
               aria-busy={approveProgram.isPending}
-              className="flex items-center gap-1.5 rounded-control bg-warning px-4 py-2 text-xs font-bold text-white shadow-sm hover:opacity-90 disabled:opacity-50"
+              className="flex items-center gap-1.5 rounded-control bg-warning px-4 py-2 text-xs font-bold text-surface hover:opacity-90 disabled:opacity-50"
             >
               <Check aria-hidden="true" className="h-3.5 w-3.5 shrink-0" /> Onayla ve Profiline İşle
             </button>
@@ -562,7 +562,7 @@ export default function WorkoutTab({
             <button
               type="button"
               onClick={startLiveWorkout}
-              className="flex items-center gap-1.5 rounded-control bg-accent px-4 py-2 text-xs font-bold text-accent-fg shadow-sm"
+              className="flex items-center gap-1.5 rounded-control bg-accent px-4 py-2 text-xs font-bold text-accent-fg"
             >
               <Dumbbell aria-hidden="true" className="h-3.5 w-3.5 shrink-0" /> BUGÜNÜ BAŞLAT
             </button>
@@ -587,7 +587,7 @@ export default function WorkoutTab({
         >
           <Bot aria-hidden="true" className="mt-2 h-10 w-10 shrink-0 text-accent" />
           <div className="w-full flex-1 space-y-3">
-            <p className="mb-1 block text-xs font-bold uppercase tracking-wide text-accent">
+            <p className="mb-1 block text-xs font-bold uppercase tracking-[0.06em] text-accent">
               OTOMATİK PROGRAM ÜRETİCİ
             </p>
             <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
@@ -919,7 +919,7 @@ export default function WorkoutTab({
           onClick={handleSaveProgram}
           disabled={savePlan.isPending}
           aria-busy={savePlan.isPending}
-          className="w-full rounded-control bg-success py-4 font-bold text-white shadow-sm transition-transform hover:opacity-90 active:scale-95 disabled:opacity-50"
+          className="w-full rounded-control bg-success py-4 font-bold text-surface transition-transform hover:opacity-90 active:scale-[0.97] disabled:opacity-50"
         >
           Antrenman Tablosunu Güncelle
         </button>
@@ -929,10 +929,10 @@ export default function WorkoutTab({
           onClick={sendToCoachForApproval}
           disabled={isWaitingMyApproval || submitForApproval.isPending}
           aria-busy={submitForApproval.isPending}
-          className={`flex w-full items-center justify-center gap-2 rounded-control py-4 font-bold shadow-sm transition-all ${
+          className={`flex w-full items-center justify-center gap-2 rounded-control py-4 font-bold transition-all ${
             isWaitingMyApproval
               ? 'cursor-not-allowed bg-border text-fg-muted'
-              : 'bg-warning text-white hover:opacity-90'
+              : 'bg-warning text-surface hover:opacity-90'
           }`}
         >
           {isWaitingMyApproval ? (

@@ -31,7 +31,7 @@ vi.mock('next/font/google', () => {
     variable: 'mock-font-variable',
     className: 'mock-font',
   })
-  return { Archivo: font, Hanken_Grotesk: font, IBM_Plex_Mono: font }
+  return { Bricolage_Grotesque: font, Instrument_Sans: font, JetBrains_Mono: font }
 })
 
 // Gerçek `Providers` React Query / next-themes / sonner ağacını sürüklerdi; bize yalnızca

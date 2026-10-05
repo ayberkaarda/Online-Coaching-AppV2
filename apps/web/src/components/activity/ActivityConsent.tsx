@@ -240,7 +240,7 @@ function GrantPanel({
         onClick={() => grant.mutate()}
         disabled={!isChecked || grant.isPending}
         aria-busy={grant.isPending}
-        className="inline-flex items-center gap-2 rounded-control bg-accent px-5 py-3 text-sm font-bold text-accent-fg transition-transform active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+        className="inline-flex items-center gap-2 rounded-control bg-accent px-5 py-3 text-sm font-bold text-accent-fg transition-transform active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50"
       >
         <ShieldCheck aria-hidden="true" className="h-4 w-4 shrink-0" />
         {grant.isPending ? 'Kaydediliyor...' : actionLabel}

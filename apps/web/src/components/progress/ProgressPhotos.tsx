@@ -314,7 +314,7 @@ export function ProgressPhotos({ clientId, readOnly }: ProgressPhotosProps): JSX
             {PROGRESS_PHOTO_ANGLES.filter((value) => photosByAngle[value].length > 0).map(
               (value) => (
                 <div key={value} className="space-y-2">
-                  <h5 className="text-xs font-bold uppercase tracking-wide text-fg-muted">
+                  <h5 className="text-xs font-bold uppercase tracking-[0.06em] text-fg-muted">
                     {PROGRESS_PHOTO_ANGLE_LABELS[value]}
                   </h5>
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">

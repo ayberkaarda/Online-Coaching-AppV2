@@ -140,7 +140,7 @@ export function ClientActivityLog({ userId }: ClientActivityLogProps): JSX.Eleme
           <section aria-labelledby="client-activity-sessions-heading">
             <h3
               id="client-activity-sessions-heading"
-              className="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-fg-muted"
+              className="mb-3 flex items-center gap-2 text-sm font-bold text-fg-muted"
             >
               <CalendarClock aria-hidden="true" className="h-4 w-4 shrink-0" />
               Oturumlar
@@ -159,7 +159,7 @@ export function ClientActivityLog({ userId }: ClientActivityLogProps): JSX.Eleme
           <section aria-labelledby="client-activity-events-heading">
             <h3
               id="client-activity-events-heading"
-              className="mb-3 text-sm font-bold uppercase tracking-wider text-fg-muted"
+              className="mb-3 text-sm font-bold text-fg-muted"
             >
               Olaylar
             </h3>

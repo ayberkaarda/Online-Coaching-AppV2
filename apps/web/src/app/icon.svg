@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="2">
+  <style>
+    .g { stroke: #17150F; }
+    .k { stroke: #B63D0B; }
+    @media (prefers-color-scheme: dark) {
+      .g { stroke: #F3EFE8; }
+      .k { stroke: #FF8A4C; }
+    }
+  </style>
+  <path class="g" d="M7.5 7.6 C8.2 7.1 8.4 5.6 7.4 4.6 C6.3 3.6 4.1 3.6 2.8 5.1 C1.6 6.7 1.8 9.7 3.9 11.2 C5.9 12.7 9.6 12.3 11.4 9.7"/>
+  <path class="k" d="M11.4 9.7 L14 6"/>
+</svg>

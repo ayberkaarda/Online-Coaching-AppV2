@@ -46,19 +46,17 @@ export function NotificationForm({ clients }: NotificationFormProps): JSX.Elemen
   const isSending = isSubmitting || sendNotification.isPending
 
   return (
-    <div className="rounded-3xl border border-gray-100 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-[#16161d] md:p-8">
+    <div className="rounded-card border border-border bg-surface p-6 md:p-8">
       <div className="mb-6 flex items-center gap-3">
         <Megaphone aria-hidden="true" className="h-6 w-6 shrink-0 text-accent" />
-        <h3 className="text-lg font-black text-gray-800 dark:text-zinc-200">
-          Duyuru &amp; Mesaj Gönder
-        </h3>
+        <h3 className="text-lg font-bold text-fg">Duyuru &amp; Mesaj Gönder</h3>
       </div>
 
       <form onSubmit={onSubmit} className="space-y-5" noValidate>
         <div>
           <label
             htmlFor="notification-target"
-            className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-500"
+            className="mb-2 block text-xs font-bold uppercase tracking-[0.06em] text-fg-muted"
           >
             KİME
           </label>
@@ -67,7 +65,7 @@ export function NotificationForm({ clients }: NotificationFormProps): JSX.Elemen
             {...register('target')}
             aria-invalid={errors.target ? 'true' : 'false'}
             aria-describedby={errors.target ? 'notification-target-error' : undefined}
-            className="w-full rounded-xl border border-gray-200 bg-gray-50 p-3.5 text-sm font-medium focus:border-accent focus:outline-none dark:border-zinc-800 dark:bg-zinc-950"
+            className="w-full rounded-control border border-border-control bg-surface-sunken p-3.5 text-sm font-medium focus:border-accent focus:outline-none"
           >
             {/* `<option>` içinde ikon render edilemez (tarayıcı yalnızca düz metin
                 gösterir), bu yüzden burada emoji ikonun yerine düz metin geçer. */}
@@ -82,7 +80,7 @@ export function NotificationForm({ clients }: NotificationFormProps): JSX.Elemen
             <p
               id="notification-target-error"
               role="alert"
-              className="mt-1 text-xs font-bold text-red-500"
+              className="mt-1 text-xs font-bold text-danger"
             >
               {errors.target.message}
             </p>
@@ -92,7 +90,7 @@ export function NotificationForm({ clients }: NotificationFormProps): JSX.Elemen
         <div>
           <label
             htmlFor="notification-title"
-            className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-500"
+            className="mb-2 block text-xs font-bold uppercase tracking-[0.06em] text-fg-muted"
           >
             BAŞLIK
           </label>
@@ -103,13 +101,13 @@ export function NotificationForm({ clients }: NotificationFormProps): JSX.Elemen
             aria-invalid={errors.title ? 'true' : 'false'}
             aria-describedby={errors.title ? 'notification-title-error' : undefined}
             placeholder="Örn: Yeni Antrenman Bloklarına Geçiş"
-            className="w-full rounded-xl border border-gray-200 bg-gray-50 p-3.5 text-sm focus:border-accent focus:outline-none dark:border-zinc-800 dark:bg-zinc-950"
+            className="w-full rounded-control border border-border-control bg-surface-sunken p-3.5 text-sm focus:border-accent focus:outline-none"
           />
           {errors.title ? (
             <p
               id="notification-title-error"
               role="alert"
-              className="mt-1 text-xs font-bold text-red-500"
+              className="mt-1 text-xs font-bold text-danger"
             >
               {errors.title.message}
             </p>
@@ -119,7 +117,7 @@ export function NotificationForm({ clients }: NotificationFormProps): JSX.Elemen
         <div>
           <label
             htmlFor="notification-message"
-            className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-500"
+            className="mb-2 block text-xs font-bold uppercase tracking-[0.06em] text-fg-muted"
           >
             MESAJ DETAYI
           </label>
@@ -129,13 +127,13 @@ export function NotificationForm({ clients }: NotificationFormProps): JSX.Elemen
             aria-invalid={errors.message ? 'true' : 'false'}
             aria-describedby={errors.message ? 'notification-message-error' : undefined}
             placeholder="Kardiyo süreleri 10 dakika artırıldı..."
-            className="h-32 w-full resize-none rounded-xl border border-gray-200 bg-gray-50 p-3.5 text-sm focus:border-accent focus:outline-none dark:border-zinc-800 dark:bg-zinc-950"
+            className="h-32 w-full resize-none rounded-control border border-border-control bg-surface-sunken p-3.5 text-sm focus:border-accent focus:outline-none"
           />
           {errors.message ? (
             <p
               id="notification-message-error"
               role="alert"
-              className="mt-1 text-xs font-bold text-red-500"
+              className="mt-1 text-xs font-bold text-danger"
             >
               {errors.message.message}
             </p>
@@ -146,7 +144,7 @@ export function NotificationForm({ clients }: NotificationFormProps): JSX.Elemen
           type="submit"
           disabled={isSending}
           aria-busy={isSending}
-          className="w-full rounded-xl bg-gradient-to-r from-accent to-purple-600 py-4 text-sm font-black text-white shadow-lg shadow-purple-500/30 transition-all hover:from-purple-600 hover:to-accent disabled:opacity-50"
+          className="w-full rounded-control bg-accent py-4 text-sm font-bold text-accent-fg transition-colors hover:bg-accent/90 disabled:opacity-50"
         >
           {isSending ? 'Gönderiliyor...' : 'Gönder'}
         </button>

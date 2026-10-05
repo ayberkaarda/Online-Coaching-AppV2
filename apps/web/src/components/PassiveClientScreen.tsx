@@ -70,7 +70,7 @@ export function PassiveClientScreen(): JSX.Element {
     >
       <section
         aria-labelledby="passive-heading"
-        className="rounded-panel border border-border bg-surface p-6 shadow-sm md:p-8"
+        className="rounded-panel border border-border bg-surface p-6 md:p-8"
       >
         <h1 id="passive-heading" className="mb-3 text-2xl font-bold text-fg">
           Koçluk hizmetiniz sona erdi
@@ -97,16 +97,16 @@ export function PassiveClientScreen(): JSX.Element {
       {/* --- HESAP SİLME (KVKK unutulma hakkı) --- */}
       <section
         aria-labelledby="passive-delete-heading"
-        className="mt-6 rounded-panel border-2 border-red-200 bg-red-50/60 p-6 dark:border-red-900/60 dark:bg-red-950/20"
+        className="mt-6 rounded-panel border-2 border-danger/30 bg-danger/60 p-6"
       >
         <h2
           id="passive-delete-heading"
-          className="mb-3 flex items-center gap-2 text-lg font-bold text-red-700 dark:text-red-400"
+          className="mb-3 flex items-center gap-2 text-lg font-bold text-danger"
         >
           <AlertTriangle aria-hidden="true" className="h-5 w-5 shrink-0" />
           Hesabımı Sil
         </h2>
-        <p className="text-sm font-medium leading-relaxed text-red-900/90 dark:text-red-200/90">
+        <p className="text-sm font-medium leading-relaxed text-danger/90">
           Hesabınızı sildiğinizde <strong>geri dönüşü yoktur</strong>. Profiliniz, programlarınız,
           kayıtlarınız, ölçümleriniz, fotoğraflarınız ve koçunuzla olan tüm yazışmalarınız kalıcı
           olarak silinir ve kurtarılamaz.
@@ -117,7 +117,7 @@ export function PassiveClientScreen(): JSX.Element {
             type="button"
             onClick={() => setIsArmed(true)}
             disabled={deleteAccount.isPending}
-            className="mt-4 inline-flex items-center gap-2 rounded-xl border-2 border-red-600 px-5 py-3 text-sm font-bold text-red-700 transition-colors hover:bg-red-600 hover:text-white disabled:opacity-50 dark:border-red-500 dark:text-red-400 dark:hover:bg-red-600 dark:hover:text-white"
+            className="mt-4 inline-flex items-center gap-2 rounded-control border-2 border-danger px-5 py-3 text-sm font-bold text-danger transition-colors hover:bg-danger/90 hover:text-surface disabled:opacity-50"
           >
             <Trash2 aria-hidden="true" className="h-4 w-4 shrink-0" />
             Hesabımı Sil
@@ -126,10 +126,10 @@ export function PassiveClientScreen(): JSX.Element {
           <div className="mt-4 space-y-3">
             <label
               htmlFor="passive-delete-confirmation"
-              className="block text-sm font-bold text-red-900 dark:text-red-200"
+              className="block text-sm font-bold text-danger"
             >
               Onaylamak için aşağıdaki kutuya{' '}
-              <code className="rounded bg-red-100 px-1.5 py-0.5 font-mono text-red-800 dark:bg-red-900/60 dark:text-red-100">
+              <code className="rounded bg-danger/15 px-1.5 py-0.5 font-mono text-danger">
                 {DELETE_ACCOUNT_CONFIRMATION}
               </code>{' '}
               yazın
@@ -144,12 +144,9 @@ export function PassiveClientScreen(): JSX.Element {
               autoCorrect="off"
               spellCheck={false}
               aria-describedby="passive-delete-confirmation-hint"
-              className="w-full max-w-sm rounded-xl border-2 border-red-300 bg-white p-3 text-sm font-medium focus:border-red-600 focus:outline-none dark:border-red-900 dark:bg-zinc-950"
+              className="w-full max-w-sm rounded-control border-2 border-danger/40 bg-surface p-3 text-sm font-medium focus:border-danger focus:outline-none"
             />
-            <p
-              id="passive-delete-confirmation-hint"
-              className="text-xs font-medium text-red-800/80 dark:text-red-300/80"
-            >
+            <p id="passive-delete-confirmation-hint" className="text-xs font-medium text-danger/80">
               {isPhraseCorrect
                 ? 'Onay metni doğru. Aşağıdaki düğmeye bastığınızda hesabınız kalıcı olarak silinecek.'
                 : 'Silme düğmesi, onay metnini birebir yazana kadar etkinleşmez.'}
@@ -161,7 +158,7 @@ export function PassiveClientScreen(): JSX.Element {
                 onClick={handleDelete}
                 disabled={!canSubmit}
                 aria-busy={deleteAccount.isPending}
-                className="inline-flex items-center gap-2 rounded-xl bg-red-600 px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-40"
+                className="inline-flex items-center gap-2 rounded-control bg-danger px-5 py-3 text-sm font-bold text-surface transition-colors hover:bg-danger/90 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <Trash2 aria-hidden="true" className="h-4 w-4 shrink-0" />
                 {deleteAccount.isPending ? 'Siliniyor...' : 'Hesabımı kalıcı olarak sil'}
@@ -173,7 +170,7 @@ export function PassiveClientScreen(): JSX.Element {
                   setConfirmation('')
                 }}
                 disabled={deleteAccount.isPending}
-                className="rounded-xl border border-border px-5 py-3 text-sm font-bold text-fg transition-colors hover:bg-canvas disabled:opacity-40"
+                className="rounded-control border border-border px-5 py-3 text-sm font-bold text-fg transition-colors hover:bg-canvas disabled:opacity-40"
               >
                 Vazgeç
               </button>

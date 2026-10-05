@@ -1,86 +1,77 @@
-// Görsel kimliğin TEK KAYNAĞI — "Demir & Tebeşir" paleti (ADR-0015).
+// Görsel kimliğin TEK KAYNAĞI — "Kor & Kemik" paleti (marka kararı v2, ADR-0015'in yerine).
 //
 // Bu dosya bilinçli olarak platformdan bağımsızdır: yalnızca `#RRGGBB` biçiminde
 // düz hex string'ler içerir. Px'li gölge string'i, `rgba()`/`calc()` gibi CSS
-// fonksiyonları, Tailwind sınıf adları ve birimler buraya GİREMEZ — Faz 4.5'te
-// Expo (React Native) bu dosyayı aynen import edecek (ADR-0009, ADR-0018).
+// fonksiyonları, Tailwind sınıf adları ve birimler buraya GİREMEZ — mobil
+// (`apps/mobile/lib/theme.ts`) aynı değerleri birebir taşır (palet eşitliği testi).
 // Web'e özgü dönüşüm (hex → RGB kanalları → CSS değişkeni) `tailwind.config.ts`
 // içinde yapılır.
 //
-// ── Adlandırılmış altı hex (ADR-0015 kararı, değiştirilemez) ────────────────
-//   Tebeşir          #F4F4F1  açık tema zemini
-//   Demir            #14161B  koyu tema zemini
-//   Menevis          #5B48D9  birincil (koyu temadaki durağı #A79BFF)
-//   Kapanış          #0F7A4C  başarı
-//   Kehribar         #A65600  uyarı (2026-08-17 kontrast ölçümüyle revize edildi)
-//   Plaka Kırmızısı  #C22F2F  hata
+// ── Adlandırılmış çekirdek renkler ─────────────────────────────────────────
+//   Kemik  #F5F2EC  açık tema zemini (sıcak kâğıt)
+//   Gece   #121110  koyu tema zemini (sıcak grafit)
+//   Kor    #B63D0B  tek vurgu rengi (koyu temadaki durağı #FF8A4C)
+//   Su     #0E6E78  ikinci veri serisi / bilgi (koyu durağı #4CC3CF)
 //
-// Geri kalan her token bu altı hex'ten TÜRETİLİR; sisteme yeni serbest renk
-// eklenmez. Türetme kuralları tek tek aşağıda gerekçelendirilmiştir. Tüm
-// kontrast oranları WCAG 2.1 bağıl parlaklık formülüyle hesaplanmış ve
-// `tests/unit/design-tokens.test.ts` içinde makineye bağlanmıştır.
+// Nötrler sıcak grilerdir; saf gri ve mor yoktur. Kor bir ekranda en fazla bir
+// dolu öğede kullanılır (birincil buton, aktif sekme, ilerleme halkası, PR anı).
+// Durum rengi asla tek sinyal değildir — her zaman ikon ya da etiketle birlikte.
+//
+// Kontrast matrisi (WCAG 2.1, her metin token'ı her yüzeyde ≥4.5:1, her kontrol
+// sınırı ≥3:1) `tests/unit/design-tokens.test.ts` içinde makineye bağlıdır.
 
 export const tokens = {
   light: {
-    /** Tebeşir — adlandırılmış hex. Kanonik referans tema açık temadır. */
-    bg: '#F4F4F1',
-    /** Türetilmiş: Tebeşir → beyaz ekseninde %50. Kart zemini; zeminden 1.05:1 ile ayrışır. */
-    surface: '#FAFAF8',
-    /** Türetilmiş: aynı eksenin uç noktası. Modal/popover — açık temada "yükselme" = aydınlanma. */
+    /** Kemik — adlandırılmış hex. */
+    bg: '#F5F2EC',
+    /** Kart zemini. Kartlar gölgesizdir; 1px `border` ile ayrılır. */
+    surface: '#FFFFFF',
+    /** Input, tablo şeridi, iç içe alan. */
+    surfaceSunken: '#ECE7DE',
+    /** Modal, popover, sheet. Açık temada yükselme tek kademe gölgeyle verilir. */
     surfaceRaised: '#FFFFFF',
-    /** Türetilmiş: Tebeşir + %20 Demir. Zemine 1.52:1 — ayırıcı çizgi, metin değil. */
-    border: '#C7C8C6',
-    /** Demir — adlandırılmış hex. Zemin üstünde 16.42:1 (AAA). */
-    textPrimary: '#14161B',
-    /** Türetilmiş: Demir + %35 Tebeşir. Zeminde 5.39:1 — eski `text-gray-400` borcunu kapatır. */
-    textSecondary: '#626466',
-    /** Menevis — adlandırılmış hex. Zeminde 5.65:1 (eski marka moru ≈ 4.2:1 idi). */
-    accent: '#5B48D9',
-    /** Türetilmiş: Tebeşir'in kendisi. Menevis üstünde 5.65:1 — buton metni için yeni renk gerekmez. */
-    accentContrast: '#F4F4F1',
-    /** Kapanış — adlandırılmış hex. Zeminde 4.88:1. */
-    success: '#0F7A4C',
-    /**
-     * Kehribar — adlandırılmış hex (2026-08-17 kontrast ölçümüyle revize edildi:
-     * #B45D00 → #A65600). Zeminde 4.82:1, kart zemininde 5.08:1, beyaz üstünde 5.31:1.
-     * Uyarı rengi bu kod tabanında ezici çoğunlukla küçük punto METİN olarak kullanılıyor,
-     * bu yüzden 3:1 UI eşiği değil 4.5:1 metin eşiği geçerlidir.
-     */
-    warning: '#A65600',
-    /** Plaka Kırmızısı — adlandırılmış hex. Zeminde 5.09:1. */
-    danger: '#C22F2F',
-    /** Türetilmiş: accent ile aynı. Zeminde 5.65:1, UI bileşeni eşiği 3:1'in çok üstünde. */
-    focusRing: '#5B48D9',
+    /** Yalnız dekoratif ayırıcı — 3:1 aranmaz. */
+    border: '#D9D2C5',
+    /** Input/checkbox sınırı — her açık yüzeyde ≥3:1 (WCAG 1.4.11). */
+    borderControl: '#81796B',
+    /** Kemik üstünde 16.33:1. */
+    textPrimary: '#17150F',
+    /** Kemik üstünde 6.42:1, sunken üstünde 5.82:1. */
+    textSecondary: '#5C574E',
+    /** Kor — dolgu ve metin. Kemik üstünde 5.13:1, sunken üstünde 4.66:1. */
+    accent: '#B63D0B',
+    /** Kor dolgu üstündeki metin: 5.74:1. */
+    accentContrast: '#FFFFFF',
+    success: '#2B7449',
+    /** Hardal. */
+    warning: '#825F00',
+    /** Ahududu. */
+    danger: '#B4123F',
+    /** Su — bilgi ve ikinci veri serisi. */
+    info: '#0E6E78',
+    /** Kor ile aynı; 2px halka + 2px zemin ofseti. */
+    focusRing: '#B63D0B',
   },
   dark: {
-    /** Demir — adlandırılmış hex. Eski #0f0f12 saf siyaha fazla yakındı, kademeler eziliyordu. */
-    bg: '#14161B',
-    /** Türetilmiş: Demir + %7 Tebeşir. Zeminden 1.19:1 — koyu temada "yükselme" = açılma. */
-    surface: '#24262A',
-    /** Türetilmiş: Demir + %13 Tebeşir. Yüzeyden 1.20:1 ile ikinci kademe. */
-    surfaceRaised: '#313337',
-    /** Türetilmiş: Demir + %20 Tebeşir — açık temadaki kenarlıkla aynı oran. Zeminde 1.80:1. */
-    border: '#414246',
-    /** Tebeşir — adlandırılmış hex. Demir üstünde 16.42:1 (AAA). */
-    textPrimary: '#F4F4F1',
-    /** Türetilmiş: Tebeşir + %35 Demir. Zeminde 7.43:1, en açık yüzeyde bile 5.20:1. */
-    textSecondary: '#A6A6A6',
-    /** Menevis'in koyu tema durağı — adlandırılmış hex. Demir üstünde 7.56:1. */
-    accent: '#A79BFF',
-    /** Türetilmiş: Demir'in kendisi. Açık Menevis üstünde 7.56:1 — koyu metin şart. */
-    accentContrast: '#14161B',
-    /**
-     * Türetilmiş: Kapanış'a ADR-0015'in Menevis→#A79BFF işleminin aynısı uygulandı —
-     * ton korunur (154°), doygunluk ×1.5 (%78→%100), parlaklık eşiği tutturana kadar
-     * yükseltilir (%27→%36). Demir üstünde 6.95:1, en açık yüzeyde 4.86:1.
-     */
-    success: '#00B869',
-    /** Türetilmiş: Kehribar, aynı kural (ton 31°, %33→%48 parlaklık). Zeminde 6.93:1. */
-    warning: '#F78000',
-    /** Türetilmiş: Plaka Kırmızısı, aynı kural (ton 0°, doygunluk %61→%91). Zeminde 6.88:1. */
-    danger: '#F97878',
-    /** Türetilmiş: accent ile aynı. Zeminde 7.56:1 — odak halkası koyu temada da okunur. */
-    focusRing: '#A79BFF',
+    /** Gece — adlandırılmış hex. */
+    bg: '#121110',
+    /** Koyu temada yükselme açılmayla verilir; gölge yoktur. */
+    surface: '#1C1A17',
+    surfaceSunken: '#0B0A09',
+    surfaceRaised: '#24221F',
+    border: '#36322C',
+    borderControl: '#7A7266',
+    textPrimary: '#F3EFE8',
+    textSecondary: '#A69F93',
+    /** Kor'un koyu tema durağı — Gece üstünde 8.08:1. */
+    accent: '#FF8A4C',
+    /** Açık kor üstünde koyu metin şart: 8.08:1. */
+    accentContrast: '#121110',
+    success: '#5FC98A',
+    warning: '#E8B931',
+    danger: '#FF6B8B',
+    info: '#4CC3CF',
+    focusRing: '#FF8A4C',
   },
 } as const
 

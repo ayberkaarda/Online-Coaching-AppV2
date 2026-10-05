@@ -53,7 +53,7 @@ import { toast } from 'sonner'
 
 import { ProgressPhotos } from '@/components/progress/ProgressPhotos'
 import { QueryState, SkeletonChart } from '@/components/ui'
-import { tokens } from '@/design/tokens'
+import { chartColors, chartTooltipStyle } from '@/design/chart'
 import {
   DEFAULT_TREND_RANGE_DAYS,
   PROGRESS_METRICS,
@@ -220,7 +220,7 @@ function ProgressEntryForm({ clientId }: { clientId: string }): JSX.Element {
         onClick={handleSubmit}
         disabled={upsert.isPending}
         aria-busy={upsert.isPending}
-        className="w-full rounded-control bg-accent py-2.5 text-sm font-bold text-accent-fg shadow-sm transition-transform active:scale-95 disabled:opacity-50 md:w-auto md:px-6"
+        className="w-full rounded-control bg-accent py-2.5 text-sm font-bold text-accent-fg transition-transform active:scale-[0.97] disabled:opacity-50 md:w-auto md:px-6"
       >
         Ölçümü Kaydet
       </button>
@@ -279,7 +279,7 @@ function ProgressTrendChart({ clientId, rangeDays, metric }: ProgressTrendChartP
             )}
           </div>
 
-          <figure className="rounded-panel border border-border bg-canvas p-4 shadow-sm">
+          <figure className="rounded-panel border border-border bg-canvas p-4">
             <div className="h-72 w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={trend.points} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
@@ -291,30 +291,21 @@ function ProgressTrendChart({ clientId, rangeDays, metric }: ProgressTrendChartP
                   />
                   <XAxis
                     dataKey="label"
-                    // recharts JS renk değeri bekliyor; `CoachUserManagement.tsx`'teki
-                    // grafik deseniyle tutarlı olması için statik tokens.light.*
-                    // kullanılıyor (tema duyarlı grafik renkleri ayrı bir iştir).
-                    stroke={tokens.light.textSecondary}
+                    // Tema duyarlı: CSS değişkenine bağlı (src/design/chart.ts).
+                    stroke={chartColors.axis}
                     fontSize={12}
                     tickLine={false}
                     axisLine={false}
                     minTickGap={16}
                   />
                   <YAxis
-                    stroke={tokens.light.textSecondary}
+                    stroke={chartColors.axis}
                     fontSize={12}
                     tickLine={false}
                     axisLine={false}
                     domain={['dataMin - 1', 'dataMax + 1']}
                   />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: tokens.dark.surface,
-                      border: `1px solid ${tokens.dark.border}`,
-                      borderRadius: '12px',
-                      color: tokens.dark.textPrimary,
-                    }}
-                  />
+                  <Tooltip contentStyle={chartTooltipStyle} />
                   <Area
                     type="monotone"
                     dataKey={metric.key}
@@ -332,11 +323,11 @@ function ProgressTrendChart({ clientId, rangeDays, metric }: ProgressTrendChartP
                     // # (path `d`) okuyarak çizginin GERÇEKTEN kesildiğini doğrular.  #
                     // ###############################################################
                     connectNulls={false}
-                    stroke={tokens.light.accent}
-                    fill={tokens.light.accent}
+                    stroke={chartColors.series1}
+                    fill={chartColors.series1}
                     fillOpacity={0.2}
                     strokeWidth={3}
-                    dot={{ r: 4, fill: tokens.light.accent }}
+                    dot={{ r: 4, fill: chartColors.series1 }}
                     activeDot={{ r: 6 }}
                   />
                 </AreaChart>

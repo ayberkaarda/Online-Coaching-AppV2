@@ -336,7 +336,7 @@ function CoachTargetEditor({ clientId }: { clientId: string }): JSX.Element {
         onClick={handleSave}
         disabled={setTargets.isPending}
         aria-busy={setTargets.isPending}
-        className="w-full rounded-control bg-accent py-2.5 text-sm font-bold text-accent-fg shadow-sm transition-transform active:scale-95 disabled:opacity-50 md:w-auto md:px-6"
+        className="w-full rounded-control bg-accent py-2.5 text-sm font-bold text-accent-fg transition-transform active:scale-[0.97] disabled:opacity-50 md:w-auto md:px-6"
       >
         Hedefi Kaydet
       </button>
@@ -628,7 +628,7 @@ function ClientMealSection({ clientId, logs, foodDB }: ClientMealSectionProps): 
         onClick={handleSubmit}
         disabled={createLog.isPending}
         aria-busy={createLog.isPending}
-        className="w-full rounded-control bg-accent py-2.5 text-sm font-bold text-accent-fg shadow-sm transition-transform active:scale-95 disabled:opacity-50"
+        className="w-full rounded-control bg-accent py-2.5 text-sm font-bold text-accent-fg transition-transform active:scale-[0.97] disabled:opacity-50"
       >
         Öğünü Ekle
       </button>
@@ -924,7 +924,7 @@ export default function NutritionTab({
       <form
         onSubmit={onGenerate}
         noValidate
-        className="mb-6 rounded-panel border border-accent/20 bg-surface p-5 shadow-inner"
+        className="mb-6 rounded-panel border border-accent/20 bg-surface p-5"
       >
         <h4 className="mb-4 flex items-center gap-2 text-sm font-bold text-accent">
           <Brain aria-hidden="true" className="h-4 w-4 shrink-0" /> OTOMATİK DİYET &amp; KALORİ
@@ -1058,7 +1058,7 @@ export default function NutritionTab({
                 type="submit"
                 disabled={isGenerating}
                 aria-busy={isGenerating}
-                className="flex flex-1 items-center justify-center gap-1.5 rounded-control bg-accent p-3 text-sm font-bold text-accent-fg shadow-md transition-all hover:bg-accent/90 disabled:opacity-50"
+                className="flex flex-1 items-center justify-center gap-1.5 rounded-control bg-accent p-3 text-sm font-bold text-accent-fg transition-all hover:bg-accent/90 disabled:opacity-50"
               >
                 {isGenerating ? (
                   'Hesaplanıyor...'
@@ -1075,7 +1075,7 @@ export default function NutritionTab({
       </form>
 
       {/* HIZLI BESİN EKLEME PANELİ (Oto-Tamamlama) */}
-      <div className="relative z-10 flex flex-col items-end gap-4 rounded-panel border border-border bg-canvas p-4 shadow-sm md:flex-row">
+      <div className="relative z-10 flex flex-col items-end gap-4 rounded-panel border border-border bg-canvas p-4 md:flex-row">
         <div className="w-full md:w-1/4">
           <label htmlFor="quick-add-day" className="mb-1 block text-[10px] font-bold text-fg-muted">
             GÜN SEÇ
@@ -1124,7 +1124,7 @@ export default function NutritionTab({
               id="quick-add-listbox"
               role="listbox"
               aria-label="Besin önerileri"
-              className="absolute left-0 top-full z-50 mt-1 w-full overflow-hidden rounded-control border border-border bg-surface shadow-xl"
+              className="absolute left-0 top-full z-50 mt-1 w-full overflow-hidden rounded-control border border-border bg-surface"
             >
               {suggestions.map((food, index) => (
                 <button
@@ -1168,7 +1168,7 @@ export default function NutritionTab({
         <button
           type="button"
           onClick={handleQuickAdd}
-          className="flex w-full items-center justify-center gap-1.5 whitespace-nowrap rounded-control bg-accent px-6 py-2.5 font-bold text-accent-fg shadow-md transition-transform active:scale-95 md:w-auto"
+          className="flex w-full items-center justify-center gap-1.5 whitespace-nowrap rounded-control bg-accent px-6 py-2.5 font-bold text-accent-fg transition-transform active:scale-[0.97] md:w-auto"
         >
           Hızlı Ekle
           <Zap aria-hidden="true" className="h-4 w-4 shrink-0" />
@@ -1238,7 +1238,7 @@ export default function NutritionTab({
         onClick={handleSaveProgram}
         disabled={savePlan.isPending}
         aria-busy={savePlan.isPending}
-        className="w-full rounded-control bg-success py-4 text-sm font-bold text-accent-fg shadow-md transition-transform hover:bg-success/90 active:scale-95 disabled:opacity-50"
+        className="w-full rounded-control bg-success py-4 text-sm font-bold text-accent-fg transition-transform hover:bg-success/90 active:scale-[0.97] disabled:opacity-50"
       >
         Beslenme Tablosunu Kaydet
       </button>

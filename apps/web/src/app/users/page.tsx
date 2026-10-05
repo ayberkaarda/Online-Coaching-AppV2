@@ -55,10 +55,10 @@ export default function UsersPage(): JSX.Element {
       <ThemeToggle />
 
       <header className="mb-12 mt-12 text-center md:mt-0">
-        <h1 className="bg-gradient-to-r from-accent to-purple-400 bg-clip-text text-3xl font-black tracking-tight text-transparent md:text-5xl">
+        <h1 className="font-display text-3xl font-bold tracking-tight text-fg md:text-5xl">
           Kullanıcı Yönetim Merkezi
         </h1>
-        <p className="mt-2 text-sm font-medium uppercase tracking-widest text-gray-500 md:text-base">
+        <p className="mt-2 text-sm font-medium text-fg-muted md:text-base">
           Danışan Analiz ve Program Editörü
         </p>
       </header>

@@ -31,19 +31,19 @@ export function ThemeToggle(): JSX.Element | null {
     <button
       type="button"
       onClick={() => setTheme(isDark ? 'light' : 'dark')}
-      className="group fixed bottom-6 right-6 z-50 flex items-center justify-center rounded-full border border-gray-200 bg-white p-4 shadow-2xl transition-all duration-300 hover:scale-110 dark:border-zinc-800 dark:bg-zinc-900"
+      className="group fixed bottom-6 right-6 z-50 flex items-center justify-center rounded-full border border-border bg-surface-raised p-4 shadow-raised transition-colors duration-fast ease-standard"
       title="Temayı Değiştir"
       aria-label={isDark ? 'Açık temaya geç' : 'Koyu temaya geç'}
     >
       {isDark ? (
         <Sun
           aria-hidden="true"
-          className="h-6 w-6 drop-shadow-md transition-colors duration-300 group-hover:text-yellow-400"
+          className="h-6 w-6 transition-colors duration-base group-hover:text-accent"
         />
       ) : (
         <Moon
           aria-hidden="true"
-          className="h-6 w-6 drop-shadow-md transition-colors duration-300 group-hover:text-accent"
+          className="h-6 w-6 transition-colors duration-base group-hover:text-accent"
         />
       )}
     </button>
