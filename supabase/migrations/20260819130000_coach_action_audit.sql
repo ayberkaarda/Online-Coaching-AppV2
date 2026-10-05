@@ -140,6 +140,7 @@ grant select, insert, update, delete on public.coach_actions to authenticated;
 --    ##########################################################################
 revoke truncate, references, trigger on public.coach_actions from authenticated;
 revoke all on public.coach_actions from anon;
+revoke all on public.coach_actions from service_role;
 
 
 -- #############################################################################
