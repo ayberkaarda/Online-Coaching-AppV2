@@ -1,5 +1,7 @@
 <p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="apps/web/public/brand/sarmal-logo-dark.svg"><img src="apps/web/public/brand/sarmal-logo.svg" width="216" alt="sarmal logo: a single-centre rising spiral beside the lowercase sarmal logotype"></picture></p>
 
+**English** | [Türkçe](README.tr.md)
+
 # Sarmal
 
 An online one-on-one fitness coaching platform: a coach manages clients' training, nutrition and progress data, and every AI-generated plan has to pass an explicit coach approval before it becomes a client's active program.
