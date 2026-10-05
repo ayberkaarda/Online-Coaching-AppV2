@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" color="#17150F" role="img" aria-label="Sarmal">
+  <g fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M8.7 12.1 C9.2 12.8 10.8 13.2 11.9 12.1 C12.9 11 13 8.7 11.4 7.3 C9.8 5.9 6.6 6 4.9 8.2 C3.2 10.4 3.5 14.4 6.3 16.4 C9.1 18.5 13.9 17.9 16.2 14.5" stroke="currentColor"/>
+    <path d="M16.2 14.5 L20.11 8.72" stroke="#C2410C"/>
+  </g>
+</svg>
