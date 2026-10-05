@@ -1,11 +1,13 @@
 // Yükleniyor / hata / boş durum görünümleri — web'deki QueryState + EmptyState ruhu.
 // Kimlikli (token'lı zemin, aktif fiil metin) ve erişilebilir (role/live region).
+// Boş durum illüstrasyonu sarmal sembolünün ince çizgili 48'lik sürümüdür (brand-proposal §5).
 
 import { ActivityIndicator, View } from 'react-native'
 
 import { useTheme } from '../../lib/theme'
 import { Button } from './Button'
 import { Card } from './Card'
+import { SarmalMark } from './SarmalMark'
 import { Body, Heading } from './Text'
 
 /** Tam ekran yükleniyor göstergesi (accent renkli). */
@@ -24,7 +26,7 @@ export function LoadingState({ label = 'Yükleniyor…' }: { label?: string }) {
 
 /** Hata kartı — danger tonlu, opsiyonel "Tekrar dene". */
 export function ErrorState({
-  message = 'Bir şeyler ters gitti. Lütfen tekrar deneyin.',
+  message = 'Veriler yüklenemedi. Bağlantını kontrol edip tekrar dene.',
   onRetry,
 }: {
   message?: string
@@ -68,7 +70,10 @@ export function EmptyState({
         paddingHorizontal: theme.spacing.xl,
       }}
     >
-      <Heading variant="displaySm">{title}</Heading>
+      <SarmalMark size={48} thin color="textSecondary" />
+      <Heading variant="displaySm" style={{ textAlign: 'center' }}>
+        {title}
+      </Heading>
       {description ? (
         <Body variant="bodySm" color="textSecondary" style={{ textAlign: 'center' }}>
           {description}

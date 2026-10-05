@@ -1,13 +1,12 @@
-import { Ionicons } from '@expo/vector-icons'
 import { useSupabaseClient } from '@repo/api-client/context'
 import { useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { View } from 'react-native'
 
-import { Body, Button, Card, Heading, Input, Screen } from '../components/ui'
+import { Body, Button, Card, Heading, Input, SarmalMark, Screen } from '../components/ui'
 import { useTheme } from '../lib/theme'
 
-// GERÇEK giriş ekranı (B-052 dilim 1). Faz 4.7: ADR-0015 kimliğiyle güzelleştirildi —
+// GERÇEK giriş ekranı (B-052 dilim 1). "Kor & Kemik" kimliği: sarmal sembolü + küçük harfli logotype —
 // marka başlığı + tanımlı kart + ikonlu girişler.
 //
 // NEDEN `useSignIn` (paket hook'u) DEĞİL, doğrudan `supabase.auth.signInWithPassword`:
@@ -56,30 +55,32 @@ export default function SignInScreen() {
 
   return (
     <Screen center scroll={false} edgeTop contentStyle={{ gap: 24 }}>
-      {/* Marka başlığı — accent işaret + ad. Halka DEĞİL (tek anlam kuralı). */}
+      {/* Marka başlığı — sarmal sembolü + küçük harfli logotype (brand-proposal §2).
+          Sembol logotype'ın solunda, aradaki boşluk sembol genişliğinin %35'i. */}
       <View style={{ alignItems: 'center', gap: 12 }}>
         <View
-          style={{
-            width: 56,
-            height: 56,
-            borderRadius: theme.radius.panel,
-            backgroundColor: theme.colors.accent,
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
+          accessible
+          accessibilityRole="header"
+          accessibilityLabel="Sarmal"
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 17 }}
         >
-          <Ionicons name="fitness" size={30} color={theme.colors.accentContrast} />
+          <SarmalMark size={48} />
+          <Heading
+            variant="displayXl"
+            style={{ letterSpacing: -0.78, fontFamily: theme.fontFamily.displayBold }}
+          >
+            sarmal
+          </Heading>
         </View>
-        <Heading variant="displayLg">Sarmal</Heading>
         <Body variant="bodyLg" color="textSecondary" style={{ textAlign: 'center' }}>
-          Danışan hesabınızla giriş yapın.
+          Danışan hesabınla giriş yap.
         </Body>
       </View>
 
       <Card variant="panel" style={{ width: '100%', gap: 16 }}>
         <Input
           label="E-POSTA"
-          leftIcon="mail-outline"
+          leftIcon="mail"
           placeholder="ornek@eposta.com"
           autoCapitalize="none"
           autoCorrect={false}
@@ -91,7 +92,7 @@ export default function SignInScreen() {
         />
         <Input
           label="ŞİFRE"
-          leftIcon="lock-closed-outline"
+          leftIcon="lock"
           placeholder="••••••••"
           secureTextEntry
           textContentType="password"

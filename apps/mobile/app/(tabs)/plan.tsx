@@ -1,4 +1,3 @@
-import { Ionicons } from '@expo/vector-icons'
 import { useWorkoutPlan } from '@repo/api-client'
 import { DAY_NAMES } from '@repo/types'
 import { useRouter } from 'expo-router'
@@ -11,6 +10,7 @@ import {
   Card,
   EmptyState,
   ErrorState,
+  Icon,
   LoadingState,
   Screen,
   SectionHeader,
@@ -19,7 +19,7 @@ import { useTheme } from '../../lib/theme'
 import { useCurrentUserId } from '../../lib/useCurrentUserId'
 
 // ANTRENMAN sekmesi (B-052 dilim 2 + Faz 4.7 zenginleştirme) — GERÇEK veri, salt okuma.
-// ADR-0015 kart listesi + bölüm başlığı ikonu. Veri/hook mantığı DEĞİŞMEDİ.
+// "Kor & Kemik" kart listesi + bölüm başlığı ikonu. Veri/hook mantığı DEĞİŞMEDİ.
 //
 // `useWorkoutPlan` aktif planı `workout_plans` + `workout_plan_exercises`'ten okuyup gün
 // bazında `Record<gün, string>` şekline geri üretir (paketteki `rowsToWorkoutPlan`). Web ile
@@ -68,11 +68,11 @@ export default function PlanScreen() {
 
   return (
     <Screen>
-      <SectionHeader icon="barbell" title={`ANTRENMAN PROGRAMI · ${days.length} GÜN`} />
+      <SectionHeader icon="dumbbell" title={`ANTRENMAN PROGRAMI · ${days.length} GÜN`} />
       {days.map((day) => (
         <Card key={day}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <Ionicons name="calendar-outline" size={16} color={theme.colors.accent} />
+            <Icon name="calendar" size={16} color={theme.colors.accent} />
             <Badge label={day} tone="accent" />
           </View>
           <Body variant="body">{plan.data[day].trim()}</Body>

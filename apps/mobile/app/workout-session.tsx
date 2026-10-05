@@ -1,4 +1,3 @@
-import { Ionicons } from '@expo/vector-icons'
 import {
   rowsToSessionExercises,
   useWorkoutPlanExercises,
@@ -21,6 +20,7 @@ import {
   Card,
   EmptyState,
   ErrorState,
+  Icon,
   Input,
   Label,
   LoadingState,
@@ -279,7 +279,7 @@ export default function WorkoutSessionScreen() {
             },
           ]}
         >
-          <Ionicons name="cloud-upload-outline" size={16} color={theme.colors.accent} />
+          <Icon name="cloud-upload" size={16} color={theme.colors.accent} />
           <Body variant="bodySm" color="textSecondary">
             Senkron bekliyor ({pendingSyncCount}) · şimdi dene
           </Body>
@@ -288,7 +288,7 @@ export default function WorkoutSessionScreen() {
 
       {activeSessionId === null ? (
         <>
-          <SectionHeader icon="barbell-outline" title="OTURUM BAŞLAT" />
+          <SectionHeader icon="dumbbell" title="OTURUM BAŞLAT" />
           {plan.isLoading ? (
             <LoadingState label="Plan yükleniyor" />
           ) : plan.isError ? (
@@ -318,7 +318,7 @@ export default function WorkoutSessionScreen() {
         </>
       ) : (
         <>
-          <SectionHeader icon="play-circle" title="AKTİF OTURUM" />
+          <SectionHeader icon="circle-play" title="AKTİF OTURUM" />
           <Card style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <Badge label={sessionSource === 'program' ? 'Program' : 'Serbest'} tone="accent" />
             <Body variant="bodySm" color="textSecondary">
@@ -326,7 +326,7 @@ export default function WorkoutSessionScreen() {
             </Body>
           </Card>
 
-          <SectionHeader icon="list-outline" title="EGZERSİZ" />
+          <SectionHeader icon="list" title="EGZERSİZ" />
           {sessionSource === 'program' && todaysExercises.length > 0 ? (
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
               {todaysExercises.map((exercise) => (
@@ -361,10 +361,10 @@ export default function WorkoutSessionScreen() {
 
           {selectedExercise ? (
             <>
-              <SectionHeader icon="add-circle" title={`SET EKLE · ${selectedExercise.name}`} />
+              <SectionHeader icon="circle-plus" title={`SET EKLE · ${selectedExercise.name}`} />
               <Card variant="panel">
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <Ionicons name="layers-outline" size={16} color={theme.colors.accent} />
+                  <Icon name="layers" size={16} color={theme.colors.accent} />
                   <Mono variant="monoSm" color="textSecondary">
                     SET #{nextSetNumber}
                   </Mono>
@@ -441,7 +441,7 @@ export default function WorkoutSessionScreen() {
 
           {loggedSets.length > 0 ? (
             <>
-              <SectionHeader icon="checkmark-done-outline" title="GİRİLEN SETLER" />
+              <SectionHeader icon="check-check" title="GİRİLEN SETLER" />
               <Card style={{ gap: 0, paddingVertical: 4 }}>
                 {loggedSets.map((entry, index) => (
                   <View
@@ -477,7 +477,7 @@ export default function WorkoutSessionScreen() {
             </>
           ) : null}
 
-          <SectionHeader icon="flag-outline" title="OTURUMU BİTİR" />
+          <SectionHeader icon="flag" title="OTURUMU BİTİR" />
           <Card>
             <Input
               label="ALGILANAN ZORLUK (1-10, OPSİYONEL)"

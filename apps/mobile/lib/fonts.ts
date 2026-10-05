@@ -1,21 +1,23 @@
-// Yüklenecek font varlıkları (ADR-0015 tipografisi). Anahtarlar `lib/theme.ts`
-// `fontFamily` değerleriyle BİREBİR aynıdır — `useFonts` bu anahtarlarla kaydeder,
-// bileşenler aynı anahtarı `fontFamily` olarak kullanır. Yalnız ADR-0015'in izin
-// verdiği ağırlıklar yüklenir (Archivo 600/700, Hanken 400/500/600, Plex Mono 500).
+// Yüklenecek font varlıkları ("Kor & Kemik" tipografisi, brand-proposal §4). Anahtarlar
+// `lib/theme.ts` `fontFamily` değerleriyle BİREBİR aynıdır — `useFonts` bu anahtarlarla
+// kaydeder, bileşenler aynı anahtarı `fontFamily` olarak kullanır. Yalnız kararın izin
+// verdiği ağırlıklar yüklenir: Bricolage 600/700, Instrument Sans 400/500/600, JetBrains Mono 500.
+//
+// Ağırlık başına ALT YOL import edilir (`/600SemiBold`): paket kökünden import, metro'nun
+// paketteki TÜM ağırlıkların ttf'sini (≈30 dosya) bundle'a koymasına yol açıyordu (ÖLÇÜLDÜ).
 
-import { Archivo_600SemiBold, Archivo_700Bold } from '@expo-google-fonts/archivo'
-import {
-  HankenGrotesk_400Regular,
-  HankenGrotesk_500Medium,
-  HankenGrotesk_600SemiBold,
-} from '@expo-google-fonts/hanken-grotesk'
-import { IBMPlexMono_500Medium } from '@expo-google-fonts/ibm-plex-mono'
+import { BricolageGrotesque_600SemiBold } from '@expo-google-fonts/bricolage-grotesque/600SemiBold'
+import { BricolageGrotesque_700Bold } from '@expo-google-fonts/bricolage-grotesque/700Bold'
+import { InstrumentSans_400Regular } from '@expo-google-fonts/instrument-sans/400Regular'
+import { InstrumentSans_500Medium } from '@expo-google-fonts/instrument-sans/500Medium'
+import { InstrumentSans_600SemiBold } from '@expo-google-fonts/instrument-sans/600SemiBold'
+import { JetBrainsMono_500Medium } from '@expo-google-fonts/jetbrains-mono/500Medium'
 
 export const fontAssets = {
-  Archivo_600SemiBold,
-  Archivo_700Bold,
-  HankenGrotesk_400Regular,
-  HankenGrotesk_500Medium,
-  HankenGrotesk_600SemiBold,
-  IBMPlexMono_500Medium,
+  BricolageGrotesque_600SemiBold,
+  BricolageGrotesque_700Bold,
+  InstrumentSans_400Regular,
+  InstrumentSans_500Medium,
+  InstrumentSans_600SemiBold,
+  JetBrainsMono_500Medium,
 } as const

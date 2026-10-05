@@ -95,7 +95,7 @@ export function CoachActivityPanel({ clientId }: { clientId: string }) {
 
       {eventRows.length > 0 ? (
         <View style={{ gap: theme.spacing.sm }}>
-          <SectionHeader icon="pulse-outline" title="OLAY DÖKÜMÜ" />
+          <SectionHeader icon="activity" title="OLAY DÖKÜMÜ" />
           <Card>
             {eventRows.map(([key, count], index) => (
               <View
@@ -120,7 +120,7 @@ export function CoachActivityPanel({ clientId }: { clientId: string }) {
       ) : null}
 
       <View style={{ gap: theme.spacing.sm }}>
-        <SectionHeader icon="calendar-outline" title="GÜNLÜK" />
+        <SectionHeader icon="calendar" title="GÜNLÜK" />
         <Card>
           {days.map((day, index) => (
             <View

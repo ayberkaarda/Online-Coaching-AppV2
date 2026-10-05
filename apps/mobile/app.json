@@ -6,21 +6,46 @@
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "scheme": "mycoaching",
+    "icon": "./assets/icons/icon.png",
+    "backgroundColor": "#F5F2EC",
+    "primaryColor": "#B63D0B",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.mycoachingapp.mobile"
+      "bundleIdentifier": "com.mycoachingapp.mobile",
+      "icon": "./assets/icons/icon.png"
     },
     "android": {
-      "package": "com.mycoachingapp.mobile"
+      "package": "com.mycoachingapp.mobile",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/icons/adaptive-foreground.png",
+        "monochromeImage": "./assets/icons/adaptive-monochrome.png",
+        "backgroundColor": "#B63D0B"
+      }
     },
     "web": {
       "bundler": "metro",
-      "output": "static"
+      "output": "static",
+      "favicon": "./assets/icons/favicon.png",
+      "themeColor": "#F5F2EC",
+      "backgroundColor": "#F5F2EC"
     },
     "plugins": [
       "expo-router",
       "expo-font",
-      "expo-sqlite"
+      "expo-sqlite",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/icons/splash.png",
+          "imageWidth": 120,
+          "resizeMode": "contain",
+          "backgroundColor": "#F5F2EC",
+          "dark": {
+            "image": "./assets/icons/splash-dark.png",
+            "backgroundColor": "#121110"
+          }
+        }
+      ]
     ]
   }
 }

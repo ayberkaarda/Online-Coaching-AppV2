@@ -5,7 +5,6 @@ import {
   useSendMessage,
 } from '@repo/api-client'
 import type { Message } from '@repo/types'
-import { Ionicons } from '@expo/vector-icons'
 import { useEffect, useRef, useState } from 'react'
 import {
   FlatList,
@@ -18,7 +17,7 @@ import {
 } from 'react-native'
 
 import { useTheme, type Theme } from '../../lib/theme'
-import { Body, EmptyState, ErrorState, Input, LoadingState } from '../ui'
+import { Body, EmptyState, ErrorState, Icon, Input, LoadingState } from '../ui'
 
 // KOÇ MESAJ THREAD'İ (ADR-0028 yetenek 2) — koç <-> seçili danışan birebir sohbet. Danışan
 // `(tabs)/chat.tsx` YENİDEN KULLANILMAZ (o danışan-yüzü); AYNI paylaşılan hook'lar ama koç yüzü:
@@ -196,7 +195,7 @@ export function CoachMessageThread({
                 draft.trim().length === 0 || sendMessage.isPending ? 0.45 : pressed ? 0.85 : 1,
             })}
           >
-            <Ionicons name="send" size={20} color={theme.colors.accentContrast} />
+            <Icon name="send" size={20} color={theme.colors.accentContrast} />
           </Pressable>
         </View>
       </View>

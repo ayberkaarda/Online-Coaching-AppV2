@@ -1,6 +1,5 @@
 import { useLastCheckins, usePendingFormChecks, useProfiles, useSignOut } from '@repo/api-client'
 import type { ProfileWithAvatar } from '@repo/api-client'
-import { Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
 import { Image, Pressable, ScrollView, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -12,6 +11,7 @@ import {
   EmptyState,
   ErrorState,
   Heading,
+  Icon,
   IconButton,
   Label,
   LoadingState,
@@ -119,7 +119,7 @@ function ClientRow({
             </Body>
           </View>
           {pendingCount > 0 ? <Badge label={`${pendingCount} bekliyor`} tone="warning" /> : null}
-          <Ionicons name="chevron-forward" size={18} color={theme.colors.textSecondary} />
+          <Icon name="chevron-right" size={18} color={theme.colors.textSecondary} />
         </View>
       </Card>
     </Pressable>
@@ -162,7 +162,7 @@ export default function CoachDashboard() {
           <Heading variant="displayMd">Koç paneli</Heading>
         </View>
         <IconButton
-          name="log-out-outline"
+          name="log-out"
           onPress={() => signOut.mutate()}
           accessibilityLabel="Hesaptan çıkış yap"
         />
@@ -191,7 +191,7 @@ export default function CoachDashboard() {
                 justifyContent: 'center',
               }}
             >
-              <Ionicons name="clipboard-outline" size={22} color={theme.colors.accent} />
+              <Icon name="clipboard-list" size={22} color={theme.colors.accent} />
             </View>
             <View style={{ flex: 1, gap: 2 }}>
               <Body variant="bodyMedium">Bekleyen form-check</Body>
@@ -207,7 +207,7 @@ export default function CoachDashboard() {
           </View>
         </Card>
 
-        <SectionHeader icon="people-outline" title="DANIŞANLAR" />
+        <SectionHeader icon="users" title="DANIŞANLAR" />
 
         {profiles.isLoading ? (
           <LoadingState label="Danışanlar yükleniyor" />

@@ -194,7 +194,7 @@ export default function NutritionScreen() {
       )}
 
       {/* Bugünün öğün listesi */}
-      <SectionHeader icon="restaurant" title="BUGÜNÜN ÖĞÜNLERİ" />
+      <SectionHeader icon="utensils" title="BUGÜNÜN ÖĞÜNLERİ" />
       {logs.isLoading ? (
         <LoadingState label="Öğünler yükleniyor" />
       ) : logs.isError ? (
@@ -215,7 +215,7 @@ export default function NutritionScreen() {
                 </Body>
               </View>
               <IconButton
-                name="trash-outline"
+                name="trash-2"
                 color="danger"
                 size={20}
                 onPress={() => handleDeleteMeal(log.id)}
@@ -227,7 +227,7 @@ export default function NutritionScreen() {
       )}
 
       {/* Öğün ekle formu */}
-      <SectionHeader icon="add-circle" title="ÖĞÜN EKLE" />
+      <SectionHeader icon="circle-plus" title="ÖĞÜN EKLE" />
       <Card variant="panel">
         <Input
           label="AÇIKLAMA"

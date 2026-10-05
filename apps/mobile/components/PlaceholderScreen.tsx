@@ -1,18 +1,17 @@
-import { Ionicons } from '@expo/vector-icons'
 import type { ReactNode } from 'react'
 import { View } from 'react-native'
 
 import { useTheme } from '../lib/theme'
-import { Body, Heading, Screen } from './ui'
+import { Body, Heading, Icon, Screen } from './ui'
 import type { IconName } from './ui'
 
 // Kapı/placeholder ekranlarının ortak kabuğu (coach-web, mfa-web, boş sekmeler).
-// Faz 4.7: ADR-0015 kimliğiyle sade ama markalı — accent ikon işareti + ortalanmış
+// "Kor & Kemik" kimliğiyle sade ama markalı — accent ikon işareti + ortalanmış
 // başlık + açıklama. İkon işlevseldir (ekranın konusunu anlatır), dekoratif daire değil.
 export function PlaceholderScreen({
   title,
   description,
-  icon = 'sparkles-outline',
+  icon = 'sparkles',
   children,
 }: {
   title: string
@@ -35,7 +34,7 @@ export function PlaceholderScreen({
           justifyContent: 'center',
         }}
       >
-        <Ionicons name={icon} size={30} color={theme.colors.accent} />
+        <Icon name={icon} size={30} color={theme.colors.accent} />
       </View>
       <Heading variant="displayMd" style={{ textAlign: 'center' }}>
         {title}

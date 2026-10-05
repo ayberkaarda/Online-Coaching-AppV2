@@ -6,7 +6,7 @@
 //
 // KRİTİK KISIT (ADR-0017): dolgu her zaman state kaynaklı gerçek değerdir — hiçbir pulse/loop/
 // kutlama animasyonu YOK. Tek istisna (Motion Doktrini): sürekli halkada (segmentsiz) mount'ta
-// mevcut değere TEK SEFERLİK bir çizim geçişi oynar (boştan gerçek değere, `slow` + decelerate);
+// mevcut değere TEK SEFERLİK bir çizim geçişi oynar (boştan gerçek değere, `reward` + decelerate);
 // bu geçiş halkanın döngü anlamına giden yoldur, sonraki veri güncellemeleri ANINDA (animasyonsuz)
 // yansır — halka asla eski/yanlış bir değerde donmaz. Hareket azaltma açıkken çizim atlanır,
 // halka doğrudan gerçek değerde açılır. Segmentli halka (haftalık seri) sabit kalır: ayrık
@@ -18,7 +18,7 @@ import { StyleSheet, View } from 'react-native'
 import Svg, { Circle, G } from 'react-native-svg'
 import Animated, { useAnimatedProps, useSharedValue, withTiming } from 'react-native-reanimated'
 
-import { duration, easing } from '../../lib/motion'
+import { duration, easing, haptic } from '../../lib/motion'
 import { useTheme } from '../../lib/theme'
 import { motionDuration, useReducedMotion } from '../../lib/useReducedMotion'
 
@@ -39,7 +39,7 @@ interface ProgressRingProps {
   valueText?: string
   /** Segment sayısı (7 = haftalık döngü). Yoksa sürekli halka. */
   segments?: number
-  /** Döngü kapandığında Kapanış yeşiline döner (ADR-0017 kutlama). */
+  /** Döngü kapandığında success rengine döner (etiketle birlikte; renk tek sinyal değildir). */
   celebrating?: boolean
   size?: number
   strokeWidth?: number
@@ -78,13 +78,21 @@ export function ProgressRing({
     const target = circumference * (1 - progress)
     if (!hasDrawn.current) {
       hasDrawn.current = true
-      const d = motionDuration(duration.slow, reducedMotion)
+      const d = motionDuration(duration.reward, reducedMotion)
       dashOffset.value =
         d === 0 ? target : withTiming(target, { duration: d, easing: easing.decelerate })
     } else {
       dashOffset.value = target
     }
   }, [circumference, progress, segments, reducedMotion, dashOffset])
+
+  // Halka dolduğu AN (önceki değer <1 → şimdi 1) Success haptik (brand-proposal §6).
+  // Mount'ta zaten dolu açılan halka titreşmez; haptik azaltılmış harekette de kalır.
+  const prevProgress = useRef(progress)
+  useEffect(() => {
+    if (prevProgress.current < 1 && progress >= 1) haptic.success()
+    prevProgress.current = progress
+  }, [progress])
 
   const animatedDashProps = useAnimatedProps(() => ({
     strokeDashoffset: dashOffset.value,

@@ -1,4 +1,3 @@
-import { Ionicons } from '@expo/vector-icons'
 import { summarizeMetric, useProfile, useProgressTrend, useWorkoutPlan } from '@repo/api-client'
 import { DAY_NAMES } from '@repo/types'
 import { useRouter } from 'expo-router'
@@ -12,6 +11,7 @@ import {
   Card,
   ErrorState,
   Heading,
+  Icon,
   IconButton,
   LoadingState,
   Mono,
@@ -100,7 +100,7 @@ export default function DashboardScreen() {
           </Body>
         </View>
         <IconButton
-          name="settings-outline"
+          name="settings"
           onPress={() => setSettingsOpen(true)}
           accessibilityLabel="Ayarlar menüsünü aç"
         />
@@ -108,7 +108,7 @@ export default function DashboardScreen() {
 
       {/* HERO — haftalık döngü halkası (ADR-0017 #1) */}
       <Card variant="panel" style={{ alignItems: 'center', gap: 12, paddingVertical: 24 }}>
-        <SectionHeader icon="sync" title="HAFTALIK DÖNGÜ" />
+        <SectionHeader icon="repeat" title="HAFTALIK DÖNGÜ" />
         <ProgressRing
           value={weekProgress}
           max={WEEK_LENGTH}
@@ -126,7 +126,7 @@ export default function DashboardScreen() {
 
       {/* Bugünkü antrenman — mevcut plan verisinden bugünün günü */}
       <View style={{ gap: 8 }}>
-        <SectionHeader icon="barbell" title="BUGÜNKÜ ANTRENMAN" />
+        <SectionHeader icon="dumbbell" title="BUGÜNKÜ ANTRENMAN" />
         <Card>
           {plan.isLoading ? (
             <Body variant="bodySm" color="textSecondary">
@@ -147,12 +147,12 @@ export default function DashboardScreen() {
                 <Body variant="bodySm" color="accent">
                   Planın tamamı
                 </Body>
-                <Ionicons name="chevron-forward" size={14} color={theme.colors.accent} />
+                <Icon name="chevron-right" size={14} color={theme.colors.accent} />
               </Pressable>
             </>
           ) : (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              <Ionicons name="bed-outline" size={22} color={theme.colors.textSecondary} />
+              <Icon name="bed" size={22} color={theme.colors.textSecondary} />
               <View style={{ flex: 1 }}>
                 <Body variant="bodyMedium">Bugün dinlenme</Body>
                 <Body variant="bodySm" color="textSecondary">
@@ -166,7 +166,7 @@ export default function DashboardScreen() {
 
       {/* Son kilo ölçümü */}
       <View style={{ gap: 8 }}>
-        <SectionHeader icon="scale" title="SON KİLO ÖLÇÜMÜ" />
+        <SectionHeader icon="weight" title="SON KİLO ÖLÇÜMÜ" />
         <Card>
           {weight?.last ? (
             <View
@@ -211,7 +211,7 @@ export default function DashboardScreen() {
               justifyContent: 'center',
             }}
           >
-            <Ionicons name="add" size={24} color={theme.colors.accentContrast} />
+            <Icon name="plus" size={24} color={theme.colors.accentContrast} />
           </View>
           <View style={{ flex: 1 }}>
             <Body variant="bodyMedium">Kilo ekle</Body>
@@ -219,7 +219,7 @@ export default function DashboardScreen() {
               Bugünün ölçümünü gir
             </Body>
           </View>
-          <Ionicons name="chevron-forward" size={18} color={theme.colors.textSecondary} />
+          <Icon name="chevron-right" size={18} color={theme.colors.textSecondary} />
         </Card>
       </Pressable>
 

@@ -1,60 +1,25 @@
-// Mobil tasarım token'ları — web'in görsel kimliğinin ("Demir & Tebeşir", ADR-0015)
-// React Native karşılığı. Renkler apps/web/src/design/tokens.ts ile BİREBİR aynı altı
-// adlandırılmış hex ve türevleridir; token ADLARI da korunur (bg/surface/accent/…) ki
-// koç paneli mobile geldiğinde (B-065) aynı sözlük kullanılabilsin.
-//
-// Neden web tokens.ts doğrudan import edilmiyor: kapsam sınırı apps/web'e dokunmayı
-// yasaklar ve metro/tsconfig cross-app çözümü kurulmadı. Değerler burada yeniden
-// bildirilir; tek kaynak yine ADR-0015'tir (değişirse iki yerde güncellenir).
+// Mobil tasarım token'ları — "Kor & Kemik" kimliğinin (.orchestra/brand-proposal.md)
+// React Native karşılığı. Renkler `lib/palette.ts`'te (saf modül, web tokens.ts ile
+// eşitliği palette-parity.test.mts doğrular); burada radius, boşluk, tipografi, gölge
+// ve aktif temayı seçen `useTheme` bulunur. Token ADLARI web sözleşmesiyle aynıdır.
 
-import { useColorScheme } from 'react-native'
+import { Platform, useColorScheme, type ViewStyle } from 'react-native'
 
-// ── Palet (ADR-0015 — altı adlandırılmış hex + türevler) ───────────────────
-export const palette = {
-  light: {
-    bg: '#F4F4F1',
-    surface: '#FAFAF8',
-    surfaceRaised: '#FFFFFF',
-    border: '#C7C8C6',
-    textPrimary: '#14161B',
-    textSecondary: '#626466',
-    accent: '#5B48D9',
-    accentContrast: '#F4F4F1',
-    success: '#0F7A4C',
-    warning: '#A65600',
-    danger: '#C22F2F',
-    focusRing: '#5B48D9',
-  },
-  dark: {
-    bg: '#14161B',
-    surface: '#24262A',
-    surfaceRaised: '#313337',
-    border: '#414246',
-    textPrimary: '#F4F4F1',
-    textSecondary: '#A6A6A6',
-    accent: '#A79BFF',
-    accentContrast: '#14161B',
-    success: '#00B869',
-    warning: '#F78000',
-    danger: '#F97878',
-    focusRing: '#A79BFF',
-  },
-} as const
+import { palette, type Colors, type ThemeName } from './palette'
 
-export type ThemeName = keyof typeof palette
-export type ColorToken = keyof (typeof palette)['light']
-/** Aktif temanın renk sözlüğü — token adı → hex. light/dark ikisi de bu şekle uyar. */
-export type Colors = Record<ColorToken, string>
+export { palette, type ColorToken, type Colors, type ThemeName } from './palette'
 
-// ── Köşe yarıçapı (ADR-0017: daire yalnız halkadır; kart/panel köşesi 8/12/16) ─
+// ── Köşe yarıçapı (§5: adlar korunur, değerler değişir; badge için sm) ──────
 export const radius = {
-  control: 8,
-  card: 12,
-  panel: 16,
+  sm: 6,
+  control: 10,
+  card: 16,
+  panel: 24,
   pill: 999,
 } as const
 
-// ── Boşluk ölçeği (4'ün katları) ───────────────────────────────────────────
+// ── Boşluk ölçeği (§5: 4px ızgara — 4·8·12·16·24·32·48) ─────────────────────
+// `xl` (20) mevcut ekran/kart düzenini korumak için tutulur; 4'ün katıdır.
 export const spacing = {
   xs: 4,
   sm: 8,
@@ -63,36 +28,59 @@ export const spacing = {
   xl: 20,
   xxl: 24,
   xxxl: 32,
+  huge: 48,
 } as const
 
-// ── Tipografi (ADR-0015): display=Archivo, gövde=Hanken Grotesk, veri=IBM Plex Mono.
-// RN'de ağırlık font AİLE ADINA gömülüdür (numeric fontWeight custom font ile güvenilmez),
-// bu yüzden her ağırlık ayrı family key'idir; _layout.tsx bu key'lerle yükler.
+// ── Tipografi (§4): display=Bricolage Grotesque, metin=Instrument Sans, veri=JetBrains Mono.
+// RN'de ağırlık font AİLE ADINA gömülüdür; her ağırlık ayrı family key'idir ve
+// `lib/fonts.ts` anahtarlarıyla BİREBİR eşleşir.
 export const fontFamily = {
-  displaySemibold: 'Archivo_600SemiBold',
-  displayBold: 'Archivo_700Bold',
-  bodyRegular: 'HankenGrotesk_400Regular',
-  bodyMedium: 'HankenGrotesk_500Medium',
-  bodySemibold: 'HankenGrotesk_600SemiBold',
-  mono: 'IBMPlexMono_500Medium',
+  displaySemibold: 'BricolageGrotesque_600SemiBold',
+  displayBold: 'BricolageGrotesque_700Bold',
+  bodyRegular: 'InstrumentSans_400Regular',
+  bodyMedium: 'InstrumentSans_500Medium',
+  bodySemibold: 'InstrumentSans_600SemiBold',
+  mono: 'JetBrainsMono_500Medium',
 } as const
 
-// Adlandırılmış metin stilleri — bileşenler boyut/satır yüksekliğini burada tek yerden alır.
+// Ölçek 1.25: 12 · 14 · 16 (gövde) · 20 · 25 · 31 · 39 · 49. Satır yüksekliği gövdede
+// 1.5, başlıkta 1.15. Etiket 12px, +%6 harf aralığı (0.72), büyük harf (tr-TR).
 export const typography = {
-  displayLg: { fontFamily: fontFamily.displayBold, fontSize: 28, lineHeight: 34 },
-  displayMd: { fontFamily: fontFamily.displaySemibold, fontSize: 22, lineHeight: 28 },
-  displaySm: { fontFamily: fontFamily.displaySemibold, fontSize: 18, lineHeight: 24 },
+  displayXl: { fontFamily: fontFamily.displayBold, fontSize: 39, lineHeight: 45 },
+  displayLg: { fontFamily: fontFamily.displayBold, fontSize: 31, lineHeight: 36 },
+  displayMd: { fontFamily: fontFamily.displaySemibold, fontSize: 25, lineHeight: 29 },
+  displaySm: { fontFamily: fontFamily.displaySemibold, fontSize: 20, lineHeight: 23 },
   bodyLg: { fontFamily: fontFamily.bodyRegular, fontSize: 16, lineHeight: 24 },
-  body: { fontFamily: fontFamily.bodyRegular, fontSize: 15, lineHeight: 22 },
-  bodyMedium: { fontFamily: fontFamily.bodyMedium, fontSize: 15, lineHeight: 22 },
-  bodySm: { fontFamily: fontFamily.bodyRegular, fontSize: 13, lineHeight: 18 },
-  label: { fontFamily: fontFamily.bodySemibold, fontSize: 12, lineHeight: 16, letterSpacing: 0.4 },
-  monoLg: { fontFamily: fontFamily.mono, fontSize: 24, lineHeight: 28 },
+  body: { fontFamily: fontFamily.bodyRegular, fontSize: 16, lineHeight: 24 },
+  bodyMedium: { fontFamily: fontFamily.bodyMedium, fontSize: 16, lineHeight: 24 },
+  bodySm: { fontFamily: fontFamily.bodyRegular, fontSize: 14, lineHeight: 21 },
+  label: { fontFamily: fontFamily.bodySemibold, fontSize: 12, lineHeight: 16, letterSpacing: 0.72 },
+  monoXl: { fontFamily: fontFamily.mono, fontSize: 49, lineHeight: 56 },
+  monoLg: { fontFamily: fontFamily.mono, fontSize: 25, lineHeight: 29 },
   monoMd: { fontFamily: fontFamily.mono, fontSize: 16, lineHeight: 20 },
-  monoSm: { fontFamily: fontFamily.mono, fontSize: 13, lineHeight: 16 },
+  monoSm: { fontFamily: fontFamily.mono, fontSize: 14, lineHeight: 18 },
 } as const
 
 export type TypographyVariant = keyof typeof typography
+
+/** ≥31px display/sayaç metninde Dynamic Type tavanı (§4). Gövde/UI'da tavan yok. */
+export const DISPLAY_SCALE_THRESHOLD = 31
+export const DISPLAY_MAX_FONT_SCALE = 1.5
+
+// ── Gölge (§5): açık temada tek kademe "raised"; koyu temada gölge yok (yükselme
+// daha açık yüzey kademesiyle verilir). Kart gölgesizdir (1px border).
+function raisedShadow(name: ThemeName): ViewStyle {
+  if (name === 'dark') return {}
+  return Platform.select<ViewStyle>({
+    android: { elevation: 4 },
+    default: {
+      shadowColor: '#17150F',
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.08,
+      shadowRadius: 12,
+    },
+  })
+}
 
 export interface Theme {
   name: ThemeName
@@ -101,11 +89,12 @@ export interface Theme {
   spacing: typeof spacing
   typography: typeof typography
   fontFamily: typeof fontFamily
+  shadow: { raised: ViewStyle }
 }
 
 /**
- * Aktif temayı `useColorScheme` üzerinden seçer (app.json `userInterfaceStyle: automatic`).
- * `null`/`undefined` (okunamadı) → açık tema; ADR-0015 kanonik referansı açık temadır.
+ * Aktif temayı `useColorScheme` üzerinden seçer (app.json `userInterfaceStyle: automatic`,
+ * tema sistem tercihini izler). `null`/`undefined` → açık tema (kanonik referans).
  */
 export function useTheme(): Theme {
   const scheme = useColorScheme()
@@ -117,5 +106,6 @@ export function useTheme(): Theme {
     spacing,
     typography,
     fontFamily,
+    shadow: { raised: raisedShadow(name) },
   }
 }

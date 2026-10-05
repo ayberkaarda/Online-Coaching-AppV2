@@ -10,7 +10,7 @@ export default function CoachNoMfaScreen() {
     <PlaceholderScreen
       title="Önce iki adımlı doğrulama"
       description="Acil-erişim paneli için hesabınızda iki adımlı doğrulama kurulu olmalı. Kurulum (QR kod) yalnızca web uygulamasındadır; kurduktan sonra buradan kodla giriş yapabilirsiniz."
-      icon="shield-outline"
+      icon="shield"
     >
       <SignOutButton />
     </PlaceholderScreen>

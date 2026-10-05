@@ -1,4 +1,3 @@
-import { Ionicons } from '@expo/vector-icons'
 import {
   useMesocycles,
   useWorkoutLogs,
@@ -18,6 +17,7 @@ import {
   EmptyState,
   ErrorState,
   Heading,
+  Icon,
   LoadingState,
   Mono,
   Screen,
@@ -136,7 +136,7 @@ export default function PeriodizationScreen() {
     <Screen>
       <Stack.Screen options={{ title: 'Periyodizasyon' }} />
 
-      <SectionHeader icon="layers-outline" title="MEZOSİKLÜLER" />
+      <SectionHeader icon="layers" title="MEZOSİKLÜLER" />
       {mesocycles.isLoading ? (
         <LoadingState label="Mezosiklüler yükleniyor" />
       ) : mesocycles.isError ? (
@@ -161,7 +161,7 @@ export default function PeriodizationScreen() {
         ))
       )}
 
-      <SectionHeader icon="calendar-outline" title="HAFTALIK PLAN" />
+      <SectionHeader icon="calendar" title="HAFTALIK PLAN" />
       {plan.isLoading ? (
         <LoadingState label="Haftalık plan yükleniyor" />
       ) : plan.isError ? (
@@ -175,7 +175,7 @@ export default function PeriodizationScreen() {
         planDays.map((day) => (
           <Card key={day}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <Ionicons name="calendar-outline" size={16} color={theme.colors.accent} />
+              <Icon name="calendar" size={16} color={theme.colors.accent} />
               <Badge label={day} tone="accent" />
             </View>
             {(byDay[day] ?? []).map((row) => {
@@ -208,7 +208,7 @@ export default function PeriodizationScreen() {
 
       {exerciseLabels.length > 0 ? (
         <>
-          <SectionHeader icon="stats-chart" title="EGZERSİZ REKORLARI · TAHMİNİ 1RM" />
+          <SectionHeader icon="trophy" title="EGZERSİZ REKORLARI · TAHMİNİ 1RM" />
           <Card style={{ gap: 0, paddingVertical: 4 }}>
             {exerciseLabels.map((label, index) => {
               const value = e1rmByExercise.get(label)

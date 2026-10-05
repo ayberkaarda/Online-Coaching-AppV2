@@ -1,13 +1,12 @@
-// Metin girişi — token'lı kenarlık/zemin, odakta accent kenarlık. sign-in ve progress
-// ekranları bunu paylaşır. Etiket + hata metni erişilebilir biçimde bağlanır. Opsiyonel
-// sol ikon (mail/kilit vb.) doku katar.
+// Metin girişi — surfaceSunken zemin + borderControl kenarlık (≥3:1, brand-proposal §3),
+// odakta accent (focusRing) kenarlık. Etiket + hata metni erişilebilir biçimde bağlanır.
+// Opsiyonel sol Lucide ikon (mail/kilit vb.).
 
-import { Ionicons } from '@expo/vector-icons'
 import { useState } from 'react'
 import { TextInput, View, type TextInputProps, type ViewStyle } from 'react-native'
 
 import { fontFamily, useTheme } from '../../lib/theme'
-import type { IconName } from './IconButton'
+import { Icon, type IconName } from './Icon'
 import { Body, Label } from './Text'
 
 interface InputProps extends TextInputProps {
@@ -35,8 +34,8 @@ export function Input({
   const borderColor = error
     ? theme.colors.danger
     : focused
-      ? theme.colors.accent
-      : theme.colors.border
+      ? theme.colors.focusRing
+      : theme.colors.borderControl
 
   return (
     <View style={[{ gap: theme.spacing.xs }, containerStyle]}>
@@ -45,20 +44,22 @@ export function Input({
         style={{
           flexDirection: 'row',
           alignItems: 'center',
-          borderWidth: 1,
+          borderWidth: focused || error ? 2 : 1,
+          // Kalınlık değişince içerik kaymasın diye yatay dolgu telafi edilir.
+          paddingHorizontal: focused || error ? 13 : 14,
           borderColor,
           borderRadius: theme.radius.control,
-          backgroundColor: theme.colors.surfaceRaised,
-          paddingHorizontal: 14,
+          backgroundColor: theme.colors.surfaceSunken,
         }}
       >
         {leftIcon ? (
-          <Ionicons
-            name={leftIcon}
-            size={18}
-            color={focused ? theme.colors.accent : theme.colors.textSecondary}
-            style={{ marginRight: 10 }}
-          />
+          <View style={{ marginRight: 10 }}>
+            <Icon
+              name={leftIcon}
+              size={18}
+              color={focused ? theme.colors.accent : theme.colors.textSecondary}
+            />
+          </View>
         ) : null}
         <TextInput
           placeholderTextColor={theme.colors.textSecondary}

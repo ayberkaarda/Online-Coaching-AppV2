@@ -137,7 +137,7 @@ export function CoachFormCheckReview({ clientId }: { clientId: string }) {
 
   return (
     <View style={{ gap: theme.spacing.lg }}>
-      <SectionHeader icon="clipboard-outline" title={`BEKLEYEN (${items.length})`} />
+      <SectionHeader icon="clipboard-list" title={`BEKLEYEN (${items.length})`} />
       {items.map((formCheck) => (
         <FormCheckReviewCard
           key={formCheck.id}

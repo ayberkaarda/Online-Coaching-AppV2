@@ -26,7 +26,7 @@ import { useTheme } from '../../lib/theme'
 import { useCurrentUserId } from '../../lib/useCurrentUserId'
 
 // İLERLEME sekmesi (B-052 dilim 3 + Faz 4.7 zenginleştirme) — tek YAZMA yolu: günün kilosu.
-// ADR-0015 kimliği; sayılar IBM Plex Mono; bölüm başlığı ikonları. Doğrulama/mutation/hook
+// "Kor & Kemik" kimliği; sayılar JetBrains Mono; bölüm başlığı ikonları. Doğrulama/mutation/hook
 // mantığı DEĞİŞMEDİ.
 //
 // Web'deki `StatsTab`'in mantığı paket üzerinden mobilde tüketilir: `validateProgressEntry`
@@ -77,7 +77,7 @@ export default function ProgressScreen() {
 
   return (
     <Screen>
-      <SectionHeader icon="scale" title="GÜNLÜK KİLO KAYDI" />
+      <SectionHeader icon="weight" title="GÜNLÜK KİLO KAYDI" />
       <Card variant="panel">
         <Input
           label="BUGÜNÜN KİLOSU (KG)"
@@ -99,7 +99,7 @@ export default function ProgressScreen() {
       </Card>
 
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-        <SectionHeader icon="trending-up" title="SON 30 GÜN" />
+        <SectionHeader icon="activity" title="SON 30 GÜN" />
         {hasDelta ? (
           <Badge
             label={`${delta > 0 ? '+' : ''}${delta.toFixed(1)} kg · ${summary?.count} ölçüm`}

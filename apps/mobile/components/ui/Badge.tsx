@@ -1,13 +1,13 @@
-// Rozet/Pill — küçük durum etiketi (seri, tarih, uyarı). Ton token'dan gelir; zemin
-// rengin düşük opaklıklı hâli, metin tam renk. Daire DEĞİL (ADR-0017: daire yalnız halka) —
-// pill köşesi kullanılır ama form belirgin biçimde yatay kapsül, tam çember değil.
+// Rozet — küçük durum etiketi (seri, tarih, uyarı). Ton token'dan gelir; metin tam renk,
+// zemin sunken yüzey. Köşe `radius.sm` (6, brand-proposal §5). Durum rengi tek sinyal
+// değildir: etiket metni her zaman anlamı taşır.
 
 import { View, type ViewStyle } from 'react-native'
 
 import { useTheme, type ColorToken } from '../../lib/theme'
 import { Body } from './Text'
 
-type Tone = 'neutral' | 'accent' | 'success' | 'warning' | 'danger'
+type Tone = 'neutral' | 'accent' | 'success' | 'warning' | 'danger' | 'info'
 
 const TONE_COLOR: Record<Tone, ColorToken> = {
   neutral: 'textSecondary',
@@ -15,6 +15,7 @@ const TONE_COLOR: Record<Tone, ColorToken> = {
   success: 'success',
   warning: 'warning',
   danger: 'danger',
+  info: 'info',
 }
 
 interface BadgeProps {
@@ -31,12 +32,12 @@ export function Badge({ label, tone = 'neutral', style }: BadgeProps) {
       style={[
         {
           alignSelf: 'flex-start',
-          backgroundColor: theme.colors.surface,
+          backgroundColor: theme.colors.surfaceSunken,
           borderColor: theme.colors.border,
           borderWidth: 1,
-          borderRadius: theme.radius.pill,
-          paddingHorizontal: 12,
-          paddingVertical: 5,
+          borderRadius: theme.radius.sm,
+          paddingHorizontal: 8,
+          paddingVertical: 3,
         },
         style,
       ]}

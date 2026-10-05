@@ -1,13 +1,12 @@
 // İkon düğmesi — başlık/eylem ikonları (ayar dişlisi vb.). Dokunma hedefi ≥44px.
-// Renk token'dan; basılıyken hafif opaklık. Ionicons @expo/vector-icons'tan gelir
-// (Expo ile uyumlu, ADR-0016 lucide kararı web'e özgü; mobilde Ionicons tercih edilir).
+// Renk token'dan; basılıyken hafif opaklık. İkonlar Lucide (brand-proposal §5, web ile aynı aile).
 
-import { Ionicons } from '@expo/vector-icons'
 import { Pressable, type ViewStyle } from 'react-native'
 
 import { useTheme, type ColorToken } from '../../lib/theme'
+import { Icon, type IconName } from './Icon'
 
-export type IconName = keyof typeof Ionicons.glyphMap
+export type { IconName } from './Icon'
 
 interface IconButtonProps {
   name: IconName
@@ -23,7 +22,7 @@ export function IconButton({
   onPress,
   accessibilityLabel,
   color = 'textPrimary',
-  size = 24,
+  size = 22,
   style,
 }: IconButtonProps) {
   const theme = useTheme()
@@ -45,7 +44,7 @@ export function IconButton({
         style,
       ]}
     >
-      <Ionicons name={name} size={size} color={theme.colors[color]} />
+      <Icon name={name} size={size} color={theme.colors[color]} />
     </Pressable>
   )
 }

@@ -1,5 +1,4 @@
 import { usePendingFormChecks, useProfile } from '@repo/api-client'
-import { Ionicons } from '@expo/vector-icons'
 import { Stack, useLocalSearchParams } from 'expo-router'
 import { useState } from 'react'
 import { Pressable, ScrollView, View } from 'react-native'
@@ -7,7 +6,7 @@ import { Pressable, ScrollView, View } from 'react-native'
 import { CoachActivityPanel } from '../../../components/coach/CoachActivityPanel'
 import { CoachFormCheckReview } from '../../../components/coach/CoachFormCheckReview'
 import { CoachMessageThread } from '../../../components/coach/CoachMessageThread'
-import { Body, ErrorState, LoadingState } from '../../../components/ui'
+import { Body, ErrorState, Icon, LoadingState } from '../../../components/ui'
 import type { IconName } from '../../../components/ui'
 import { useTheme, type Theme } from '../../../lib/theme'
 import { useCurrentUserId } from '../../../lib/useCurrentUserId'
@@ -23,9 +22,9 @@ import { useCurrentUserId } from '../../../lib/useCurrentUserId'
 type Section = 'activity' | 'chat' | 'formcheck'
 
 const SEGMENTS: { key: Section; label: string; icon: IconName }[] = [
-  { key: 'activity', label: 'Aktivite', icon: 'pulse-outline' },
-  { key: 'chat', label: 'Mesaj', icon: 'chatbubble-ellipses-outline' },
-  { key: 'formcheck', label: 'Form-check', icon: 'clipboard-outline' },
+  { key: 'activity', label: 'Aktivite', icon: 'activity' },
+  { key: 'chat', label: 'Mesaj', icon: 'message-circle' },
+  { key: 'formcheck', label: 'Form-check', icon: 'clipboard-list' },
 ]
 
 function SegmentButton({
@@ -59,7 +58,7 @@ function SegmentButton({
         opacity: pressed ? 0.8 : 1,
       })}
     >
-      <Ionicons
+      <Icon
         name={segment.icon}
         size={16}
         color={active ? theme.colors.accentContrast : theme.colors.textSecondary}

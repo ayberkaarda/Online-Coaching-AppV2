@@ -7,7 +7,6 @@
 // kararı) — var olan ekler (web'den gönderilmiş) `useMessageAttachmentUrl` ile SATIR İÇİ
 // görüntülenir, yükleme UI'ı eklenmedi.
 
-import { Ionicons } from '@expo/vector-icons'
 import {
   useCoachId,
   useMarkConversationRead,
@@ -32,6 +31,7 @@ import {
   Body,
   EmptyState,
   ErrorState,
+  Icon,
   Input,
   LoadingState,
   SectionHeader,
@@ -188,7 +188,7 @@ export default function ChatScreen() {
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
       <View style={{ flex: 1, padding: theme.spacing.xl, gap: theme.spacing.md }}>
-        <SectionHeader icon="chatbubble-ellipses" title="KOÇ İLE SOHBET" />
+        <SectionHeader icon="message-circle" title="KOÇ İLE SOHBET" />
 
         <View style={{ flex: 1 }}>
           {messages.isLoading ? (
@@ -244,7 +244,7 @@ export default function ChatScreen() {
                 draft.trim().length === 0 || sendMessage.isPending ? 0.45 : pressed ? 0.85 : 1,
             })}
           >
-            <Ionicons name="send" size={20} color={theme.colors.accentContrast} />
+            <Icon name="send" size={20} color={theme.colors.accentContrast} />
           </Pressable>
         </View>
       </View>

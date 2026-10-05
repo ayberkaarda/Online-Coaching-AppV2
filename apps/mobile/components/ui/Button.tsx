@@ -1,11 +1,12 @@
-// Buton — accent zemin + control köşe (8px). Web'in birincil buton deseninin RN karşılığı.
+// Buton — Kor (accent) zemin + control köşe (10px). Web'in birincil buton deseninin RN karşılığı.
+// Bir ekranda en fazla 1 dolu kor öğe (brand-proposal §3) — ikincil eylemler `secondary`/`ghost`.
 // Dokunma hedefi ≥44px (minHeight 48). Durumlar: pending (spinner), disabled (soluk), basılı
-// (reanimated ile scale 0.97 + hafif opaklık, `fast` süre — Motion Doktrini). Gradyan/gölge YOK.
+// (scale 0.97 + Light haptik, `fast` süre — §6; azaltılmış harekette ölçek atlanır, haptik kalır).
 
 import { ActivityIndicator, Pressable, StyleSheet, type ViewStyle } from 'react-native'
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated'
 
-import { duration, easing } from '../../lib/motion'
+import { duration, easing, haptic, PRESS_SCALE } from '../../lib/motion'
 import { useTheme, type Colors } from '../../lib/theme'
 import { motionDuration, useReducedMotion } from '../../lib/useReducedMotion'
 import { Body } from './Text'
@@ -32,7 +33,7 @@ function surfaceFor(
     case 'danger':
       return { bg: colors.danger, border: colors.danger, fg: 'accentContrast' }
     case 'secondary':
-      return { bg: colors.surface, border: colors.border, fg: 'textPrimary' }
+      return { bg: colors.surface, border: colors.borderControl, fg: 'textPrimary' }
     case 'ghost':
       return { bg: 'transparent', border: 'transparent', fg: 'accent' }
   }
@@ -52,11 +53,11 @@ export function Button({
   const skin = surfaceFor(variant, theme.colors)
   const reducedMotion = useReducedMotion()
 
-  // 0 = dinlenme, 1 = basılı. Ölçek 1 → 0.97, opaklık 1 → 0.85 (hafif) buradan türer.
+  // 0 = dinlenme, 1 = basılı. Ölçek 1 → PRESS_SCALE, opaklık 1 → 0.85 (hafif) buradan türer.
   const pressProgress = useSharedValue(0)
 
   const pressedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: 1 - pressProgress.value * 0.03 }],
+    transform: [{ scale: 1 - pressProgress.value * (1 - PRESS_SCALE) }],
     opacity: 1 - pressProgress.value * 0.15,
   }))
 
@@ -68,7 +69,10 @@ export function Button({
   return (
     <Pressable
       onPress={onPress}
-      onPressIn={() => setPressed(true)}
+      onPressIn={() => {
+        haptic.light()
+        setPressed(true)
+      }}
       onPressOut={() => setPressed(false)}
       disabled={isDisabled}
       accessibilityRole="button"

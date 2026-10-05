@@ -1,10 +1,9 @@
 import { isValidTotpCode, normalizeTotpCode, useMfaStatus, useVerifyTotp } from '@repo/api-client'
-import { Ionicons } from '@expo/vector-icons'
 import { useState } from 'react'
 import { View } from 'react-native'
 
 import { SignOutButton } from '../components/SignOutButton'
-import { Body, Button, Card, Heading, Input, LoadingState, Screen } from '../components/ui'
+import { Body, Button, Card, Heading, Icon, Input, LoadingState, Screen } from '../components/ui'
 import { useTheme } from '../lib/theme'
 
 // STEP-UP EKRANI (B-065 / ADR-0028) — aal1→aal2 SEVİYE YÜKSELTME.
@@ -72,7 +71,7 @@ export default function StepUpScreen() {
           alignSelf: 'center',
         }}
       >
-        <Ionicons name="shield-checkmark-outline" size={30} color={theme.colors.accent} />
+        <Icon name="shield-check" size={30} color={theme.colors.accent} />
       </View>
 
       <View style={{ gap: theme.spacing.xs }}>
@@ -87,7 +86,7 @@ export default function StepUpScreen() {
       <Card variant="panel" style={{ gap: theme.spacing.md }}>
         <Input
           label="Doğrulama kodu"
-          leftIcon="keypad-outline"
+          leftIcon="key-round"
           mono
           value={code}
           onChangeText={(text) => setCode(normalizeTotpCode(text))}
@@ -122,12 +121,7 @@ export default function StepUpScreen() {
           padding: theme.spacing.md,
         }}
       >
-        <Ionicons
-          name="information-circle-outline"
-          size={18}
-          color={theme.colors.warning}
-          style={{ marginTop: 1 }}
-        />
+        <Icon name="info" size={18} color={theme.colors.warning} style={{ marginTop: 1 }} />
         <Body variant="bodySm" color="textSecondary" style={{ flex: 1 }}>
           Doğrulama, diğer cihazlardaki oturumlarınızı sonlandırır.
         </Body>

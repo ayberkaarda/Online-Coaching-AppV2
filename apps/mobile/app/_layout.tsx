@@ -12,7 +12,7 @@ import { AppProviders } from '../lib/providers'
 import { fontFamily, useTheme } from '../lib/theme'
 
 // Kök yerleşim: önce paylaşılan sağlayıcılar (Supabase/Notifier/Query enjeksiyonu),
-// sonra OTURUM + ROL + MFA kapısı. Faz 4.7+: ADR-0015 fontları + tema.
+// sonra OTURUM + ROL + MFA kapısı. "Kor & Kemik" fontları + tema.
 //
 // KAPI — ADR-0028 (B-052'nin "mobil = yalnız danışan" kararı TERSİNE ÇEVRİLDİ):
 //   * oturum yok             -> giriş ekranı
@@ -30,7 +30,7 @@ import { fontFamily, useTheme } from '../lib/theme'
 // uygun ekrana otomatik geçer — elle `router.replace` gerekmez. Durumlar birbirini dışlar,
 // bu yüzden aynı anda YALNIZCA bir guard `true`'dur.
 
-// ADR-0015 tipografisi yüklenene kadar açılış ekranı görünür kalsın — fontsuz ilk boyama
+// Marka tipografisi yüklenene kadar açılış ekranı görünür kalsın — fontsuz ilk boyama
 // (sistem fontuyla "flaş") engellenir.
 void SplashScreen.preventAutoHideAsync()
 

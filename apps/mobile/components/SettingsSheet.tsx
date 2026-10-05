@@ -90,6 +90,7 @@ export function SettingsSheet({ visible, onClose, userName }: SettingsSheetProps
                 paddingBottom: insets.bottom + theme.spacing.xl,
                 gap: theme.spacing.lg,
               },
+              theme.shadow.raised,
               panelStyle,
             ]}
           >
@@ -101,7 +102,7 @@ export function SettingsSheet({ visible, onClose, userName }: SettingsSheetProps
               }}
             >
               <Heading variant="displaySm">Ayarlar</Heading>
-              <IconButton name="close" onPress={onClose} accessibilityLabel="Menüyü kapat" />
+              <IconButton name="x" onPress={onClose} accessibilityLabel="Menüyü kapat" />
             </View>
 
             {userName ? (
@@ -124,6 +125,7 @@ export function SettingsSheet({ visible, onClose, userName }: SettingsSheetProps
 const styles = StyleSheet.create({
   backdrop: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(0,0,0,0.45)',
+    // Gece (#121110) tabanlı sıcak karartma — saf siyah yok (brand-proposal §3).
+    backgroundColor: 'rgba(18,17,16,0.45)',
   },
 })
