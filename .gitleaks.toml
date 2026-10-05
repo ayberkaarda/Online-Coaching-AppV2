@@ -1,0 +1,41 @@
+# gitleaks yapılandırması — `gitleaks detect --source .` bu dosyayı kaynak kökünde
+# otomatik bulur (ci.yml'deki PR / push / haftalık tam geçmiş adımları --config vermez).
+# Varsayılan kural seti AYNEN korunur; yalnızca doğrulanmış, gerçek sır OLMAYAN
+# değerler dar allowlist'lerle susturulur.
+
+title = "my-coaching-appv2 gitleaks config"
+
+[extend]
+useDefault = true
+
+# Supabase CLI'nin yerel geliştirme yığını için herkese açık, sabit "demo" JWT'leri
+# (`supabase start` çıktısı; iss = "supabase-demo"). Yalnız 127.0.0.1:54321'deki yerel
+# yığında geçerlidir, hosted projelerde hiçbir anlamı yoktur. Regex, payload'un
+# `{"iss":"supabase-demo"` ile başladığını şart koşar — gerçek (hosted) Supabase
+# anahtarlarında iss = "supabase" olduğundan onlar hâlâ yakalanır.
+[[allowlists]]
+description = "Supabase yerel demo JWT'leri (iss=supabase-demo)"
+targetRules = ["jwt"]
+regexTarget = "secret"
+regexes = [
+  '''^eyJ[A-Za-z0-9_-]+\.eyJpc3MiOiJzdXBhYmFzZS1kZW1v[A-Za-z0-9_-]*\.[A-Za-z0-9_-]+$''',
+]
+
+# Test/CI yer tutucu değerleri: birim test stub'ları, NODE_ENV=test istemci env'i ve
+# E2E job'unun ai_backend'i hiç ayağa kaldırmadığı CI-yerel anahtar. Hepsi küçük harfli,
+# tire ile ayrılmış okunur kelimeler. Koşul AND: hem dosya listede olmalı hem değer bu
+# biçimde olmalı — aynı dosyalara gerçek, rastgele görünümlü bir anahtar girerse yakalanır.
+[[allowlists]]
+description = "Test ve CI yer tutucu anahtarları (generic-api-key)"
+targetRules = ["generic-api-key"]
+condition = "AND"
+regexTarget = "secret"
+paths = [
+  '''^src/env\.ts$''',
+  '''^tests/unit/env-hosted-guard\.test\.ts$''',
+  '''^tests/unit/logger-redact\.test\.ts$''',
+  '''^\.github/workflows/ci\.yml$''',
+]
+regexes = [
+  '''^[a-z0-9]+(-[a-z0-9]+)+$''',
+]
