@@ -353,7 +353,7 @@ $$;
 comment on function public.backfill_form_check_weight_to_progress()
   is 'form_checks.current_weight -> progress_entries.weight_kg veri taşıması. Yerel gün Europe/Istanbul; aynı günde EN YENİ form check kazanır; var olan satır EZİLMEZ (yalnızca weight_kg NULL ise dolar). IDEMPOTENTTİR: ikinci koşu 0 satır üretir. SECURITY INVOKER — tüm çağıranları (postgres/service_role) zaten RLS''i baypas eder, DEFINER sıfır kazanç karşılığı yeni bir yetkilendirme yüzeyi olurdu.';
 
-revoke all     on function public.backfill_form_check_weight_to_progress() from public;
+revoke all     on function public.backfill_form_check_weight_to_progress() from public, anon, authenticated;
 grant  execute on function public.backfill_form_check_weight_to_progress() to service_role;
 
 
