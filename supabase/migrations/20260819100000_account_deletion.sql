@@ -170,6 +170,7 @@ grant select, insert, update, delete on public.account_deletions to authenticate
 --  bir gün `supabase_admin` ile yeniden yaratılsa bile delik kalmasın.)
 revoke truncate, references, trigger on public.account_deletions from authenticated;
 revoke all on public.account_deletions from anon;
+revoke all on public.account_deletions from service_role;
 
 
 -- #############################################################################
