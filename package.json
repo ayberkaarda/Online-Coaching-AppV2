@@ -44,6 +44,9 @@
       "esbuild",
       "unrs-resolver"
     ],
+    "overrides": {
+      "next@<16.3.6": "16.3.8"
+    },
     "packageExtensions": {
       "eslint-config-next": {
         "peerDependencies": {
