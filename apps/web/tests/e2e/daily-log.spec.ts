@@ -39,7 +39,7 @@ test.describe('Günlük Veriler', () => {
       // Seed verisinde aynı makro değerlerini paylaşan geçmiş kartlar olabileceğinden
       // (bkz. tests/e2e/daily-log.spec.ts strict-mode hatası), assertion'ları sayfa
       // genelinde değil yalnızca bu en yeni karta kapsayarak yapıyoruz.
-      const logCards = page.locator('div.rounded-3xl.border.bg-gray-50', {
+      const logCards = page.locator('div.rounded-card.border.bg-surface-sunken', {
         has: page.locator('[role="img"]'),
       })
       const latestCard = logCards.first()
